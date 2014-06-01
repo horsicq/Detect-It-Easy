@@ -7,36 +7,35 @@ function detect(bShowType,bShowVersion,bShowOptions)
 {
     if(PE.compareOverlay("'wextract'",16))
     {
-	// The version is probably for what's being installed, not what's doing
-	// the installing; it does seem, though, the raw product version is for
-	// the installer itself.  Take a punt, anyway.
-	var nOffset=PE.getOverlayOffset();
-	nOffset=PE.findSignature(nOffset-0xE00,0xE00,"BD04EFFE00000100");
-	if(nOffset!=-1)
-	{
-	    nOffset+=16;
-	    sVersion=PE.readWord(nOffset+2)+"."+PE.readWord(nOffset)+"."
-		    +PE.readWord(nOffset+6)+"."+PE.readWord(nOffset+4);
-	}
-	bDetected=1;
+        // The version is probably for what's being installed, not what's doing
+        // the installing; it does seem, though, the raw product version is for
+        // the installer itself.  Take a punt, anyway.
+        var nOffset=PE.getOverlayOffset();
+        nOffset=PE.findSignature(nOffset-0xE00,0xE00,"BD04EFFE00000100");
+        if(nOffset!=-1)
+        {
+            nOffset+=16;
+            sVersion=PE.readWord(nOffset+2)+"."+PE.readWord(nOffset)+"."
+                    +PE.readWord(nOffset+6)+"."+PE.readWord(nOffset+4);
+        }
+        bDetected=1;
     }
     else if(PE.getManifest().match(/sfxcab/))
     {
-	// There's two version resources, locate the second.
-	var nRsrc=PE.getSectionNumber(".rsrc");
-	if(nRsrc!=-1)
-	{
-	    var nVirtSize=PE.getSectionVirtualSize(nRsrc);
-	    var nOffset=PE.getSectionFileOffset(nRsrc)+nVirtSize;
-	    nOffset=PE.findSignature(nOffset-0x600,0x600,"BD04EFFE00000100");
-	    if(nOffset!=-1)
-	    {
-		nOffset+=8;
-		sVersion=PE.readWord(nOffset+2)+"."+PE.readWord(nOffset)+"."
-			+PE.readWord(nOffset+6)+"."+PE.readWord(nOffset+4);
-		bDetected=1;
-	    }
-	}
+        // There's two version resources, locate the second.
+        if(PE.section[".rsrc"])
+        {
+            var nVirtSize=PE.section[".rsrc"].VirtualSize;
+            var nOffset=PE.section[".rsrc"].FileOffset+nVirtSize;
+            nOffset=PE.findSignature(nOffset-0x600,0x600,"BD04EFFE00000100");
+            if(nOffset!=-1)
+            {
+                nOffset+=8;
+                sVersion=PE.readWord(nOffset+2)+"."+PE.readWord(nOffset)+"."
+                        +PE.readWord(nOffset+6)+"."+PE.readWord(nOffset+4);
+            }
+        }
+        bDetected=1;
     }
 
     return result(bShowType,bShowVersion,bShowOptions);
