@@ -1,0 +1,44 @@
+// DIE's signature file
+
+init("compiler","Visual Basic");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(PE.isNET())
+    {
+        if(PE.isNETStringPresent("Microsoft.VisualBasic"))
+        {
+            sName="VB.NET";
+            bDetected=1;
+        }
+    }
+    else
+    {
+        if(PE.isLibraryPresent("MSVBVM50.DLL"))
+        {
+            sVersion="5.0";
+            bDetected=1;
+        }
+        else if(PE.isLibraryPresent("MSVBVM60.DLL"))
+        {
+            sVersion="6.0";
+            bDetected=1;
+        }
+        if(bDetected&&bShowOptions&&PE.compareEP("68"))
+        {
+            // get VB options
+            var nOffset=PE.RVAToOffset(PE.getAddressOfEntryPoint()+1);
+            var nDword=PE.readDword(nOffset);
+            nOffset=PE.VAToOffset(nDword);
+            if(PE.compare("'VB5!'",nOffset))
+            {
+                nDword=PE.readDword(nOffset+0x30);
+                nOffset=PE.VAToOffset(nDword);
+                nDword=PE.readDword(nOffset+0x20);
+                sOptions=(nDword==0)?"P-Code":"Native";
+            }
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

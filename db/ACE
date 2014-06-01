@@ -1,0 +1,56 @@
+// Detect an ACE archive.
+// Author: Jason Hood <jadoxa@yahoo.com.au>
+/*
+   Only tested with 2.04.
+*/
+
+includeScript("archive");
+sName="ACE";
+
+function detect_ACE(bFile,bShowOptions)
+{
+    var nOffset,nSize;
+    if(bFile)
+    {
+        nOffset=0;
+        nSize=File.getSize();
+    }
+    else
+    {
+        nOffset=File.getOverlayOffset();
+        nSize=File.getOverlaySize();
+    }
+    if(nSize>48)
+    {
+        if(File.compare("'**ACE**'",nOffset+7))
+        {
+            bDetected=1;
+            sVersion="2";
+            if(File.readByte(nOffset+6)&0x80)
+            {
+                sOptions="solid";
+            }
+            if(File.compare("'UNREGISTERED'",nOffset+32))
+            {
+                sOptions=sOptions.append("unregistered");
+            }
+            if(bShowOptions)
+            {
+                // Not sure about this...
+                var nOffset=File.findSignature(nOffset+0x20,128,"000101");
+                if(nOffset!=-1)
+                {
+                    nOffset-=3;
+                    while(nOffset<File.getSize())
+                    {
+                        var nPacked=File.readDword(nOffset+7);
+                        Archive.add(File.readDword(nOffset+11),nPacked,
+                                    File.readByte(nOffset+19)&16);
+                        nOffset+=0x23+File.readWord(nOffset+0x21)+nPacked;
+                    }
+                    sOptions=sOptions.append(Archive.contents());
+                }
+            }
+        }
+    }
+}

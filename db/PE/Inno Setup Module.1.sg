@@ -1,0 +1,52 @@
+// DIE's signature file
+
+init("installer","Inno Setup Module");
+
+function getVersion(nSection)
+{
+    var nOffset=PE.getSectionFileOffset(nSection);
+    var nSize=PE.getSectionFileSize(nSection);
+    if(nSize<0x2000)
+    {
+        var nInno=PE.findString(nOffset,nSize,"Inno Setup Setup Data");
+        if(nInno!=-1)
+        {
+            var sRawVersion=PE.getString(nInno+23);
+            sVersion=sRawVersion.substring(0,sRawVersion.indexOf(')'));
+            sOptions=sRawVersion.match(/\(u\)/)?"unicode":"";
+            return 1;
+        }
+        else
+        {
+            nInno=PE.findSignature(nOffset,nSize,"'i1.'............'32'1A");
+            if(nInno!=-1)
+            {
+                sVersion=PE.getString(nInno+1).replace(/-.*/,"");
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(PE.compareOverlay("'zlb'1A")||PE.compareOverlay("'idska32'1A"))
+    {
+        var nSection=PE.getSectionNumber("DATA");
+        if(nSection==-1)
+        {
+            nSection=PE.getSectionNumber(".data");
+        }
+        if(nSection!=-1)
+        {
+            if(getVersion(nSection))
+            {
+                bDetected=1;
+            }
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

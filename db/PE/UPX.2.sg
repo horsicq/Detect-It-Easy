@@ -1,0 +1,73 @@
+// DIE's signature file
+// History:
+// 1:00 06.10.2013 x64 support (ajax)
+//      2014-05-25 rewritten (adoxa)
+
+init("packer","UPX");
+
+function getUPXVersion()
+{
+    var nOffset=PE.findString(0,1024,"$Id: UPX ");
+    if(nOffset==-1)
+    {
+        nOffset=PE.findString(0,1024,"UPX!");
+        if(nOffset==-1)
+        {
+            return;
+        }
+        var nOption=PE.readByte(nOffset+7);
+        if(nOption==10)
+        {
+            if(PE.readByte(nOffset+6)==8)
+            {
+                sOptions="best";
+            }
+            else
+            {
+                sOptions="brute";
+            }
+        }
+        else
+        {
+            sOptions=nOption;
+        }
+        nOffset-=5;
+    }
+    else
+    {
+        nOffset+=9;
+    }
+    sVersion=PE.getString(nOffset,4);
+}
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(!PE.isPEPlus())
+    {
+        var nEP=PE.compareEP("807C")?27:0;
+        if(PE.compareEP("60BE........8DBE........57",nEP))
+        {
+            bDetected=1;
+        }
+    }
+    else
+    {
+        var nEP=PE.compareEP("4889")?24:0;
+        if(PE.compareEP("53565755488D35........488DBE........57",nEP))
+        {
+            bDetected=1;
+        }
+    }
+
+    getUPXVersion();
+    if(sVersion!="")
+    {
+        bDetected=1;
+    }
+    else if(bDetected)
+    {
+        sOptions="modified";
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

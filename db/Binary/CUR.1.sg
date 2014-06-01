@@ -1,0 +1,55 @@
+// DIE's signature file
+// Author: Jason Hood <jadoxa@yahoo.com.au>
+
+init("image","Windows Cursor");
+
+includeScript("CurIcoBPP");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(Binary.getSize()>=40)
+    {
+        if(Binary.compare("00000200"))
+        {
+            // Find the biggest, assuming square.
+            var nCount=Binary.readWord(4);
+            var nWidth=0,nHeight=0,nBPP=0;
+            var nHotX, nHotY;
+            for(var i=0;i<nCount;i++)
+            {
+                var w=Binary.readByte(6+i*16);
+                if(w>nWidth)
+                {
+                    nWidth=w;
+                    nHeight=Binary.readByte(7+i*16);
+                    nBPP=getCurIcoBPP(6+i*16);
+                    nHotX=Binary.readShort(10+i*16);
+                    nHotY=Binary.readShort(12+i*16);
+                }
+                else if(w==nWidth)
+                {
+                    var b=getCurIcoBPP(6+i*16);
+                    if(b>nBPP)
+                    {
+                        nBPP=b;
+                        nHotX=Binary.readShort(10+i*16);
+                        nHotY=Binary.readShort(12+i*16);
+                    }
+                }
+            }
+            sOptions=nWidth+"x"+nHeight;
+            if(nBPP!=0)
+            {
+                sOptions=sOptions.append(nBPP+"bpp");
+            }
+            sOptions=sOptions.append("("+nHotX+","+nHotY+")");
+            if(nCount>1)
+            {
+                sOptions=sOptions.append(nCount+" cursors");
+            }
+            bDetected=1;
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

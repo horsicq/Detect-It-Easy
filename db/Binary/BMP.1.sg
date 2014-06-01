@@ -1,0 +1,44 @@
+// DIE's signature file
+// Author: Jason Hood <jadoxa@yahoo.com.au>
+
+init("image","Windows Bitmap");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(Binary.getSize()>=40)
+    {
+        if(Binary.compare("'BM'"))
+        {
+            if(Binary.getSize()>=Binary.readDword(2))
+            {
+                switch(Binary.readDword(14))
+                {
+                case  40: sVersion="3"; break;
+                case 108: sVersion="4"; break;
+                case 124: sVersion="5"; break;
+                }
+                if(sVersion!="")
+                {
+                    switch(Binary.readDword(0x1e))
+                    {
+                    case /*BI_RLE8*/1:
+                    case /*BI_RLE4*/2: sOptions="RLE";  break;
+                    case /*BI_JPEG*/4: sOptions="JPEG"; break;
+                    case /*BI_PNG*/ 5: sOptions="PNG";  break;
+                    }
+                    nHeight=~~Binary.readDword(0x16);
+                    if(nHeight<0)
+                    {
+                        nHeight=-nHeight;
+                        sOptions=sOptions.append("top-down");
+                    }
+                    sOptions=sOptions.append(Binary.readDword(0x12)+"x"+nHeight,
+                                             Binary.readWord(0x1c)+"bpp");
+                }
+                bDetected=1;
+            }
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}
