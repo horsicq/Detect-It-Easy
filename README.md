@@ -44,3 +44,4 @@ which lie in the corresponding folder. Currently the program defines the followi
 
 • Binary all other files
 
+You could download DIE here: http://ntinfo.biz/index.php/detect-it-easy
