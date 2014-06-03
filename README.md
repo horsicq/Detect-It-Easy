@@ -33,9 +33,14 @@ First, DIE determines the type of file, and then sequentially loads all the sign
 which lie in the corresponding folder. Currently the program defines the following types:
 
 • MSDOS executable files MS-DOS
+
 • PE executable files Windows
+
 • ELF executable files Linux
+
 • MACH executable files Mac OS
+
 • Text files
+
 • Binary all other files
 
