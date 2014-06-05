@@ -5,24 +5,46 @@ init("compiler","Borland C/C++");
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
-    if(MSDOS.compareEP("BA....2E8916....B430CD218B2E02008B1E2C008EDA"))
+    var nOffset=0;
+    if(MSDOS.compareEP("FB"))
     {
-        var nDataSeg=MSDOS.readWord(MSDOS.getEntryPointOffset(1));
-        var nOffset=MSDOS.findString(MSDOS.AddressToOffset(nDataSeg),64,
-                                     "Borland C++ - Copyright ");
-        if(nOffset!=-1)
+        nOffset=1;
+    }
+    if(MSDOS.compareEP("BA....2E8916....B430CD218B2E02008B1E2C008EDA",nOffset))
+    {
+        var nDataSeg=MSDOS.readWord(MSDOS.getEntryPointOffset(nOffset+1));
+        nOffset=MSDOS.AddressToOffset(nDataSeg);
+    }
+    else if(MSDOS.compareEP("8CCA2E8916....B430CD218B2E02008B1E2C008EDAA3"))
+    {
+        var nDataOfs=MSDOS.readWord(MSDOS.getEntryPointOffset(22));
+        nOffset=MSDOS.AddressToOffset(0,nDataOfs-120);
+    }
+    nOffset=MSDOS.findString(nOffset,64," - Copyright ");
+    if(nOffset!=-1)
+    {
+        sVersion=MSDOS.getString(nOffset+13,4);
+        if(MSDOS.compare("43",nOffset-1))
         {
-            sVer=MSDOS.getString(nOffset+24,4);
-            if(sVer=="1991")
+            sName="Turbo C";
+            if(sVersion=="(c) ")
             {
-                sVersion="3.1";
+                sVersion=MSDOS.getString(nOffset+17,4);
             }
-            else if(sVer=="1994")
-            {
-                sVersion="4.X";
-            }
-            bDetected=1;
         }
+        else if(MSDOS.compare("'Turbo'",nOffset-9))
+        {
+            sName="Turbo C/C++";
+        }
+        else if(sVersion=="1991")
+        {
+            sVersion="3.1";
+        }
+        else if(sVersion=="1994")
+        {
+            sVersion="4.X";
+        }
+        bDetected=1;
     }
 
     return result(bShowType,bShowVersion,bShowOptions);
