@@ -94,12 +94,21 @@ PE.getImageBase=function(){};
  * @returns {String}
  */
 PE.getImportFunctionName=function(nImport,nFunctionNumber){};
+/**
+ * This function returns the name of the imported library.
+ * @param {UInt} nImport - The sequence number of the imported library (0…N).
+ * @returns {String}
+ */
 PE.getImportLibraryName=function(nImport){};
 /**
  * The function returns the number of a section, where the import is located (address of entry point) (0…N)
  * @returns {Int} if no import returns -1
  */
 PE.getImportSection=function(){};
+/**
+ * Get machine type
+ * @returns {UShort} 
+ */
 PE.getMachineType=function(){};
 /**
  * Get major linker version
@@ -116,7 +125,15 @@ PE.getManifest=function(){};
  * @returns {UInt} 
  */
 PE.getMinorLinkerVersion=function(){};
+/**
+ * This .NET version.
+ * @returns {String}
+ */
 PE.getNETVersion=function(){};
+/**
+ * Get number of imports
+ * @returns {Int} 
+ */
 PE.getNumberOfImports=function(){};
 /**
  * This function returns the number of functions in the imported library.  
@@ -124,6 +141,10 @@ PE.getNumberOfImports=function(){};
  * @returns {UInt}
  */
 PE.getNumberOfImportThunks=function(nImport){};
+/**
+ * Get number of sections
+ * @returns {Int} 
+ */
 PE.getNumberOfSections=function(){};
 /**
  * Get overlay offset
@@ -141,24 +162,98 @@ PE.getOverlaySize=function(){};
  * @returns {String}
  */
 PE.getPEFileVersion=function(sFileName){};
+/**
+ * This function returns a offset to resource with a specific name in the file.
+ * @param {String} sFileName - The name of the resource.
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
 PE.getResourceNameOffset=function(sName){};
+/**
+ * This function returns a size of resource with a specific name in the file.
+ * @param {String} sFileName - The name of the resource.
+ * @returns {Int} 
+ */
 PE.getResourceNameSize=function(sName){};
+/**
+ * 
+ * @param {Int} nSectionNumber - Section number
+ * @returns {String} 
+ */
 PE.getSectionCharacteristics=function(nSectionNumber){};
+/**
+ * Get section characteristics
+ * @param {Int} nSectionNumber - Section number
+ * @returns {UInt} 
+ */
 PE.getSectionFileOffset=function(nSectionNumber){};
+/**
+ * Get section file offset
+ * @param {Int} nSectionNumber - Section number
+ * @returns {UInt} 
+ */
 PE.getSectionFileSize=function(nSectionNumber){};
+/**
+ * Get section name
+ * @param {Int} nSectionNumber - Section number
+ * @returns {String} 
+ */
 PE.getSectionName=function(nSectionNumber){};
+/**
+ * Get section virtual address
+ * @param {Int} nSectionNumber - Section number
+ * @returns {UInt} 
+ */
 PE.getSectionVirtualAddress=function(nSectionNumber){};
+/**
+ * Get section virtual size
+ * @param {Int} nSectionNumber - Section number
+ * @returns {UInt} 
+ */
 PE.getSectionVirtualSize=function(nSectionNumber){};
+/**
+ * If the file contains sections with names “UPX0”, “UPX1”, this function  will return the string "UPX"
+ * @param {String} sString1 - Section name 1.
+ * @param {String} sString2 - Section name 2.
+ * @returns {String} If there is no section with such name, -1 will be returned.
+ */
 PE.getSectionNameCollision=function(sString1,sString2){};
+/**
+ * This function returns the number of a section with a specific name (0-N) 
+ * @param {String} sSectionName - Section name.
+ * @returns {String} If there is no section with such name, -1 will be returned.
+ */
 PE.getSectionNumber=function(sSectionName){};
+/**
+ * This function returns the number of a section with a specific name (0-N). Can use regular expressions as the section name.
+ * @param {String} sSectionName - Section name.
+ * @returns {String} If there is no section with such name, -1 will be returned.
+ */
 PE.getSectionNumberExp=function(sSectionName){};
+/**
+ * This function checks whether there exists a section with a specific name.
+ * @param {String} sSectionName - Section name.
+ * @returns {Bool} 
+ */
 PE.isSectionNamePresent=function(sSectionName){};
+/**
+ * This function checks whether there exists a section with a specific name. Can use regular expressions as the section name.
+ * @param {String} sSectionName - Section name.
+ * @returns {Bool} 
+ */
 PE.isSectionNamePresentExp=function(sSectionName){};
 /**
  * @see {@link Binary.getSize}
  */
 PE.getSize=function(){};
+/**
+ * Get size of code
+ * @returns {Int} 
+ */
 PE.getSizeOfCode=function(){};
+/**
+ * Get size of unitialized data
+ * @returns {Int} 
+ */
 PE.getSizeOfUninitializedData=function(){};
 /**
  * This function checks whether the file is a console application.
@@ -197,28 +292,34 @@ PE.isRichSignaturePresent=function(){};
  */
 PE.isResourceNamePresent=function(sName){};
 /**
-
+ * This function checks whether there is a string with a specific name in .NET.
+ * @param {String} sString
  * @returns {Bool} 
  */
 PE.isNETStringPresent=function(sString){};
 /**
- *
+ * This function checks whether there is a unicode string with a specific name in .NET.
+ * @param {String} sString
  * @returns {Bool} 
  */
 PE.isNETUnicodeStringPresent=function(sString){};
 /**
-
- * @returns {Bool}
+ * This function checks whether there is a function with a specific name in the import.
+ * @param {String} sLibraryName - The name of the library.
+ * @param {String} sFunctionName - The name of the function.
+ * @returns {Bool} 
  */
 PE.isLibraryFunctionPresent=function(sLibraryName,sFunctionName){};
 /**
- * his function checks whether there is a file with a specific name in the imported library.
+ * This function checks whether there is a library with a specific name in the import.
  * @param {String} sLibraryName - The name of the library.
  * @returns {Bool} 
  */
 PE.isLibraryPresent=function(sLibraryName){};
 /**
- *
+ * This function checks whether there is a signature int the section.
+ * @param {Int} nSection - Section number.
+ * @param {String} sSignature - Signature.
  * @returns {Bool} 
  */
 PE.isSignatureInSectionPresent=function(nSection,sSignature){};
@@ -266,4 +367,9 @@ PE.VAToOffset=function(nVA){};
  * @see {@link Binary.getString}
  */
 PE.getString=function(nOffset,nSize){};
+/**
+ * Get VersionString info
+ * @param {String} sKey 
+ * @returns {String} 
+ */
 PE.getVersionStringInfo=function(sKey){};
