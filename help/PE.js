@@ -14,6 +14,7 @@ PE.calculateSizeOfHeaders=function(){};
 PE.compare=function(sSignature,nOffset){};
 /**
  * The function compares bytes at the EntryPoint 
+ * @see {@link Binary.compare}
  * @param {String} sString - The Signature.
  * @param {UInt} nOffset - The offset from the EntryPoint. By default is 0.
  * @returns {Bool} 
@@ -21,6 +22,7 @@ PE.compare=function(sSignature,nOffset){};
 PE.compareEP=function(sSignature,nOffset){};
 /**
  * The function compares bytes at the EntryPoint of .NET
+ * @see {@link Binary.compare}
  * @param {String} sString - The Signature.
  * @param {UInt} nOffset - The offset from the EntryPoint of .NET. By default is 0.
  * @returns {Bool} 
@@ -212,32 +214,32 @@ PE.getSectionVirtualAddress=function(nSectionNumber){};
 PE.getSectionVirtualSize=function(nSectionNumber){};
 /**
  * If the file contains sections with names “UPX0”, “UPX1”, this function  will return the string "UPX"
- * @param {String} sString1 - Section name 1.
- * @param {String} sString2 - Section name 2.
+ * @param {String} sString1 - Section name 1
+ * @param {String} sString2 - Section name 2
  * @returns {String} If there is no section with such name, -1 will be returned.
  */
 PE.getSectionNameCollision=function(sString1,sString2){};
 /**
  * This function returns the number of a section with a specific name (0-N) 
- * @param {String} sSectionName - Section name.
+ * @param {String} sSectionName - Section name
  * @returns {String} If there is no section with such name, -1 will be returned.
  */
 PE.getSectionNumber=function(sSectionName){};
 /**
  * This function returns the number of a section with a specific name (0-N). Can use regular expressions as the section name.
- * @param {String} sSectionName - Section name.
+ * @param {String} sSectionName - Section name
  * @returns {String} If there is no section with such name, -1 will be returned.
  */
 PE.getSectionNumberExp=function(sSectionName){};
 /**
  * This function checks whether there exists a section with a specific name.
- * @param {String} sSectionName - Section name.
+ * @param {String} sSectionName - Section name
  * @returns {Bool} 
  */
 PE.isSectionNamePresent=function(sSectionName){};
 /**
  * This function checks whether there exists a section with a specific name. Can use regular expressions as the section name.
- * @param {String} sSectionName - Section name.
+ * @param {String} sSectionName - Section name
  * @returns {Bool} 
  */
 PE.isSectionNamePresentExp=function(sSectionName){};
@@ -287,7 +289,7 @@ PE.isPEPlus=function(){};
 PE.isRichSignaturePresent=function(){};
 /**
  * This function checks whether there is a resource with a specific name in the file.
- * @param {String} sFileName - The name of the resource.
+ * @param {String} sFileName - The name of the resource
  * @returns {Bool} 
  */
 PE.isResourceNamePresent=function(sName){};
@@ -305,21 +307,22 @@ PE.isNETStringPresent=function(sString){};
 PE.isNETUnicodeStringPresent=function(sString){};
 /**
  * This function checks whether there is a function with a specific name in the import.
- * @param {String} sLibraryName - The name of the library.
- * @param {String} sFunctionName - The name of the function.
+ * @param {String} sLibraryName - The name of the library
+ * @param {String} sFunctionName - The name of the function
  * @returns {Bool} 
  */
 PE.isLibraryFunctionPresent=function(sLibraryName,sFunctionName){};
 /**
  * This function checks whether there is a library with a specific name in the import.
- * @param {String} sLibraryName - The name of the library.
+ * @param {String} sLibraryName - The name of the library
  * @returns {Bool} 
  */
 PE.isLibraryPresent=function(sLibraryName){};
 /**
  * This function checks whether there is a signature int the section.
- * @param {Int} nSection - Section number.
- * @param {String} sSignature - Signature.
+ * @see {@link Binary.compare}
+ * @param {Int} nSection - Section number
+ * @param {String} sSignature - Signature
  * @returns {Bool} 
  */
 PE.isSignatureInSectionPresent=function(nSection,sSignature){};
@@ -360,7 +363,7 @@ PE.RVAToOffset=function(nRVA){};
 /**
  * This function converts a virtual address to a file offset. 
  * @param {UInt} nVA 
- * @returns {Int} If an error occurs, -1 will be returned.
+ * @returns {Int} If an error occurs, -1 will be returned
  */
 PE.VAToOffset=function(nVA){};
 /**
