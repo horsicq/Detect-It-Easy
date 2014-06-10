@@ -55,8 +55,31 @@ MACH.getString=function(nOffset,nSize){};
  * @see {@link Binary.getFileDirectory}
  */
 MACH.getFileDirectory=function(){};
+/**
+ * This function returns a string in the form of <MACHtype><MACHmоde>
+ * @returns {String}
+ */
 MACH.getGeneralOptions=function(){};
+/**
+ * Get library current version.
+ * @param {String} sLibrary - The name of the library.
+ * @returns {String} 
+ */
 MACH.getLibraryCurrentVersion=function(sLibrary){};
+/**
+ * Get number of sections
+ * @returns {Int} 
+ */
 MACH.getNumberOfSections=function(){};
+/**
+ * This function checks whether there is a library with a specific name in the import.
+ * @param {String} sLibraryName - The name of the library.
+ * @returns {Bool} 
+ */
 MACH.isLibraryPresent=function(sLibrary){};
+/**
+ * This function checks whether there exists a section with a specific name. Can use regular expressions as the section name.
+ * @param {String} sSectionName - Section name.
+ * @returns {Bool} 
+ */
 MACH.isSectionNamePresent=function(sSectionName){};

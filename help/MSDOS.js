@@ -55,9 +55,33 @@ MSDOS.getString=function(nOffset,nSize){};
  * @see {@link Binary.getFileDirectory}
  */
 MSDOS.getFileDirectory=function(){};
+/**
+ * Get overlay offset
+ * @returns {UInt} 
+ */
 MSDOS.getOverlayOffset=function(){};
+/**
+ * Get overlay size
+ * @returns {UInt} 
+ */
 MSDOS.getOverlaySize=function(){};
+/**
+ * This function checks whether there is an overlay.
+ * @returns {Bool} 
+ */
 MSDOS.isOverlayPresent=function(){};
+/**
+ * This function checks whether the file is NE.
+ * @returns {Bool} 
+ */
 MSDOS.isNE=function(){};
+/**
+ * This function checks whether the file is LE.
+ * @returns {Bool} 
+ */
 MSDOS.isLE=function(){};
+/**
+ * This function checks whether the file is LX.
+ * @returns {Bool} 
+ */
 MSDOS.isLX=function(){};
