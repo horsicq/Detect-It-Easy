@@ -18,6 +18,11 @@ PE.compare=function(sSignature,nOffset){};
  * @param {String} sString - The Signature.
  * @param {UInt} nOffset - The offset from the EntryPoint. By default is 0.
  * @returns {Bool} 
+ * @example
+    if(PE.compareEP("2C81",8))
+    {
+        sVersion="1.98";
+    }
  */
 PE.compareEP=function(sSignature,nOffset){};
 /**
@@ -33,6 +38,11 @@ PE.compareEP_NET=function(sSignature,nOffset){};
  * @param {String} sString - The Signature.
  * @param {UInt} nOffset - The offset from the overlay offset. By default is 0.
  * @returns {Bool} 
+ * @example
+    if(PE.compareOverlay("';!@Install@!UTF-8!'"))
+    {
+        bDetected=1;
+    }
  */
 PE.compareOverlay=function(sSignature,nOffset){};
 /**
@@ -45,6 +55,12 @@ PE.findByte=function(nOffset,nSize,cValue){};
 PE.findDword=function(nOffset,nSize,nValue){};
 /**
  * @see {@link Binary.findSignature}
+ * @example
+    nOffset=PE.findSignature(nOffset,1024,"'7z'BCAF271C");
+    if(nOffset!=-1)
+    {
+        bDetected=1;
+    }
  */
 PE.findSignature=function(nOffset,nSize,Signature){};
 /**
@@ -115,16 +131,36 @@ PE.getMachineType=function(){};
 /**
  * Get major linker version
  * @returns {UInt} 
+ * @example
+    var nMajor=PE.getMajorLinkerVersion();
+    if(nMajor>3)
+    {
+        sName="Microsoft Linker";
+        bDetected=1;
+    }
  */
 PE.getMajorLinkerVersion=function(){};
 /**
  * This XML manifest from the resources.
  * @returns {String}
+ * @example
+    if(PE.getManifest().match(/requireAdministrator/))
+    {
+        sOptions=sOptions.append("admin");
+    }
  */
 PE.getManifest=function(){};
 /**
  * Get minor linker version
  * @returns {UInt} 
+ * @example
+    var nMinor=PE.getMinorLinkerVersion();
+    if(nMinor==55)
+    {
+        sName="LCC Linker";
+        sVersion+="*";
+        bDetected=1;
+    }
  */
 PE.getMinorLinkerVersion=function(){};
 /**
@@ -291,6 +327,12 @@ PE.isRichSignaturePresent=function(){};
  * This function checks whether there is a resource with a specific name in the file.
  * @param {String} sFileName - The name of the resource
  * @returns {Bool} 
+ * @example
+    if(PE.isRichSignaturePresent())
+    {
+        sName="Microsoft Linker";
+        bDetected=1;
+    }
  */
 PE.isResourceNamePresent=function(sName){};
 /**
