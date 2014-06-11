@@ -97,7 +97,7 @@ ELF.getElfHeader_version=function(){};
  */
 ELF.getFileDirectory=function(){};
 /**
- * This function returns a string in the form of <ELFtype><ELFmоde> 
+ * This function returns a string in the form of [ELFtype][ELFmоde] 
  * @returns {String}
  */
 ELF.getGeneralOptions=function(){};

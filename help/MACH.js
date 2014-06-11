@@ -56,7 +56,7 @@ MACH.getString=function(nOffset,nSize){};
  */
 MACH.getFileDirectory=function(){};
 /**
- * This function returns a string in the form of <MACHtype><MACHmоde>
+ * This function returns a string in the form of [MACHtype][MACHmоde]
  * @returns {String}
  */
 MACH.getGeneralOptions=function(){};

@@ -31,6 +31,12 @@ PE.compareEP=function(sSignature,nOffset){};
  * @param {String} sString - The Signature.
  * @param {UInt} nOffset - The offset from the EntryPoint of .NET. By default is 0.
  * @returns {Bool} 
+ * @example
+    if(PE.compareEP_NET("4228070000066f09000006283800000a2a1b3004006f0000000d0000110272b9"))
+    {
+        bDetected=1;
+        sVersion="2.X";
+    }
  */
 PE.compareEP_NET=function(sSignature,nOffset){};
 /**
@@ -65,6 +71,12 @@ PE.findDword=function(nOffset,nSize,nValue){};
 PE.findSignature=function(nOffset,nSize,Signature){};
 /**
  * @see {@link Binary.findString}
+ * @example
+    nOffset=PE.findString(0,1024,"UPX!");
+    if(nOffset==-1)
+    {
+        return;
+    }
  */
 PE.findString=function(nOffset,nSize,sValue){};
 /**
@@ -78,7 +90,7 @@ PE.findWord=function(nOffset,nSize,sValue){};
 PE.getAddressOfEntryPoint=function(){};
 /**
  * Get compiler version.
- * @returns {String} The function returns the string <MajorLinkerVersion >.< MinorLinkerVersion >
+ * @returns {String} The function returns the string [MajorLinkerVersion].[MinorLinkerVersion]
  */
 PE.getCompilerVersion=function(){};
 /**
@@ -96,7 +108,7 @@ PE.getFileDirectory=function(){};
  */
 PE.getFileVersion=function(){};
 /**
- * This function returns a string in the form of <PEtype><PEmоde> For example EXE32 or Driver32
+ * This function returns a string in the form of [PEtype][PEmоde} For example "EXE32" or "Driver32"
  * @returns {String}
  */
 PE.getGeneralOptions=function(){};
@@ -114,7 +126,7 @@ PE.getImageBase=function(){};
 PE.getImportFunctionName=function(nImport,nFunctionNumber){};
 /**
  * This function returns the name of the imported library.
- * @param {UInt} nImport - The sequence number of the imported library (0…N).
+ * @param {UInt} nImport - The sequence number of the imported library (0…N)
  * @returns {String}
  */
 PE.getImportLibraryName=function(nImport){};
@@ -164,19 +176,42 @@ PE.getManifest=function(){};
  */
 PE.getMinorLinkerVersion=function(){};
 /**
- * This .NET version.
+ * This function returns .NET version.
  * @returns {String}
+ * @example
+    if(PE.isNET())
+    {
+        sVersion=PE.getNETVersion();
+        bDetected=1;
+    }
  */
 PE.getNETVersion=function(){};
 /**
  * Get number of imports
  * @returns {Int} 
+ * @example
+    if(PE.getNumberOfImports()==1)
+    {
+        if(PE.getNumberOfImportThunks(0)==2)
+        {
+            if(PE.section[0].Name=="ANDpakk2")
+            {
+                sVersion="2.X";
+                bDetected=1;
+            }
+        }
+    }
  */
 PE.getNumberOfImports=function(){};
 /**
  * This function returns the number of functions in the imported library.  
  * @param {UInt} nImport - The sequence number of the imported library (0…N).
  * @returns {UInt}
+ * @example
+    if(PE.getNumberOfImportThunks(0)==1)
+    {
+        bDetected=1;
+    }
  */
 PE.getNumberOfImportThunks=function(nImport){};
 /**
