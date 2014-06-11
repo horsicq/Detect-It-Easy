@@ -80,10 +80,13 @@ Binary.getFileDirectory=function(){};
  */
 Binary.getSize=function(){};
 /**
- * Get string value from file.
+ * Read string from specific offset. A string is read up to the first unreadable character or up to the maximum string.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nOffset - The size of memory. By default is 50
+ * @param {UInt} nSize - The maximum size of the string. By default is 50.
  * @returns {String} 
+ * @example
+    var sString=Binary.getString(0x100,32); // Read a string from offset 0x100, maximum length 32 bytes.
+    var sString=Binary.getString(60); // read a string from offset 60, maximum length 50 bytes(default value).
  */
 Binary.getString=function(nOffset,nSize){};
 /**
