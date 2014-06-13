@@ -86,16 +86,54 @@ PE.findWord=function(nOffset,nSize,sValue){};
 /**
  * Get address of EntryPoint
  * @returns {UInt} 
+ * @example
+    var nSection=PE.nLastSection;
+    if(nSection>=2)
+    {
+        if(PE.getAddressOfEntryPoint()==PE.section[nSection].VirtualAddress)
+        {
+            if(PE.section[nSection].Characteristics==0xe0000040)
+            {
+                if(PE.section[nSection-1].Characteristics==0xe0000040)
+                {
+                    if(PE.getNumberOfImportThunks(0)==1)
+                    {
+                        bDetected=1;
+                    }
+                }
+            }
+        }
+    }
  */
 PE.getAddressOfEntryPoint=function(){};
 /**
  * Get compiler version.
  * @returns {String} The function returns the string [MajorLinkerVersion].[MinorLinkerVersion]
+ * @example
+    if(bDetected)
+    {
+        switch(PE.getCompilerVersion())
+        {
+        case "6.0":  sVersion="6.0";  break;
+        case "7.0":  sVersion="2002"; break;
+        case "7.10": sVersion="2003"; break;
+        case "8.0":  sVersion="2005"; break;
+        case "9.0":  sVersion="2008"; break;
+        case "10.0": sVersion="2010"; break;
+        case "11.0": sVersion="2012"; break;
+        case "12.0": sVersion="2013"; break;
+        }
+    }
  */
 PE.getCompilerVersion=function(){};
 /**
  * The function returns the number of a section, where the point of entry is located (address of entry point) (0…N)
  * @returns {Int} if no entry point returns -1
+ * @example
+if(PE.getEntryPointSection()==PE.nLastSection)
+{
+    bDetected=1;
+}
  */
 PE.getEntryPointSection=function(){};
 /**
