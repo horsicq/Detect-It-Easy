@@ -23,6 +23,11 @@ PE.compare=function(sSignature,nOffset){};
     {
         sVersion="1.98";
     }
+    
+    if(PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24"))
+    {
+        bDetected=1;
+    }
  */
 PE.compareEP=function(sSignature,nOffset){};
 /**
