@@ -4,9 +4,16 @@
  */
 function ELF(){};
 /**
+ * @see {@link Binary.calculateEntropy}
+ */
+ELF.calculateEntropy=function(nOffset,nSize){};
+/**
  * @see {@link Binary.compare}
  */
 ELF.compare=function(sSignature,nOffset){};
+/**
+  * @see {@link PE.compareEP}
+ */
 ELF.compareEP=function(sSignature,nOffset){};
 /**
  * @see {@link Binary.findByte}
@@ -101,6 +108,10 @@ ELF.getFileDirectory=function(){};
  * @returns {String}
  */
 ELF.getGeneralOptions=function(){};
+/**
+ * @see {@link Binary.getSignature}
+ */
+ELF.getSignature=function(){};
 /**
  * @see {@link Binary.getSize}
  */

@@ -4,6 +4,10 @@
  */
 function Text(){};
 /**
+ * @see {@link Binary.calculateEntropy}
+ */
+Text.calculateEntropy=function(nOffset,nSize){};
+/**
  * @see {@link Binary.compare}
  */
 Text.compare=function(sSignature,nOffset){};
@@ -27,6 +31,10 @@ Text.findString=function(nOffset,nSize,sValue){};
  * @see {@link Binary.findWord}
  */
 Text.findWord=function(nOffset,nSize,sValue){};
+/**
+ * @see {@link Binary.getSignature}
+ */
+Text.getSignature=function(){};
 /**
  * @see {@link Binary.getSize}
  */

@@ -4,9 +4,17 @@
  */
 function MSDOS(){};
 /**
+ * @see {@link Binary.calculateEntropy}
+ */
+MSDOS.calculateEntropy=function(nOffset,nSize){};
+/**
  * @see {@link Binary.compare}
  */
 MSDOS.compare=function(sSignature,nOffset){};
+/**
+  * @see {@link PE.compareEP}
+ */
+MSDOS.compareEP=function(sSignature,nOffset){};
 /**
  * @see {@link Binary.findByte}
  */
@@ -27,6 +35,10 @@ MSDOS.findString=function(nOffset,nSize,sValue){};
  * @see {@link Binary.findWord}
  */
 MSDOS.findWord=function(nOffset,nSize,sValue){};
+/**
+ * @see {@link Binary.getSignature}
+ */
+MSDOS.getSignature=function(){};
 /**
  * @see {@link Binary.getSize}
  */

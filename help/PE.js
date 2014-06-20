@@ -4,6 +4,10 @@
  */
 function PE(){};
 /**
+ * @see {@link Binary.calculateEntropy}
+ */
+PE.calculateEntropy=function(nOffset,nSize){};
+/**
  * Calculate size of headers
  * @returns {UInt} 
  */
@@ -357,6 +361,10 @@ PE.isSectionNamePresent=function(sSectionName){};
  * @returns {Bool} 
  */
 PE.isSectionNamePresentExp=function(sSectionName){};
+/**
+ * @see {@link Binary.getSignature}
+ */
+PE.getSignature=function(){};
 /**
  * @see {@link Binary.getSize}
  */

@@ -4,6 +4,13 @@
  */
 function Binary(){};
 /**
+ * The function calculates entropy.
+ * @param {UInt} nOffset - The offset in the file.
+ * @param {UInt} nSize - The size of memory.
+ * @returns {Float} Result in the form of quantity of bits per byte. Since there is 8 bits in a byte, the maximum entropy will be 8.0.
+ */
+Binary.calculateEntropy=function(nOffset,nSize){};
+/**
  * The function compares bytes with a string signature.
  * <p>The signature may contain both lowercase and uppercase characters.
  * Gaps are skipped while processing lines, and “.” and “?” represent any character.
@@ -74,6 +81,19 @@ Binary.findSignature=function(nOffset,nSize,sValue){};
  * @returns {String} 
  */
 Binary.getFileDirectory=function(){};
+/**
+ * The function returns signature as string.
+ * @param {UInt} nOffset - The offset in the file.
+ * @param {UInt} nSize - The size of memory.
+ * @returns {String} Signature.
+ * @example
+    var signature=Binary.getSignature(0,4);
+    if(signature=="AA5411DD")
+    {
+        bDetected=1;
+    }
+*/
+Binary.getSignature=function(){};
 /**
  * Get file size
  * @returns {UInt} 

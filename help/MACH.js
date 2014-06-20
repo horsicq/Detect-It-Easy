@@ -4,6 +4,10 @@
  */
 function MACH(){};
 /**
+ * @see {@link Binary.calculateEntropy}
+ */
+MACH.calculateEntropy=function(nOffset,nSize){};
+/**
  * @see {@link Binary.compare}
  */
 MACH.compare=function(sSignature,nOffset){};
@@ -27,6 +31,10 @@ MACH.findString=function(nOffset,nSize,sValue){};
  * @see {@link Binary.findWord}
  */
 MACH.findWord=function(nOffset,nSize,sValue){};
+/**
+ * @see {@link Binary.getSignature}
+ */
+MACH.getSignature=function(){};
 /**
  * @see {@link Binary.getSize}
  */
