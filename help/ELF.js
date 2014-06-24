@@ -155,13 +155,13 @@ ELF.readWord=function(nOffset){};
 ELF.getString=function(nOffset,nSize){};
 /**
  * Get section file offset
- * @param {Int} nSectionNumber - Section number
+ * @param {Int} nSection - Section number
  * @returns {UInt} 
  */
 ELF.getSectionFileOffset=function(nSection){};
 /**
  * Get section file size
- * @param {Int} nSectionNumber - Section number
+ * @param {Int} nSection - Section number
  * @returns {UInt} 
  */
 ELF.getSectionFileSize=function(nSection){};
