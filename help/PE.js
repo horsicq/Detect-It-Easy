@@ -541,3 +541,18 @@ PE.getString=function(nOffset,nSize){};
  * @returns {String} 
  */
 PE.getVersionStringInfo=function(sKey){};
+/**
+ * This function checks whether there is a MS DOS stub.
+ * @returns {Bool} 
+ */
+PE.isDosStubPresent=function(){};
+/**
+ * Get MSDOS stub offset
+ * @returns {UInt} 
+ */
+PE.getDosStubOffset=function(){};
+/**
+ * Get MSDOS stub size
+ * @returns {UInt} 
+ */
+PE.getDosStubSize=function(){};
