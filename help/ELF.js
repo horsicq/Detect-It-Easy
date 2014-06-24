@@ -149,3 +149,21 @@ ELF.readWord=function(nOffset){};
  * @see {@link Binary.getString}
  */
 ELF.getString=function(nOffset,nSize){};
+/**
+ * Get section file offset
+ * @param {Int} nSectionNumber - Section number
+ * @returns {UInt} 
+ */
+ELF.getSectionFileOffset=function(nSection);
+/**
+ * Get section file size
+ * @param {Int} nSectionNumber - Section number
+ * @returns {UInt} 
+ */
+ELF.getSectionFileSize=function(nSection);
+/**
+ * This function returns the number of a section with a specific name  
+ * @param {String} sSectionName - Section name
+ * @returns {Int} (0-N) If there is no section with such name, -1 will be returned.
+ */
+ELF.getSectionNumber=function(sSectionName);

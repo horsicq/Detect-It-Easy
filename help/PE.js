@@ -295,19 +295,19 @@ PE.getResourceNameOffset=function(sName){};
  */
 PE.getResourceNameSize=function(sName){};
 /**
- * 
+ * Get section characteristics
  * @param {Int} nSectionNumber - Section number
- * @returns {String} 
+ * @returns {UInt} 
  */
 PE.getSectionCharacteristics=function(nSectionNumber){};
 /**
- * Get section characteristics
+ * Get section file offset
  * @param {Int} nSectionNumber - Section number
  * @returns {UInt} 
  */
 PE.getSectionFileOffset=function(nSectionNumber){};
 /**
- * Get section file offset
+ * Get section file size
  * @param {Int} nSectionNumber - Section number
  * @returns {UInt} 
  */
@@ -334,19 +334,19 @@ PE.getSectionVirtualSize=function(nSectionNumber){};
  * If the file contains sections with names “UPX0”, “UPX1”, this function  will return the string "UPX"
  * @param {String} sString1 - Section name 1
  * @param {String} sString2 - Section name 2
- * @returns {String} If there is no section with such name, -1 will be returned.
+ * @returns {String} 
  */
 PE.getSectionNameCollision=function(sString1,sString2){};
 /**
- * This function returns the number of a section with a specific name (0-N) 
+ * This function returns the number of a section with a specific name 
  * @param {String} sSectionName - Section name
- * @returns {String} If there is no section with such name, -1 will be returned.
+ * @returns {Int} (0-N) If there is no section with such name, -1 will be returned.
  */
 PE.getSectionNumber=function(sSectionName){};
 /**
- * This function returns the number of a section with a specific name (0-N). Can use regular expressions as the section name.
+ * This function returns the number of a section with a specific name. Can use regular expressions as the section name.
  * @param {String} sSectionName - Section name
- * @returns {String} If there is no section with such name, -1 will be returned.
+ * @returns {Int} (0-N) If there is no section with such name, -1 will be returned.
  */
 PE.getSectionNumberExp=function(sSectionName){};
 /**
