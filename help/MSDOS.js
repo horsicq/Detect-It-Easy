@@ -8,6 +8,10 @@ function MSDOS(){};
  */
 MSDOS.calculateEntropy=function(nOffset,nSize){};
 /**
+ * @see {@link Binary.calculateMD5}
+ */
+MSDOS.calculateMD5=function(nOffset,nSize){};
+/**
  * @see {@link Binary.compare}
  */
 MSDOS.compare=function(sSignature,nOffset){};

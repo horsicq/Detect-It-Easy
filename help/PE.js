@@ -8,6 +8,10 @@ function PE(){};
  */
 PE.calculateEntropy=function(nOffset,nSize){};
 /**
+ * @see {@link Binary.calculateMD5}
+ */
+PE.calculateMD5=function(nOffset,nSize){};
+/**
  * Calculate size of headers
  * @returns {UInt} 
  */

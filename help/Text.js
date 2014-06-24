@@ -8,6 +8,10 @@ function Text(){};
  */
 Text.calculateEntropy=function(nOffset,nSize){};
 /**
+ * @see {@link Binary.calculateMD5}
+ */
+Text.calculateMD5=function(nOffset,nSize){};
+/**
  * @see {@link Binary.compare}
  */
 Text.compare=function(sSignature,nOffset){};

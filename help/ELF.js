@@ -8,6 +8,10 @@ function ELF(){};
  */
 ELF.calculateEntropy=function(nOffset,nSize){};
 /**
+ * @see {@link Binary.calculateMD5}
+ */
+ELF.calculateMD5=function(nOffset,nSize){};
+/**
  * @see {@link Binary.compare}
  */
 ELF.compare=function(sSignature,nOffset){};
@@ -154,16 +158,16 @@ ELF.getString=function(nOffset,nSize){};
  * @param {Int} nSectionNumber - Section number
  * @returns {UInt} 
  */
-ELF.getSectionFileOffset=function(nSection);
+ELF.getSectionFileOffset=function(nSection){};
 /**
  * Get section file size
  * @param {Int} nSectionNumber - Section number
  * @returns {UInt} 
  */
-ELF.getSectionFileSize=function(nSection);
+ELF.getSectionFileSize=function(nSection){};
 /**
  * This function returns the number of a section with a specific name  
  * @param {String} sSectionName - Section name
  * @returns {Int} (0-N) If there is no section with such name, -1 will be returned.
  */
-ELF.getSectionNumber=function(sSectionName);
+ELF.getSectionNumber=function(sSectionName){};
