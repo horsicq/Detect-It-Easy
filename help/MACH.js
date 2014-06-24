@@ -8,6 +8,10 @@ function MACH(){};
  */
 MACH.calculateEntropy=function(nOffset,nSize){};
 /**
+ * @see {@link Binary.calculateMD5}
+ */
+MACH.calculateMD5=function(nOffset,nSize){};
+/**
  * @see {@link Binary.compare}
  */
 MACH.compare=function(sSignature,nOffset){};

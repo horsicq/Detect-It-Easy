@@ -8,6 +8,10 @@ function PE(){};
  */
 PE.calculateEntropy=function(nOffset,nSize){};
 /**
+ * @see {@link Binary.calculateMD5}
+ */
+PE.calculateMD5=function(nOffset,nSize){};
+/**
  * Calculate size of headers
  * @returns {UInt} 
  */
@@ -412,7 +416,7 @@ PE.isPEPlus=function(){};
 /**
  * This function checks whether there is a Rich signature in the file. For more information check {@link http://www.ntсоre.соm/files/riсhsign.htm|http://www.ntсоre.соm/files/riсhsign.htm} It is typical for the files made by using the MS Linker. 
  * @returns {Bool} 
-  * @example
+ * @example
     if(PE.isRichSignaturePresent())
     {
         sName="Microsoft Linker";
@@ -422,7 +426,7 @@ PE.isPEPlus=function(){};
 PE.isRichSignaturePresent=function(){};
 /**
  * This function checks whether there is a resource with a specific name in the file.
- * @param {String} sFileName - The name of the resource
+ * @param {String} sName - The name of the resource
  * @returns {Bool} 
  * @example
     if(PE.isResourceNamePresent("PACKAGEINFO"))
@@ -459,7 +463,6 @@ PE.isNETUnicodeStringPresent=function(sString){};
  * @param {String} sLibraryName - The name of the library
  * @param {String} sFunctionName - The name of the function
  * @returns {Bool} 
- * @example
  
  */
 PE.isLibraryFunctionPresent=function(sLibraryName,sFunctionName){};

@@ -11,6 +11,13 @@ function Binary(){};
  */
 Binary.calculateEntropy=function(nOffset,nSize){};
 /**
+ * The function calculates MD5 hash
+ * @param {UInt} nOffset - The offset in the file.
+ * @param {UInt} nSize - The size of memory.
+ * @returns {String} MD5 hash
+ */
+Binary.calculateMD5=function(nOffset,nSize){};
+/**
  * The function compares bytes with a string signature.
  * <p>The signature may contain both lowercase and uppercase characters.
  * Gaps are skipped while processing lines, and “.” and “?” represent any character.
