@@ -402,11 +402,22 @@ PE.isOverlayPresent=function(){};
 /**
  * This function checks whether the file is 64 bit (PE+)
  * @returns {Bool} 
+ * @example
+    if(PE.isPEPlus())
+    {
+        sOptions="PE+";
+    }
  */
 PE.isPEPlus=function(){};
 /**
  * This function checks whether there is a Rich signature in the file. For more information check {@link http://www.ntсоre.соm/files/riсhsign.htm|http://www.ntсоre.соm/files/riсhsign.htm} It is typical for the files made by using the MS Linker. 
  * @returns {Bool} 
+  * @example
+    if(PE.isRichSignaturePresent())
+    {
+        sName="Microsoft Linker";
+        bDetected=1;
+    }
  */
 PE.isRichSignaturePresent=function(){};
 /**
@@ -414,9 +425,8 @@ PE.isRichSignaturePresent=function(){};
  * @param {String} sFileName - The name of the resource
  * @returns {Bool} 
  * @example
-    if(PE.isRichSignaturePresent())
+    if(PE.isResourceNamePresent("PACKAGEINFO"))
     {
-        sName="Microsoft Linker";
         bDetected=1;
     }
  */
@@ -425,12 +435,23 @@ PE.isResourceNamePresent=function(sName){};
  * This function checks whether there is a string with a specific name in .NET.
  * @param {String} sString
  * @returns {Bool} 
+ * @example
+    if(PE.isNETStringPresent(0,"DotfuscatorAttribute"))
+    {
+        bDetected=1;
+    }
  */
 PE.isNETStringPresent=function(sString){};
 /**
  * This function checks whether there is a unicode string with a specific name in .NET.
  * @param {String} sString
  * @returns {Bool} 
+ * @example
+    if(PE.isNETUnicodeStringPresent("E_TamperDetected"))
+    {
+        sVersion="3.X-4.X";
+        bDetected=1;
+    }
  */
 PE.isNETUnicodeStringPresent=function(sString){};
 /**
@@ -438,12 +459,20 @@ PE.isNETUnicodeStringPresent=function(sString){};
  * @param {String} sLibraryName - The name of the library
  * @param {String} sFunctionName - The name of the function
  * @returns {Bool} 
+ * @example
+ 
  */
 PE.isLibraryFunctionPresent=function(sLibraryName,sFunctionName){};
 /**
  * This function checks whether there is a library with a specific name in the import.
  * @param {String} sLibraryName - The name of the library
  * @returns {Bool} 
+ * @example
+    if(PE.isLibraryPresent("MSVBVM50.DLL"))
+    {
+        sVersion="5.0";
+        bDetected=1;
+    }
  */
 PE.isLibraryPresent=function(sLibraryName){};
 /**
@@ -452,6 +481,11 @@ PE.isLibraryPresent=function(sLibraryName){};
  * @param {Int} nSection - Section number
  * @param {String} sSignature - Signature
  * @returns {Bool} 
+ * @example
+    if(PE.isSignatureInSectionPresent(0,"'ENIGMA'"))
+    {
+        bDetected=1;
+    }
  */
 PE.isSignatureInSectionPresent=function(nSection,sSignature){};
 /**
@@ -461,7 +495,7 @@ PE.isSignaturePresent=function(nOffset,nSize,sSignature){};
 /**
  * This function converts a file offset to a relative virtual address. 
  * @param {UInt} nOffset 
- * @returns {UInt} 
+ * @returns {UInt} If an error occurs, -1 will be returned
  */
 PE.OffsetToRVA=function(nOffset){};
 /**
