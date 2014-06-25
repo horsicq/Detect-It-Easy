@@ -556,3 +556,32 @@ PE.getDosStubOffset=function(){};
  * @returns {UInt} 
  */
 PE.getDosStubSize=function(){};
+/**
+ * Get number of resource's entries
+ * @returns {UInt} 
+ */
+PE.getNumberOfResources=function(){};
+/**
+ * Get offset of resource
+ * @param {UInt} nNumber 
+ * @returns {Int} If an error occurs, -1 will be returned
+ */
+PE.getResourceOffsetByNumber=function(nNumber){};
+/**
+ * Get size of resource
+ * @param {UInt} nNumber 
+ * @returns {Int} 
+ */
+PE.getResourceSizeByNumber=function(nNumber){};
+/**
+ * Get Id of resource
+ * @param {UInt} nNumber 
+ * @returns {IUnt} O
+ */
+PE.getResourceIdByNumber=function(nNumber){};
+/**
+ * Get name of resource
+ * @param {UInt} nNumber 
+ * @returns {String}
+ */
+PE.getResourceNameByNumber=function(nNumber){};
