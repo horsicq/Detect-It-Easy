@@ -34,6 +34,70 @@ function isMFC()
     return aMFC!=null;
 }
 
+function getVersionFromRichSignature()
+{
+    var sResult="";
+    if(PE.isRichSignaturePresent())
+    {
+        var nDosStubOffset=PE.getDosStubOffset();
+        var nDosStubSize=PE.getDosStubSize();
+        var nDword=0;
+
+        var nRichOffset=PE.findString(nDosStubOffset,nDosStubSize,"Rich");
+        if(nRichOffset!=-1)
+        {
+            var nXorKey=PE.readDword(nRichOffset+4);
+            var nCurrentOffset=nRichOffset-4;
+            while(nCurrentOffset>nDosStubOffset)
+            {
+                nDword=PE.readDword(nCurrentOffset);
+                if(nDword==0)
+                {
+                    break;
+                }
+                nDword^=nXorKey;
+                if((nDword==0)&&(nDword==0x536e6144))
+                {
+                     break;
+                }
+                nDword&=0xFFFF;
+
+                switch(nDword)
+                {
+                case 8804:  sResult="6.0";  break;
+                case 9466:  sResult="2002";  break;
+                case 3077:  sResult="2003";  break;
+                case 50727:  
+                    if(PE.getMajorLinkerVersion()==8)
+                    {
+                        sResult="2005";
+                    }
+                    else if(PE.getMajorLinkerVersion()==11)
+                    {
+                        sResult="2012"; 
+                    }
+                    break;
+                case 56336:  sResult="2005 sp1";  break;
+                case 21022:  sResult="2008";  break;
+                case 30729:  sResult="2008 sp1";  break;
+                case 30319:  sResult="2010";  break;
+                case 40219:  sResult="2010 sp1";  break;
+                case 51106:  sResult="2012 update 1";  break;
+                case 60315:  sResult="2012 update 2";  break;
+                case 60610:  sResult="2012 update 3";  break;
+                case 61030:  sResult="2012 update 4";  break;
+                case 21005:  sResult="2013";  break;
+                case 30501:  sResult="2013 update 2";  break;
+                }             
+
+                nCurrentOffset-=4;
+            }
+        }
+    }
+    
+    return sResult;
+}
+
 init("compiler","Microsoft Visual "+(isMFC()||PE.isLibraryPresentExp(/^MSVCP/i)?"C++":"C/C++"));
 
 function detect(bShowType,bShowVersion,bShowOptions)
@@ -451,13 +515,11 @@ function detect(bShowType,bShowVersion,bShowOptions)
         }
         else if(PE.compareEP("56E8........8BF0E8........68........68........E8........6A..68........56E8"))
         {
-            sName="Visual C++";
             sVersion="2.0";
             bDetected=1;
         }
         else if(PE.compareEP("53B8........8B......565785DB5575"))
         {
-            sName="Visual C++";
             sVersion="4.2";
             bDetected=1;
         }
@@ -572,6 +634,14 @@ function detect(bShowType,bShowVersion,bShowOptions)
         case "12.0": sVersion="2013"; break;
         }
     }
+
+    var sRichVersion=getVersionFromRichSignature();
+    if(sRichVersion!="")
+    {
+         sVersion=sRichVersion;
+         bDetected=1;
+    }
+
 
     return result(bShowType,bShowVersion,bShowOptions);
 }
