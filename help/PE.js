@@ -576,7 +576,7 @@ PE.getResourceSizeByNumber=function(nNumber){};
 /**
  * Get Id of resource
  * @param {UInt} nNumber 
- * @returns {IUnt} O
+ * @returns {UInt}
  */
 PE.getResourceIdByNumber=function(nNumber){};
 /**
