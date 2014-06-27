@@ -34,9 +34,11 @@ function isMFC()
     return aMFC!=null;
 }
 
+init("compiler","Microsoft Visual "+(isMFC()||PE.isLibraryPresentExp(/^MSVCP/i)?"C++":"C/C++"));
+
 function getVersionFromRichSignature()
 {
-    var sResult="";
+    var sResult="",nResult=0;
     if(PE.isRichSignaturePresent())
     {
         var nDosStubOffset=PE.getDosStubOffset();
@@ -47,64 +49,59 @@ function getVersionFromRichSignature()
         if(nRichOffset!=-1)
         {
             var nXorKey=PE.readDword(nRichOffset+4);
-            var nCurrentOffset=nRichOffset-4;
-            while(nCurrentOffset>nDosStubOffset)
+            for(var nCurrentOffset=nRichOffset-8;
+                nCurrentOffset>nDosStubOffset;
+                nCurrentOffset-=8)
             {
-                nDword=PE.readDword(nCurrentOffset);
-                if(nDword==0)
+                nDword=PE.readDword(nCurrentOffset)^nXorKey;
+                if((nDword==0)||(nDword==0x536e6144)) // 'DanS'
                 {
                     break;
-                }
-                nDword^=nXorKey;
-                if(nDword==0x536e6144)
-                {
-                     break;
                 }
                 nDword&=0xFFFF;
 
+                var sVer,nVer=0;
                 switch(nDword)
                 {
-                case 7274:  sResult="97";  break;
-                case 9049:  sResult="97";  break;
-                case 8168:  sResult="6.0";  break;
-                case 8804:  sResult="6.0";  break;
-                case 8966:  sResult="6.0";  break;
-                case 9044:  sResult="6.0";  break;
-                case 9466:  sResult="2002";  break;
-                case 3077:  sResult="2003";  break;
-                case 2240:  sResult="2003";  break;
+                case 7274:  sVer="97";            nVer=1997; break;
+                case 9049:  sVer="97";            nVer=1997; break;
+                case 8168:  sVer="6.0";           nVer=1998; break;
+                case 8804:  sVer="6.0";           nVer=1998; break;
+                case 8966:  sVer="6.0";           nVer=1998; break;
+                case 9044:  sVer="6.0";           nVer=1998; break;
+                case 9466:  sVer="2002";          nVer=2002; break;
+                case 3077:  sVer="2003";          nVer=2003; break;
+                case 2240:  sVer="2003";          nVer=2003; break;
                 case 50727:  
-                    if(PE.getMajorLinkerVersion()==8)
+                    switch(PE.getMajorLinkerVersion())
                     {
-                        sResult="2005";
-                    }
-                    else if(PE.getMajorLinkerVersion()==11)
-                    {
-                        sResult="2012"; 
+                    case 8: sVer="2005";          nVer=2005; break;
+                    case 11:sVer="2012";          nVer=2012; break;
                     }
                     break;
-                case 56336:  sResult="2005 sp1";  break;
-                case 21022:  sResult="2008";  break;
-                case 30729:  sResult="2008 sp1";  break;
-                case 30319:  sResult="2010";  break;
-                case 40219:  sResult="2010 sp1";  break;
-                case 51106:  sResult="2012 update 1";  break;
-                case 60315:  sResult="2012 update 2";  break;
-                case 60610:  sResult="2012 update 3";  break;
-                case 61030:  sResult="2012 update 4";  break;
-                case 21005:  sResult="2013";  break;
-                case 30501:  sResult="2013 update 2";  break;
-                }             
-
-                nCurrentOffset-=4;
+                case 56336: sVer="2005 SP1";      nVer=2005.1; break;
+                case 21022: sVer="2008";          nVer=2008;   break;
+                case 30729: sVer="2008 SP1";      nVer=2008.1; break;
+                case 30319: sVer="2010";          nVer=2010;   break;
+                case 40219: sVer="2010 SP1";      nVer=2010.1; break;
+                case 51106: sVer="2012 update 1"; nVer=2012.1; break;
+                case 60315: sVer="2012 update 2"; nVer=2012.2; break;
+                case 60610: sVer="2012 update 3"; nVer=2012.3; break;
+                case 61030: sVer="2012 update 4"; nVer=2012.4; break;
+                case 21005: sVer="2013";          nVer=2013;   break;
+                case 30501: sVer="2013 update 2"; nVer=2013.2; break;
+                }
+                if(nVer>nResult)
+                {
+                    sResult=sVer;
+                    nResult=nVer;
+                }
             }
         }
     }
     
     return sResult;
 }
-
-init("compiler","Microsoft Visual "+(isMFC()||PE.isLibraryPresentExp(/^MSVCP/i)?"C++":"C/C++"));
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
@@ -644,10 +641,9 @@ function detect(bShowType,bShowVersion,bShowOptions)
     var sRichVersion=getVersionFromRichSignature();
     if(sRichVersion!="")
     {
-         sVersion=sRichVersion;
+         sVersion=sVersion.append(sRichVersion);
          bDetected=1;
     }
-
 
     return result(bShowType,bShowVersion,bShowOptions);
 }
