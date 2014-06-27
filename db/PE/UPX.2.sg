@@ -6,107 +6,95 @@
 init("packer","UPX");
 
 function isPatchedUPX()
-{	
+{
     var nResult=0;
     var nNumberOfFunctions=PE.getNumberOfImportThunks(0);
-    var nCount=0;
     if((nNumberOfFunctions>1)&&(nNumberOfFunctions<7))
     {
-        if(PE.getImportFunctionName(0,0)=="LoadLibraryA")
+        if((PE.getSizeOfCode())&&(PE.getSizeOfUninitializedData())&&(PE.section.length>2))
         {
-            nCount++;
-        }
-        if(PE.getImportFunctionName(0,1)=="GetProcAddress")
-        {
-            nCount++;
-        }
-        if(nNumberOfFunctions==4)
-        {
-            if(PE.getImportFunctionName(0,2)=="VirtualProtect")
+            var nCount=0;
+            if(PE.getImportFunctionName(0,0)=="LoadLibraryA")
             {
                 nCount++;
             }
-            if(PE.getImportFunctionName(0,3)=="ExitProcess")
+            if(PE.getImportFunctionName(0,1)=="GetProcAddress")
             {
                 nCount++;
             }
-        }
-        if((nNumberOfFunctions>=3)&&(nNumberOfFunctions<=6)&&(nCount<4))
-        {
-            if(PE.getImportFunctionName(0,2)=="ExitProcess")
-            {
-                nCount++;
-            }
-            if(PE.isDll())
+            if(nNumberOfFunctions==4)
             {
                 if(PE.getImportFunctionName(0,2)=="VirtualProtect")
                 {
                     nCount++;
                 }
+                if(PE.getImportFunctionName(0,3)=="ExitProcess")
+                {
+                    nCount++;
+                }
             }
-        }
-        if(nNumberOfFunctions==6)
-        {
-            if(PE.getImportFunctionName(0,2)=="VirtualProtect")
+            if((nNumberOfFunctions>=3)&&(nCount<4))
             {
-                nCount++;
+                if(PE.getImportFunctionName(0,2)=="ExitProcess")
+                {
+                    nCount++;
+                }
+                else if(PE.isDll())
+                {
+                    if(PE.getImportFunctionName(0,2)=="VirtualProtect")
+                    {
+                        nCount++;
+                    }
+                }
             }
-            if(PE.getImportFunctionName(0,3)=="VirtualAlloc")
+            if(nNumberOfFunctions==6)
             {
-                nCount++;
+                if(PE.getImportFunctionName(0,2)=="VirtualProtect")
+                {
+                    nCount++;
+                }
+                if(PE.getImportFunctionName(0,3)=="VirtualAlloc")
+                {
+                    nCount++;
+                }
+                if(PE.getImportFunctionName(0,4)=="VirtualFree")
+                {
+                    nCount++;
+                }
+                if(PE.getImportFunctionName(0,5)=="ExitProcess")
+                {
+                    nCount++;
+                }
             }
-            if(PE.getImportFunctionName(0,4)=="VirtualFree")
+
+            if((nCount==2)&&(nNumberOfFunctions==2))
             {
-                nCount++;
+                nResult=1;
             }
-            if(PE.getImportFunctionName(0,5)=="ExitProcess")
+            if((nCount==3)&&(nNumberOfFunctions>=3))
             {
-                nCount++;
+                nResult=1;
             }
-        }
-    }
-	
-    if((PE.getSizeOfCode())&&(PE.getSizeOfUninitializedData())&&(PE.getNumberOfSections()>2))
-    {
-        if((nCount==2)&&(nNumberOfFunctions==2))
-        {
-            nResult=1;
-        }
-        if((nCount==3)&&(nNumberOfFunctions==3))
-        {
-            nResult=1;
-        }
-        if((nCount==3)&&(nNumberOfFunctions==4))
-        {
-            nResult=1;
-        }
-        if((nCount==3)&&(nNumberOfFunctions==5))
-        {
-            nResult=1;
-        }
-        if((nCount==3)&&(nNumberOfFunctions==6))
-        {
-            nResult=1;
-        }
-        if((nCount==4)&&(nNumberOfFunctions==4))
-        {
-            nResult=1;
-        }
-        if((nCount==6)&&(nNumberOfFunctions==6))
-        {
-            nResult=1;
+            if((nCount==4)&&(nNumberOfFunctions==4))
+            {
+                nResult=1;
+            }
+            if((nCount==6)&&(nNumberOfFunctions==6))
+            {
+                nResult=1;
+            }
+
+            if(nResult)
+            {
+                if(PE.getAddressOfEntryPoint()==0x00001018)
+                {
+                    // (Win)Upack
+                    nResult=0;
+                }
+            }
         }
     }
 
-    if(nResult)
-    {
-        if(PE.getAddressOfEntryPoint()==0x00001018)
-        {
-            // Win(Upack)
-            nResult=0;
-        }
-    }
-	
     return nResult;
 }
 
@@ -169,12 +157,12 @@ function detect(bShowType,bShowVersion,bShowOptions)
     {
         bDetected=1;
     }
-	
+
     if(!bDetected)
     {
         bDetected=isPatchedUPX();
     }
-		
+
     if((bDetected)&&(sVersion==""))
     {
         sOptions="modified";
