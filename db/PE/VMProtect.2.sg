@@ -20,6 +20,53 @@ function detectVMP(sSectionName)
     return 0;
 }
 
+function detectVMP2()
+{
+    if(PE.section.length>6)
+    {
+       var nCount=4;
+       for(var nSection=PE.section.length-6;nSection<PE.section.length;nSection++)
+        {
+            if((PE.section[nSection].Name==".rsrc")||(PE.section[nSection].Name==".relocs"))
+            {
+                nCount++;
+            }
+        }
+        
+        var nDetectCount=0;
+        var nLastVMPSection=0;
+
+        for(var nSection=PE.section.length-nCount;nSection<PE.section.length;nSection++)
+        {
+            if((PE.section[nSection].Name==".rsrc")||(PE.section[nSection].Name==".relocs"))
+            {
+               continue;
+            }
+            if((PE.section[nSection].FileSize==0)&&(PE.section[nSection].FileOffset==0))
+            {
+               nDetectCount++;
+            }
+            
+            if((PE.section[nSection].FileSize!=0)&&(PE.section[nSection].FileOffset!=0))
+            {
+               nLastVMPSection=nSection;
+            }
+        }
+
+        if(nDetectCount==3)
+        {
+            if(PE.calculateEntropy(PE.section[nLastVMPSection].FileOffset,PE.section[nLastVMPSection].FileSize)>7.85)
+            {
+                return 1;
+            }
+        }
+    }
+
+    
+
+    return 0;
+}
+
 function detect(bShowType,bShowVersion,bShowOptions)
 {
     var nSectionNumber=0;
@@ -63,6 +110,10 @@ function detect(bShowType,bShowVersion,bShowOptions)
             {
                 bDetected=1;
             }
+        }
+        if(!bDetected)
+        {
+            bDetected=detectVMP2();
         }
     }
 
