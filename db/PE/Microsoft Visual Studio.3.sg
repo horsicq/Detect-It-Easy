@@ -2,8 +2,8 @@
 
 /*
 Visual Studio                   4.0
-Visual Studio 97                5.0
-Visual Studio 6.0               6.0
+Visual Studio 5.0 (1997)        5.0
+Visual Studio 6.0 (1998)        6.0
 Visual Studio .NET (2002)       7.0
 Visual Studio .NET 2003         7.1
 Visual Studio 2005              8.0
@@ -13,28 +13,11 @@ Visual Studio 2012              11.0
 Visual Studio 2013              12.0
 */
 
-// Compiler comes before library, but the library MFC provides a distinction
-// between C and C++, so we'll detect it here but use it in "MFC.4".
-var aMFC;
+includeScript("MFC");
+includeScript("Qt");
+includeScript("wxWidgets");
 
-function isMFC()
-{
-    aMFC=PE.isLibraryPresentExp(/^MFC(\d+?)(u?)(d?)\.dll/i);
-    if(!aMFC)
-    {
-        if(PE.section[".data"])
-        {
-            if(PE.isSignatureInSectionPresent(PE.section[".data"].Number,"'CMFCComObject'"))
-            {
-                aMFC=1;
-            }
-        }
-    }
-
-    return aMFC!=null;
-}
-
-init("compiler","Microsoft Visual "+(isMFC()||PE.isLibraryPresentExp(/^MSVCP/i)?"C++":"C/C++"));
+init("compiler","Microsoft Visual "+(aMFC||aQt||aWx||PE.isLibraryPresentExp(/^MSVCP/i)?"C++":"C/C++"));
 
 function getVersionFromRichSignature()
 {
@@ -63,27 +46,31 @@ function getVersionFromRichSignature()
                 var sVer,nVer=0;
                 switch(nDword)
                 {
-                case 7274:  sVer="97";            nVer=1997; break;
-                case 9049:  sVer="97";            nVer=1997; break;
-                case 8168:  sVer="6.0";           nVer=1998; break;
-                case 8804:  sVer="6.0";           nVer=1998; break;
-                case 8966:  sVer="6.0";           nVer=1998; break;
-                case 9044:  sVer="6.0";           nVer=1998; break;
-                case 9466:  sVer="2002";          nVer=2002; break;
-                case 3077:  sVer="2003";          nVer=2003; break;
-                case 2240:  sVer="2003";          nVer=2003; break;
+                case 7274:  sVer="5.0";           nVer=1997;   break;
+                case 9049:  sVer="5.0";           nVer=1997;   break;
+                case 8168:  sVer="6.0";           nVer=1998;   break;
+                case 8966:  sVer="6.0";           nVer=1998;   break;
+                case 9044:  sVer="6.0";           nVer=1998;   break;
+                case 8804:  sVer="6.0";           nVer=1998;   break; // SP 5/6
+                case 9466:  sVer="2002";          nVer=2002;   break;
+                case 2240:  sVer="2003";          nVer=2003;   break;
+                case 3077:  sVer="2003";          nVer=2003;   break;
+                case 4035:  sVer="2003";          nVer=2003;   break;
+                case 6030:  sVer="2003 SP1";      nVer=2003.1; break;
                 case 50727:  
                     switch(PE.getMajorLinkerVersion())
                     {
-                    case 8: sVer="2005";          nVer=2005; break;
-                    case 11:sVer="2012";          nVer=2012; break;
+                    case 8: sVer="2005";          nVer=2005;   break;
+                    case 11:sVer="2012";          nVer=2012;   break;
                     }
                     break;
+                case 50320: sVer="2005 SP1";      nVer=2005.1; break;
                 case 56336: sVer="2005 SP1";      nVer=2005.1; break;
                 case 21022: sVer="2008";          nVer=2008;   break;
                 case 30729: sVer="2008 SP1";      nVer=2008.1; break;
                 case 30319: sVer="2010";          nVer=2010;   break;
                 case 40219: sVer="2010 SP1";      nVer=2010.1; break;
+                case 51025: sVer="2012";          nVer=2012;   break;
                 case 51106: sVer="2012 update 1"; nVer=2012.1; break;
                 case 60315: sVer="2012 update 2"; nVer=2012.2; break;
                 case 60610: sVer="2012 update 3"; nVer=2012.3; break;
@@ -299,6 +286,11 @@ function detect(bShowType,bShowVersion,bShowOptions)
             sVersion="2003";
             bDetected=1;
         }
+        else if(PE.compareEP("6A..68........E8........66813D"))
+        {
+            sVersion="2003";
+            bDetected=1;
+        }
         else if(PE.compareEP("6A..68........E8........BF940000008BC7E8"))
         {
             nOfs=0;
@@ -507,7 +499,7 @@ function detect(bShowType,bShowVersion,bShowOptions)
         }
         else if(PE.compareEP("64A100000000506489250000000083C4A8535657"))
         {
-            sVersion="97";
+            sVersion="5.0";
             bDetected=1;
         }
         else if(PE.compareEP("535657BB........8B......553BFB75"))
@@ -621,12 +613,12 @@ function detect(bShowType,bShowVersion,bShowOptions)
         }
     }
 
-    if(bDetected)
+    if(bDetected||PE.isRichSignaturePresent())
     {
         switch(PE.getCompilerVersion())
         {
-        case "4.0":  sVersion="95";  break;
-        case "5.0":  sVersion="97";  break;
+        case "4.0":  sVersion="4.0";  break;
+        case "5.0":  sVersion="5.0";  break;
         case "6.0":  sVersion="6.0";  break;
         case "7.0":  sVersion="2002"; break;
         case "7.10": sVersion="2003"; break;
@@ -636,6 +628,7 @@ function detect(bShowType,bShowVersion,bShowOptions)
         case "11.0": sVersion="2012"; break;
         case "12.0": sVersion="2013"; break;
         }
+        bDetected=1;
     }
 
     var sRichVersion=getVersionFromRichSignature();
