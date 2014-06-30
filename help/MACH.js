@@ -2,96 +2,104 @@
  * @class
  * @classdesc This is a description of the MACH class.
  */
-function MACH(){};
+function MACH(){}
 /**
- * @see {@link Binary.calculateEntropy}
+ * @see Binary.calculateEntropy
  */
-MACH.calculateEntropy=function(nOffset,nSize){};
+MACH.calculateEntropy=function(nOffset,nSize){}
 /**
- * @see {@link Binary.calculateMD5}
+ * @see Binary.calculateMD5
  */
-MACH.calculateMD5=function(nOffset,nSize){};
+MACH.calculateMD5=function(nOffset,nSize){}
 /**
- * @see {@link Binary.compare}
+ * @see Binary.compare
  */
-MACH.compare=function(sSignature,nOffset){};
+MACH.compare=function(sSignature,nOffset){}
 /**
- * @see {@link Binary.findByte}
+ * @see PE.compareEP
  */
-MACH.findByte=function(nOffset,nSize,cValue){};
+MACH.compareEP=function(sSignature,nOffset){}
 /**
- * @see {@link Binary.findDword}
+ * @see Binary.findByte
  */
-MACH.findDword=function(nOffset,nSize,nValue){};
+MACH.findByte=function(nOffset,nSize,cValue){}
 /**
- * @see {@link Binary.findSignature}
+ * @see Binary.findDword
  */
-MACH.findSignature=function(nOffset,nSize,Signature){};
+MACH.findDword=function(nOffset,nSize,nValue){}
 /**
- * @see {@link Binary.findString}
+ * @see Binary.findSignature
  */
-MACH.findString=function(nOffset,nSize,sValue){};
+MACH.findSignature=function(nOffset,nSize,sSignature){}
 /**
- * @see {@link Binary.findWord}
+ * @see Binary.findString
  */
-MACH.findWord=function(nOffset,nSize,sValue){};
+MACH.findString=function(nOffset,nSize,sValue){}
 /**
- * @see {@link Binary.getSignature}
+ * @see Binary.findWord
  */
-MACH.getSignature=function(){};
+MACH.findWord=function(nOffset,nSize,sValue){}
 /**
- * @see {@link Binary.getSize}
+ * @see Binary.getSignature
  */
-MACH.getSize=function(){};
+MACH.getSignature=function(nOffset,nSize){}
 /**
- * @see {@link Binary.isSignaturePresent}
+ * @see Binary.getSize
  */
-MACH.isSignaturePresent=function(nOffset,nSize,sSignature){};
+MACH.getSize=function(){}
 /**
- * @see {@link Binary.readByte}
+ * @see Binary.isSignaturePresent
  */
-MACH.readByte=function(nOffset){};
+MACH.isSignaturePresent=function(nOffset,nSize,sSignature){}
 /**
- * @see {@link Binary.readDword}
+ * @see Binary.readByte
  */
-MACH.readDword=function(nOffset){};
+MACH.readByte=function(nOffset){}
 /**
- * @see {@link Binary.readWord}
+ * @see Binary.readDword
  */
-MACH.readWord=function(nOffset){};
+MACH.readDword=function(nOffset){}
 /**
- * @see {@link Binary.getString}
+ * @see Binary.readWord
  */
-MACH.getString=function(nOffset,nSize){};
+MACH.readWord=function(nOffset){}
 /**
- * @see {@link Binary.getFileDirectory}
+ * @see Binary.swapBytes
  */
-MACH.getFileDirectory=function(){};
+MACH.swapBytes=function(nValue){}
 /**
- * This function returns a string in the form of [MACHtype][MACHmоde]
+ * @see Binary.getString
+ */
+MACH.getString=function(nOffset,nSize){}
+/**
+ * @see Binary.getFileDirectory
+ */
+MACH.getFileDirectory=function(){}
+/**
+ * Get a string in the form of <code>"<i>MACHtype</i><i>MACHmode</i>"</code>. For example <code>"EXE32"</code> or <code>"DYLIB64"</code>.
  * @returns {String}
  */
-MACH.getGeneralOptions=function(){};
+MACH.getGeneralOptions=function(){}
 /**
- * Get library current version.
+ * Get the current version of a library.
  * @param {String} sLibrary - The name of the library.
- * @returns {String} 
+ * @returns {String}
  */
-MACH.getLibraryCurrentVersion=function(sLibrary){};
+MACH.getLibraryCurrentVersion=function(sLibrary){}
 /**
- * Get number of sections
- * @returns {Int} 
+ * Get the number of sections.
+ * @returns {Int}
  */
-MACH.getNumberOfSections=function(){};
+MACH.getNumberOfSections=function(){}
 /**
- * This function checks whether there is a library with a specific name in the import.
+ * Check if there is a library with a specific name in the import table.
  * @param {String} sLibraryName - The name of the library.
- * @returns {Bool} 
+ * @returns {Bool}
  */
-MACH.isLibraryPresent=function(sLibrary){};
+MACH.isLibraryPresent=function(sLibrary){}
 /**
- * This function checks whether there exists a section with a specific name. Can use regular expressions as the section name.
- * @param {String} sSectionName - Section name.
- * @returns {Bool} 
+ * Check if a section exists with a specific name or matches a regular expression.
+ * @param {String} sSectionName - Section name or pattern.
+ * @returns {Bool}
  */
-MACH.isSectionNamePresent=function(sSectionName){};
+MACH.isSectionNamePresent=function(sSectionName){}

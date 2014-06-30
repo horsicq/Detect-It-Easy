@@ -1,145 +1,149 @@
 /**
  * @class
- * @classdesc This is a description of the Binary class.
+ * @classdesc This is a description of the Binary class. This class is used when no other class matches.
  */
-function Binary(){};
+function Binary(){}
 /**
- * The function calculates entropy.
+ * Calculate the entropy of a region of the file.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The size of memory.
- * @returns {Float} Result in the form of quantity of bits per byte. Since there is 8 bits in a byte, the maximum entropy will be 8.0.
+ * @param {UInt} nSize - Number of bytes.
+ * @returns {Float} Result in the form of quantity of bits per byte. Since there are 8 bits in a byte, the maximum entropy will be 8.0.
  */
-Binary.calculateEntropy=function(nOffset,nSize){};
+Binary.calculateEntropy=function(nOffset,nSize){}
 /**
- * The function calculates MD5 hash
+ * Calculate the MD5 hash of a region of the file.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The size of memory.
- * @returns {String} MD5 hash
+ * @param {UInt} nSize - Number of bytes.
+ * @returns {String} MD5 hash.
  */
-Binary.calculateMD5=function(nOffset,nSize){};
+Binary.calculateMD5=function(nOffset,nSize){}
 /**
- * The function compares bytes with a string signature.
- * <p>The signature may contain both lowercase and uppercase characters.
- * Gaps are skipped while processing lines, and “.” and “?” represent any character.
- * <p>Can use ANSI symbols too. For example "01'Test'01".
- * <p>In the PE class can use # and $:
- * <p># for absolute jump
- * <p>$ for relative jump
-
- * @param {String} sString - The signature.
- * @param {UInt} nOffset - The offset in the file. By default is 0.
- * @returns {Bool} 
+ * Compares bytes with a hexadecimal string signature.
+ * <p>The signature may contain both lowercase and uppercase hexadecimal digits.
+ * Spaces are skipped, and <code>.</code> and <code>?</code> represent any digit.
+ * <p>Text may be matched by using single quotes. For example <samp>"01'Test'01"</samp>.
+ * <p>The PE class has two additional symbols:
+ * <br><code>#</code> for absolute jump (e.g. <code>"68########55"</code>);
+ * <br><code>$</code> for relative jump (e.g. <code>"E8$$$$$$$$55"</code>).
+ *
+ * @param {String} sSignature - The signature.
+ * @param {UInt} [nOffset=0] - The offset in the file.
+ * @returns {Bool}
  * @example
-    if(Binary.compare("'7z'BCAF271C")) // Compare file header(nOffset=0)
-    {
-        sVersion=Binary.readByte(6)+"."+Binary.readByte(7);
-        bDetected=1;
-    }
+ * if(Binary.compare("'7z'BCAF271C")) // compare file header (nOffset=0)
+ * {
+ *     sVersion=Binary.readByte(6)+"."+Binary.readByte(7);
+ *     bDetected=1;
+ * }
  * @example
-    if(Binary.compare("'WAVEfmt '",8)) // Compare file from offset 8
-    {
-        bDetected=1;
-    }
+ * if(Binary.compare("'WAVEfmt '",8)) // compare file from offset 8
+ * {
+ *     bDetected=1;
+ * }
  */
-Binary.compare=function(sString,nOffset){};
+Binary.compare=function(sSignature,nOffset){}
 /**
- * Search for byte in the file.
+ * Search for a byte in the file.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The size of memory.
+ * @param {UInt} nSize - Number of bytes to search.
  * @param {UChar} cValue - The byte value.
- * @returns {Int} The function returns the offset in the file, if the value is found. If nothing is found, -1 is returned.
+ * @returns {Int} Offset in the file if the value is found; <code>-1</code> otherwise.
  */
-Binary.findByte=function(nOffset,nSize,cValue){};
+Binary.findByte=function(nOffset,nSize,cValue){}
 /**
- * Search for word in the file.
+ * Search for a word in the file.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The size of memory.
+ * @param {UInt} nSize - Number of bytes to search.
  * @param {UShort} sValue - The word value.
- * @returns {Int} The function returns the offset in the file, if the value is found. If nothing is found, -1 is returned.
+ * @returns {Int} Offset in the file if the value is found; <code>-1</code> otherwise.
  */
-Binary.findWord=function(nOffset,nSize,sValue){};
+Binary.findWord=function(nOffset,nSize,sValue){}
 /**
- * Search for dword in the file.
+ * Search for a dword in the file.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The size of memory.
+ * @param {UInt} nSize - Number of bytes to search.
  * @param {UInt} nValue - The dword value.
- * @returns {Int} The function returns the offset in the file, if the value is found. If nothing is found, -1 is returned.
+ * @returns {Int} Offset in the file if the value is found; <code>-1</code> otherwise.
  */
-Binary.findDword=function(nOffset,nSize,nValue){};
+Binary.findDword=function(nOffset,nSize,nValue){}
 /**
- * Search for string in the file.
+ * Search for a string in the file.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The size of memory.
+ * @param {UInt} nSize - Number of bytes to search.
  * @param {String} sValue - The string value.
- * @returns {Int} The function returns the offset in the file, if the value is found. If nothing is found, -1 is returned.
+ * @returns {Int} Offset in the file if the value is found; <code>-1</code> otherwise.
  */
-Binary.findString=function(nOffset,nSize,sValue){};
+Binary.findString=function(nOffset,nSize,sValue){}
 /**
- * Search for signature in the file.
- * @see {@link Binary.compare}
+ * Search for a signature (see {@link Binary.compare compare}) in the file.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The size of memory.
+ * @param {UInt} nSize - Number of bytes to search.
  * @param {String} sValue - The signature.
- * @returns {Int} The function returns the offset in the file, if the signature is found. If nothing is found, -1 is returned.
+ * @returns {Int} Offset in the file if the signature is found; <code>-1</code> otherwise.
  */
-Binary.findSignature=function(nOffset,nSize,sValue){};
+Binary.findSignature=function(nOffset,nSize,sValue){}
 /**
- * Get file directory
- * @returns {String} 
+ * Get the directory of the file.
+ * @returns {String}
  */
-Binary.getFileDirectory=function(){};
+Binary.getFileDirectory=function(){}
 /**
- * The function returns signature as string.
+ * Get a signature string from the file.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The size of memory.
+ * @param {UInt} nSize - Number of bytes.
  * @returns {String} Signature.
  * @example
-    var signature=Binary.getSignature(0,4);
-    if(signature=="AA5411DD")
-    {
-        bDetected=1;
-    }
-*/
-Binary.getSignature=function(){};
-/**
- * Get file size
- * @returns {UInt} 
+ * var signature=Binary.getSignature(0,4);
+ * if(signature=="AA5411DD")
+ * {
+ *     bDetected=1;
+ * }
  */
-Binary.getSize=function(){};
+Binary.getSignature=function(nOffset,nSize){}
 /**
- * Read string from specific offset. A string is read up to the first unreadable character or up to the maximum string.
+ * Get the size of the file.
+ * @returns {UInt}
+ */
+Binary.getSize=function(){}
+/**
+ * Get a text string from the file. A string is read up to the first unreadable character or up to the maximum length.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The maximum size of the string. By default is 50.
- * @returns {String} 
+ * @param {UInt} [nSize=50] - The maximum size of the string, in bytes.
+ * @returns {String}
  * @example
-    var sString=Binary.getString(0x100,32); // Read a string from offset 0x100, maximum length 32 bytes.
-    var sString=Binary.getString(60); // read a string from offset 60, maximum length 50 bytes(default value).
+ * var sString=Binary.getString(0x100,32); // read a string from offset 0x100, maximum length 32 bytes
+ * var sString=Binary.getString(60); // read a string from offset 60, maximum length 50 bytes (default value)
  */
-Binary.getString=function(nOffset,nSize){};
+Binary.getString=function(nOffset,nSize){}
 /**
- * This function checks whether there exists a signature. 
- * @see {@link Binary.compare}
+ * Check if a signature (see {@link Binary.compare compare}) exists in a region of the file.
  * @param {UInt} nOffset - The offset in the file.
- * @param {UInt} nSize - The size of memory.
- * @param {String} sValue - The signature.
+ * @param {UInt} nSize - Number of bytes to check.
+ * @param {String} sSignature - The signature.
  * @returns {Bool}
  */
-Binary.isSignaturePresent=function(nOffset,nSize,sSignature){};
+Binary.isSignaturePresent=function(nOffset,nSize,sSignature){}
 /**
- * Read byte value from the file.
+ * Read a byte value from the file.
  * @param {UInt} nOffset - The offset in the file.
  * @returns {UChar} The byte value.
  */
-Binary.readByte=function(nOffset){};
+Binary.readByte=function(nOffset){}
 /**
- * Read dword value from the file.
+ * Read a dword value from the file.
  * @param {UInt} nOffset - The offset in the file.
  * @returns {UInt} The dword value.
  */
-Binary.readDword=function(nOffset){};
+Binary.readDword=function(nOffset){}
 /**
- * Read word from the file.
+ * Read a word from the file.
  * @param {UInt} nOffset - The offset in the file.
  * @returns {UShort} The word value.
  */
-Binary.readWord=function(nOffset){};
+Binary.readWord=function(nOffset){}
+/**
+ * Swap the four bytes of a dword. For example <samp>0x11223344</samp> becomes <samp>0x44332211</samp>.
+ * @param nValue {UInt} - The value.
+ * @returns {Uint} The value with its bytes swapped.
+ */
+Binary.swapBytes=function(nValue){}

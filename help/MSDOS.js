@@ -2,102 +2,106 @@
  * @class
  * @classdesc This is a description of the MSDOS class.
  */
-function MSDOS(){};
+function MSDOS(){}
 /**
- * @see {@link Binary.calculateEntropy}
+ * @see Binary.calculateEntropy
  */
-MSDOS.calculateEntropy=function(nOffset,nSize){};
+MSDOS.calculateEntropy=function(nOffset,nSize){}
 /**
- * @see {@link Binary.calculateMD5}
+ * @see Binary.calculateMD5
  */
-MSDOS.calculateMD5=function(nOffset,nSize){};
+MSDOS.calculateMD5=function(nOffset,nSize){}
 /**
- * @see {@link Binary.compare}
+ * @see Binary.compare
  */
-MSDOS.compare=function(sSignature,nOffset){};
+MSDOS.compare=function(sSignature,nOffset){}
 /**
-  * @see {@link PE.compareEP}
+  * @see PE.compareEP
  */
-MSDOS.compareEP=function(sSignature,nOffset){};
+MSDOS.compareEP=function(sSignature,nOffset){}
 /**
- * @see {@link Binary.findByte}
+ * @see Binary.findByte
  */
-MSDOS.findByte=function(nOffset,nSize,cValue){};
+MSDOS.findByte=function(nOffset,nSize,cValue){}
 /**
- * @see {@link Binary.findDword}
+ * @see Binary.findDword
  */
-MSDOS.findDword=function(nOffset,nSize,nValue){};
+MSDOS.findDword=function(nOffset,nSize,nValue){}
 /**
- * @see {@link Binary.findSignature}
+ * @see Binary.findSignature
  */
-MSDOS.findSignature=function(nOffset,nSize,Signature){};
+MSDOS.findSignature=function(nOffset,nSize,sSignature){}
 /**
- * @see {@link Binary.findString}
+ * @see Binary.findString
  */
-MSDOS.findString=function(nOffset,nSize,sValue){};
+MSDOS.findString=function(nOffset,nSize,sValue){}
 /**
- * @see {@link Binary.findWord}
+ * @see Binary.findWord
  */
-MSDOS.findWord=function(nOffset,nSize,sValue){};
+MSDOS.findWord=function(nOffset,nSize,sValue){}
 /**
- * @see {@link Binary.getSignature}
+ * @see Binary.getSignature
  */
-MSDOS.getSignature=function(){};
+MSDOS.getSignature=function(nOffset,nSize){}
 /**
- * @see {@link Binary.getSize}
+ * @see Binary.getSize
  */
-MSDOS.getSize=function(){};
+MSDOS.getSize=function(){}
 /**
- * @see {@link Binary.isSignaturePresent}
+ * @see Binary.isSignaturePresent
  */
-MSDOS.isSignaturePresent=function(nOffset,nSize,sSignature){};
+MSDOS.isSignaturePresent=function(nOffset,nSize,sSignature){}
 /**
- * @see {@link Binary.readByte}
+ * @see Binary.readByte
  */
-MSDOS.readByte=function(nOffset){};
+MSDOS.readByte=function(nOffset){}
 /**
- * @see {@link Binary.readDword}
+ * @see Binary.readDword
  */
-MSDOS.readDword=function(nOffset){};
+MSDOS.readDword=function(nOffset){}
 /**
- * @see {@link Binary.readWord}
+ * @see Binary.readWord
  */
-MSDOS.readWord=function(nOffset){};
+MSDOS.readWord=function(nOffset){}
 /**
- * @see {@link Binary.getString}
+ * @see Binary.swapBytes
  */
-MSDOS.getString=function(nOffset,nSize){};
+MSDOS.swapBytes=function(nValue){}
 /**
- * @see {@link Binary.getFileDirectory}
+ * @see Binary.getString
  */
-MSDOS.getFileDirectory=function(){};
+MSDOS.getString=function(nOffset,nSize){}
 /**
- * Get overlay offset
- * @returns {UInt} 
+ * @see Binary.getFileDirectory
  */
-MSDOS.getOverlayOffset=function(){};
+MSDOS.getFileDirectory=function(){}
 /**
- * Get overlay size
- * @returns {UInt} 
+ * Get the file offset of the overlay.
+ * @returns {Int}
  */
-MSDOS.getOverlaySize=function(){};
+MSDOS.getOverlayOffset=function(){}
 /**
- * This function checks whether there is an overlay.
- * @returns {Bool} 
+ * Get the size of the overlay.
+ * @returns {Int}
  */
-MSDOS.isOverlayPresent=function(){};
+MSDOS.getOverlaySize=function(){}
 /**
- * This function checks whether the file is NE.
- * @returns {Bool} 
+ * Check if an overlay is present.
+ * @returns {Bool}
  */
-MSDOS.isNE=function(){};
+MSDOS.isOverlayPresent=function(){}
 /**
- * This function checks whether the file is LE.
- * @returns {Bool} 
+ * Check if the file is a <b>N</b>ew <b>E</b>xecutable.
+ * @returns {Bool}
  */
-MSDOS.isLE=function(){};
+MSDOS.isNE=function(){}
 /**
- * This function checks whether the file is LX.
- * @returns {Bool} 
+ * Check if the file is a <b>L</b>inear <b>E</b>xecutable.
+ * @returns {Bool}
  */
-MSDOS.isLX=function(){};
+MSDOS.isLE=function(){}
+/**
+ * Check if the file is a <b>L</b>inear e<b>X</b>ecutable.
+ * @returns {Bool}
+ */
+MSDOS.isLX=function(){}

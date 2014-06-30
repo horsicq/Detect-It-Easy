@@ -2,586 +2,592 @@
  * @class
  * @classdesc This is a description of the PE class.
  */
-function PE(){};
+function PE(){}
 /**
- * @see {@link Binary.calculateEntropy}
+ * @see Binary.calculateEntropy
  */
-PE.calculateEntropy=function(nOffset,nSize){};
+PE.calculateEntropy=function(nOffset,nSize){}
 /**
- * @see {@link Binary.calculateMD5}
+ * @see Binary.calculateMD5
  */
-PE.calculateMD5=function(nOffset,nSize){};
+PE.calculateMD5=function(nOffset,nSize){}
 /**
- * Calculate size of headers
+ * Calculate the size of the headers.
  * @returns {UInt}
  */
-PE.calculateSizeOfHeaders=function(){};
+PE.calculateSizeOfHeaders=function(){}
 /**
- * @see {@link Binary.compare}
+ * @see Binary.compare
  */
-PE.compare=function(sSignature,nOffset){};
+PE.compare=function(sSignature,nOffset){}
 /**
- * The function compares bytes at the EntryPoint
- * @see {@link Binary.compare}
- * @param {String} sString - The Signature
- * @param {UInt} nOffset - The offset from the EntryPoint. By default is 0
- * @returns {Bool} 
+ * Compare (see {@link Binary.compare}) bytes at the <b>E</b>ntry <b>P</b>oint.
+ * @param {String} sSignature - The signature.
+ * @param {Int} [nOffset=0] - The offset from the entry point.
+ * @returns {Bool}
  * @example
-    if(PE.compareEP("2C81",8))
-    {
-        sVersion="1.98";
-    }
-    
-    if(PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24"))
-    {
-        bDetected=1;
-    }
+ * if(PE.compareEP("2C81",8))
+ * {
+ *     sVersion="1.98";
+ * }
+ *
+ * if(PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24"))
+ * {
+ *     bDetected=1;
+ * }
  */
-PE.compareEP=function(sSignature,nOffset){};
+PE.compareEP=function(sSignature,nOffset){}
 /**
- * The function compares bytes at the EntryPoint of .NET
- * @see {@link Binary.compare}
- * @param {String} sString - The Signature
- * @param {UInt} nOffset - The offset from the EntryPoint of .NET. By default is 0
- * @returns {Bool} 
+ * Compare (see {@link Binary.compare}) bytes at the <b>E</b>ntry <b>P</b>oint of .NET.
+ * @param {String} sSignature - The signature.
+ * @param {Int} [nOffset=0] - The offset from the entry point of .NET.
+ * @returns {Bool}
  * @example
-    if(PE.compareEP_NET("4228070000066f09000006283800000a2a1b3004006f0000000d0000110272b9"))
-    {
-        bDetected=1;
-        sVersion="2.X";
-    }
+ * if(PE.compareEP_NET("4228070000066f09000006283800000a2a1b3004006f0000000d0000110272b9"))
+ * {
+ *     bDetected=1;
+ *     sVersion="2.X";
+ * }
  */
-PE.compareEP_NET=function(sSignature,nOffset){};
+PE.compareEP_NET=function(sSignature,nOffset){}
 /**
- * The function compares bytes of overlay
- * @param {String} sString - The Signature
- * @param {UInt} nOffset - The offset from the overlay offset. By default is 0
- * @returns {Bool} 
+ * Compare bytes at the overlay.
+ * @param {String} sSignature - The signature.
+ * @param {Int} [nOffset=0] - The offset from the overlay.
+ * @returns {Bool}
  * @example
-    if(PE.compareOverlay("';!@Install@!UTF-8!'"))
-    {
-        bDetected=1;
-    }
+ * if(PE.compareOverlay("';!@Install@!UTF-8!'"))
+ * {
+ *     bDetected=1;
+ * }
  */
-PE.compareOverlay=function(sSignature,nOffset){};
+PE.compareOverlay=function(sSignature,nOffset){}
 /**
- * @see {@link Binary.findByte}
+ * @see Binary.findByte
  */
-PE.findByte=function(nOffset,nSize,cValue){};
+PE.findByte=function(nOffset,nSize,cValue){}
 /**
- * @see {@link Binary.findDword}
+ * @see Binary.findDword
  */
-PE.findDword=function(nOffset,nSize,nValue){};
+PE.findDword=function(nOffset,nSize,nValue){}
 /**
- * @see {@link Binary.findSignature}
+ * @see Binary.findSignature
  * @example
-    nOffset=PE.findSignature(nOffset,1024,"'7z'BCAF271C");
-    if(nOffset!=-1)
-    {
-        bDetected=1;
-    }
+ * nOffset=PE.findSignature(nOffset,1024,"'7z'BCAF271C");
+ * if(nOffset!=-1)
+ * {
+ *     bDetected=1;
+ * }
  */
-PE.findSignature=function(nOffset,nSize,Signature){};
+PE.findSignature=function(nOffset,nSize,sSignature){}
 /**
- * @see {@link Binary.findString}
+ * @see Binary.findString
  * @example
-    nOffset=PE.findString(0,1024,"UPX!");
-    if(nOffset==-1)
-    {
-        return;
-    }
+ * nOffset=PE.findString(0,1024,"UPX!");
+ * if(nOffset==-1)
+ * {
+ *     return;
+ * }
  */
-PE.findString=function(nOffset,nSize,sValue){};
+PE.findString=function(nOffset,nSize,sValue){}
 /**
- * @see {@link Binary.findWord}
+ * @see Binary.findWord
  */
-PE.findWord=function(nOffset,nSize,sValue){};
+PE.findWord=function(nOffset,nSize,sValue){}
 /**
- * Get address of EntryPoint
- * @returns {UInt} 
- * @example
-    var nSection=PE.nLastSection;
-    if(nSection>=2)
-    {
-        if(PE.getAddressOfEntryPoint()==PE.section[nSection].VirtualAddress)
-        {
-            if(PE.section[nSection].Characteristics==0xe0000040)
-            {
-                if(PE.section[nSection-1].Characteristics==0xe0000040)
-                {
-                    if(PE.getNumberOfImportThunks(0)==1)
-                    {
-                        bDetected=1;
-                    }
-                }
-            }
-        }
-    }
- */
-PE.getAddressOfEntryPoint=function(){};
-/**
- * Get compiler version
- * @returns {String} The function returns the string [MajorLinkerVersion].[MinorLinkerVersion]
- * @example
-    if(bDetected)
-    {
-        switch(PE.getCompilerVersion())
-        {
-        case "6.0":  sVersion="6.0";  break;
-        case "7.0":  sVersion="2002"; break;
-        case "7.10": sVersion="2003"; break;
-        case "8.0":  sVersion="2005"; break;
-        case "9.0":  sVersion="2008"; break;
-        case "10.0": sVersion="2010"; break;
-        case "11.0": sVersion="2012"; break;
-        case "12.0": sVersion="2013"; break;
-        }
-    }
- */
-PE.getCompilerVersion=function(){};
-/**
- * The function returns the number of a section, where the point of entry is located (address of entry point) (0…N)
- * @returns {Int} if no entry point returns -1
- * @example
-if(PE.getEntryPointSection()==PE.nLastSection)
-{
-    bDetected=1;
-}
- */
-PE.getEntryPointSection=function(){};
-/**
- * @see {@link Binary.getFileDirectory}
- */
-PE.getFileDirectory=function(){};
-/**
- * This function returns the version of the opened file. If the version can be found in the resources
- * @returns {String}
- */
-PE.getFileVersion=function(){};
-/**
- * This function returns a string in the form of [PEtype][PEmоde} For example "EXE32" or "Driver32"
- * @returns {String}
- */
-PE.getGeneralOptions=function(){};
-/**
- * Get image base
- * @returns {UInt} 
- */
-PE.getImageBase=function(){};
-/**
- * This function returns the name of the imported function
- * @param {UInt} nImport - The sequence number of the imported library (0…N)
- * @param {UInt} nFunctionNumber - The sequence number of the function in the library (0…N)
- * @returns {String}
- */
-PE.getImportFunctionName=function(nImport,nFunctionNumber){};
-/**
- * This function returns the name of the imported library
- * @param {UInt} nImport - The sequence number of the imported library (0…N)
- * @returns {String}
- */
-PE.getImportLibraryName=function(nImport){};
-/**
- * The function returns the number of a section, where the import is located (address of entry point) (0…N)
- * @returns {Int} if no import returns -1
- */
-PE.getImportSection=function(){};
-/**
- * Get machine type
- * @returns {UShort} 
- */
-PE.getMachineType=function(){};
-/**
- * Get major linker version
- * @returns {UInt} 
- * @example
-    var nMajor=PE.getMajorLinkerVersion();
-    if(nMajor>3)
-    {
-        sName="Microsoft Linker";
-        bDetected=1;
-    }
- */
-PE.getMajorLinkerVersion=function(){};
-/**
- * This XML manifest from the resources
- * @returns {String}
- * @example
-    if(PE.getManifest().match(/requireAdministrator/))
-    {
-        sOptions=sOptions.append("admin");
-    }
- */
-PE.getManifest=function(){};
-/**
- * Get minor linker version
- * @returns {UInt} 
- * @example
-    var nMinor=PE.getMinorLinkerVersion();
-    if(nMinor==55)
-    {
-        sName="LCC Linker";
-        sVersion+="*";
-        bDetected=1;
-    }
- */
-PE.getMinorLinkerVersion=function(){};
-/**
- * This function returns .NET version.
- * @returns {String}
- * @example
-    if(PE.isNET())
-    {
-        sVersion=PE.getNETVersion();
-        bDetected=1;
-    }
- */
-PE.getNETVersion=function(){};
-/**
- * Get number of imports
- * @returns {Int} 
- * @example
-    if(PE.getNumberOfImports()==1)
-    {
-        if(PE.getNumberOfImportThunks(0)==2)
-        {
-            if(PE.section[0].Name=="ANDpakk2")
-            {
-                sVersion="2.X";
-                bDetected=1;
-            }
-        }
-    }
- */
-PE.getNumberOfImports=function(){};
-/**
- * This function returns the number of functions in the imported library
- * @param {UInt} nImport - The sequence number of the imported library (0…N)
+ * Get the relative virtual address (RVA) of the entry point.
  * @returns {UInt}
  * @example
-    if(PE.getNumberOfImportThunks(0)==1)
-    {
-        bDetected=1;
-    }
+ * var nSection=PE.nLastSection;
+ * if(nSection>=2)
+ * {
+ *     if(PE.getAddressOfEntryPoint()==PE.section[nSection].VirtualAddress)
+ *     {
+ *         if(PE.section[nSection].Characteristics==0xe0000040)
+ *         {
+ *             if(PE.section[nSection-1].Characteristics==0xe0000040)
+ *             {
+ *                 if(PE.getNumberOfImportThunks(0)==1)
+ *                 {
+ *                     bDetected=1;
+ *                 }
+ *             }
+ *         }
+ *     }
+ * }
  */
-PE.getNumberOfImportThunks=function(nImport){};
+PE.getAddressOfEntryPoint=function(){}
 /**
- * Get number of sections
- * @returns {Int} 
+ * Get the compiler version.
+ * @returns {String} The string <code>"<i>MajorLinkerVersion</i>.<i>MinorLinkerVersion</i>"</code>.
+ * @example
+ * if(bDetected)
+ * {
+ *     switch(PE.getCompilerVersion())
+ *     {
+ *     case "6.0":  sVersion="6.0";  break;
+ *     case "7.0":  sVersion="2002"; break;
+ *     case "7.10": sVersion="2003"; break;
+ *     case "8.0":  sVersion="2005"; break;
+ *     case "9.0":  sVersion="2008"; break;
+ *     case "10.0": sVersion="2010"; break;
+ *     case "11.0": sVersion="2012"; break;
+ *     case "12.0": sVersion="2013"; break;
+ *     }
+ * }
  */
-PE.getNumberOfSections=function(){};
+PE.getCompilerVersion=function(){}
 /**
- * Get overlay offset
- * @returns {UInt} 
+ * Get the number of the section containing the entry point.
+ * @returns {Int} If no entry point returns <code>-1</code>.
+ * @example
+ * if(PE.getEntryPointSection()==PE.nLastSection)
+ * {
+ *     bDetected=1;
+ * }
  */
-PE.getOverlayOffset=function(){};
+PE.getEntryPointSection=function(){}
 /**
- * Get overlay size
- * @returns {UInt} 
+ * @see Binary.getFileDirectory
  */
-PE.getOverlaySize=function(){};
+PE.getFileDirectory=function(){}
 /**
- * This function returns the version of the file. If the version can be found in resources
- * @param {String} sFileName - The file name
+ * Get the version of the file, if the version resource exists.
  * @returns {String}
  */
-PE.getPEFileVersion=function(sFileName){};
+PE.getFileVersion=function(){}
 /**
- * This function returns a offset to resource with a specific name in the file
- * @param {String} sFileName - The name of the resource
- * @returns {Int} If an error occurs, -1 will be returned
+ * Get a string in the form of <code>"<i>PEtype</i><i>PEmode</i>"</code>. For example <samp>"EXE32"</samp> or <samp>"Driver32"</samp>.
+ * @returns {String}
  */
-PE.getResourceNameOffset=function(sName){};
+PE.getGeneralOptions=function(){}
 /**
- * This function returns a size of resource with a specific name in the file
+ * Get the base address of the image.
+ * @returns {UInt}
+ */
+PE.getImageBase=function(){}
+/**
+ * Get the name of an imported function.
+ * @param {UInt} nImport - Number of the imported library.
+ * @param {UInt} nFunctionNumber - Number of the function in the library.
+ * @returns {String}
+ */
+PE.getImportFunctionName=function(nImport,nFunctionNumber){}
+/**
+ * Get the name of an imported library.
+ * @param {UInt} nImport - Number of the imported library.
+ * @returns {String}
+ */
+PE.getImportLibraryName=function(nImport){}
+/**
+ * Get the number of the section containing the import table.
+ * @returns {Int} If no import returns <code>-1</code>.
+ */
+PE.getImportSection=function(){}
+/**
+ * Get the machine type.
+ * @returns {UShort}
+ */
+PE.getMachineType=function(){}
+/**
+ * Get the major linker version.
+ * @returns {UInt}
+ * @example
+ * var nMajor=PE.getMajorLinkerVersion();
+ * if(nMajor>3)
+ * {
+ *     sName="Microsoft Linker";
+ *     bDetected=1;
+ * }
+ */
+PE.getMajorLinkerVersion=function(){}
+/**
+ * Get the XML manifest from the resources.
+ * @returns {String}
+ * @example
+ * if(/requireAdministrator/.test(PE.getManifest()))
+ * {
+ *     sOptions=sOptions.append("admin");
+ * }
+ */
+PE.getManifest=function(){}
+/**
+ * Get the minor linker version.
+ * @returns {UInt}
+ * @example
+ * var nMinor=PE.getMinorLinkerVersion();
+ * if(nMinor==55)
+ * {
+ *     sName="LCC Linker";
+ *     sVersion+="*";
+ *     bDetected=1;
+ * }
+ */
+PE.getMinorLinkerVersion=function(){}
+/**
+ * Get the .NET version.
+ * @returns {String}
+ * @example
+ * if(PE.isNET())
+ * {
+ *     sVersion=PE.getNETVersion();
+ *     bDetected=1;
+ * }
+ */
+PE.getNETVersion=function(){}
+/**
+ * Get the number of imports.
+ * @returns {Int}
+ * @example
+ * if(PE.getNumberOfImports()==1)
+ * {
+ *     if(PE.getNumberOfImportThunks(0)==2)
+ *     {
+ *         if(PE.section[0].Name=="ANDpakk2")
+ *         {
+ *             sVersion="2.X";
+ *             bDetected=1;
+ *         }
+ *     }
+ * }
+ */
+PE.getNumberOfImports=function(){}
+/**
+ * Get the number of functions in the imported library.
+ * @param {UInt} nImport - Number of the library.
+ * @returns {UInt}
+ * @example
+ * if(PE.getNumberOfImportThunks(0)==1)
+ * {
+ *     bDetected=1;
+ * }
+ */
+PE.getNumberOfImportThunks=function(nImport){}
+/**
+ * Get the number of sections.
+ * @returns {Int}
+ */
+PE.getNumberOfSections=function(){}
+/**
+ * Get the file offset of the overlay.
+ * @returns {UInt}
+ */
+PE.getOverlayOffset=function(){}
+/**
+ * Get the size of the overlay .
+ * @returns {UInt}
+ */
+PE.getOverlaySize=function(){}
+/**
+ * Get the version of a particular file, if the version resource exists.
+ * @param {String} sFileName - The file name.
+ * @returns {String}
+ */
+PE.getPEFileVersion=function(sFileName){}
+/**
+ * Get the file offset to a named resource.
  * @param {String} sFileName - The name of the resource.
- * @returns {Int} 
+ * @returns {Int} If an error occurs, <code>-1</code> will be returned.
  */
-PE.getResourceNameSize=function(sName){};
+PE.getResourceNameOffset=function(sName){}
 /**
- * Get section characteristics
- * @param {Int} nSectionNumber - Section number
- * @returns {UInt} 
+ * Get the size of a named resource.
+ * @param {String} sFileName - The name of the resource.
+ * @returns {Int}
  */
-PE.getSectionCharacteristics=function(nSectionNumber){};
+PE.getResourceNameSize=function(sName){}
 /**
- * Get section file offset
- * @param {Int} nSectionNumber - Section number
- * @returns {UInt} 
- */
-PE.getSectionFileOffset=function(nSectionNumber){};
-/**
- * Get section file size
- * @param {Int} nSectionNumber - Section number
- * @returns {UInt} 
- */
-PE.getSectionFileSize=function(nSectionNumber){};
-/**
- * Get section name
- * @param {Int} nSectionNumber - Section number
- * @returns {String} 
- */
-PE.getSectionName=function(nSectionNumber){};
-/**
- * Get section virtual address
- * @param {Int} nSectionNumber - Section number
- * @returns {UInt} 
- */
-PE.getSectionVirtualAddress=function(nSectionNumber){};
-/**
- * Get section virtual size
- * @param {Int} nSectionNumber - Section number
- * @returns {UInt} 
- */
-PE.getSectionVirtualSize=function(nSectionNumber){};
-/**
- * If the file contains sections with names “UPX0”, “UPX1”, this function  will return the string "UPX"
- * @param {String} sString1 - Section name 1
- * @param {String} sString2 - Section name 2
- * @returns {String} 
- */
-PE.getSectionNameCollision=function(sString1,sString2){};
-/**
- * This function returns the number of a section with a specific name 
- * @param {String} sSectionName - Section name
- * @returns {Int} (0-N) If there is no section with such name, -1 will be returned
- */
-PE.getSectionNumber=function(sSectionName){};
-/**
- * This function returns the number of a section with a specific name. Can use regular expressions as the section name
- * @param {String} sSectionName - Section name
- * @returns {Int} (0-N) If there is no section with such name, -1 will be returned
- */
-PE.getSectionNumberExp=function(sSectionName){};
-/**
- * This function checks whether there exists a section with a specific name
- * @param {String} sSectionName - Section name
- * @returns {Bool} 
- */
-PE.isSectionNamePresent=function(sSectionName){};
-/**
- * This function checks whether there exists a section with a specific name. Can use regular expressions as the section name
- * @param {String} sSectionName - Section name
- * @returns {Bool} 
- */
-PE.isSectionNamePresentExp=function(sSectionName){};
-/**
- * @see {@link Binary.getSignature}
- */
-PE.getSignature=function(){};
-/**
- * @see {@link Binary.getSize}
- */
-PE.getSize=function(){};
-/**
- * Get size of code
- * @returns {Int} 
- */
-PE.getSizeOfCode=function(){};
-/**
- * Get size of unitialized data
- * @returns {Int} 
- */
-PE.getSizeOfUninitializedData=function(){};
-/**
- * This function checks whether the file is a console application
- * @returns {Bool} 
- */
-PE.isConsole=function(){};
-/**
- * This function checks whether the file is a DLL
- * @returns {Bool} 
- */
-PE.isDll=function(){};
-/**
- * This function checks whether the file is a .NET application
- * @returns {Bool} 
- */
-PE.isNET=function(){};
-/**
- * This function checks whether there is an overlay in the file
- * @returns {Bool} 
- */
-PE.isOverlayPresent=function(){};
-/**
- * This function checks whether the file is 64 bit (PE+)
- * @returns {Bool} 
- * @example
-    if(PE.isPEPlus())
-    {
-        sOptions="PE+";
-    }
- */
-PE.isPEPlus=function(){};
-/**
- * This function checks whether there is a Rich signature in the file. For more information check {@link http://www.ntсоre.соm/files/riсhsign.htm|http://www.ntсоre.соm/files/riсhsign.htm} It is typical for the files made by using the MS Linker
- * @returns {Bool} 
- * @example
-    if(PE.isRichSignaturePresent())
-    {
-        sName="Microsoft Linker";
-        bDetected=1;
-    }
- */
-PE.isRichSignaturePresent=function(){};
-/**
- * This function checks whether there is a resource with a specific name in the file
- * @param {String} sName - The name of the resource
- * @returns {Bool} 
- * @example
-    if(PE.isResourceNamePresent("PACKAGEINFO"))
-    {
-        bDetected=1;
-    }
- */
-PE.isResourceNamePresent=function(sName){};
-/**
- * This function checks whether there is a string with a specific name in .NET
- * @param {String} sString
- * @returns {Bool} 
- * @example
-    if(PE.isNETStringPresent(0,"DotfuscatorAttribute"))
-    {
-        bDetected=1;
-    }
- */
-PE.isNETStringPresent=function(sString){};
-/**
- * This function checks whether there is a unicode string with a specific name in .NET
- * @param {String} sString
- * @returns {Bool} 
- * @example
-    if(PE.isNETUnicodeStringPresent("E_TamperDetected"))
-    {
-        sVersion="3.X-4.X";
-        bDetected=1;
-    }
- */
-PE.isNETUnicodeStringPresent=function(sString){};
-/**
- * This function checks whether there is a function with a specific name in the import
- * @param {String} sLibraryName - The name of the library
- * @param {String} sFunctionName - The name of the function
- * @returns {Bool} 
- 
- */
-PE.isLibraryFunctionPresent=function(sLibraryName,sFunctionName){};
-/**
- * This function checks whether there is a library with a specific name in the import
- * @param {String} sLibraryName - The name of the library
- * @returns {Bool} 
- * @example
-    if(PE.isLibraryPresent("MSVBVM50.DLL"))
-    {
-        sVersion="5.0";
-        bDetected=1;
-    }
- */
-PE.isLibraryPresent=function(sLibraryName){};
-/**
- * This function checks whether there is a signature int the section
- * @see {@link Binary.compare}
- * @param {Int} nSection - Section number
- * @param {String} sSignature - Signature
- * @returns {Bool} 
- * @example
-    if(PE.isSignatureInSectionPresent(0,"'ENIGMA'"))
-    {
-        bDetected=1;
-    }
- */
-PE.isSignatureInSectionPresent=function(nSection,sSignature){};
-/**
- * @see {@link Binary.isSignaturePresent}
- */
-PE.isSignaturePresent=function(nOffset,nSize,sSignature){};
-/**
- * This function converts a file offset to a relative virtual address
- * @param {UInt} nOffset 
- * @returns {UInt} If an error occurs, -1 will be returned
- */
-PE.OffsetToRVA=function(nOffset){};
-/**
- * This function converts a file offset to a virtual address
- * @param {UInt} nOffset 
- * @returns {UInt} 
- */
-PE.OffsetToVA=function(nOffset){};
-/**
- * @see {@link Binary.readByte}
- */
-PE.readByte=function(nOffset){};
-/**
- * @see {@link Binary.readDword}
- */
-PE.readDword=function(nOffset){};
-/**
- * @see {@link Binary.readWord}
- */
-PE.readWord=function(nOffset){};
-/**
- * This function converts a relative virtual address to a file offset
- * @param {UInt} nRVA 
- * @returns {Int} If an error occurs, -1 will be returned
- */
-PE.RVAToOffset=function(nRVA){};
-/**
- * This function converts a virtual address to a file offset
- * @param {UInt} nVA 
- * @returns {Int} If an error occurs, -1 will be returned
- */
-PE.VAToOffset=function(nVA){};
-/**
- * @see {@link Binary.getString}
- */
-PE.getString=function(nOffset,nSize){};
-/**
- * Get VersionString info
- * @param {String} sKey 
- * @returns {String} 
- */
-PE.getVersionStringInfo=function(sKey){};
-/**
- * This function checks whether there is a MS DOS stub
- * @returns {Bool} 
- */
-PE.isDosStubPresent=function(){};
-/**
- * Get MSDOS stub offset
- * @returns {UInt} 
- */
-PE.getDosStubOffset=function(){};
-/**
- * Get MSDOS stub size
- * @returns {UInt} 
- */
-PE.getDosStubSize=function(){};
-/**
- * Get number of resource's entries
- * @returns {UInt} 
- */
-PE.getNumberOfResources=function(){};
-/**
- * Get offset of resource
- * @param {UInt} nNumber 
- * @returns {Int} If an error occurs, -1 will be returned
- */
-PE.getResourceOffsetByNumber=function(nNumber){};
-/**
- * Get size of resource
- * @param {UInt} nNumber 
- * @returns {Int} 
- */
-PE.getResourceSizeByNumber=function(nNumber){};
-/**
- * Get Id of resource
- * @param {UInt} nNumber 
+ * Get the characteristics of a section.
+ * @param {Int} nSectionNumber - Section number (from 0).
  * @returns {UInt}
  */
-PE.getResourceIdByNumber=function(nNumber){};
+PE.getSectionCharacteristics=function(nSectionNumber){}
 /**
- * Get name of resource
- * @param {UInt} nNumber 
+ * Get the file offset of a setion.
+ * @param {Int} nSectionNumber - Section number (from 0).
+ * @returns {UInt}
+ */
+PE.getSectionFileOffset=function(nSectionNumber){}
+/**
+ * Get the file size of a section.
+ * @param {Int} nSectionNumber - Section number (from 0).
+ * @returns {UInt}
+ */
+PE.getSectionFileSize=function(nSectionNumber){}
+/**
+ * Get the name of a section.
+ * @param {Int} nSectionNumber - Section number (from 0).
  * @returns {String}
  */
-PE.getResourceNameByNumber=function(nNumber){};
+PE.getSectionName=function(nSectionNumber){}
+/**
+ * Get the relative virtual address of a section.
+ * @param {Int} nSectionNumber - Section number (from 0).
+ * @returns {UInt}
+ */
+PE.getSectionVirtualAddress=function(nSectionNumber){}
+/**
+ * Get the virtual size of a section.
+ * @param {Int} nSectionNumber - Section number (from 0).
+ * @returns {UInt}
+ */
+PE.getSectionVirtualSize=function(nSectionNumber){}
+/**
+ * Get the common prefix of two section name suffixes.
+ * @param {String} sString1 - First section name suffix.
+ * @param {String} sString2 - Second section name suffix.
+ * @returns {String} Section name prefix.
+ * @example
+ * if("UPX"==PE.getSectionNameCollision("0","1"))
+ * {
+ *     // Both "UPX0" and "UPX1" exist.
+ *     bDetected=1;
+ * }
+ */
+PE.getSectionNameCollision=function(sString1,sString2){}
+/**
+ * Get the number of a section with a specific name.
+ * @param {String} sSectionName - Section name.
+ * @returns {Int} 0-based section number, or <code>-1</code> if there is no section with that name.
+ */
+PE.getSectionNumber=function(sSectionName){}
+/**
+ * Get the number of a section whose name matches a regular expression.
+ * @param {String} sSectionName - Section pattern.
+ * @returns {Int} 0-based section number, or <code>-1</code> if there is no section with that pattern.
+ */
+PE.getSectionNumberExp=function(sSectionName){}
+/**
+ * Checks if a section exists with a specific name.
+ * @param {String} sSectionName - Section name.
+ * @returns {Bool}
+ */
+PE.isSectionNamePresent=function(sSectionName){}
+/**
+ * Check if a section name matches a regular expression.
+ * @param {String} sSectionName - Section pattern.
+ * @returns {Bool}
+ */
+PE.isSectionNamePresentExp=function(sSectionName){}
+/**
+ * @see Binary.getSignature
+ */
+PE.getSignature=function(nOffset,nSize){}
+/**
+ * @see Binary.getSize
+ */
+PE.getSize=function(){}
+/**
+ * Get the size of code.
+ * @returns {Int}
+ */
+PE.getSizeOfCode=function(){}
+/**
+ * Get the size of unitialized data.
+ * @returns {Int}
+ */
+PE.getSizeOfUninitializedData=function(){}
+/**
+ * Check if the file is a console application.
+ * @returns {Bool}
+ */
+PE.isConsole=function(){}
+/**
+ * Check if the file is a DLL.
+ * @returns {Bool}
+ */
+PE.isDll=function(){}
+/**
+ * Check if the file is a .NET application.
+ * @returns {Bool}
+ */
+PE.isNET=function(){}
+/**
+ * Check if there is an overlay in the file.
+ * @returns {Bool}
+ */
+PE.isOverlayPresent=function(){}
+/**
+ * Check if the file is 64 bit (PE+).
+ * @returns {Bool}
+ * @example
+ * if(PE.isPEPlus())
+ * {
+ *     sOptions="PE+";
+ * }
+ */
+PE.isPEPlus=function(){}
+/**
+ * Check if the “Rich” signature is in the file. For more information see {@link http://www.ntcore.com/files/richsign.htm}. It is typical for the files made by the MS Linker.
+ * @returns {Bool}
+ * @example
+ * if(PE.isRichSignaturePresent())
+ * {
+ *     sName="Microsoft Linker";
+ *     bDetected=1;
+ * }
+ */
+PE.isRichSignaturePresent=function(){}
+/**
+ * Check if there is a resource with a specific name in the file.
+ * @param {String} sName - The name of the resource.
+ * @returns {Bool}
+ * @example
+ * if(PE.isResourceNamePresent("PACKAGEINFO"))
+ * {
+ *     bDetected=1;
+ * }
+ */
+PE.isResourceNamePresent=function(sName){}
+/**
+ * Check if there is a specific .NET string.
+ * @param {String} sString
+ * @returns {Bool}
+ * @example
+ * if(PE.isNETStringPresent(0,"DotfuscatorAttribute"))
+ * {
+ *     bDetected=1;
+ * }
+ */
+PE.isNETStringPresent=function(sString){}
+/**
+ * Check if there is a specific .NET Unicode string.
+ * @param {String} sString
+ * @returns {Bool}
+ * @example
+ * if(PE.isNETUnicodeStringPresent("E_TamperDetected"))
+ * {
+ *     sVersion="3.X-4.X";
+ *     bDetected=1;
+ * }
+ */
+PE.isNETUnicodeStringPresent=function(sString){}
+/**
+ * Check if a function exists in a library.
+ * @param {String} sLibraryName - The name of the library.
+ * @param {String} sFunctionName - The name of the function.
+ * @returns {Bool}
+ */
+PE.isLibraryFunctionPresent=function(sLibraryName,sFunctionName){}
+/**
+ * Check if a library is imported.
+ * @param {String} sLibraryName - The name of the library.
+ * @returns {Bool}
+ * @example
+ * if(PE.isLibraryPresent("MSVBVM50.DLL"))
+ * {
+ *     sVersion="5.0";
+ *     bDetected=1;
+ * }
+ */
+PE.isLibraryPresent=function(sLibraryName){}
+/**
+ * Check if a signature (see {@link Binary.compare}) exists in a section.
+ * @param {Int} nSection - Section number (from 0).
+ * @param {String} sSignature - Signature.
+ * @returns {Bool}
+ * @example
+ * if(PE.isSignatureInSectionPresent(0,"'ENIGMA'"))
+ * {
+ *     bDetected=1;
+ * }
+ */
+PE.isSignatureInSectionPresent=function(nSection,sSignature){}
+/**
+ * @see Binary.isSignaturePresent
+ */
+PE.isSignaturePresent=function(nOffset,nSize,sSignature){}
+/**
+ * Convert a file offset to a relative virtual address (RVA).
+ * @param {UInt} nOffset
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+PE.OffsetToRVA=function(nOffset){}
+/**
+ * Convert a file offset to a virtual address (VA).
+ * @param {UInt} nOffset
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+PE.OffsetToVA=function(nOffset){}
+/**
+ * @see Binary.readByte
+ */
+PE.readByte=function(nOffset){}
+/**
+ * @see Binary.readDword
+ */
+PE.readDword=function(nOffset){}
+/**
+ * @see Binary.readWord
+ */
+PE.readWord=function(nOffset){}
+/**
+ * @see Binary.swapBytes
+ */
+PE.swapBytes=function(nValue){}
+/**
+ * Convert a relative virtual address (RVA) to a file offset.
+ * @param {UInt} nRVA
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+PE.RVAToOffset=function(nRVA){}
+/**
+ * Convert a virtual address (VA) to a file offset.
+ * @param {UInt} nVA
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+PE.VAToOffset=function(nVA){}
+/**
+ * @see Binary.getString
+ */
+PE.getString=function(nOffset,nSize){}
+/**
+ * Get the value associated with a version resource string key.
+ * @param {String} sKey
+ * @returns {String}
+ */
+PE.getVersionStringInfo=function(sKey){}
+/**
+ * Check if there is an MSDOS stub.
+ * @returns {Bool}
+ */
+PE.isDosStubPresent=function(){}
+/**
+ * Get the file offset of the MSDOS stub.
+ * @returns {UInt}
+ */
+PE.getDosStubOffset=function(){}
+/**
+ * Get the size of the MSDOS stub.
+ * @returns {UInt}
+ */
+PE.getDosStubSize=function(){}
+/**
+ * Get the number of resources.
+ * @returns {UInt}
+ */
+PE.getNumberOfResources=function(){}
+/**
+ * Get the offset of a resource.
+ * @param {UInt} nNumber - Number of resource.
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+PE.getResourceOffsetByNumber=function(nNumber){}
+/**
+ * Get the size of a resource.
+ * @param {UInt} nNumber - Number of resource.
+ * @returns {Int}
+ */
+PE.getResourceSizeByNumber=function(nNumber){}
+/**
+ * Get the Id of a resource.
+ * @param {UInt} nNumber - Number of resource.
+ * @returns {UInt}
+ */
+PE.getResourceIdByNumber=function(nNumber){}
+/**
+ * Get the name of a resource.
+ * @param {UInt} nNumber - Number of resource.
+ * @returns {String}
+ */
+PE.getResourceNameByNumber=function(nNumber){}

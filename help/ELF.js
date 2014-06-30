@@ -2,172 +2,176 @@
  * @class
  * @classdesc This is a description of the ELF class.
  */
-function ELF(){};
+function ELF(){}
 /**
- * @see {@link Binary.calculateEntropy}
+ * @see Binary.calculateEntropy
  */
-ELF.calculateEntropy=function(nOffset,nSize){};
+ELF.calculateEntropy=function(nOffset,nSize){}
 /**
- * @see {@link Binary.calculateMD5}
+ * @see Binary.calculateMD5
  */
-ELF.calculateMD5=function(nOffset,nSize){};
+ELF.calculateMD5=function(nOffset,nSize){}
 /**
- * @see {@link Binary.compare}
+ * @see Binary.compare
  */
-ELF.compare=function(sSignature,nOffset){};
+ELF.compare=function(sSignature,nOffset){}
 /**
-  * @see {@link PE.compareEP}
+ * @see PE.compareEP
  */
-ELF.compareEP=function(sSignature,nOffset){};
+ELF.compareEP=function(sSignature,nOffset){}
 /**
- * @see {@link Binary.findByte}
+ * @see Binary.findByte
  */
-ELF.findByte=function(nOffset,nSize,cValue){};
+ELF.findByte=function(nOffset,nSize,cValue){}
 /**
- * @see {@link Binary.findDword}
+ * @see Binary.findDword
  */
-ELF.findDword=function(nOffset,nSize,nValue){};
+ELF.findDword=function(nOffset,nSize,nValue){}
 /**
- * @see {@link Binary.findSignature}
+ * @see Binary.findSignature
  */
-ELF.findSignature=function(nOffset,nSize,Signature){};
+ELF.findSignature=function(nOffset,nSize,sSignature){}
 /**
- * @see {@link Binary.findString}
+ * @see Binary.findString
  */
-ELF.findString=function(nOffset,nSize,sValue){};
+ELF.findString=function(nOffset,nSize,sValue){}
 /**
- * @see {@link Binary.findWord}
+ * @see Binary.findWord
  */
-ELF.findWord=function(nOffset,nSize,sValue){};
+ELF.findWord=function(nOffset,nSize,sValue){}
 /**
  * @returns {UShort}
  */
-ELF.getElfHeader_ehsize=function(){};
+ELF.getElfHeader_ehsize=function(){}
 /**
  * @returns {UInt}
  */
-ELF.getElfHeader_entry=function(){};
+ELF.getElfHeader_entry=function(){}
 /**
  * @returns {UInt64}
  */
-ELF.getElfHeader_entry64=function(){};
+ELF.getElfHeader_entry64=function(){}
 /**
  * @returns {UInt}
  */
-ELF.getElfHeader_flags=function(){};
+ELF.getElfHeader_flags=function(){}
 /**
  * @returns {UShort}
  */
-ELF.getElfHeader_machine=function(){};
+ELF.getElfHeader_machine=function(){}
 /**
  * @returns {UShort}
  */
-ELF.getElfHeader_phentsize=function(){};
+ELF.getElfHeader_phentsize=function(){}
 /**
  * @returns {UShort}
  */
-ELF.getElfHeader_phnum=function(){};
+ELF.getElfHeader_phnum=function(){}
 /**
  * @returns {UInt}
  */
-ELF.getElfHeader_phoff=function(){};
+ELF.getElfHeader_phoff=function(){}
 /**
  * @returns {UInt64}
  */
-ELF.getElfHeader_phoff64=function(){};
+ELF.getElfHeader_phoff64=function(){}
 /**
  * @returns {UShort}
  */
-ELF.getElfHeader_shentsize=function(){};
+ELF.getElfHeader_shentsize=function(){}
 /**
  * @returns {UShort}
  */
-ELF.getElfHeader_shnum=function(){};
+ELF.getElfHeader_shnum=function(){}
 /**
  * @returns {UInt}
  */
-ELF.getElfHeader_shoff=function(){};
+ELF.getElfHeader_shoff=function(){}
 /**
  * @returns {UInt64}
  */
-ELF.getElfHeader_shoff64=function(){};
+ELF.getElfHeader_shoff64=function(){}
 /**
  * @returns {UShort}
  */
-ELF.getElfHeader_shstrndx=function(){};
+ELF.getElfHeader_shstrndx=function(){}
 /**
  * @returns {UShort}
  */
-ELF.getElfHeader_type=function(){};
+ELF.getElfHeader_type=function(){}
 /**
  * @returns {UInt}
  */
-ELF.getElfHeader_version=function(){};
+ELF.getElfHeader_version=function(){}
 /**
- * @see {@link Binary.getFileDirectory}
+ * @see Binary.getFileDirectory
  */
-ELF.getFileDirectory=function(){};
+ELF.getFileDirectory=function(){}
 /**
- * This function returns a string in the form of [ELFtype][ELFmоde] 
+ * Get a string in the form of <code>"<i>ELFtype</i> <i>ELFmode</i>"</code>. For example <code>"executable x86"</code> or <code>"shared object amd64"</code>.
  * @returns {String}
  */
-ELF.getGeneralOptions=function(){};
+ELF.getGeneralOptions=function(){}
 /**
- * @see {@link Binary.getSignature}
+ * @see Binary.getSignature
  */
-ELF.getSignature=function(){};
+ELF.getSignature=function(nOffset,nSize){}
 /**
- * @see {@link Binary.getSize}
+ * @see Binary.getSize
  */
-ELF.getSize=function(){};
+ELF.getSize=function(){}
 /**
- * This function checks whether there exists a section with a specific name. Can use regular expressions as the section name.
- * @param {String} sSectionName - Section name.
- * @returns {Bool} 
+ * Check if a section exists with a specific name or matches a regular expression.
+ * @param {String} sSectionName - Section name or pattern.
+ * @returns {Bool}
  */
-ELF.isSectionNamePresent=function(sSectionName){};
+ELF.isSectionNamePresent=function(sSectionName){}
 /**
- * @see {@link Binary.isSignaturePresent}
+ * @see Binary.isSignaturePresent
  */
-ELF.isSignaturePresent=function(nOffset,nSize,sSignature){};
+ELF.isSignaturePresent=function(nOffset,nSize,sSignature){}
 /**
- * This function checks whether there exists a string in the table.
+ * Check if a string exists in the table.
  * @param {String} sSectionName - Section name.
  * @param {String} sString - String.
- * @returns {Bool} 
+ * @returns {Bool}
  */
-ELF.isStringInTablePresent=function(sSectionName,sString){};
+ELF.isStringInTablePresent=function(sSectionName,sString){}
 /**
- * @see {@link Binary.readByte}
+ * @see Binary.readByte
  */
-ELF.readByte=function(nOffset){};
+ELF.readByte=function(nOffset){}
 /**
- * @see {@link Binary.readDword}
+ * @see Binary.readDword
  */
-ELF.readDword=function(nOffset){};
+ELF.readDword=function(nOffset){}
 /**
- * @see {@link Binary.readWord}
+ * @see Binary.readWord
  */
-ELF.readWord=function(nOffset){};
+ELF.readWord=function(nOffset){}
 /**
- * @see {@link Binary.getString}
+ * @see Binary.swapBytes
  */
-ELF.getString=function(nOffset,nSize){};
+ELF.swapBytes=function(nValue){}
 /**
- * Get section file offset
- * @param {Int} nSection - Section number
- * @returns {UInt} 
+ * @see Binary.getString
  */
-ELF.getSectionFileOffset=function(nSection){};
+ELF.getString=function(nOffset,nSize){}
 /**
- * Get section file size
- * @param {Int} nSection - Section number
- * @returns {UInt} 
+ * Get the file offset of a section.
+ * @param {Int} nSection - Section number.
+ * @returns {UInt}
  */
-ELF.getSectionFileSize=function(nSection){};
+ELF.getSectionFileOffset=function(nSection){}
 /**
- * This function returns the number of a section with a specific name  
- * @param {String} sSectionName - Section name
- * @returns {Int} (0-N) If there is no section with such name, -1 will be returned.
+ * Get the file size of a section.
+ * @param {Int} nSection - Section number.
+ * @returns {UInt}
  */
-ELF.getSectionNumber=function(sSectionName){};
+ELF.getSectionFileSize=function(nSection){}
+/**
+ * Get the number of a section with a specific name.
+ * @param {String} sSectionName - Section name.
+ * @returns {Int} 0-based section number, or <code>-1</code> if there is no section with that name.
+ */
+ELF.getSectionNumber=function(sSectionName){}

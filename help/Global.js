@@ -1,15 +1,24 @@
 /**
- * The function includes a script.
- * @param {String} sScriptName - The script name. Default path is $APP/db
+ * Include another script into this one.
+ * @param {String} sScriptName - The script name. Default path is <code>$APP/db</code>.
  * @example
- * includeScript("Cab"); // include scritp $APP/db/cab
+ * includeScript("Cab"); // include script $APP/db/Cab
  */
-function includeScript(sScriptName){};
+function includeScript(sScriptName){}
 /**
- * The function displays the message in the log window. It is used to debug signatures.
+ * Display a message in the log window or as a console error. It is used to debug signatures.
  * @param {String} sString - The message.
  * @example
- * _lоg(“Hello world!”); // It displays a string.
- * _lоg(123); // It displays the number.
+ * _log("Hello world!"); // display a string
+ * _log(123); // display a number
  */
-function _log(sString){};
+function _log(sString){}
+
+/**
+ * Get a result string appropriate to the class.
+ * @param {Bool} bShowType - True to include the type.
+ * @param {Bool} bShowVersion - True to include the version.
+ * @param {Bool} bShowOptions - True to include the options.
+ * @returns {String}
+ */
+function result(bShowType,bShowVersion,bShowOptions){}

@@ -2,68 +2,72 @@
  * @class
  * @classdesc This is a description of the Text class.
  */
-function Text(){};
+function Text(){}
 /**
- * @see {@link Binary.calculateEntropy}
+ * @see Binary.calculateEntropy
  */
-Text.calculateEntropy=function(nOffset,nSize){};
+Text.calculateEntropy=function(nOffset,nSize){}
 /**
- * @see {@link Binary.calculateMD5}
+ * @see Binary.calculateMD5
  */
-Text.calculateMD5=function(nOffset,nSize){};
+Text.calculateMD5=function(nOffset,nSize){}
 /**
- * @see {@link Binary.compare}
+ * @see Binary.compare
  */
-Text.compare=function(sSignature,nOffset){};
+Text.compare=function(sSignature,nOffset){}
 /**
- * @see {@link Binary.findByte}
+ * @see Binary.findByte
  */
-Text.findByte=function(nOffset,nSize,cValue){};
+Text.findByte=function(nOffset,nSize,cValue){}
 /**
- * @see {@link Binary.findDword}
+ * @see Binary.findDword
  */
-Text.findDword=function(nOffset,nSize,nValue){};
+Text.findDword=function(nOffset,nSize,nValue){}
 /**
- * @see {@link Binary.findSignature}
+ * @see Binary.findSignature
  */
-Text.findSignature=function(nOffset,nSize,Signature){};
+Text.findSignature=function(nOffset,nSize,sSignature){}
 /**
- * @see {@link Binary.findString}
+ * @see Binary.findString
  */
-Text.findString=function(nOffset,nSize,sValue){};
+Text.findString=function(nOffset,nSize,sValue){}
 /**
- * @see {@link Binary.findWord}
+ * @see Binary.findWord
  */
-Text.findWord=function(nOffset,nSize,sValue){};
+Text.findWord=function(nOffset,nSize,sValue){}
 /**
- * @see {@link Binary.getSignature}
+ * @see Binary.getSignature
  */
-Text.getSignature=function(){};
+Text.getSignature=function(nOffset,nSize){}
 /**
- * @see {@link Binary.getSize}
+ * @see Binary.getSize
  */
-Text.getSize=function(){};
+Text.getSize=function(){}
 /**
- * @see {@link Binary.isSignaturePresent}
+ * @see Binary.isSignaturePresent
  */
-Text.isSignaturePresent=function(nOffset,nSize,sSignature){};
+Text.isSignaturePresent=function(nOffset,nSize,sSignature){}
 /**
- * @see {@link Binary.readByte}
+ * @see Binary.readByte
  */
-Text.readByte=function(nOffset){};
+Text.readByte=function(nOffset){}
 /**
- * @see {@link Binary.readDword}
+ * @see Binary.readDword
  */
-Text.readDword=function(nOffset){};
+Text.readDword=function(nOffset){}
 /**
- * @see {@link Binary.readWord}
+ * @see Binary.readWord
  */
-Text.readWord=function(nOffset){};
+Text.readWord=function(nOffset){}
 /**
- * @see {@link Binary.getString}
+ * @see Binary.swapBytes
  */
-Text.getString=function(nOffset,nSize){};
+Text.swapBytes=function(nValue){}
 /**
- * @see {@link Binary.getFileDirectory}
+ * @see Binary.getString
  */
-Text.getFileDirectory=function(){};
+Text.getString=function(nOffset,nSize){}
+/**
+ * @see Binary.getFileDirectory
+ */
+Text.getFileDirectory=function(){}
