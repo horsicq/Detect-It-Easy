@@ -103,3 +103,9 @@ MACH.isLibraryPresent=function(sLibrary){}
  * @returns {Bool}
  */
 MACH.isSectionNamePresent=function(sSectionName){}
+/**
+ * Get the number of a section with a specific name.
+ * @param {String} sSectionName - Section name.
+ * @returns {Int} 0-based section number, or <code>-1</code> if there is no section with that name.
+ */
+MACH.getSectionNumber=function(sSectionName){}
