@@ -6,6 +6,27 @@
 
 init("protector","Themida/Winlicense");
 
+function detectThemida(nSection)
+{
+    if(PE.getAddressOfEntryPoint()==PE.section[nSection].VirtualAddress)
+    {
+        if(PE.section[nSection].Characteristics==0xe0000040)
+        {
+            if(PE.section[nSection-1].Characteristics==0xe0000040)
+            {
+                if(PE.getNumberOfImports()>3)
+                {
+                    if((PE.getNumberOfImportThunks(1)==1)&&(PE.getNumberOfImportThunks(2)==1))
+                    {
+                        return 1;
+                    }
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 function detect(bShowType,bShowVersion,bShowOptions)
 {
     if(PE.isPEPlus())
@@ -66,18 +87,14 @@ function detect(bShowType,bShowVersion,bShowOptions)
         var nSection=PE.nLastSection;
         if(nSection>=2)
         {
-            if(PE.getAddressOfEntryPoint()==PE.section[nSection].VirtualAddress)
+            if(PE.section[nSection].FileSize==0)
             {
-                if(PE.section[nSection].Characteristics==0xe0000040)
-                {
-                    if(PE.section[nSection-1].Characteristics==0xe0000040)
-                    {
-                        if(PE.getNumberOfImportThunks(0)==1)
-                        {
-                            bDetected=1;
-                        }
-                    }
-                }
+                nSection--;
+            }
+            if(detectThemida(nSection))
+            {
+                sVersion="2.X";
+                bDetected=1;
             }
         }
     }
