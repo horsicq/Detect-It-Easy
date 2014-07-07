@@ -2,6 +2,25 @@
 
 init("compiler","Visual Basic");
 
+function getVBOptions()
+{
+    var sResult="";
+
+    if(PE.section.length>=1)
+    {
+        var nOffset=PE.findDword(PE.section[0].FileOffset,PE.section[0].FileSize,0x21354256);
+        if(nOffset!=-1)
+        {
+            var nDword=PE.readDword(nOffset+0x30);
+            nOffset=PE.VAToOffset(nDword);
+            nDword=PE.readDword(nOffset+0x20);
+            sResult=(nDword==0)?"P-Code":"Native";
+        }
+    }
+
+    return sResult;
+}
+
 function detect(bShowType,bShowVersion,bShowOptions)
 {
     if(PE.isNET())
@@ -24,19 +43,9 @@ function detect(bShowType,bShowVersion,bShowOptions)
             sVersion="6.0";
             bDetected=1;
         }
-        if(bDetected&&bShowOptions&&PE.compareEP("68"))
+        if(bDetected&&bShowOptions)
         {
-            // get VB options
-            var nOffset=PE.RVAToOffset(PE.getAddressOfEntryPoint()+1);
-            var nDword=PE.readDword(nOffset);
-            nOffset=PE.VAToOffset(nDword);
-            if(PE.compare("'VB5!'",nOffset))
-            {
-                nDword=PE.readDword(nOffset+0x30);
-                nOffset=PE.VAToOffset(nDword);
-                nDword=PE.readDword(nOffset+0x20);
-                sOptions=(nDword==0)?"P-Code":"Native";
-            }
+            sOptions=getVBOptions();
         }
     }
 
