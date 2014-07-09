@@ -109,3 +109,15 @@ MACH.isSectionNamePresent=function(sSectionName){}
  * @returns {Int} 0-based section number, or <code>-1</code> if there is no section with that name.
  */
 MACH.getSectionNumber=function(sSectionName){}
+/**
+ * Get the file offset of a section.
+ * @param {Int} nSection - Section number.
+ * @returns {UInt}
+ */
+MACH.getSectionFileOffset=function(nSection){}
+/**
+ * Get the file size of a section.
+ * @param {Int} nSection - Section number.
+ * @returns {UInt}
+ */
+MACH.getSectionFileSize=function(nSection){}
