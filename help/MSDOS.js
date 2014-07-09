@@ -105,3 +105,7 @@ MSDOS.isLE=function(){}
  * @returns {Bool}
  */
 MSDOS.isLX=function(){}
+/**
+ * @see PE.compareOverlay
+ */
+MSDOS.compareOverlay=function(sSignature,nOffset){}
