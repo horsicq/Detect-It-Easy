@@ -199,3 +199,44 @@ ELF.OffsetToRVA=function(nOffset){}
  * @returns {Int64} If an error occurs, -1 will be returned.
  */
 ELF.OffsetToVA=function(nOffset){}
+/**
+ * Get the number of sections.
+ * @returns {Int}
+ */
+MACH.getNumberOfSections=function(){}
+/**
+ * Get the number of programs in the program header table(pht).
+ * @returns {Int}
+ */
+MACH.getNumberOfPrograms=function(){}
+/**
+ * Get the file offset of a program.
+ * @param {Int} nProgram - Program number.
+ * @returns {UInt}
+ */
+ELF.getProgramFileOffset=function(nProgram){}
+/**
+ * Get the file size of a program.
+ * @param {Int} nProgram - Program number.
+ * @returns {UInt}
+ */
+ELF.getProgramFileSize=function(nProgram){}
+/**
+ * Get the size of the overlay.
+ * @returns {Int}
+ */
+ELF.getOverlaySize=function(){}
+/**
+ * Get the file offset of the overlay.
+ * @returns {Int}
+ */
+ELF.getOverlayOffset=function(){}
+/**
+ * Check if an overlay is present.
+ * @returns {Bool}
+ */
+ELF.isOverlayPresent=function(){}
+/**
+ * @see PE.compareOverlay
+ */
+ELF.compareOverlay=function(sSignature,nOffset){}
