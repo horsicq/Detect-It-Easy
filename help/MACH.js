@@ -121,3 +121,27 @@ MACH.getSectionFileOffset=function(nSection){}
  * @returns {UInt}
  */
 MACH.getSectionFileSize=function(nSection){}
+/**
+ * Convert a relative virtual address (RVA) to a file offset.
+ * @param {UInt} nRVA
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+MACH.RVAToOffset=function(nRVA){}
+/**
+ * Convert a virtual address (VA) to a file offset.
+ * @param {UInt} nVA
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+MACH.VAToOffset=function(nVA){}
+/**
+ * Convert a file offset to a relative virtual address (RVA).
+ * @param {UInt} nOffset
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+MACH.OffsetToRVA=function(nOffset){}
+/**
+ * Convert a file offset to a virtual address (VA).
+ * @param {UInt} nOffset
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+MACH.OffsetToVA=function(nOffset){}

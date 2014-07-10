@@ -175,3 +175,27 @@ ELF.getSectionFileSize=function(nSection){}
  * @returns {Int} 0-based section number, or <code>-1</code> if there is no section with that name.
  */
 ELF.getSectionNumber=function(sSectionName){}
+/**
+ * Convert a relative virtual address (RVA) to a file offset.
+ * @param {UInt} nRVA
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+ELF.RVAToOffset=function(nRVA){}
+/**
+ * Convert a virtual address (VA) to a file offset.
+ * @param {UInt} nVA
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+ELF.VAToOffset=function(nVA){}
+/**
+ * Convert a file offset to a relative virtual address (RVA).
+ * @param {UInt} nOffset
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+ELF.OffsetToRVA=function(nOffset){}
+/**
+ * Convert a file offset to a virtual address (VA).
+ * @param {UInt} nOffset
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+ELF.OffsetToVA=function(nOffset){}
