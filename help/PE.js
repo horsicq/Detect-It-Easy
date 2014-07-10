@@ -499,14 +499,14 @@ PE.isSignatureInSectionPresent=function(nSection,sSignature){}
 PE.isSignaturePresent=function(nOffset,nSize,sSignature){}
 /**
  * Convert a file offset to a relative virtual address (RVA).
- * @param {UInt} nOffset
- * @returns {Int} If an error occurs, -1 will be returned.
+ * @param {UInt64} nOffset
+ * @returns {Int64} If an error occurs, -1 will be returned.
  */
 PE.OffsetToRVA=function(nOffset){}
 /**
  * Convert a file offset to a virtual address (VA).
- * @param {UInt} nOffset
- * @returns {Int} If an error occurs, -1 will be returned.
+ * @param {UInt64} nOffset
+ * @returns {Int64} If an error occurs, -1 will be returned.
  */
 PE.OffsetToVA=function(nOffset){}
 /**
@@ -527,14 +527,14 @@ PE.readWord=function(nOffset){}
 PE.swapBytes=function(nValue){}
 /**
  * Convert a relative virtual address (RVA) to a file offset.
- * @param {UInt} nRVA
- * @returns {Int} If an error occurs, -1 will be returned.
+ * @param {UInt64} nRVA
+ * @returns {Int64} If an error occurs, -1 will be returned.
  */
 PE.RVAToOffset=function(nRVA){}
 /**
  * Convert a virtual address (VA) to a file offset.
- * @param {UInt} nVA
- * @returns {Int} If an error occurs, -1 will be returned.
+ * @param {UInt64} nVA
+ * @returns {Int64} If an error occurs, -1 will be returned.
  */
 PE.VAToOffset=function(nVA){}
 /**
