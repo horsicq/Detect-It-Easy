@@ -591,3 +591,18 @@ PE.getResourceIdByNumber=function(nNumber){}
  * @returns {String}
  */
 PE.getResourceNameByNumber=function(nNumber){}
+/**
+ * Get the number of the section containing the export table.
+ * @returns {Int} If no export returns <code>-1</code>.
+ */
+PE.getExportSection=function(){}
+/**
+ * Get the number of the section containing the relocs.
+ * @returns {Int} If no relocs returns <code>-1</code>.
+ */
+PE.getRelocsSection=function(){}
+/**
+ * Get the number of the section containing the resource.
+ * @returns {Int} If no resource returns <code>-1</code>.
+ */
+PE.getResourceSection=function(){}

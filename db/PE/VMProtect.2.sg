@@ -24,10 +24,12 @@ function detectVMP2()
 {
     if(PE.section.length>6)
     {
-        var nCount=4;
+        var nCount=5;
+        var nResource=PE.getResourceSection();
+        var nRelocs=PE.getRelocsSection();
         for(var nSection=PE.section.length-4;nSection<PE.section.length;nSection++)
         {
-            if((PE.section[nSection].Name==".rsrc")||(PE.section[nSection].Name==".reloc"))
+            if((nSection==nResource)||(nSection==nRelocs))
             {
                 nCount++;
             }
@@ -38,7 +40,7 @@ function detectVMP2()
 
         for(var nSection=PE.section.length-nCount;nSection<PE.section.length;nSection++)
         {
-            if((PE.section[nSection].Name==".rsrc")||(PE.section[nSection].Name==".reloc"))
+            if((nSection==nResource)||(nSection==nRelocs))
             {
                continue;
             }
@@ -53,11 +55,17 @@ function detectVMP2()
             }
         }
 
-        if((nDetectCount==3)&&(PE.section[nLastVMPSection].Characteristics!=0xE0000000))
+        if(nDetectCount>=3)
         {
-            if(PE.calculateEntropy(PE.section[nLastVMPSection].FileOffset,PE.section[nLastVMPSection].FileSize)>7.85)
+            if(PE.getEntryPointSection()==nLastVMPSection)
             {
-                return 1;
+                if(PE.section[nLastVMPSection].Characteristics==0xE0000060)
+                {
+                    if(PE.calculateEntropy(PE.section[nLastVMPSection].FileOffset,PE.section[nLastVMPSection].FileSize)>7.6)
+                    {
+                        return 1;
+                    }
+                }
             }
         }
     }
