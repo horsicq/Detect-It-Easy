@@ -606,3 +606,8 @@ PE.getRelocsSection=function(){}
  * @returns {Int} If no resources returns <code>-1</code>.
  */
 PE.getResourceSection=function(){}
+/**
+ * Get the number of the section containing the TLS.
+ * @returns {Int} If no TLS returns <code>-1</code>.
+ */
+PE.getTLSSection=function(){}
