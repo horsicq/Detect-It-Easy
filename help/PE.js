@@ -597,12 +597,12 @@ PE.getResourceNameByNumber=function(nNumber){}
  */
 PE.getExportSection=function(){}
 /**
- * Get the number of the section containing the relocs.
- * @returns {Int} If no relocs returns <code>-1</code>.
+ * Get the number of the section containing the relocations.
+ * @returns {Int} If no relocations returns <code>-1</code>.
  */
 PE.getRelocsSection=function(){}
 /**
- * Get the number of the section containing the resource.
- * @returns {Int} If no resource returns <code>-1</code>.
+ * Get the number of the section containing the resources.
+ * @returns {Int} If no resources returns <code>-1</code>.
  */
 PE.getResourceSection=function(){}

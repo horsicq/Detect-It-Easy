@@ -22,7 +22,7 @@ Binary.calculateMD5=function(nOffset,nSize){}
  * <p>The signature may contain both lowercase and uppercase hexadecimal digits.
  * Spaces are skipped, and <code>.</code> and <code>?</code> represent any digit.
  * <p>Text may be matched by using single quotes. For example <samp>"01'Test'01"</samp>.
- * <p>The PE,ELF and MACH classes have two additional symbols:
+ * <p>The PE, ELF and MACH classes have two additional symbols:
  * <br><code>#</code> for absolute jump (e.g. <code>"68########55"</code>);
  * <br><code>$</code> for relative jump (e.g. <code>"E8$$$$$$$$55"</code>).
  *
