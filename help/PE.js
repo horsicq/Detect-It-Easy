@@ -398,6 +398,11 @@ PE.isConsole=function(){}
  */
 PE.isDll=function(){}
 /**
+ * Check if the file is a driver
+ * @returns {Bool}
+ */
+PE.isDriver=function(){}
+/**
  * Check if the file is a .NET application.
  * @returns {Bool}
  */
