@@ -398,7 +398,7 @@ PE.isConsole=function(){}
  */
 PE.isDll=function(){}
 /**
- * Check if the file is a driver
+ * Check if the file is a driver.
  * @returns {Bool}
  */
 PE.isDriver=function(){}
