@@ -7,11 +7,11 @@ function getVersion()
     var nSection=PE.nLastSection;
     var nOffset=PE.section[nSection].FileOffset;
     var nSize=PE.section[nSection].FileSize;
-    var nOffset=PE.findString(nOffset,nSize,"ENIGMA");
+    var nOffset=PE.findSignature(nOffset,nSize,"000000'ENIGMA'");
     if(nOffset!=-1)
     {
-        var sMajor=PE.readByte(nOffset+6);
-        var sMinor=PE.readByte(nOffset+7);
+        var sMajor=PE.readByte(nOffset+9);
+        var sMinor=PE.readByte(nOffset+10);
         sVersion=sMajor+"."+sMinor;
         return 1;
     }
@@ -48,6 +48,11 @@ function detect(bShowType,bShowVersion,bShowOptions)
        getVersion();
        bDetected=1;
     }    
+    else if(PE.compareEP("68........e8$$$$$$$$eb$$83c4..e9$$$$$$$$60e8000000005d81ed"))
+    {
+       getVersion();
+       bDetected=1;
+    }    
     else if(PE.compareEP("eb$$e9$$$$$$$$60e8000000005d81ed........81ed........e9"))
     {
        getVersion();
@@ -63,14 +68,6 @@ function detect(bShowType,bShowVersion,bShowOptions)
        getVersion_old();
        bDetected=1;
     }
-    else if(PE.getNumberOfImports()>1
-        &&PE.getNumberOfImportThunks(1)==1
-        &&PE.getImportFunctionName(1,0)=="MessageBoxA"
-        &&PE.section[0].Characteristics==0xe0000040
-        &&getVersion())
-    {
-        bDetected=1;
-    }  
     else if(PE.isNET())
     {
         if(PE.isSignatureInSectionPresent(0,"'ENIGMA'"))
