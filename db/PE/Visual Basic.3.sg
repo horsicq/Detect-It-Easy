@@ -14,44 +14,67 @@ function getVBOptions()
         nDword=PE.readDword(nOffset+0x20);
         sResult=(nDword==0)?"P-Code":"Native";
     }
+    nOffset=PE.findDword(PE.section[0].FileOffset,PE.section[0].FileSize,0x21364256);
+    if (nOffset!=-1)
+    {
+        var nDword=PE.readDword(nOffset+0x30);
+        nOffset=PE.VAToOffset(nDword);
+        nDword=PE.readDword(nOffset+0x20);
+        sResult=(nDword==0)?"P-Code":"Native";
+    }
 
     return sResult;
 }
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
-    if(PE.isNET())
+
+    if(PE.compareEP("5a68........68........52e9$$$$$$$$ff25") && PE.isLibraryPresent("MSVBVM50.DLL"))
     {
-        if(PE.isNETStringPresent("Microsoft.VisualBasic"))
-        {
-            sName="VB.NET";
-            bDetected=1;
-        }
+        sName="Visual Basic";
+        sVersion="5.0";
+        sOptions="(DLL)"+getVBOptions();
+        bDetected=1;
     }
-    else
+    else if(PE.compareEP("5a68........68........52e9$$$$$$$$ff25") && PE.isLibraryPresent("MSVBVM60.DLL"))
     {
-        if(PE.isLibraryPresent("MSVBVM50.DLL"))
-        {
-            sVersion="5.0";
-            bDetected=1;
-        }
-        else if(PE.isLibraryPresent("MSVBVM60.DLL"))
-        {
-            sVersion="6.0";
-            bDetected=1;
-        }
-        if(bDetected)
-        {
-            if(bShowOptions)
-            {
-                sOptions=getVBOptions();
-            }
-        }
-        else if(PE.isLibraryPresent("VB40032.DLL"))
-        {
-            sVersion="4.0";
-            bDetected=1;
-        }
+        sName="Visual Basic";
+        sVersion="6.0";
+        sOptions="(DLL)"+getVBOptions();
+        bDetected=1;
+    }
+    else if(PE.compareEP("68........e8$$$$$$$$ff25") && PE.isLibraryPresent("MSVBVM50.DLL"))
+    {
+        sName="Visual Basic";
+        sVersion="5.0";
+        sOptions="(EXE)"+getVBOptions();
+        bDetected=1;
+    }
+    else if(PE.compareEP("68........e8$$$$$$$$ff25") && PE.isLibraryPresent("MSVBVM60.DLL"))
+    {
+        sName="Visual Basic";
+        sVersion="6.0";
+        sOptions="(EXE)"+getVBOptions();
+        bDetected=1;
+    }
+    else if(PE.compareEP("68........e8$$$$$$$$ff25") && PE.isLibraryPresent("VB40032.DLL"))
+    {
+        sName="Visual Basic";
+        sVersion="4.0";
+        sOptions="(EXE)"+getVBOptions();
+        bDetected=1;
+    }
+    else if(PE.compareEP("5868........50e9$$$$$$$$ff25") && PE.isLibraryPresent("VB40032.DLL"))
+    {
+        sName="Visual Basic";
+        sVersion="4.0";
+        sOptions="(DLL)"+getVBOptions();
+        bDetected=1;
+    }
+    else if(PE.isNET() && PE.isNETStringPresent("Microsoft.VisualBasic"))
+    {
+        sName="VB.NET";
+        bDetected=1;
     }
 
     return result(bShowType,bShowVersion,bShowOptions);
