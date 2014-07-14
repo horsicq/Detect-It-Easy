@@ -92,6 +92,11 @@ MACH.getLibraryCurrentVersion=function(sLibrary){}
  */
 MACH.getNumberOfSections=function(){}
 /**
+ * Get the number of segments.
+ * @returns {Int}
+ */
+MACH.getNumberOfSegments=function(){}
+/**
  * Check if there is a library with a specific name in the import table.
  * @param {String} sLibraryName - The name of the library.
  * @returns {Bool}
@@ -122,6 +127,30 @@ MACH.getSectionFileOffset=function(nSection){}
  */
 MACH.getSectionFileSize=function(nSection){}
 /**
+ * Get the name of a section.
+ * @param {Int} nSection - Section number.
+ * @returns {UInt}
+ */
+MACH.getSectionName=function(nSection){}
+/**
+ * Get the file offset of a segment.
+ * @param {Int} nSection - Section number.
+ * @returns {UInt}
+ */
+MACH.getSegmentFileOffset=function(nSection){}
+/**
+ * Get the file size of a segment.
+ * @param {Int} nSection - Section number.
+ * @returns {UInt}
+ */
+MACH.getSegmentFileSize=function(nSection){}
+/**
+ * Get the name of a segment.
+ * @param {Int} nSection - Section number.
+ * @returns {UInt}
+ */
+MACH.getSegmentName=function(nSection){}
+/**
  * Convert a relative virtual address (RVA) to a file offset.
  * @param {UInt64} nRVA
  * @returns {Int64} If an error occurs, -1 will be returned.
@@ -145,3 +174,22 @@ MACH.OffsetToRVA=function(nOffset){}
  * @returns {Int64} If an error occurs, -1 will be returned.
  */
 MACH.OffsetToVA=function(nOffset){}
+/**
+ * Get the size of the overlay.
+ * @returns {Int}
+ */
+MACH.getOverlaySize=function(){}
+/**
+ * Get the file offset of the overlay.
+ * @returns {Int}
+ */
+MACH.getOverlayOffset=function(){}
+/**
+ * Check if an overlay is present.
+ * @returns {Bool}
+ */
+MACH.isOverlayPresent=function(){}
+/**
+ * @see PE.compareOverlay
+ */
+MACH.compareOverlay=function(sSignature,nOffset){}
