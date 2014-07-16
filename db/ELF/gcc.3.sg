@@ -2,14 +2,11 @@
 
 init("compiler","gcc");
 
-function getGCCVersion()
+function getGCCVersion(nOffset,nSize)
 {
-    var sResult="";
-    var nSection=ELF.getSectionNumber(".comment");
-    if(nSection!=-1)
+    var nOffset=ELF.findString(nOffset,nSize,"GCC:");
+    if(nOffset!=-1)
     {
-        var nOffset=ELF.findString(ELF.getSectionFileOffset(nSection),ELF.getSectionFileSize(nSection),"GCC:");
-
         sResult=ELF.getString(nOffset+5,100);
     }
     return sResult;
@@ -31,11 +28,27 @@ function detect(bShowType,bShowVersion,bShowOptions)
     {
         bDetected=1;
     }
-    var sGCCVersion=getGCCVersion();
-    if(sGCCVersion!="")
+    var nSection=ELF.getSectionNumber(".comment");
+    if(nSection!=-1)
     {
-        sVersion=sGCCVersion;
-        bDetected=1;
+        var sGCCVersion=getGCCVersion(ELF.getSectionFileOffset(nSection),ELF.getSectionFileSize(nSection));
+        if(sGCCVersion!="")
+        {
+            sVersion=sGCCVersion;
+            bDetected=1;
+        }
+    }
+    if(sVersion=="")
+    {
+        if(ELF.isOverlayPresent())
+        {
+            var sGCCVersion=getGCCVersion(ELF.getOverlayOffset(),ELF.getOverlaySize());
+            if(sGCCVersion!="")
+            {
+                //sVersion=sGCCVersion; // Version mb corrupted!
+                bDetected=1;
+            }
+        }
     }
 
     return result(bShowType,bShowVersion,bShowOptions);
