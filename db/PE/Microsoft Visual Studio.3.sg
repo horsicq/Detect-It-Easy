@@ -19,6 +19,35 @@ includeScript("wxWidgets");
 
 init("compiler","Microsoft Visual "+(aMFC||aQt||aWx||PE.isLibraryPresentExp(/^MSVCP/i)?"C++":"C/C++"));
 
+function getVCVersionFromLinkerVersion()
+{
+    var sResult="";
+        switch(PE.getMajorLinkerVersion())
+        {
+        case 3:  sResult=PE.getCompilerVersion();   break; // MS C++
+        case 4:  sResult="4.0";  break;
+        case 5:  sResult="5.0";  break;
+        case 6:  sResult="6.0";  break;
+        case 7:
+            if(PE.getMinorLinkerVersion()<10)
+            {
+                 sResult="2002";
+            }
+            else
+            {
+                sResult="2003";
+            }
+            break;
+        case 8:  sResult="2005"; break;
+        case 9:  sResult="2008"; break;
+        case 10: sResult="2010"; break;
+        case 11: sResult="2012"; break;
+        case 12: sResult="2013"; break;
+        }
+    
+    return sResult;
+}
+
 function getVersionFromRichSignature()
 {
     var sResult="",nResult=0;
@@ -630,27 +659,11 @@ function detect(bShowType,bShowVersion,bShowOptions)
     // Correct version.
     if(bDetected) // MASM32 has RichSignature too.
     {
-        switch(PE.getMajorLinkerVersion())
+        sVersion=getVCVersionFromLinkerVersion();
+        if(PE.getMajorLinkerVersion()==3)
         {
-        case 4:  sVersion="4.0";  break;
-        case 5:  sVersion="5.0";  break;
-        case 6:  sVersion="6.0";  break;
-        case 7:
-            if(PE.getMinorLinkerVersion()<10)
-            {
-                 sVersion="2002";
-            }
-            else
-            {
-                sVersion="2003";
-            }
-            break;
-        case 8:  sVersion="2005"; break;
-        case 9:  sVersion="2008"; break;
-        case 10: sVersion="2010"; break;
-        case 11: sVersion="2012"; break;
-        case 12: sVersion="2013"; break;
-        }
+            sName="Visual C++";
+        }     
     }
 
     var sRichVersion=getVersionFromRichSignature();
@@ -662,6 +675,23 @@ function detect(bShowType,bShowVersion,bShowOptions)
          }
          bDetected=1;
     }
+    
+    if(!bDetected)
+    {
+        var sVCVersion=getVCVersionFromLinkerVersion();
+        if(sVCVersion!="")
+        {
+            if(PE.section.length>=3)
+            {
+                if(PE.isSignatureInSectionPresent(0,"'Microsoft Visual C++ Runtime Library'")||PE.isSignatureInSectionPresent(1,"'Microsoft Visual C++ Runtime Library'")||PE.isSignatureInSectionPresent(2,"'Microsoft Visual C++ Runtime Library'"))
+                {
+                    sVersion=sVCVersion;
+                    bDetected=1;
+                }  
+            }
+        }
+        
+    } 
 
     return result(bShowType,bShowVersion,bShowOptions);
 }
