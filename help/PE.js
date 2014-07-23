@@ -622,8 +622,8 @@ PE.getTLSSection=function(){}
  */
 PE.getNumberOfRichIDs=function(){}
 /**
- * Check if there is a Rich ID.
- * @param {String} nID - Rich ID.
+ * Check if there is a Rich version.
+ * @param {UInt} nVersion - Rich version.
  * @returns {Bool} 
  */
-PE.isRichIDPresent=function((nID);
+PE.isRichVersionPresent=function(nVersion);
