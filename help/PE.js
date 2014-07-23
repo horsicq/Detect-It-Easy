@@ -616,3 +616,14 @@ PE.getResourceSection=function(){}
  * @returns {Int} If no TLS returns <code>-1</code>.
  */
 PE.getTLSSection=function(){}
+/**
+ * Get the number of the Rich IDs.
+ * @returns {UInt}
+ */
+PE.getNumberOfRichIDs=function(){}
+/**
+ * Check if there is a Rich ID.
+ * @param {String} nID - Rich ID.
+ * @returns {Bool} 
+ */
+PE.isRichIDPresent=function((nID);
