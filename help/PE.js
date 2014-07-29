@@ -627,3 +627,8 @@ PE.getNumberOfRichIDs=function(){}
  * @returns {Bool} 
  */
 PE.isRichVersionPresent=function(nVersion){}
+/**
+ * Check if there is a digital signature.
+ * @returns {Bool}
+ */
+PE.isSignedFile=function(){}
