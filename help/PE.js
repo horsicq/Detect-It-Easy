@@ -597,6 +597,17 @@ PE.getResourceIdByNumber=function(nNumber){}
  */
 PE.getResourceNameByNumber=function(nNumber){}
 /**
+ * Get the type of a resource.
+ * @param {UInt} nNumber - Number of resource.
+ * @returns {String}
+ * @example
+ * if(PE.getResourceTypeByNumber(0)=="RT_MANIFEST")
+ * {
+ *     bDetected=1;
+ * }
+ */
+PE.getResourceTypeByNumber=function(nNumber){}
+/**
  * Get the number of the section containing the export table.
  * @returns {Int} If no export returns <code>-1</code>.
  */
