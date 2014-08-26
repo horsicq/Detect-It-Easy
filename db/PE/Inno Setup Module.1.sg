@@ -2,6 +2,20 @@
 
 init("installer","Inno Setup Module");
 
+function getVersionAndOptions(nOffset)
+{
+    var sRawVersion=PE.getString(nOffset);
+    sVersion=sRawVersion.substring(0,sRawVersion.indexOf(')'));
+    if(/\(u\)/.test(sRawVersion))
+    {
+        sOptions=sOptions.append("unicode");
+    }
+    else if(/\(a\)/.test(sRawVersion))
+    {
+        sOptions=sOptions.append("ANSI");
+    }
+}
+
 function getVersion(sSection)
 {
     if(PE.section[sSection])
@@ -13,16 +27,7 @@ function getVersion(sSection)
             var nInno=PE.findString(nOffset,nSize,"Inno Setup Setup Data");
             if(nInno!=-1)
             {
-                var sRawVersion=PE.getString(nInno+23);
-                sVersion=sRawVersion.substring(0,sRawVersion.indexOf(')'));
-                if(/\(u\)/.test(sRawVersion))
-                {
-                    sOptions=sOptions.append("unicode");
-                }
-                else if(/\(a\)/.test(sRawVersion))
-                {
-                    sOptions=sOptions.append("ANSI");
-                }
+                getVersionAndOptions(nInno+23);
                 return 1;
             }
             else
@@ -58,16 +63,7 @@ function detect(bShowType,bShowVersion,bShowOptions)
             var nOffset=PE.findString(PE.getOverlayOffset(),Math.min(0x100,PE.getOverlaySize()),"Inno Setup Messages");
             if(nOffset!=-1)
             {
-                var sRawVersion=PE.getString(nOffset+21);
-                sVersion=sRawVersion.substring(0,sRawVersion.indexOf(')'));
-                if(/\(u\)/.test(sRawVersion))
-                {
-                    sOptions=sOptions.append("unicode");
-                }
-                else if(/\(a\)/.test(sRawVersion))
-                {
-                    sOptions=sOptions.append("ANSI");
-                }
+                getVersionAndOptions(nOffset+21);
                 bDetected=1;
             }
             if(!bDetected)
@@ -75,16 +71,7 @@ function detect(bShowType,bShowVersion,bShowOptions)
                 nOffset=PE.findString(PE.section[0].FileOffset,PE.section[0].FileSize,"Inno Setup version");
                 if(nOffset!=-1)
                 {
-                    var sRawVersion=PE.getString(nOffset+19);
-                    sVersion=sRawVersion.substring(0,sRawVersion.indexOf(' '));
-                    if(/\(u\)/.test(sRawVersion))
-                    {
-                        sOptions=sOptions.append("unicode");
-                    }
-                    else if(/\(a\)/.test(sRawVersion))
-                    {
-                        sOptions=sOptions.append("ANSI");
-                    }
+                    getVersionAndOptions(nOffset+19);
                     bDetected=1;
                 }
             }
@@ -95,6 +82,15 @@ function detect(bShowType,bShowVersion,bShowOptions)
                     bDetected=1;
                 }
             }
+        }
+    }
+    if(!bDetected)
+    {
+        if(PE.compareOverlay("'Inno Setup Messages'"))
+        {
+            sOptions="uninstall";
+            getVersionAndOptions(PE.getOverlayOffset()+21);
+            bDetected=1;
         }
     }
     if(PE.compareOverlay("78da"))
