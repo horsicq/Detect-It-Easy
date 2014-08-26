@@ -6,103 +6,105 @@
     <message>
         <location filename="../main/dialogabout.ui" line="42"/>
         <source>About</source>
-        <translation type="unfinished"></translation>
+        <translation>Über DIE</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.ui" line="126"/>
         <source>Info</source>
-        <translation type="unfinished"></translation>
+        <translation>Info</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.ui" line="158"/>
         <source>Libs</source>
-        <translation type="unfinished"></translation>
+        <translation>Bibliotheken</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.ui" line="186"/>
         <source>Thanks</source>
-        <translation type="unfinished"></translation>
+        <translation>Dank</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.ui" line="464"/>
         <source>Check Update</source>
-        <translation type="unfinished"></translation>
+        <translation>Aktualisieren</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.ui" line="483"/>
         <source>OK</source>
-        <translation type="unfinished"></translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="70"/>
         <source>Network error</source>
-        <translation type="unfinished"></translation>
+        <translation>Netzwerkfehler</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="79"/>
         <location filename="../main/dialogabout.cpp" line="83"/>
         <source>Update information</source>
-        <translation type="unfinished"></translation>
+        <translation>Aktualisieren</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="79"/>
         <source>No update available</source>
-        <translation type="unfinished"></translation>
+        <translation>
+Kein Update verfügbar</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="83"/>
         <source>New version available</source>
-        <translation type="unfinished"></translation>
+        <translation>
+Neue Version verfügbar</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="83"/>
         <source>Go to download page?</source>
-        <translation type="unfinished"></translation>
+        <translation>Gehe zu Seite herunterladen?</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="296"/>
         <source>Check update</source>
-        <translation type="unfinished"></translation>
+        <translation>Aktualisieren</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="297"/>
         <source>Quit</source>
-        <translation type="unfinished"></translation>
+        <translation>Beenden</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="298"/>
         <source>Info(Alt+1)</source>
-        <translation type="unfinished"></translation>
+        <translation>Info(Alt+1)</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="299"/>
         <source>Libs(Alt+2)</source>
-        <translation type="unfinished"></translation>
+        <translation>Bibliotheken(Alt+2)</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="300"/>
         <source>Thanks(Alt+3)</source>
-        <translation type="unfinished"></translation>
+        <translation>Dank(Alt+3)</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="301"/>
         <source>Avatar</source>
-        <translation type="unfinished"></translation>
+        <translation>Avatar</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="302"/>
         <source>Used libraries</source>
-        <translation type="unfinished"></translation>
+        <translation>Gebrauchte Bibliotheken</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="303"/>
         <source>Information</source>
-        <translation type="unfinished"></translation>
+        <translation>Information</translation>
     </message>
     <message>
         <location filename="../main/dialogabout.cpp" line="304"/>
         <source>Logo</source>
-        <translation type="unfinished"></translation>
+        <translation>logo</translation>
     </message>
 </context>
 <context>
