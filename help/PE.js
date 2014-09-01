@@ -643,3 +643,8 @@ PE.isRichVersionPresent=function(nVersion){}
  * @returns {Bool}
  */
 PE.isSignedFile=function(){}
+/**
+ * Get the offset of the entry point.
+ * @returns {Int64} If an error occurs, -1 will be returned.
+ */
+PE.getEntryPointOffset=function(){}

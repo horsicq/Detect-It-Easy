@@ -193,3 +193,8 @@ MACH.isOverlayPresent=function(){}
  * @see PE.compareOverlay
  */
 MACH.compareOverlay=function(sSignature,nOffset){}
+/**
+ * Get the offset of the entry point.
+ * @returns {Int64} If an error occurs, -1 will be returned.
+ */
+MACH.getEntryPointOffset=function(){}

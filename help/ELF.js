@@ -240,3 +240,8 @@ ELF.isOverlayPresent=function(){}
  * @see PE.compareOverlay
  */
 ELF.compareOverlay=function(sSignature,nOffset){}
+/**
+ * Get the offset of the entry point.
+ * @returns {Int64} If an error occurs, -1 will be returned.
+ */
+ELF.getEntryPointOffset=function(){}
