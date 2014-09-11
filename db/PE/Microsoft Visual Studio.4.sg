@@ -50,71 +50,60 @@ function getVCVersionFromLinkerVersion()
 
 function getVersionFromRichSignature()
 {
-    var sResult="",nResult=0;
+    var sResult="";
     if(PE.getNumberOfRichIDs()>3)
     {
         var nDosStubOffset=PE.getDosStubOffset();
         var nDosStubSize=PE.getDosStubSize();
-        var nDword=0;
 
         var nRichOffset=PE.findString(nDosStubOffset,nDosStubSize,"Rich");
         if(nRichOffset!=-1)
         {
+            // Given information presented in issue #4, just take the second last
+            // (compiler version, don't worry about anything else).
+            // https://github.com/horsicq/Detect-It-Easy/issues/4
             var nXorKey=PE.readDword(nRichOffset+4);
-            for(var nCurrentOffset=nRichOffset-8;
-                nCurrentOffset>nDosStubOffset;
-                nCurrentOffset-=8)
+            var nDword=PE.readDword(nRichOffset-16)^nXorKey;
+            switch(nDword&0xFFFF)
             {
-                nDword=PE.readDword(nCurrentOffset)^nXorKey;
-                if((nDword==0)||(nDword==0x536e6144)) // 'DanS'
+            case 9782:  // seen from VC6 SP6, but probably earlier
+            case 7299:  // ditto
+            case 8168:
+                if(!PE.isLibraryPresent("MSVBVM60.DLL")) // VB
                 {
-                    break;
+                        sResult="6.0";                  // cl.exe 12.00.8168
                 }
-                nDword&=0xFFFF;
-
-                var sVer,nVer=0;
-                switch(nDword)
+                break;
+            case 8804:  sResult="6.0";           break; // SP 5/6 cl.exe 12.00.8804
+            case 9466:  sResult="2002";          break; // cl.exe 13.00.9466
+            case 3077:  sResult="2003";          break; // cl.exe 13.10.3077
+            case 4035:  sResult="2003";          break; // cl.exe 13.10.4035
+            case 6030:  sResult="2003 SP1";      break; // cl.exe 13.10.6030
+            case 50727:
+                switch(PE.getMajorLinkerVersion())
                 {
-                case 8168:  sVer="6.0"; // cl.exe 12.00.8168
-                    if(!PE.isLibraryPresent("MSVBVM60.DLL")) // VB
-                    {
-                        nVer=1998;
-                    }
-                    break;
-                case 8804:  sVer="6.0";           nVer=1998;   break; // SP 5/6 cl.exe 12.00.8804
-                case 9466:  sVer="2002";          nVer=2002;   break; // cl.exe 13.00.9466
-                case 3077:  sVer="2003";          nVer=2003;   break; // cl.exe 13.10.3077
-                case 4035:  sVer="2003";          nVer=2003;   break; // cl.exe 13.10.4035
-                case 6030:  sVer="2003 SP1";      nVer=2003.1; break; // cl.exe 13.10.6030
-                case 50727:
-                    switch(PE.getMajorLinkerVersion())
-                    {
-                    case 8: sVer="2005";          nVer=2005;   break; // cl.exe 14.00.50727.42 14.00.50727.762 SP1?
-                    case 11:sVer="2012";          nVer=2012;   break; // cl.exe 17.00.50727
-                    }
-                    break;
-                case 21022: sVer="2008";          nVer=2008;   break; // cl.exe 15.00.21022
-                case 30729:
-                    switch(PE.getMajorLinkerVersion())
-                    {
-                    case 9: sVer="2008 SP1";          nVer=2008.1;   break; // cl.exe 15.00.30729.01
-                    }
-                    break;
-                case 30319: sVer="2010";          nVer=2010;   break; // cl.exe 16.00.30319
-                case 40219: sVer="2010 SP1";      nVer=2010.1; break; // cl.exe 16.00.40219
-                case 51025: sVer="2012";          nVer=2012;   break; // cl.exe 17.00.51025
-                case 51106: sVer="2012 update 1"; nVer=2012.1; break; // cl.exe 17.00.51106
-                case 60315: sVer="2012 update 2"; nVer=2012.2; break; // cl.exe 17.00.60315
-                case 60610: sVer="2012 update 3"; nVer=2012.3; break; // cl.exe 17.00.60610
-                case 61030: sVer="2012 update 4"; nVer=2012.4; break; // cl.exe 17.00.61030
-                case 21005: sVer="2013";          nVer=2013;   break; // cl.exe 18.00.21005
-                case 30501: sVer="2013 update 2"; nVer=2013.2; break; // cl.exe 18.00.30501
+                case 8: sResult="2005";          break; // cl.exe 14.00.50727.42 14.00.50727.762 SP1?
+                case 11:sResult="2012";          break; // cl.exe 17.00.50727
                 }
-                if(nVer>nResult)
+                break;
+            case 21022: sResult="2008";          break; // cl.exe 15.00.21022
+            case 30729: sResult="2008 SP1";      break; // cl.exe 15.00.30729.01
+                /* What are we guarding against?  And why doesn't MASM?
+                switch(PE.getMajorLinkerVersion())
                 {
-                    sResult=sVer;
-                    nResult=nVer;
+                case 9: sResult="2008 SP1";      break; // cl.exe 15.00.30729.01
                 }
+                break;
+                */
+            case 30319: sResult="2010";          break; // cl.exe 16.00.30319
+            case 40219: sResult="2010 SP1";      break; // cl.exe 16.00.40219
+            case 51025: sResult="2012";          break; // cl.exe 17.00.51025
+            case 51106: sResult="2012 update 1"; break; // cl.exe 17.00.51106
+            case 60315: sResult="2012 update 2"; break; // cl.exe 17.00.60315
+            case 60610: sResult="2012 update 3"; break; // cl.exe 17.00.60610
+            case 61030: sResult="2012 update 4"; break; // cl.exe 17.00.61030
+            case 21005: sResult="2013";          break; // cl.exe 18.00.21005
+            case 30501: sResult="2013 update 2"; break; // cl.exe 18.00.30501
             }
         }
     }
@@ -661,10 +650,7 @@ function detect(bShowType,bShowVersion,bShowOptions)
     var sRichVersion=getVersionFromRichSignature(); // VC 6.0-2013
     if(sRichVersion!="")
     {
-        if(sVersion!=sRichVersion)
-        {
-            sVersion=sVersion.append(sRichVersion);
-        }
+        sVersion=sRichVersion;
         bDetected=1;
     }
 
