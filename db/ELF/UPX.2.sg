@@ -2,6 +2,40 @@
 
 init("packer","UPX");
 
+function getUPXOptions(nOffset)
+{
+        var nLevel=ELF.readByte(nOffset+2);
+        var nMethod=ELF.readByte(nOffset+3);
+        var sCompression="";
+        switch(nMethod) // From http://sourceforge.net/p/upx/code/ci/default/tree/src/conf.h
+        {
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10: sCompression="NRV"; break;
+        case 14: sCompression="LZMA"; break;
+        case 15: sCompression="zlib"; break;
+        }
+
+        if(sCompression!="")
+        {
+            sOptions=sOptions.append(sCompression);
+            if(nLevel==8)
+            {
+                sOptions=sOptions.append("best");
+            }
+            else
+            {
+                sOptions=sOptions.append("brute");
+            }
+        }
+}
+
 function detect(bShowType,bShowVersion,bShowOptions)
 {
     var nSize=ELF.getSize();
@@ -16,22 +50,7 @@ function detect(bShowType,bShowVersion,bShowOptions)
         {
             sVersion="3.X";
         }
-        var nOption=ELF.readByte(nSize-0x24+7);
-        if(nOption==10)
-        {
-            if(ELF.readByte(nSize-0x24+6)==8)
-            {
-                sOptions="best";
-            }
-            else
-            {
-                sOptions="brute";
-            }
-        }
-        else
-        {
-            sOptions=nOption;
-        }
+        getUPXOptions(nSize-0x20);
         bDetected=1;
     }
 
