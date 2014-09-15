@@ -108,6 +108,18 @@ ELF.getElfHeader_version=function(){}
  */
 ELF.getFileDirectory=function(){}
 /**
+ * @see Binary.getFileBaseName
+ */
+ELF.getFileBaseName=function(){}
+/**
+ * @see Binary.getFileSuffix
+ */
+ELF.getFileSuffix=function(){}
+/**
+ * @see Binary.getFileCompleteSuffix
+ */
+ELF.getFileCompleteSuffix=function(){}
+/**
  * Get a string in the form of <code>"<i>ELFtype</i> <i>ELFmode</i>"</code>. For example <code>"executable x86"</code> or <code>"shared object amd64"</code>.
  * @returns {String}
  */

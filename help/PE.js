@@ -648,3 +648,15 @@ PE.isSignedFile=function(){}
  * @returns {Int64} If an error occurs, -1 will be returned.
  */
 PE.getEntryPointOffset=function(){}
+/**
+ * @see Binary.getFileBaseName
+ */
+PE.getFileBaseName=function(){}
+/**
+ * @see Binary.getFileSuffix
+ */
+PE.getFileSuffix=function(){}
+/**
+ * @see Binary.getFileCompleteSuffix
+ */
+PE.getFileCompleteSuffix=function(){}

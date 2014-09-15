@@ -88,6 +88,21 @@ Binary.findSignature=function(nOffset,nSize,sValue){}
  */
 Binary.getFileDirectory=function(){}
 /**
+ * Get the base name of the file.
+ * @returns {String}
+ */
+Binary.getFileBaseName=function(){}
+/**
+ * Get the complete suffix of the file.
+ * @returns {String}
+ */
+Binary.getFileCompleteSuffix=function(){}
+/**
+ * Get the suffix of the file.
+ * @returns {String}
+ */
+Binary.getFileSuffix=function(){}
+/**
  * Get a signature string from the file.
  * @param {UInt} nOffset - The offset in the file.
  * @param {UInt} nSize - Number of bytes.
