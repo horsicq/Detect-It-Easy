@@ -11,12 +11,15 @@
   + -d option and DIE_DB environment variable to select database;
   * --version includes DIE's version.
 
+  v1.02, 16 September, 2014:
+  + -E option to show entropy.
+
   Build (VC6):
 	cl /nologo /W3 /O2 /MD diecl.c diedll.lib setargv.obj /link /filealign:512
 */
 
-#define PVERS "1.01"
-#define PDATE "3 August, 2014"
+#define PVERS "1.02"
+#define PDATE "16 September, 2014"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -64,12 +67,13 @@ int main( int argc, char* argv[] )
 	  "\n"
 	  "Determine file type by examination of contents.\n"
 	  "\n"
-	  "diecl [-1aeov] [-d DB] FILE...\n"
+	  "diecl [-1aeEov] [-d DB] FILE...\n"
 	  "\n"
 	  "-1\tsingle line output\n"
 	  "-a\tshow all files (don't ignore unscannable)\n"
 	  "-d\tuse DB as the database directory\n"
 	  "-e\tshow errors\n"
+	  "-E\tshow entropy\n"
 	  "-o\tdon't show options\n"
 	  "-v\tdon't show version\n"
 	  "\n"
@@ -78,7 +82,7 @@ int main( int argc, char* argv[] )
   }
   if (argc > 1 && strcmp( argv[1], "--version" ) == 0)
   {
-    printf( "diecl version " PVERS " (" PDATE ").  %s.\n",
+    printf( "diecl version " PVERS " (" PDATE ").  DIE v%s.\n",
 	    DIE_version() );
     return 0;
   }
@@ -95,6 +99,7 @@ int main( int argc, char* argv[] )
 	  case 'a': all ^= 1; break;
 	  case '1': flags ^= DIE_SINGLELINEOUTPUT|DIE_SHOWFILEFORMATONCE; break;
 	  case 'e': flags ^= DIE_SHOWERRORS;  break;
+	  case 'E': flags ^= DIE_SHOWENTROPY; break;
 	  case 'o': flags ^= DIE_SHOWOPTIONS; break;
 	  case 'v': flags ^= DIE_SHOWVERSION; break;
 	  case 'd':
