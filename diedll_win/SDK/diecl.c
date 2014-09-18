@@ -18,13 +18,7 @@
 #define PVERS "1.01"
 #define PDATE "3 August, 2014"
 
-#ifdef QT_VERSION
-#include <QtGlobal>
-#else
-#define Q_OS_WIN
-#endif
-
-#ifdef Q_OS_WIN
+#if !defined(DIE_LIN)&&!defined(DIE_MAC)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
@@ -41,7 +35,7 @@
 //   3 - doesn't exist
 int status( const char* name )
 {
-#ifdef Q_OS_WIN
+#if !defined(DIE_LIN)&&!defined(DIE_MAC)
   DWORD a;
 
   a = GetFileAttributes( name );
