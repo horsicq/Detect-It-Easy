@@ -14,7 +14,7 @@
   v1.02, 16 September, 2014:
   + -E option to show entropy.
 
-  v1.10, 18 September, 2014:
+  v1.10, 18 & 19 September, 2014:
   * resize buffer to fit contents;
   + -r option to recurse subdirectories;
   * flush output to work better with a pipe;
@@ -29,7 +29,7 @@
 */
 
 #define PVERS "1.10"
-#define PDATE "18 September, 2014"
+#define PDATE "19 September, 2014"
 
 #define _CRT_SECURE_NO_WARNINGS
 #define UNICODE
@@ -38,7 +38,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <locale.h>
 #include "diedll.h"
 
 
@@ -178,7 +177,7 @@ void scan_dir( int argc, LPWSTR argv[] )
   }
   width += 2;
 
-  if (blank && last != -1)
+  if ((blank || !(flags & DIE_SINGLELINEOUTPUT)) && last != -1)
   {
     if (output)
       putchar( '\n' );
