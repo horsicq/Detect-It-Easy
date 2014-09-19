@@ -3,30 +3,41 @@
 
 init("compiler","Oracle Solaris Studio");
 
-function getOSSVersion(nOffset,nSize)
+function getOSSVersion()
 {
     var sResult="";
-    var nOffset=ELF.findString(nOffset,nSize,"Sun WorkShop");
-    if(nOffset!=-1)
+    var nSection=ELF.getSectionNumber(".comment");
+    if(nSection!=-1)
     {
-        sResult=ELF.getString(nOffset+13,100);
+        var nSectionOffset=ELF.getSectionFileOffset(nSection);
+        var nSectionSize=ELF.getSectionFileSize(nSection);
+        var nOffset=ELF.findString(nSectionOffset,nSectionSize,"Sun WorkShop");
+        if(nOffset!=-1)
+        {
+            sResult=ELF.getString(nOffset+13,100);
+        }
+        nOffset=ELF.findString(nSectionOffset,nSectionSize,"acomp: Sun C");
+        if(nOffset!=-1)
+        {
+            sResult=ELF.getString(nOffset+13,100);
+        }
     }
+   
+    
     return sResult;
 }
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
-    var nSection=ELF.getSectionNumber(".comment");
-    if(nSection!=-1)
+    if(ELF.isSectionNamePresent(".SUNW_version"))
     {
-        var sOSSVersion=getOSSVersion(ELF.getSectionFileOffset(nSection),ELF.getSectionFileSize(nSection));
+        var sOSSVersion=getOSSVersion();
         if(sOSSVersion!="")
         {
             sVersion=sOSSVersion;
-            bDetected=1;
         }
+        bDetected=1;
     }
-
 
     return result(bShowType,bShowVersion,bShowOptions);
 }
