@@ -48,6 +48,7 @@ function getVersion()
     var nAddress;
     var nLng;
     var nLng1;
+    var bNewVersion=0;
 
     var nAddressSize=PE.isPEPlus()?8:4;
 
@@ -131,7 +132,7 @@ function getVersion()
                         sName="Embarcadero Delphi";
                         sVersion="XE2-XE4";
                     }
-                    else if(nLng==0x2F0)
+                    else if((nLng==0x2F0)||(nLng==0x2F8))
                     {
                         // 64
                         sName="Embarcadero Delphi";
@@ -141,7 +142,8 @@ function getVersion()
                     {
                         // 32
                         sName="Embarcadero Delphi";
-                        sVersion="XE5-XE7";
+                        sVersion="XE5-XE6";
+                        bNewVersion=1;
                     }
                     else
                     {
@@ -158,13 +160,14 @@ function getVersion()
                             {
                                 // 64
                                 sName="Embarcadero Delphi";
-                                sVersion="XE5-XE7";
+                                sVersion="XE5-XE6";
+                                bNewVersion=1;
                             }
                         }
                     }
                 }
 
-                if(sVersion!="")
+                if((sVersion!="")&&(!bNewVersion))
                 {
                     return 1;
                 }
@@ -183,7 +186,8 @@ function getVersion()
         if(PE.isSignaturePresent(nOffset,nSize,"'System.SysUtils'"))
         {
             sName="Embarcadero Delphi";
-            sVersion="XE2-XE7";
+            sVersion="XE2-XE6";
+            bNewVersion=1;
         }
         else if(PE.isSignaturePresent(nOffset,nSize,"'ExcUtils'"))
         {
@@ -204,7 +208,7 @@ function getVersion()
             sVersion="6-7 or 2005";
         }
 
-        if(sVersion!="")
+        if((sVersion!="")&&(!bNewVersion))
         {
             return 1;
         }
@@ -218,6 +222,31 @@ function getVersion()
         }
     }
 
+    if(bNewVersion)
+    {
+        if(PE.section[".rdata"])
+        {
+            var nRDataOffset=PE.section[".rdata"].FileOffset;
+            var nRDataSize=PE.section[".rdata"].FileSize;
+            var nVersionOffset=PE.findString(nRDataOffset,nRDataSize,"Embarcadero Delphi for Win");
+            if(nVersionOffset!=-1)
+            {
+                var sCompilerVersion=PE.getString(nVersionOffset+46,4);
+                if(sCompilerVersion=="28.0")
+                {
+                   sVersion="XE7"; 
+                }
+                else if(sCompilerVersion=="29.0")
+                {
+                   sVersion="XE8"; 
+                }
+                else if(sCompilerVersion=="30.0")
+                {
+                   sVersion="10 Seattle"; 
+                }
+            }
+        }
+    }
 
     return 0;
 }
