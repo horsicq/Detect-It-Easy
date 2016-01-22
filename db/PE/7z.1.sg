@@ -8,11 +8,14 @@ function detect(bShowType,bShowVersion,bShowOptions)
     {
         sType="installer";
         var sManifest=PE.getManifest();
-        var aVersion=sManifest.match(/\nversion="(.*?)"/);
+        var aVersion=sManifest.match(/(\n?)version="(.*?)"/);
         if(aVersion)
         {
-            sVersion=aVersion[1];
-            sOptions="new";
+            sVersion=aVersion[2];
+            if(aVersion[1])
+            {
+                sOptions="new";
+            }
         }
         else if(aVersion=sManifest.match(/Archive v(\d.*?)<\/desc/))
         {
@@ -22,14 +25,27 @@ function detect(bShowType,bShowVersion,bShowOptions)
     }
     else if(PE.compareOverlay("'7z'BCAF271C"))
     {
-        if(PE.getVersionStringInfo("InternalName")=="7z.sfx")
+        bDetected=1;
+    }
+
+    if(bDetected)
+    {
+        if((PE.getVersionStringInfo("InternalName")=="7z.sfx")||(PE.getVersionStringInfo("InternalName")=="7zS2.sfx"))
         {
             sVersion=PE.getVersionStringInfo("FileVersion");
             if(sVersion=="")
             {
                 sVersion=PE.getFileVersion().replace(/\.0\.0$/,"");
             }
-            bDetected=1;
+        }
+
+        if(sVersion==""&&PE.section[".rdata"])
+        {
+            var nVersionOffset=PE.findString(PE.section[".rdata"].FileOffset,PE.section[".rdata"].FileSize,"7-Zip version:");
+            if(nVersionOffset!=-1)
+            {
+                sVersion=PE.getString(nVersionOffset+16,4);
+            }
         }
     }
 

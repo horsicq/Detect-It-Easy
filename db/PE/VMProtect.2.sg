@@ -44,16 +44,16 @@ function detectVMP2()
         {
             if((nSection==nResource)||(nSection==nRelocs))
             {
-               continue;
+                continue;
             }
             if((PE.section[nSection].FileSize==0)&&(PE.section[nSection].FileOffset==0))
             {
-               nDetectCount++;
+                nDetectCount++;
             }
-            
+
             if((PE.section[nSection].FileSize!=0)&&(PE.section[nSection].FileOffset!=0))
             {
-               nLastVMPSection=nSection;
+                nLastVMPSection=nSection;
             }
         }
 
@@ -66,6 +66,28 @@ function detectVMP2()
                     if(PE.calculateEntropy(PE.section[nLastVMPSection].FileOffset,PE.section[nLastVMPSection].FileSize)>7.6)
                     {
                         return 1;
+                    }
+                }
+                else if(PE.section[nLastVMPSection].Characteristics&0x20000000) // Fix sent Deniskore
+                {
+                    var nSectionOffset=PE.section[nLastVMPSection].FileOffset;
+                    var nSectionSize=PE.section[nLastVMPSection].FileSize;
+                    var nOffset=nSectionOffset;
+                    var nSize=nSectionSize;
+                    var nCount=0;
+                    var nSignatureOffset;
+                    while(nSize>0)
+                    {
+                        nSignatureOffset=PE.findSignature(nOffset,nSize,"9c8d64");
+                        if(nSignatureOffset==-1)
+                            break;
+                        nCount++;
+                        nOffset=nSignatureOffset+3;
+                        nSize=nSectionSize-(nSignatureOffset-nSectionOffset);
+                        if(nCount>=2)
+                        {
+                            return 1;
+                        }
                     }
                 }
             }
@@ -83,7 +105,7 @@ function detect(bShowType,bShowVersion,bShowOptions)
 
     if(PE.section[".vmp0"]&&(PE.compareEP("68........E9")||PE.compareEP("68........E8")))
     {
-        sVersion="1.X";
+        sVersion="1.60-2.05";
         bDetected=1;
     }
     else if(detectVMP(".vmp0"))
@@ -96,6 +118,11 @@ function detect(bShowType,bShowVersion,bShowOptions)
     }
     else if(detectVMP(".vmp2"))
     {
+        bDetected=1;
+    }
+    else if(PE.compareEP("54c70424........9c60c74424..........c64424....887424..60"))
+    {
+        sVersion="2.06";
         bDetected=1;
     }
     else

@@ -6,7 +6,7 @@ includeScript("result");
 /**
  * The file offset of the entry point.
  */
-PE.nEP=PE.RVAToOffset(PE.getAddressOfEntryPoint());
+PE.nEP=PE.getEntryPointOffset();
 
 /**
  * Get the signature at an offset of the entry point.
@@ -32,6 +32,10 @@ PE.getGeneralOptionsEx = function()
     if(/requireAdministrator/.test(PE.getManifest()))
     {
         sResult=sResult.append("admin");
+    }
+    if(PE.isSignedFile())
+    {
+        sResult=sResult.append("signed");
     }
     return sResult;
 }
@@ -99,7 +103,7 @@ for(var i=0;i<=PE.nLastSection;i++)
     {
         var name=PE.section[i].Name;
         // Don't do numeric names, as they are always treated as an index.
-        if(parseInt(name).toString() != name)
+        if((+name).toString() != name) // parseInt crashes the application if Delphi project uses diedll :(
         {
             PE.section[name] = PE.section[i];
         }
@@ -116,13 +120,14 @@ if(PE.nLastSection==-1)
 
 // Create an array of resources.
 
-function Resource(number, id, name, offset, size)
+function Resource(number, id, name, offset, size, type)
 {
     this.Number = number;
     this.Id     = id;
     this.Name   = name;
     this.Offset = offset;
     this.Size   = size;
+    this.Type   = type;
 }
 
 /**
@@ -137,12 +142,13 @@ for(var i=0;i<PE.getNumberOfResources();i++)
                                   PE.getResourceIdByNumber(i),
                                   PE.getResourceNameByNumber(i),
                                   PE.getResourceOffsetByNumber(i),
-                                  PE.getResourceSizeByNumber(i));
+                                  PE.getResourceSizeByNumber(i),
+                                  PE.getResourceTypeByNumber(i));
     if(PE.resource[i].Name)
     {
         var name=PE.resource[i].Name;
         // Don't do numeric names, as they are always treated as an index.
-        if(parseInt(name).toString() != name)
+        if((+name).toString() != name) // parseInt crashes the application if Delphi project uses diedll :(
         {
             PE.resource[name] = PE.resource[i];
         }

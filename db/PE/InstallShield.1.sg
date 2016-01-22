@@ -4,7 +4,30 @@ init("installer","InstallShield");
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
-    if(PE.getVersionStringInfo("ProductName").substr(0,13)=="InstallShield")
+    if(PE.compareEP("64a1........558bec6a..68........68........50648925........83ec..5356578965..ff15"))
+    {
+        if(PE.isOverlayPresent()&&PE.findSignature(PE.getOverlayOffset(),1000,"135d658c")!=-1)
+        {
+            sVersion="3.x";
+            bDetected=1;
+        }
+        else
+        {
+            for(var i=0;i<PE.resource.length;i++)
+            {
+                if(PE.resource[i].Type==3000) //IS2
+                {
+                    if(PE.compare("'SZDD'",PE.resource[i].Offset))
+                    {
+                        sVersion="2.x"
+                        bDetected=1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    else if((PE.getVersionStringInfo("ProductName").substr(0,13)=="InstallShield")||(PE.getVersionStringInfo("CompanyName")=="InstallShield Software Corporation"))
     {
         sVersion=PE.getVersionStringInfo("FileVersion").replace(/, /g,".").trim();
         bDetected=1;
@@ -17,27 +40,27 @@ function detect(bShowType,bShowVersion,bShowOptions)
     {
         bDetected=1;
     }
-    else if(PE.isOverlayPresent()&&
-            (searchSection(".rsrc",0x10000)||searchSection(".data",0x1000)))
+    /*else if(PE.isOverlayPresent()&&
+            (searchSection(".rsrc",0x10000)||searchSection(".data",0x1000))) // Too slow on some files :(
     {
         bDetected=1;
-    }
+    } */
     else if(PE.compareEP("558bec6a..68........68........64a1........50648925........83ec..5356578965..ff15........33d2"))
     {
-        if (PE.findSignature(PE.getOverlayOffset(),PE.getOverlaySize(),"'ISc('")!=-1)
+        if(PE.findSignature(PE.getOverlayOffset(),Math.min(0x2000,PE.getOverlaySize()),"'ISc('")!=-1)
         {
             sVersion="19.x";
             bDetected=1;
         }
-    }    
+    }
     else if(PE.compareEP("e8$$$$$$$$8bff558bec83ec..a1........8365....8365....5357bf........bb........3bc774..85c374..f7"))
     {
-        if (PE.findSignature(PE.getOverlayOffset(),PE.getOverlaySize(),"'ISSetupStream'")!=-1)
+        if(PE.findSignature(PE.getOverlayOffset(),Math.min(0x2000,PE.getOverlaySize()),"'ISSetupStream'")!=-1)
         {
             sVersion="18.x";
             bDetected=1;
         }
-    }    
+    }
 
     return result(bShowType,bShowVersion,bShowOptions);
 }

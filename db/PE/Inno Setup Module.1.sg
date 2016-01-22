@@ -2,23 +2,32 @@
 
 init("installer","Inno Setup Module");
 
+function getVersionAndOptions(nOffset)
+{
+    var sRawVersion=PE.getString(nOffset);
+    sVersion=sRawVersion.substring(0,sRawVersion.indexOf(')'));
+    if(/\(u\)/.test(sRawVersion))
+    {
+        sOptions=sOptions.append("unicode");
+    }
+    else if(/\(a\)/.test(sRawVersion))
+    {
+        sOptions=sOptions.append("ANSI");
+    }
+}
+
 function getVersion(sSection)
 {
     if(PE.section[sSection])
     {
         var nOffset=PE.section[sSection].FileOffset;
         var nSize=PE.section[sSection].FileSize;
-        if(nSize<0x2000)
+        if(nSize<0x4000) // There are files with "data" section's size more as 0x2000
         {
             var nInno=PE.findString(nOffset,nSize,"Inno Setup Setup Data");
             if(nInno!=-1)
             {
-                var sRawVersion=PE.getString(nInno+23);
-                sVersion=sRawVersion.substring(0,sRawVersion.indexOf(')'));
-                if(/\(u\)/.test(sRawVersion))
-                {
-                    sOptions="unicode";
-                }
+                getVersionAndOptions(nInno+23);
                 return 1;
             }
             else
@@ -40,9 +49,76 @@ function detect(bShowType,bShowVersion,bShowOptions)
 {
     if(PE.compareOverlay("'zlb'1A")||PE.compareOverlay("'idska32'1A"))
     {
-        if(getVersion("DATA")||getVersion(".data"))
+        if(!getVersion("DATA"))
+        {
+            getVersion(".data");
+        }
+        bDetected=1;
+    }
+    else
+    {
+        if(PE.getString(0x30,4)=="InUn")
+        {
+            sOptions="uninstall";
+            var nOffset=PE.findString(PE.getOverlayOffset(),Math.min(0x100,PE.getOverlaySize()),"Inno Setup Messages");
+            if(nOffset!=-1)
+            {
+                getVersionAndOptions(nOffset+21);
+                bDetected=1;
+            }
+            if(!bDetected)
+            {
+                nOffset=PE.findString(PE.section[0].FileOffset,PE.section[0].FileSize,"Inno Setup version");
+                if(nOffset!=-1)
+                {
+                    getVersionAndOptions(nOffset+19);
+                    bDetected=1;
+                }
+            }
+            if(!bDetected)
+            {
+                if(getVersion("DATA")||getVersion(".data"))
+                {
+                    bDetected=1;
+                }
+            }
+        }
+    }
+    if(!bDetected)
+    {
+        if(PE.compareOverlay("'Inno Setup Messages'"))
+        {
+            sOptions="uninstall";
+            getVersionAndOptions(PE.getOverlayOffset()+21);
+            bDetected=1;
+        }
+    }
+    if(PE.compareOverlay("78da"))
+    {
+        sOptions="zlib";
+        if(PE.compareEP("558bec83c4..53565733c08945..8945"))
         {
             bDetected=1;
+        }
+        else if(PE.compareEP("558bec83c4..e8........e8........e8"))
+        {
+            bDetected=1;
+        }
+    }
+    else if(PE.compareOverlay("'Inno'",0x34))
+    {
+        sOptions="with stub";
+        bDetected=1;
+    }
+    if(!bDetected)
+    {
+        if(PE.isNET())
+        {
+            var sComments=PE.getVersionStringInfo("Comments");
+            if(sComments=="This installation was built with Inno Setup.")
+            {
+                bDetected=1;
+            }
         }
     }
 

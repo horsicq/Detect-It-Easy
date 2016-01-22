@@ -108,6 +108,18 @@ ELF.getElfHeader_version=function(){}
  */
 ELF.getFileDirectory=function(){}
 /**
+ * @see Binary.getFileBaseName
+ */
+ELF.getFileBaseName=function(){}
+/**
+ * @see Binary.getFileSuffix
+ */
+ELF.getFileSuffix=function(){}
+/**
+ * @see Binary.getFileCompleteSuffix
+ */
+ELF.getFileCompleteSuffix=function(){}
+/**
  * Get a string in the form of <code>"<i>ELFtype</i> <i>ELFmode</i>"</code>. For example <code>"executable x86"</code> or <code>"shared object amd64"</code>.
  * @returns {String}
  */
@@ -240,3 +252,8 @@ ELF.isOverlayPresent=function(){}
  * @see PE.compareOverlay
  */
 ELF.compareOverlay=function(sSignature,nOffset){}
+/**
+ * Get the offset of the entry point.
+ * @returns {Int64} If an error occurs, -1 will be returned.
+ */
+ELF.getEntryPointOffset=function(){}

@@ -597,6 +597,17 @@ PE.getResourceIdByNumber=function(nNumber){}
  */
 PE.getResourceNameByNumber=function(nNumber){}
 /**
+ * Get the type of a resource.
+ * @param {UInt} nNumber - Number of resource.
+ * @returns {String}
+ * @example
+ * if(PE.getResourceTypeByNumber(0)=="RT_MANIFEST")
+ * {
+ *     bDetected=1;
+ * }
+ */
+PE.getResourceTypeByNumber=function(nNumber){}
+/**
  * Get the number of the section containing the export table.
  * @returns {Int} If no export returns <code>-1</code>.
  */
@@ -616,3 +627,36 @@ PE.getResourceSection=function(){}
  * @returns {Int} If no TLS returns <code>-1</code>.
  */
 PE.getTLSSection=function(){}
+/**
+ * Get the number of the Rich IDs.
+ * @returns {UInt}
+ */
+PE.getNumberOfRichIDs=function(){}
+/**
+ * Check if there is a Rich version.
+ * @param {UInt} nVersion - Rich version.
+ * @returns {Bool} 
+ */
+PE.isRichVersionPresent=function(nVersion){}
+/**
+ * Check if there is a digital signature.
+ * @returns {Bool}
+ */
+PE.isSignedFile=function(){}
+/**
+ * Get the offset of the entry point.
+ * @returns {Int64} If an error occurs, -1 will be returned.
+ */
+PE.getEntryPointOffset=function(){}
+/**
+ * @see Binary.getFileBaseName
+ */
+PE.getFileBaseName=function(){}
+/**
+ * @see Binary.getFileSuffix
+ */
+PE.getFileSuffix=function(){}
+/**
+ * @see Binary.getFileCompleteSuffix
+ */
+PE.getFileCompleteSuffix=function(){}

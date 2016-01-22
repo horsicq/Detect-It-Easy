@@ -1,0 +1,57 @@
+// Detect an ARJ archive.
+// Info from http://www.fileformat.info/format/arj/corion.htm
+includeScript("archive");
+sName="ARJ";
+
+function detect_ARJ(bFile,bShowOptions)
+{
+    var nOffset,nSize;
+    if(bFile)
+    {
+        nOffset=0;
+        nSize=File.getSize();
+    }
+    else
+    {
+        nOffset=File.getOverlayOffset()+8;
+        nSize=File.getOverlaySize();
+    }
+    if(nSize>=64)
+    {
+        if(File.compare("60EA",nOffset))
+        {
+            sVersion=File.readByte(nOffset+5);
+            bDetected=1;
+        }
+        if(bDetected&&bShowOptions)
+        {
+            // Options
+            switch(File.readByte(nOffset+7)) // Host OS
+            {
+            case(0):    sOptions=sOptions.append("MS-DOS");  break;
+            case(1):    sOptions=sOptions.append("PRIMOS");  break;
+            case(2):    sOptions=sOptions.append("UNIX");  break;
+            case(3):    sOptions=sOptions.append("AMIGA");  break;
+            case(4):    sOptions=sOptions.append("MAC-OS");  break;
+            case(5):    sOptions=sOptions.append("OS/2");  break;
+            case(6):    sOptions=sOptions.append("APPLE GS");  break;
+            case(7):    sOptions=sOptions.append("ATARI ST");  break;
+            case(8):    sOptions=sOptions.append("NeXT");  break;
+            case(9):    sOptions=sOptions.append("VAX VMS");  break;
+            }
+            if(File.readByte(nOffset+8)&0x01) // password
+            {
+                sOptions=sOptions.append("encrypted");
+            }
+
+            switch(File.readByte(nOffset+9)) // Compression method
+            {
+            case(0):    sOptions=sOptions.append("stored");  break;
+            case(1):    sOptions=sOptions.append("compressed most");  break;
+            case(2):    sOptions=sOptions.append("compressed");  break;
+            case(3):    sOptions=sOptions.append("compressed faster");  break;
+            case(4):    sOptions=sOptions.append("compressed fastest");  break;
+            }
+        }
+    }
+}

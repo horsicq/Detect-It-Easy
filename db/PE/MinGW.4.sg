@@ -1,0 +1,75 @@
+// DIE's signature file
+
+init("compiler","MinGW");
+
+function getMinGWVersion()
+{
+    sResult="";
+
+    if(PE.section[".rdata"])
+    {
+        var nOffset=PE.section[".rdata"].FileOffset;
+        var nSize=PE.section[".rdata"].FileSize;
+        var nVersionOffset=PE.findString(nOffset,nSize,"GCC: ");
+        if(nVersionOffset!=-1)
+        {
+            sResult=PE.getString(nVersionOffset);
+        }
+        if(sResult=="")
+        {
+            var nVersionOffset=PE.findString(nOffset,nSize,"gcc-");
+            if(nVersionOffset!=-1)
+            {
+                sResult=PE.getString(nVersionOffset);
+                sResult=sResult.substring(0,sResult.indexOf('/'));
+            }
+        }
+    }
+
+    return sResult;
+}
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    /*if(PE.compareEP("5589E583EC08C7042401000000FF15........E8C8FEFFFF908DB426000000005589E583EC08C7042402000000FF15"))
+    {
+        bDetected=1;
+    }
+    else if(PE.compareEP("5589E583EC0883C4F46A..A1........FFD0E8..FFFFFF"))
+    {
+        bDetected=1;
+    }
+    else if(PE.compareEP("5589E583EC146A..FF15....................................00000000"))
+    {
+        bDetected=1;
+    }
+    else */if(PE.getMajorLinkerVersion()==2)
+    {
+        if(PE.getMinorLinkerVersion()<=30||PE.getMinorLinkerVersion()==56)
+        {
+            if(PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000000000'PE'0000"))
+            {
+                if(!PE.section[".rsrc"])
+                {
+                    bDetected=1;
+                }
+                else
+                {
+                    var nOffset=PE.section[".rsrc"].FileOffset;
+                    var nSize=PE.section[".rsrc"].VirtualSize;
+                    if(!PE.isSignaturePresent(nOffset+nSize-512,512,"'Microsoft Corp.'"))
+                    {
+                        bDetected=1;
+                    }
+                }
+            }
+        }
+    }
+
+    if(bDetected)
+    {
+        sVersion=getMinGWVersion();
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

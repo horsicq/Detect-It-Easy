@@ -1,0 +1,58 @@
+// DIE's signature file
+
+init("library","GLIBC");
+
+function getMaxVersion(sValue1,sValue2)
+{
+    var aString1=sValue1.toString().split('.');
+    var aString2=sValue2.toString().split('.');
+
+    for(var i=0;i<3;i++)
+    {
+        if(aString1[i]>aString2[i])
+        {
+            return sValue1;
+        }
+        else if(aString1[i]<aString2[i])
+        {
+            return sValue2;
+        }
+    }
+
+    return sValue2;
+}
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(ELF.isSectionNamePresent(".dynstr"))
+    {
+        var nSection=ELF.getSectionNumber(".dynstr");
+
+        var nOffset=ELF.getSectionFileOffset(nSection);
+        var nSize=ELF.getSectionFileSize(nSection);
+
+        var nCurrentOffset=nOffset;
+        var nCurrentSize=nSize;
+        var sLIBCVersion;
+        while(nCurrentSize>0)
+        {
+            nCurrentOffset=ELF.findString(nCurrentOffset,nSize,"GLIBC_");
+            if(nCurrentOffset==-1)
+            {
+                break;
+            }
+            bDetected=1;
+            sLIBCVersion=ELF.getString(nCurrentOffset+6);
+
+            sVersion=getMaxVersion(sVersion,sLIBCVersion);
+
+            nCurrentSize=nSize-(nCurrentOffset-nOffset+1);
+            nCurrentOffset++;
+        }
+
+        sOptions=ELF.getGeneralOptions();
+
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

@@ -1,0 +1,136 @@
+// DIE's signature file
+
+init("compiler","gcc");
+
+function getGCCVersion(nOffset,nSize)
+{
+    var sResult="";
+    var nOffset=ELF.findString(nOffset,nSize,"GCC:");
+    if(nOffset!=-1)
+    {
+        sResult=ELF.getString(nOffset+5,100);
+    }
+    return sResult;
+}
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(ELF.compareEP("31ed5e89e183e4..50545268........68........515668........e8"))
+    {
+        if(ELF.compareEP("$$$$$$$$57565383ec..8b7424..8b7c24..8b5c24..b8........85c00f84........8b0d........85c90f94c025........a3........8b5424..8b4c24..8d44....a3........8b5424..8915........90",29))
+        {
+            sVersion="4.7.2(exe)";
+            bDetected=1;
+        }
+        else if(ELF.compareEP("$$$$$$$$55b8........57565383ec..85c08b7c24..8bb424........8b9c24........0f84........8b15........31c085d20f94c08b5424..8b4c24..a3........8d44....8b9424........a3........8915........6690",29))
+        {
+            sVersion="4.6.1(exe)";
+            bDetected=1;
+        }
+        else if(ELF.compareEP("$$$$$$$$5589e557565383ec..8b7d..8b75..8b5d..b8........85c00f84........a1........85c00f94c025........a3",29))
+        {
+            sVersion="4.5.3(exe)";
+            bDetected=1;
+        }
+        else if(ELF.compareEP("$$$$$$$$55b8........89e557565383ec..85c08b7d..8b75..8b5d..74..31c0833d..........0f94c0",29))
+        {
+            sVersion="4.4.6(exe)";
+            bDetected=1;
+        }
+        else if(ELF.compareEP("$$$$$$$$55b8........89e557565383ec..85c08b7d..8b5d..74..31c08b15........85d20f94c0",29))
+        {
+            sVersion="4.4.5(exe)";
+            bDetected=1;
+        }
+        else if(ELF.compareEP("$$$$$$$$55b8........89e557565383ec..85c08b....8b5d..74..31c0833d..........0f94c0",29))
+        {
+            sVersion="4.3.3(exe)";
+            bDetected=1;
+        }
+        else if(ELF.compareEP("$$$$$$$$55ba........89e557565381ec........85d20f85........8b45..8b4d..8915........8d54",29))
+        {
+            sVersion="4.1.2(exe)";
+            bDetected=1;
+        }
+    }
+    else if(ELF.compareEP("31ed5589e583e4..8d45..83ec..50ff75..52e8$$$$$$$$5589e557565383ec..8b5d..8b7d..8d74....8935........85db7e..8b0785c074..a3........0fb610"))
+    {
+        sVersion="4.4.7(exe)"; //BSD
+        bDetected=1;
+    }
+    else if(ELF.compareEP("5589e5565383ec..83e4..8b5d..89d18d74....85db8935........7e..8b45..85c074..a3........0fb610"))
+    {
+        sVersion="4.2.1(exe)"; //BSD
+        bDetected=1;
+    }
+    else if(ELF.compareEP("55575653e8........81c3........83ec..8b93........8b8b........8b83........8b2a8b93........890c24895424..8b93........895424..eb"))
+    {
+        sVersion="4.7.2(so)";
+        bDetected=1;
+    }
+    else if(ELF.compareEP("5589e557565383ec..83e4..8b5d..89d78d74....85db8935........7e..8b45..85c074..a3........89c10fb601"))
+    {
+        sVersion="3.4.6(exe)"; //BSD
+        bDetected=1;
+    }
+    else if(ELF.compareEP("5589e557565383ec..89d18d7d..8b5f..8d74....8935........85db7e..837d....74..8b45..a3........89c28038..74..8db6........8dbf........803a..75..8d42..a3"))
+    {
+        sVersion="3.2.1(exe)"; //BSD
+        bDetected=1;
+    }
+    else if(ELF.compareEP("5557565383ec..8b7424..8b6c24..8b3ec745..........c74424..........c74424..........8b078904248d4424..894424..ff57"))
+    {
+        sVersion="3.2(so)"; //BSD
+        bDetected=1;
+    }
+
+    else if(ELF.compareEP("7c290b785421....38......9421ff..7c0803a690......3d......85......48"))
+    //PowerPC instruction set
+    {
+        sVersion="3.2.x";
+        bDetected=1;
+    }
+    else if(ELF.compareEP("6a..6a..8bec52b8........85c074"))
+    {
+        sVersion="2.95.2";
+        bDetected=1;
+    }
+    else if(ELF.isStringInTablePresent(".strtab","gcc2_compiled."))
+    {
+        sVersion="2.X";
+        bDetected=1;
+    }
+    else if(ELF.isStringInTablePresent(".dynstr","GCC_3.0"))
+    {
+        sVersion="3.X";
+        bDetected=1;
+    }
+    else if(ELF.isSectionNamePresent(".gcc_except_table"))
+    {
+        bDetected=1;
+    }
+    var nSection=ELF.getSectionNumber(".comment");
+    if(nSection!=-1&&sVersion=="")
+    {
+        var sGCCVersion=getGCCVersion(ELF.getSectionFileOffset(nSection),ELF.getSectionFileSize(nSection));
+        if(sGCCVersion!="")
+        {
+            sVersion=sGCCVersion;
+            bDetected=1;
+        }
+    }
+    if(sVersion=="")
+    {
+        if(ELF.isOverlayPresent())
+        {
+            var sGCCVersion=getGCCVersion(ELF.getOverlayOffset(),Math.min(8192,ELF.getOverlaySize()));
+            if(sGCCVersion!="")
+            {
+                sVersion=sGCCVersion; // Version mb corrupted!
+                bDetected=1;
+            }
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

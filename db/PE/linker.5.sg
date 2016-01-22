@@ -3,6 +3,54 @@
 init("linker","unknown",PE.getCompilerVersion(),PE.getGeneralOptionsEx());
 
 includeScript("FASM");
+includeScript("RosASM");
+includeScript("SpASM");
+
+function getMSLinkerVersionFromRichSignature()
+{
+    var sResult="";
+    if(PE.getNumberOfRichIDs())
+    {
+        var nDosStubOffset=PE.getDosStubOffset();
+        var nDosStubSize=PE.getDosStubSize();
+
+        var nRichOffset=PE.findString(nDosStubOffset,nDosStubSize,"Rich");
+        if(nRichOffset!=-1)
+        {
+            var nXorKey=PE.readDword(nRichOffset+4);
+            var nDword=PE.readDword(nRichOffset-8)^nXorKey;
+            switch(nDword&0xFFFF)
+            {
+            case 8078: sResult="5.12"; break; //link.exe  5.12.8078
+            case 8168: sResult="6.0"; break; //link.exe 6.00.8168
+            case 8447: sResult="6.0"; break; //link.exe 6.00.8447
+            case 8905: sResult="7.0"; break; //link.exe 7.00.8905
+            case 9466: sResult="7.0"; break; //link.exe 7.00.9466
+            case 9955: sResult="7.0"; break; //link.exe 7.00.9955
+            case 2240: sResult="7.10"; break; //link.exe  7.10.2240
+            case 3077: sResult="7.10"; break; //link.exe  7.10.3077
+            case 6030: sResult="7.10"; break; //link.exe  7.10.6030
+            case 40310: sResult="8.0"; break; //link.exe  8.00.40310
+            case 50727: sResult="8.0 or 11.0"; break; //link.exe  8.00.50727 or 11.00.50727
+            case 21022: sResult="9.0"; break; //link.exe 9.00.21022
+            case 30729: sResult="9.0"; break; //link.exe 9.00.30729
+            case 30319: sResult="10.0"; break; //link.exe 10.00.30319
+            case 40219: sResult="10.0"; break; //link.exe 10.00.40219
+            case 60315: sResult="11.0"; break; //link.exe  11.00.60315
+            case 60610: sResult="11.0"; break; //link.exe  11.00.60610
+            case 61030: sResult="11.0"; break; //link.exe  11.00.61030
+            case 21005: sResult="12.0"; break; //link.exe  12.00.21005
+            case 30501: sResult="12.0"; break; //link.exe  12.00.30501
+            case 30626: sResult="12.0"; break; //link.exe  12.00.30626
+            case 30723: sResult="12.0"; break; //link.exe  12.00.30723
+            case 22215: sResult="14.0"; break; //link.exe  14.00.22215
+            }
+        }
+    }
+
+    return sResult;
+}
+
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
@@ -15,7 +63,7 @@ function detect(bShowType,bShowVersion,bShowOptions)
     {
         var nMajor=PE.getMajorLinkerVersion();
         var nMinor=PE.getMinorLinkerVersion();
-        if(nMajor>3)
+        if(nMajor>=3) // There are MS linker "3.0" and MS linker "3.10"
         {
             sName="Microsoft Linker";
             bDetected=1;
@@ -44,19 +92,27 @@ function detect(bShowType,bShowVersion,bShowOptions)
                 bDetected=1;
             }
         }
+        else if(nMajor==1)
+        {
+            if(nMinor==3)
+            {
+                sName="LCC Linker";
+                bDetected=1;
+            }
+        }
     }
-    else if(PE.compare("'This program must be run under Win'....0D0A243700",0x50))
+    else if(PE.compare("'This program must be run under Win'....0D0A24..00",0x50))
     {
-        sName="Borland Linker";
+        sName="Turbo Linker";
         if(sVersion=="2.25")
         {
-            sVersion+="*";
+            sVersion+="*,Delphi";
         }
         bDetected=1;
     }
     else if(PE.compare("FB..'jr'",0x1e))
     {
-        sName="Borland Linker";
+        sName="Turbo Linker";
         sVersion=(PE.readByte(0x1f)/16).toFixed(1);
         if(PE.compare("'32STUB'",0x200))
         {
@@ -69,6 +125,46 @@ function detect(bShowType,bShowVersion,bShowOptions)
         sName="Watcom Linker";
         sVersion+="*";
         bDetected=1;
+    }
+    else if(PE.compare("'MZ'6c000100000002000000ffff000000000000110000004000000000000000'Win32 Program!\r\n$'b409ba0001cd21b44ccd2160000000'GoLink, GoAsm www.GoDevTool.com'00"))
+    {
+        sName="Go Link";
+        bDetected=1;
+    }
+    var nMajor=PE.getMajorLinkerVersion();
+    var nMinor=PE.getMinorLinkerVersion();
+    if((nMajor==2)&&(nMinor==18))
+    {
+        sName="Watcom Linker";
+        bDetected=1;
+    }
+    else if((nMajor==2)&&(nMinor==52))
+    {
+        sName="PowerBASIC Linker";
+        bDetected=1;
+    }
+    // Correct version
+    if(sName=="Microsoft Linker")
+    {
+        if((PE.getMajorLinkerVersion()>15)||(PE.getMajorLinkerVersion()<3))
+        {
+            var sMSLinkerVersion=getMSLinkerVersionFromRichSignature();
+            if(sMSLinkerVersion!="")
+            {
+                sVersion=sMSLinkerVersion;
+            }
+            else
+            {
+                 sVersion+="*";
+            }
+        }
+    }
+    else if(sName=="Borland Linker")
+    {
+        if(PE.getMajorLinkerVersion()>15)
+        {
+            sVersion+="*";
+        }
     }
 
     if(!bDetected&&(bShowVersion||bShowOptions))
@@ -83,6 +179,17 @@ function detect(bShowType,bShowVersion,bShowOptions)
     if(bFASM)
     {
         // FASM doesn't have a linker.
+        bDetected=0;
+    }
+
+    if(bRosASM)
+    {
+        // RosASM doesn't have a linker.
+        bDetected=0;
+    }
+    if(bSpASM)
+    {
+        // SpASM doesn't have a linker.
         bDetected=0;
     }
 

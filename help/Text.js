@@ -71,3 +71,15 @@ Text.getString=function(nOffset,nSize){}
  * @see Binary.getFileDirectory
  */
 Text.getFileDirectory=function(){}
+/**
+ * @see Binary.getFileBaseName
+ */
+Text.getFileBaseName=function(){}
+/**
+ * @see Binary.getFileSuffix
+ */
+Text.getFileSuffix=function(){}
+/**
+ * @see Binary.getFileCompleteSuffix
+ */
+Text.getFileCompleteSuffix=function(){}

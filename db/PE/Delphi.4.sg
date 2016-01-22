@@ -1,0 +1,309 @@
+// DIE's signature file
+// 1995-2007 Borland Delph
+// 2007-2014 Embarcadero Delphi;
+
+init("compiler","Borland Delphi");
+
+includeScript("Borland");
+
+function getVersion()
+{
+    if(PE.isNET())
+    {
+        if(PE.isNETStringPresent("Borland.Vcl.Types"))
+        {
+            sVersion="8";
+        }
+        else if(PE.isNETStringPresent("Borland.Eco.Interfaces"))
+        {
+            sVersion="8 Eco WinForm";
+        }
+        else if(PE.isNETStringPresent("Borland.Delphi.System")
+              &&PE.isNETStringPresent("WinForm"))
+        {
+            sVersion="8 WinForm";
+        }
+        else if(PE.isNETStringPresent("Borland.Delphi.Units"))
+        {
+            sVersion="2005 for .NET";
+        }
+        else if(PE.isNETStringPresent("Borland.Studio.Delphi"))
+        {
+            sName="Embarcadero Delphi";
+            sVersion="XE*";
+            sOptions=".NET";
+        }
+        else
+        {
+            return 0;
+        }
+        return 1;
+    }
+
+    var nSectionOffset=PE.section[0].FileOffset;
+    var nSectionSize=PE.section[0].FileSize;
+    var nOffset=nSectionOffset;
+    var nSize=nSectionSize;
+    var nOffset2;
+    var nAddress;
+    var nLng;
+    var nLng1;
+    var bNewVersion=0;
+
+    var nAddressSize=PE.isPEPlus()?8:4;
+
+    while(nSize>0)
+    {
+        nOffset=PE.findSignature(nOffset,nSize,"0708'TControl'");
+        if(nOffset==-1)
+        {
+            break;
+        }
+        nAddress=PE.readDword(nOffset+10);
+        nOffset2=PE.VAToOffset(nAddress);
+        if(nOffset2!=-1)
+        {
+            if((nOffset2>=nSectionOffset)&&(nOffset2<nSectionOffset+nSectionSize))
+            {
+                nLng=PE.readDword(nOffset2-10*nAddressSize);
+                nLng1=PE.readDword(nOffset2-10*nAddressSize-11*nAddressSize);
+
+                switch(nLng)
+                {
+                case 0:
+                    if(nLng1==0x746E4907)
+                    {
+                        sVersion="3";
+                    }
+                    else if(nLng1==0x4F540774)
+                    {
+                        sVersion="2";
+                    }
+                    break;
+
+                case 0x0B4: sVersion="C++ Builder"; break;
+                case 0x114: sVersion="4";           break;
+                case 0x120: sVersion="5";           break;
+                case 0x128: sVersion="6 CLX";       break;
+                case 0x12C: sVersion="7 CLX";       break;
+                case 0x138: sVersion="Kylix";       break;
+                case 0x15C:
+                case 0x160:
+                    sVersion=(nLng1==0x40100000||nLng1==0x100000)?"7":"6";
+                    break;
+
+                case 0x164: sVersion="2005"; break;
+                case 0x190: sVersion="2006"; break;
+
+                default:
+                    nLng=PE.readDword(nOffset2-13*nAddressSize);
+
+                    if(nLng==0x1A4)
+                    {
+                        sName="Embarcadero Delphi";
+                        sVersion="2009";
+                    }
+                    else if(nLng==0x1AC)
+                    {
+                        if(PE.resource["PACKAGEINFO"])
+                        {
+                            nOffset=PE.resource["PACKAGEINFO"].Offset;
+                            nSize=PE.resource["PACKAGEINFO"].Size;
+                            if(PE.isSignaturePresent(nOffset,nSize,"'ExcUtils'"))
+                            {
+                                sName="Embarcadero Delphi";
+                                sVersion="XE";
+                            }
+                            else if(PE.isSignaturePresent(nOffset,nSize,"'StrUtils'"))
+                            {
+                                sName="Embarcadero Delphi";
+                                sVersion="2010";
+                            }
+                            else
+                            {
+                                sName="Embarcadero Delphi";
+                                sVersion="2010 or XE";
+                            }
+                        }
+                    }
+                    else if(nLng==0x1B4)
+                    {
+                        // 32
+                        sName="Embarcadero Delphi";
+                        sVersion="XE2-XE4";
+                    }
+                    else if((nLng==0x2F0)||(nLng==0x2F8))
+                    {
+                        // 64
+                        sName="Embarcadero Delphi";
+                        sVersion="XE2";
+                    }
+                    else if(nLng==0x1BC)
+                    {
+                        // 32
+                        sName="Embarcadero Delphi";
+                        sVersion="XE5-XE6";
+                        bNewVersion=1;
+                    }
+                    else
+                    {
+                        if(nAddressSize==8)
+                        {
+                            nLng=PE.readDword(nOffset2-16*nAddressSize);
+                            if(nLng==0x2F8)
+                            {
+                                // 64
+                                sName="Embarcadero Delphi";
+                                sVersion="XE3-X4";
+                            }
+                            else if(nLng==0x308)
+                            {
+                                // 64
+                                sName="Embarcadero Delphi";
+                                sVersion="XE5-XE6";
+                                bNewVersion=1;
+                            }
+                        }
+                    }
+                }
+
+                if((sVersion!="")&&(!bNewVersion))
+                {
+                    return 1;
+                }
+            }
+        }
+
+        nOffset++;
+        nSize=nSectionSize-(nOffset-nSectionOffset+1);
+    }
+
+    if(PE.resource["PACKAGEINFO"])
+    {
+        nOffset=PE.resource["PACKAGEINFO"].Offset;
+        nSize=PE.resource["PACKAGEINFO"].Size;
+
+        if(PE.isSignaturePresent(nOffset,nSize,"'System.SysUtils'"))
+        {
+            sName="Embarcadero Delphi";
+            sVersion="XE2-XE6";
+            bNewVersion=1;
+        }
+        else if(PE.isSignaturePresent(nOffset,nSize,"'ExcUtils'"))
+        {
+            sName="Embarcadero Delphi";
+            sVersion="XE";
+        }
+        else if(PE.isSignaturePresent(nOffset,nSize,"'StrUtils'"))
+        {
+            sName="Embarcadero Delphi";
+            sVersion="2009-2010";
+        }
+        else if(PE.isSignaturePresent(nOffset,nSize,"'ImageHlp'"))
+        {
+            sVersion="2006";
+        }
+        else if(PE.isSignaturePresent(nOffset,nSize,"'SysInit'"))
+        {
+            sVersion="6-7 or 2005";
+        }
+
+        if((sVersion!="")&&(!bNewVersion))
+        {
+            return 1;
+        }
+    }
+    else
+    {
+        if(PE.findString(PE.section[0].FileOffset,PE.section[0].FileSize,"Borland\\Delphi")!=-1)
+        {
+            sVersion="2-3";
+            return 1;
+        }
+    }
+
+    if(bNewVersion)
+    {
+        if(PE.section[".rdata"])
+        {
+            var nRDataOffset=PE.section[".rdata"].FileOffset;
+            var nRDataSize=PE.section[".rdata"].FileSize;
+            var nVersionOffset=PE.findString(nRDataOffset,nRDataSize,"Embarcadero Delphi for Win");
+            if(nVersionOffset!=-1)
+            {
+                var sCompilerVersion=PE.getString(nVersionOffset+46,4);
+                if(sCompilerVersion=="28.0")
+                {
+                   sVersion="XE7";
+                }
+                else if(sCompilerVersion=="29.0")
+                {
+                   sVersion="XE8";
+                }
+                else if(sCompilerVersion=="30.0")
+                {
+                   sVersion="10 Seattle";
+                }
+            }
+        }
+
+        return 1;
+    }
+
+    return 0;
+}
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(bBorlandC) // can't be Delphi if it's already C/C++
+    {
+        return "";
+    }
+
+    if(PE.resource["PACKAGEINFO"])
+    {
+        bDetected=1;
+        getVersion();
+    }
+    else if(PE.resource["DVCLAL"])
+    {
+        bDetected=1;
+        getVersion();
+    }
+    else if(PE.resource["TMAINFORM"])
+    {
+        bDetected=1;
+        getVersion();
+    }
+    else if(PE.isNET())
+    {
+        if(getVersion())
+        {
+            bDetected=1;
+        }
+    }
+    else if(PE.compare("0A06'string'",PE.section[0].FileOffset))
+    {
+        sVersion="2";
+        bDetected=1;
+    }
+    else if(PE.findSignature(PE.section[0].FileOffset,100,"07'Boolean'")!=-1)
+    {
+        bDetected=1;
+        getVersion();
+    }
+    else if(PE.findSignature(PE.section[0].FileOffset,100,"06'String'")!=-1)
+    {
+        bDetected=1;
+        getVersion();
+    }
+    else if(PE.findSignature(PE.section[0].FileOffset,0x100,"FF25........8BC0FF25........8BC0"))
+    {
+        if(getVersion())
+        {
+            bDetected=1;
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

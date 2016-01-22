@@ -109,3 +109,20 @@ MSDOS.isLX=function(){}
  * @see PE.compareOverlay
  */
 MSDOS.compareOverlay=function(sSignature,nOffset){}
+/**
+ * Get the offset of the entry point.
+ * @returns {Int} If an error occurs, -1 will be returned.
+ */
+MSDOS.getEntryPointOffset=function(){}
+/**
+ * @see Binary.getFileBaseName
+ */
+MSDOS.getFileBaseName=function(){}
+/**
+ * @see Binary.getFileSuffix
+ */
+MSDOS.getFileSuffix=function(){}
+/**
+ * @see Binary.getFileCompleteSuffix
+ */
+MSDOS.getFileCompleteSuffix=function(){}
