@@ -10,6 +10,7 @@
 #define DIE_SHOWENTROPY             0x00000008
 #define DIE_SINGLELINEOUTPUT        0x00000010
 #define DIE_SHOWFILEFORMATONCE      0x00000020
+#define DIE_DEEPSCAN                0x00000080
 
 #ifdef __cplusplus
 extern "C" {
