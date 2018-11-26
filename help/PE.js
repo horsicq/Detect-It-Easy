@@ -660,3 +660,35 @@ PE.getFileSuffix=function(){}
  * @see Binary.getFileCompleteSuffix
  */
 PE.getFileCompleteSuffix=function(){}
+/**
+ * Check if Export presents.
+ * @returns {Bool}
+ */
+PE.isExportPresent=function(){}
+/**
+ * Check if TLS presents.
+ * @returns {Bool}
+ */
+PE.isTLSPresent=function(){}
+/**
+ * Check if Import presents.
+ * @returns {Bool}
+ */
+PE.isImportPresent=function(){}
+/**
+ * Check if Resource presents.
+ * @returns {Bool}
+ */
+PE.isResourcePresent=function(){}
+/**
+ * Check if Export function exists with a specific name.
+ * @param {String} sFunctionName - Function name
+ * @returns {Bool}
+ */
+PE.isExportFunctionPresent=function(){}
+/**
+ * Check if Export function matches a regular expression.
+ * @param {String} sFunctionName - Function pattern
+ * @returns {Bool}
+ */
+PE.isExportFunctionPresentExp=function(){}
