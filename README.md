@@ -3,8 +3,6 @@ Detect-It-Easy
 
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/screenshot.jpg "Screenshot")
 
-Detect it Easy
-
 Detect It Easy, or abbreviated "DIE" is a program for determining types of files.
 
 "DIE" is a cross-platform application, apart from Windows version there are also 
@@ -46,4 +44,4 @@ which lie in the corresponding folder. Currently the program defines the followi
 
 * Binary all other files
 
-You could download DIE here: http://ntinfo.biz/
+You could download binaries for Windows, Linux and Mac here: http://ntinfo.biz/
