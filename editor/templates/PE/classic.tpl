@@ -11,11 +11,11 @@ function detect(bShowType,bShowVersion,bShowOptions)
     var sOptions="-";
     var sResult="";
     var nDetected=0;
-    
+
     // Start of user's code
-    
+
     // End of user's code
-    
+
     if(nDetected)
     {
         if(sOptions=="-")

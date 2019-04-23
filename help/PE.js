@@ -635,7 +635,7 @@ PE.getNumberOfRichIDs=function(){}
 /**
  * Check if there is a Rich version.
  * @param {UInt} nVersion - Rich version.
- * @returns {Bool} 
+ * @returns {Bool}
  */
 PE.isRichVersionPresent=function(nVersion){}
 /**
