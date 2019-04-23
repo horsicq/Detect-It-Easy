@@ -16,6 +16,6 @@ function detect(bShowType,bShowVersion,bShowOptions)
         bDetected=1;
     }
     // End of user's code
- 
+
     return result(bShowType,bShowVersion,bShowOptions);
 }
