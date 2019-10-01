@@ -151,6 +151,12 @@ Binary.readByte=function(nOffset){}
  */
 Binary.readDword=function(nOffset){}
 /**
+ * Read a qword value from the file.
+ * @param {UInt} nOffset - The offset in the file.
+ * @returns {UInt64} The qword value.
+ */
+Binary.readQword=function(nOffset){}
+/**
  * Read a word from the file.
  * @param {UInt} nOffset - The offset in the file.
  * @returns {UShort} The word value.

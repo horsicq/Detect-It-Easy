@@ -60,6 +60,10 @@ MSDOS.readByte=function(nOffset){}
  */
 MSDOS.readDword=function(nOffset){}
 /**
+ * @see Binary.readQword
+ */
+ELF.readQword=function(nOffset){}
+/**
  * @see Binary.readWord
  */
 MSDOS.readWord=function(nOffset){}

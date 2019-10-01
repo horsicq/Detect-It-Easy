@@ -56,6 +56,10 @@ Text.readByte=function(nOffset){}
  */
 Text.readDword=function(nOffset){}
 /**
+ * @see Binary.readQword
+ */
+ELF.readQword=function(nOffset){}
+/**
  * @see Binary.readWord
  */
 Text.readWord=function(nOffset){}
