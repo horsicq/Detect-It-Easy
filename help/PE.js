@@ -523,6 +523,10 @@ PE.readByte=function(nOffset){}
  */
 PE.readDword=function(nOffset){}
 /**
+ * @see Binary.readQword
+ */
+ELF.readQword=function(nOffset){}
+/**
  * @see Binary.readWord
  */
 PE.readWord=function(nOffset){}

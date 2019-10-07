@@ -60,6 +60,10 @@ MACH.readByte=function(nOffset){}
  */
 MACH.readDword=function(nOffset){}
 /**
+ * @see Binary.readQword
+ */
+ELF.readQword=function(nOffset){}
+/**
  * @see Binary.readWord
  */
 MACH.readWord=function(nOffset){}
