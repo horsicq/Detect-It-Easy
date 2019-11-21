@@ -3,7 +3,7 @@
 
 Detect-It-Easy
 ==============
-
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/2.05.jpg "Version")
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/screenshot.jpg "Screenshot")
 
 Detect It Easy, or abbreviated "DIE" is a program for determining types of files.
@@ -48,5 +48,3 @@ which lie in the corresponding folder. Currently the program defines the followi
 * Binary all other files
 
 You could download binaries for Windows, Linux and Mac here: http://ntinfo.biz/
-
-![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/2.05.jpg "Version")
