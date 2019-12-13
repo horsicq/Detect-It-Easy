@@ -43,8 +43,6 @@ which lie in the corresponding folder. Currently the program defines the followi
 
 * MACH executable files Mac OS
 
-* Text files
-
 * Binary all other files
 
 You could download binaries for Windows, Linux and Mac here: http://ntinfo.biz/
