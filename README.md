@@ -46,3 +46,5 @@ which lie in the corresponding folder. Currently the program defines the followi
 * Binary all other files
 
 You could download binaries for Windows, Linux and Mac here: http://ntinfo.biz/
+
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/die.jpg "Mascot")
