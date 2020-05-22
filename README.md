@@ -1,7 +1,7 @@
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/horsicq/DIE-engine.svg)](http://ntinfo.biz)
 [![GitHub All Releases](https://img.shields.io/github/downloads/horsicq/DIE-engine/total.svg)](http://ntinfo.biz)
 
-Detect-It-Easy
+Detect It Easy
 ==============
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/2.05.jpg "Version")
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/screenshot.jpg "Screenshot")
