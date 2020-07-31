@@ -3,7 +3,7 @@
 
 Detect It Easy
 ==============
-![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/2.05.jpg "Version")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/3.00.jpg "Version")
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/screenshot.jpg "Screenshot")
 
 Detect It Easy, or abbreviated "DIE" is a program for determining types of files.
