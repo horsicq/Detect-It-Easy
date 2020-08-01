@@ -45,6 +45,8 @@ which lie in the corresponding folder. Currently the program defines the followi
 
 * Binary all other files
 
+Download: https://github.com/horsicq/DIE-engine/releases
+
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/die.jpg "Mascot")
 
 How to build on Linux
