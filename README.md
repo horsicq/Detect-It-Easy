@@ -4,6 +4,9 @@
 
 Detect It Easy
 ==============
+
+**For windows users: If you have Antivirus issues please use the version: https://github.com/horsicq/DIE-engine/releases/download/3.00/die_win32_portable_noloader_3.00.zip**
+
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/3.00.jpg "Version")
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/screenshot.jpg "Screenshot")
 
