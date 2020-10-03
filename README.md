@@ -60,9 +60,9 @@ Install Qt 5.12.8: https://github.com/horsicq/build_tools
 
 Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
-Edit build_lin64.bat ( check QT_PATH variable)
+Edit build_lin64.sh ( check QT_PATH variable)
 
-Run build_lin64.bat
+Run build_lin64.sh
 
 How to build on OSX
 =======
@@ -71,9 +71,9 @@ Install Qt 5.12.8: https://github.com/horsicq/build_tools
 
 Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
-Edit build_mac.bat ( check QT_PATH variable)
+Edit build_mac.sh ( check QT_PATH variable)
 
-Run build_mac.bat
+Run build_mac.sh
 
 How to build on Windows(XP)
 =======
