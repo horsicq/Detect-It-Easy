@@ -93,9 +93,9 @@ Run build_winxp.bat
 How to build on Windows(7-10)
 =======
 
-Install Visual Studio 2017: https://github.com/horsicq/build_tools
+Install Visual Studio 2019: https://github.com/horsicq/build_tools
 
-Install Qt 5.15.2 for VS2017: https://github.com/horsicq/build_tools
+Install Qt 5.15.2 for VS2019: https://github.com/horsicq/build_tools
 
 Install 7-Zip: https://github.com/horsicq/build_tools
 
