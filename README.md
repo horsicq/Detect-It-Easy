@@ -6,6 +6,7 @@ Detect It Easy
 ==============
 
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/3.01.png "Version")
+
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/screenshot.jpg "Screenshot")
 
 Detect It Easy, or abbreviated "DIE" is a program for determining types of files.
@@ -48,7 +49,8 @@ which lie in the corresponding folder. Currently the program defines the followi
 * Binary all other files
 
 Download: https://github.com/horsicq/DIE-engine/releases
-Changelog: https://github.com/horsicq/DIE-engine/releases
+
+Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
 
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/die.jpg "Mascot")
 
