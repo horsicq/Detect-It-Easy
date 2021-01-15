@@ -54,6 +54,30 @@ Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
 
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/die.jpg "Mascot")
 
+
+Run with Docker
+=======
+
+You can also run DIE with [Docker](https://www.docker.com/community-edition)! Of course, this requires that you have git and Docker installed.
+
+Here's how to use DIE with Docker:
+
+```bash
+git clone https://github.com/horsicq/Detect-It-Easy
+cd Detect-It-Easy/
+docker build . -t horsicq:diec
+docker/diec.sh ~/example/infected.exe
+
+filetype: PE32
+arch: I386
+mode: 32
+endianess: LE
+type: GUI
+  protector: Themida/Winlicense(2.X)[-]
+  linker: Turbo Linker(2.25*,Delphi)[GUI32]
+```
+
+
 How to build on Linux
 =======
 
