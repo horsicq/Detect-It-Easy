@@ -78,8 +78,22 @@ type: GUI
   linker: Turbo Linker(2.25*,Delphi)[GUI32]
 ```
 
+How to build on Linux(Debian package)
+=======
 
-How to build on Linux
+Install:
+
+- sudo apt-get install qtbase5-dev -y
+- sudo apt-get install qtscript5-dev -y
+- sudo apt-get install qttools5-dev-tools -y
+- sudo apt-get install git -y
+- sudo apt-get install build-essential -y
+
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+
+Run build script: bash -x build_dpkg.sh
+
+How to build on Linux(Portable version)
 =======
 
 Install Qt 5.15.2: https://github.com/horsicq/build_tools
@@ -88,7 +102,7 @@ Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
 Edit build_lin64.sh ( check QT_PATH variable)
 
-Run build_lin64.sh
+Run build script: bash -x build_lin64.sh
 
 How to build on OSX
 =======
@@ -99,7 +113,7 @@ Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
 Edit build_mac.sh ( check QT_PATH variable)
 
-Run build_mac.sh
+Run build script: bash -x build_mac.sh
 
 How to build on Windows(XP)
 =======
