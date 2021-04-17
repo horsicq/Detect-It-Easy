@@ -81,7 +81,7 @@ type: GUI
 How to build on Linux(Debian package)
 =======
 
-Install:
+Install packages:
 
 - sudo apt-get install qtbase5-dev -y
 - sudo apt-get install qtscript5-dev -y
