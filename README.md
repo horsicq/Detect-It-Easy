@@ -91,7 +91,11 @@ Install packages:
 
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 
+cd DIE-engine
+
 Run build script: bash -x build_dpkg.sh
+
+Install deb package: sudo dpkg -i release/die_[Version].deb
 
 How to build on Linux(Portable version)
 =======
