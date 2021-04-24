@@ -88,6 +88,7 @@ Install packages:
 - sudo apt-get install qttools5-dev-tools -y
 - sudo apt-get install git -y
 - sudo apt-get install build-essential -y
+- sudo apt-get install qt5-default -y
 
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 
@@ -96,6 +97,8 @@ cd DIE-engine
 Run build script: bash -x build_dpkg.sh
 
 Install deb package: sudo dpkg -i release/die_[Version].deb
+
+Run DiE: *die [FileName] or diec [FileName]*
 
 How to build on Linux(Portable version)
 =======
