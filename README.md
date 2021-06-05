@@ -78,6 +78,13 @@ type: GUI
   linker: Turbo Linker(2.25*,Delphi)[GUI32]
 ```
 
+Packages: 
+=======
+
+- Chocolatey(Windows): https://community.chocolatey.org/packages/die (Thanks @chtof and Rob Reynolds(@ferventcoder))
+- Parrot OS: Package name **detect-it-easy** (Thanks Nong Hoang Tu(@dmknght))
+- Arch Linux: https://aur.archlinux.org/packages/detect-it-easy-git/ (Thanks Arnaud Dovi(@class101))
+
 How to build on Linux(Debian package)
 =======
 
