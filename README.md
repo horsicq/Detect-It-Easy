@@ -6,7 +6,7 @@
 Detect It Easy
 ==============
 
-![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/3.01.png "Version")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/3.02.png "Version")
 
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/screenshot.jpg "Screenshot")
 
@@ -100,16 +100,17 @@ Install deb package: sudo dpkg -i release/die_[Version].deb
 
 Run DiE: *die [FileName] or diec [FileName]*
 
-How to build on Linux(Portable version)
+How to build on Linux(Automake)
 =======
-
-Install Qt 5.15.2: https://github.com/horsicq/build_tools
 
 Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
-Edit build_lin64.sh ( check QT_PATH variable)
+- chmod a+x configure
+- ./configure
+- make
+- make install
 
-Run build script: bash -x build_lin64.sh
+Run DiE: *die [FileName] or diec [FileName]*
 
 How to build on OSX
 =======
