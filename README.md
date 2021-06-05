@@ -81,9 +81,9 @@ type: GUI
 Packages: 
 =======
 
-- Chocolatey(Windows): https://community.chocolatey.org/packages/die (Thanks @chtof and Rob Reynolds(@ferventcoder))
-- Parrot OS: Package name **detect-it-easy** (Thanks Nong Hoang Tu(@dmknght))
-- Arch Linux: https://aur.archlinux.org/packages/detect-it-easy-git/ (Thanks Arnaud Dovi(@class101))
+- Chocolatey(Windows): https://community.chocolatey.org/packages/die (Thanks **chtof**(https://github.com/chtof) and **Rob Reynolds**(https://github.com/ferventcoder))
+- Parrot OS: Package name **detect-it-easy** (Thanks **Nong Hoang Tu**(https://github.com/dmknght))
+- Arch Linux: https://aur.archlinux.org/packages/detect-it-easy-git/ (Thanks **Arnaud Dovi**(https://github.com/class101))
 
 How to build on Linux(Debian package)
 =======
