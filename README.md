@@ -84,6 +84,7 @@ Packages:
 - Chocolatey(Windows): https://community.chocolatey.org/packages/die (Thanks **chtof**(https://github.com/chtof) and **Rob Reynolds**(https://github.com/ferventcoder))
 - Parrot OS: Package name **detect-it-easy** (Thanks **Nong Hoang Tu**(https://github.com/dmknght))
 - Arch Linux: https://aur.archlinux.org/packages/detect-it-easy-git/ (Thanks **Arnaud Dovi**(https://github.com/class101))
+- REMnux https://remnux.org/ (Thanks **REMnux team**(https://twitter.com/REMnux/status/1401935989266919426))
 
 How to build on Linux(Debian package)
 =======
