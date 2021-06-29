@@ -111,12 +111,16 @@ Run DiE: *die [FileName] or diec [FileName]*
 How to build on Linux(Automake)
 =======
 
+Qt framework has to be installed on the system.
+
+(Ubuntu)Install Qt Framework: **sudo apt-get install --quiet --assume-yes build-essential qt5-default qtbase5-dev qttools5-dev-tools qtscript5-dev**
+
 Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
 - chmod a+x configure
 - ./configure
 - make
-- make install
+- sudo make install
 
 Run DiE: *die [FileName] or diec [FileName]*
 
