@@ -680,10 +680,10 @@ PE.isTLSPresent=function(){}
  */
 PE.isImportPresent=function(){}
 /**
- * Check if Resource presents.
+ * Check if Resources presents.
  * @returns {Bool}
  */
-PE.isResourcePresent=function(){}
+PE.isResourcesPresent=function(){}
 /**
  * Check if Export function exists with a specific name.
  * @param {String} sFunctionName - Function name
