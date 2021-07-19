@@ -64,7 +64,7 @@ You can also run DIE with [Docker](https://www.docker.com/community-edition)! Of
 Here's how to use DIE with Docker:
 
 ```bash
-git clone https://github.com/horsicq/Detect-It-Easy
+git clone --recursive https://github.com/horsicq/Detect-It-Easy
 cd Detect-It-Easy/
 docker build . -t horsicq:diec
 docker/diec.sh ~/example/infected.exe
