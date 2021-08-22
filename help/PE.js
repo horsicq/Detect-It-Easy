@@ -451,6 +451,12 @@ PE.isResourceNamePresent=function(sName){}
  */
 PE.isResourceGroupNamePresent=function(sName){}
 /**
+ * Check if there is a resource group with a specific ID in the file.
+ * @param {int} nID - The ID of the resource group.
+ * @returns {Bool}
+ */
+PE.isResourceGroupIdPresent=function(sName){}
+/**
  * Check if there is a specific .NET string.
  * @param {String} sString
  * @returns {Bool}
