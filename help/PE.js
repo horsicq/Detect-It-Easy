@@ -445,6 +445,12 @@ PE.isRichSignaturePresent=function(){}
  */
 PE.isResourceNamePresent=function(sName){}
 /**
+ * Check if there is a resource group with a specific name in the file.
+ * @param {String} sName - The name of the resource group.
+ * @returns {Bool}
+ */
+PE.isResourceGroupNamePresent=function(sName){}
+/**
  * Check if there is a specific .NET string.
  * @param {String} sString
  * @returns {Bool}
