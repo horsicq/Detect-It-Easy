@@ -423,6 +423,16 @@ PE.isOverlayPresent=function(){}
  */
 PE.isPEPlus=function(){}
 /**
+ * Check if the file is 64 bit (PE+).
+ * @returns {Bool}
+ * @example
+ * if(PE.is64())
+ * {
+ *     sOptions="PE+";
+ * }
+ */
+PE.is64=function(){}
+/**
  * Check if the “Rich” signature is in the file. For more information see {@link http://www.ntcore.com/files/richsign.htm}. It is typical for the files made by the MS Linker.
  * @returns {Bool}
  * @example

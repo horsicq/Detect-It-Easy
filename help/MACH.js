@@ -155,6 +155,16 @@ MACH.getSegmentFileSize=function(nSection){}
  */
 MACH.getSegmentName=function(nSection){}
 /**
+ * Check if the file is 64 bit (MachO64).
+ * @returns {Bool}
+ * @example
+ * if(MACH.is64())
+ * {
+ *     sOptions="MachO64";
+ * }
+ */
+MACH.is64=function(){}
+/**
  * Convert a relative virtual address (RVA) to a file offset.
  * @param {UInt64} nRVA
  * @returns {Int64} If an error occurs, -1 will be returned.

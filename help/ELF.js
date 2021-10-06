@@ -192,6 +192,16 @@ ELF.getSectionFileSize=function(nSection){}
  */
 ELF.getSectionNumber=function(sSectionName){}
 /**
+ * Check if the file is 64 bit (ELF64).
+ * @returns {Bool}
+ * @example
+ * if(ELF.is64())
+ * {
+ *     sOptions="ELF64";
+ * }
+ */
+ELF.is64=function(){}
+/**
  * Convert a relative virtual address (RVA) to a file offset.
  * @param {UInt64} nRVA
  * @returns {Int64} If an error occurs, -1 will be returned.
