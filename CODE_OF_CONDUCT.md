@@ -22,4 +22,4 @@
 
 11. always strive to simplify
 
-(C) John Sonmez https.//simpleprogrammer.com 
+(C) John Sonmez https://simpleprogrammer.com 
