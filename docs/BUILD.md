@@ -6,10 +6,7 @@ cd DIE-engine
 
 docker build .
 
-How to build on Linux(Debian package, tested on Ubuntu 14.04-20.04)
-=======
-
-How to build on Linux(Debian package)
+How to build on Linux based on Debian
 =======
 
 Install packages:
@@ -19,7 +16,9 @@ Install packages:
 - sudo apt-get install qttools5-dev-tools -y
 - sudo apt-get install git -y
 - sudo apt-get install build-essential -y
-- sudo apt-get install qt5-default -y
+- sudo apt-get install qt5-default -y (Ubuntu 14.04-20.04)
+- sudo apt-get install qtchooser -y (Ubuntu 21.04-21.10)
+- sudo apt-get install qt5-qmake -y (Ubuntu 21.04-21.10)
 
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 
