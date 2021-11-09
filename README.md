@@ -32,8 +32,8 @@ Indeed, scripts run slower than compiled code, but, thanks to the good optimizat
 of Script Engine, this doesn't cause any special inconvenience. The possibilities
 of open architecture compensate these limitations.
 
-DIE exists in three versions. Basic version ("DIE"), Lite version ("DIEL") and
-console version ("DIEC"). All the three use the same signatures, which are located
+DIE exists in three versions. Basic version ("die"), Lite version ("diel") and
+console version ("diec"). All the three use the same signatures, which are located
 in the folder "db". If you open this folder, nested sub-folders will be found
 ("Binary", "PE" and others). The names of sub-folders correspond to the types of files.
 First, DIE determines the type of file, and then sequentially loads all the signatures,
@@ -51,13 +51,18 @@ which lie in the corresponding folder. Currently the program defines the followi
 * How to build: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/BUILD.md
 * Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
 
-Packages: 
+Packages
 =======
 
 - Chocolatey(Windows): https://community.chocolatey.org/packages/die (Thanks **chtof**(https://github.com/chtof) and **Rob Reynolds**(https://github.com/ferventcoder))
 - Parrot OS: Package name **detect-it-easy** (Thanks **Nong Hoang Tu**(https://github.com/dmknght))
 - Arch Linux: https://aur.archlinux.org/packages/detect-it-easy-git/ (Thanks **Arnaud Dovi**(https://github.com/class101))
 - REMnux https://remnux.org/ (Thanks **REMnux team**(https://twitter.com/REMnux/status/1401935989266919426))
+
+Telegram Bot
+=======
+
+You could find the Bot in Telegram @detectiteasy_bot or simply enter in the search for Telegram "Detect It Easy"
 
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/die.jpg "Mascot")
 

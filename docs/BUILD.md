@@ -28,7 +28,7 @@ Run build script: bash -x build_dpkg.sh
 
 Install deb package: sudo dpkg -i release/die_[Version].deb
 
-Run DiE: *die [FileName] or diec [FileName]*
+Run DiE: *die [FileName] or diec [FileName] or diel [FileName]*
 
 How to build on Linux(Automake)
 =======
@@ -44,7 +44,7 @@ Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 - make
 - sudo make install
 
-Run DiE: *die [FileName] or diec [FileName]*
+Run DiE: *die [FileName] or diec [FileName] or diel [FileName]*
 
 How to build on OSX
 =======

@@ -1,3 +1,9 @@
+
+* die GUI version
+* diec console version
+* diel GUI lite version
+
+
 How to run portable version on Linux
 =======
 
