@@ -8,7 +8,16 @@ Detect It Easy
 
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/version.png "Version")
 
-![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/screenshot.jpg "Screenshot")
+* Download: https://github.com/horsicq/DIE-engine/releases
+* How to run: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/RUN.md
+* How to build: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/BUILD.md
+* Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
+
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/1.png "1")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/2.png "2")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/3.png "3")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/4.png "4")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/5.png "5")
 
 Detect It Easy, or abbreviated "DIE" is a program for determining types of files.
 
@@ -44,12 +53,6 @@ which lie in the corresponding folder. Currently the program defines the followi
 * ELF executable files Linux
 * MACH executable files Mac OS
 * Binary all other files
-
-
-* Download: https://github.com/horsicq/DIE-engine/releases
-* How to run: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/RUN.md
-* How to build: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/BUILD.md
-* Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
 
 Packages
 =======

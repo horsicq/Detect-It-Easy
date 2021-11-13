@@ -11,6 +11,10 @@ How to run portable version on Linux
 * make the file executable (chmod +x Detect_It_Easy-3.03-x86_64.AppImage)
 * run it (./Detect_It_Easy-3.03-x86_64.AppImage)
 
+How to tun on macOS
+=======
+
+https://github.com/horsicq/build_tools/blob/master/OSX_NO_CERT.md
 
 Run with Docker
 =======
