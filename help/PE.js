@@ -553,6 +553,22 @@ ELF.readQword=function(nOffset){}
  */
 PE.readWord=function(nOffset){}
 /**
+ * @see Binary.readSByte
+ */
+PE.readSByte=function(nOffset){}
+/**
+ * @see Binary.readSDword
+ */
+PE.readSDword=function(nOffset){}
+/**
+ * @see Binary.readSQword
+ */
+PE.readSQword=function(nOffset){}
+/**
+ * @see Binary.readSWord
+ */
+PE.readSWord=function(nOffset){}
+/**
  * @see Binary.swapBytes
  */
 PE.swapBytes=function(nValue){}

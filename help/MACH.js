@@ -62,11 +62,27 @@ MACH.readDword=function(nOffset){}
 /**
  * @see Binary.readQword
  */
-ELF.readQword=function(nOffset){}
+MACH.readQword=function(nOffset){}
 /**
  * @see Binary.readWord
  */
 MACH.readWord=function(nOffset){}
+/**
+ * @see Binary.readSByte
+ */
+MACH.readSByte=function(nOffset){}
+/**
+ * @see Binary.readSDword
+ */
+MACH.readSDword=function(nOffset){}
+/**
+ * @see Binary.readSQword
+ */
+MACH.readSQword=function(nOffset){}
+/**
+ * @see Binary.readSWord
+ */
+MACH.readSWord=function(nOffset){}
 /**
  * @see Binary.swapBytes
  */
