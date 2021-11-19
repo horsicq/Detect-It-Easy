@@ -166,6 +166,22 @@ ELF.readQword=function(nOffset){}
  */
 ELF.readWord=function(nOffset){}
 /**
+ * @see Binary.readSByte
+ */
+ELF.readSByte=function(nOffset){}
+/**
+ * @see Binary.readSDword
+ */
+ELF.readSDword=function(nOffset){}
+/**
+ * @see Binary.readSQword
+ */
+ELF.readSQword=function(nOffset){}
+/**
+ * @see Binary.readSWord
+ */
+ELF.readSWord=function(nOffset){}
+/**
  * @see Binary.swapBytes
  */
 ELF.swapBytes=function(nValue){}

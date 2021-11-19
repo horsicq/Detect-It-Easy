@@ -62,11 +62,27 @@ MSDOS.readDword=function(nOffset){}
 /**
  * @see Binary.readQword
  */
-ELF.readQword=function(nOffset){}
+MSDOS.readQword=function(nOffset){}
 /**
  * @see Binary.readWord
  */
 MSDOS.readWord=function(nOffset){}
+/**
+ * @see Binary.readSByte
+ */
+MSDOS.readSByte=function(nOffset){}
+/**
+ * @see Binary.readSDword
+ */
+MSDOS.readSDword=function(nOffset){}
+/**
+ * @see Binary.readSQword
+ */
+MSDOS.readSQword=function(nOffset){}
+/**
+ * @see Binary.readSWord
+ */
+MSDOS.readSWord=function(nOffset){}
 /**
  * @see Binary.swapBytes
  */
