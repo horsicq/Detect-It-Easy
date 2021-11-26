@@ -4,9 +4,28 @@
 
 ```
 ```
-**bool compare(QString sSignature,qint64 nOffset=0)**
+**bool compare(QString sSignature,qint64 nOffset=0)** Compares bytes with a hexadecimal string signature.
+
+The signature may contain both lowercase and uppercase hexadecimal digits.
+Spaces are skipped, and <code>.</code> and <code>?</code> represent any digit.
+Text may be matched by using single quotes. For example <samp>"01'Test'01"</samp>.
+
+There are two additional symbols:
+
+* # for absolute jump (e.g. "68########55")
+* $ for relative jump (e.g. "E8$$$$$$$$55")
 
 ```
+if(Binary.compare("'7z'BCAF271C")) // compare file header (nOffset=0)
+{
+    sVersion=Binary.readByte(6)+"."+Binary.readByte(7);
+    bDetected=1;
+}
+ 
+if(Binary.compare("'WAVEfmt '",8)) // compare file from offset 8
+{
+    bDetected=1;
+}
 ```
 **bool compareEP(QString sSignature,qint64 nOffset=0)**
 
@@ -137,11 +156,13 @@
 
 ```
 ```
-**double calculateEntropy(qint64 nOffset,qint64 nSize)**
+**double calculateEntropy(qint64 nOffset,qint64 nSize)** Calculate the entropy of a region of the file.
+
+* Result in the form of quantity of bits per byte. Since there are 8 bits in a byte, the maximum entropy will be 8.0.
 
 ```
 ```
-**QString calculateMD5(qint64 nOffset,qint64 nSize)**
+**QString calculateMD5(qint64 nOffset,qint64 nSize)** Calculate the MD5 hash of a region of the file.
 
 ```
 ```
