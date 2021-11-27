@@ -24,6 +24,4 @@ _log(123); // display a number
 * bShowOptions - True to include the options.
 
 ```
-_log("Hello world!"); // display a string
-_log(123); // display a number
 ```
