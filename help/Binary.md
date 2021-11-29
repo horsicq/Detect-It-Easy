@@ -1,4 +1,4 @@
-###This is a description of the Binary class. This class is used when no other class matches.
+This is a description of the Binary class. This class is used when no other class matches.
 
 **qint64 getSize()** Get the size of the file
 
@@ -7,8 +7,8 @@
 **bool compare(QString sSignature,qint64 nOffset=0)** Compares bytes with a hexadecimal string signature.
 
 The signature may contain both lowercase and uppercase hexadecimal digits.
-Spaces are skipped, and <code>.</code> and <code>?</code> represent any digit.
-Text may be matched by using single quotes. For example <samp>"01'Test'01"</samp>.
+Spaces are skipped, and . and ? represent any digit.
+Text may be matched by using single quotes. For example **"01'Test'01"**.
 
 There are two additional symbols:
 
@@ -27,9 +27,21 @@ if(Binary.compare("'WAVEfmt '",8)) // compare file from offset 8
     bDetected=1;
 }
 ```
-**bool compareEP(QString sSignature,qint64 nOffset=0)**
+**bool compareEP(QString sSignature,qint64 nOffset=0)** Compare bytes at the Entry Point.
+
+* sSignature - The signature.
+* nOffset - The offset from the entry point.
 
 ```
+if(PE.compareEP("2C81",8))
+{
+    sVersion="1.98";
+}
+
+if(PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24"))
+{
+    bDetected=1;
+}
 ```
 **quint8 readByte(qint64 nOffset)**
 
