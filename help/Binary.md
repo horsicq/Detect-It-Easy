@@ -78,7 +78,7 @@ if(PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24"))
 **QString getString(qint64 nOffset,qint64 nMaxSize=50)** Get a text string from the file. A string is read up to the first unreadable character or up to the maximum length.
 
 * nOffset - The offset in the file.
-* The maximum size of the string, in bytes.
+* nMaxSize - The maximum size of the string, in bytes.
 
 ```
 var sString=Binary.getString(0x100,32); // read a string from offset 0x100, maximum length 32 bytes
@@ -138,11 +138,13 @@ var sString=Binary.getString(60); // read a string from offset 60, maximum lengt
 
 ```
 ```
-**bool isSignaturePresent(qint64 nOffset,qint64 nSize,QString sSignature)**
+**bool isSignaturePresent(qint64 nOffset,qint64 nSize,QString sSignature)** Check if a signature (see {@link Binary.compare compare}) exists in a region of the file.
 
 ```
 ```
-**quint32 swapBytes(quint32 nValue)**
+**quint32 swapBytes(quint32 nValue)** Swap the four bytes of a dword. 
+
+For example **0x11223344** becomes **0x44332211**.
 
 ```
 ```
@@ -163,25 +165,30 @@ var sString=Binary.getString(60); // read a string from offset 60, maximum lengt
 
 ```
 ```
-**QString getFileDirectory()**
+**QString getFileDirectory()** Get the directory of the file.
 
 ```
 ```
-**QString getFileBaseName()**
+**QString getFileBaseName()** Get the base name of the file.
 
 ```
 ```
-**QString getFileCompleteSuffix()**
+**QString getFileCompleteSuffix()** Get the complete suffix of the file.
 
 ```
 ```
-**QString getFileSuffix()**
+**QString getFileSuffix()** Get the suffix of the file.
 
 ```
 ```
-**QString getSignature(qint64 nOffset,qint64 nSize)**
+**QString getSignature(qint64 nOffset,qint64 nSize)** Get a signature string from the file.
 
 ```
+var signature=Binary.getSignature(0,4);
+if(signature=="AA5411DD")
+{
+    bDetected=1;
+}
 ```
 **double calculateEntropy(qint64 nOffset,qint64 nSize)** Calculate the entropy of a region of the file.
 
