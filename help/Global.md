@@ -25,3 +25,7 @@ _log(123); // display a number
 
 ```
 ```
+**_setResult(sType,sName,sVersion,sOptions)** set result
+
+```
+```
