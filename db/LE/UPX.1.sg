@@ -1,0 +1,74 @@
+// DIE's signature file
+// Author: hypn0 <hypn0@mail.ru>
+
+init("packer","UPX");
+
+function getUPXOptions(nOffset)
+{
+    var nMethod=LE.readByte(nOffset+2);
+    var nLevel=LE.readByte(nOffset+3);
+   
+    var sCompression="";
+    switch(nMethod) // From http://sourceforge.net/p/upx/code/ci/default/tree/src/conf.h
+    {
+    case 2: sCompression="NRV2B_LE32"; break;
+    case 3: sCompression="NRV2B_8"; break;
+    case 4: sCompression="NRV2B_LE16"; break;
+    case 5: sCompression="NRV2D_LE32"; break;
+    case 6: sCompression="NRV2D_8"; break;
+    case 7: sCompression="NRV2D_LE16"; break;
+    case 8: sCompression="NRV2E_LE32"; break;
+    case 9: sCompression="NRV2E_8"; break;
+    case 10: sCompression="NRV"; break;
+    case 14: sCompression="LZMA"; break;
+    case 15: sCompression="zlib"; break;
+    }
+
+    if(sCompression!="")
+    {
+        sOptions=sOptions.append(sCompression);
+        if(nLevel==8)
+        {
+            sOptions=sOptions.append("best");
+        }
+        else
+        {
+            sOptions=sOptions.append("brute");
+        }
+    }
+}
+
+function getUPXVersion()
+{
+    var nEP = LE.getEntryPointOffset();
+    var nOffset1=LE.findString(nEP-1024,1024,"$Id: UPX ");
+    var nOffset2=LE.findString(nEP,1024,"UPX!");
+    if(nOffset2!=-1)
+    {
+        getUPXOptions(nOffset2+4);
+    }
+
+    if(nOffset1!=-1)
+    {
+        sVersion=LE.getString(nOffset1+9,4);
+    }
+    if((sVersion=="")&&(nOffset2!=-1))
+    {
+        sVersion=LE.getString(nOffset2-5,4);
+    }
+}
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(LE.compareEP("bf........6957..........061e07578db7........8dbf........b9........fdf3a5fc8d77..5f83cd..57e9"))
+    {
+        bDetected=1; //LE
+    }
+    else if(LE.compareEP("bf........be........6957..........57fc31db83cd..909001db75"))
+    {
+        bDetected=1; //LE
+    }
+    getUPXVersion();
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}
