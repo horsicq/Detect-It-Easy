@@ -247,3 +247,16 @@
 
 ```
 ```
+**quint32 getImportHash32()**
+
+```
+```
+**quint64 getImportHash64()**
+
+```
+```
+**bool isImportPositionHashPresent(qint32 nIndex,quint32 nHash)**
+
+```
+```
+
