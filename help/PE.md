@@ -123,6 +123,10 @@
 
 ```
 ```
+**qint32 getTLSSection()**
+
+```
+```
 **quint8 getMajorLinkerVersion()**
 
 ```
