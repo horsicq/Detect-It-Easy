@@ -6,6 +6,123 @@
 
 init("protector","VMProtect");
 
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    var nNumberOfSections=PE.getNumberOfSections();
+
+    var sVMPSectionName;
+
+    for(var i=nNumberOfSections-1;i>=0;i--)
+    {
+        if(i==PE.getRelocsSection())
+        {
+            continue;
+        }
+        if(i==PE.getResourceSection())
+        {
+            continue;
+        }
+
+        if(PE.getSectionName(i)!="")
+        {
+            sVMPSectionName=PE.getSectionName(i);
+
+            if(     (i>0)&&
+                    (sVMPSectionName.substr(sVMPSectionName.length-1)=="0"))
+            {
+                bDetected=true;
+
+                break;
+            }
+            else if((i>1)&&
+                    (sVMPSectionName.substr(sVMPSectionName.length-1)=="1"))
+            {
+                var sCollision=PE.getSectionNameCollision("0","1");
+
+                if(PE.isSectionNamePresent(sCollision+"1"))
+                {
+                    bDetected=true;
+
+                    break;
+                }
+            }
+            else if((i>2)&&
+                    (sVMPSectionName.substr(sVMPSectionName.length-1)=="2"))
+            {
+                var sCollision=PE.getSectionNameCollision("1","2");
+
+                if( PE.isSectionNamePresent(sCollision+"1")&&
+                    PE.isSectionNamePresent(sCollision+"0"))
+                {
+                    bDetected=true;
+
+                    break;
+                }
+            }
+            else if((i>3)&&
+                    (sVMPSectionName.substr(sVMPSectionName.length-1)=="3"))
+            {
+                var sCollision=PE.getSectionNameCollision("2","3");
+
+                if( PE.isSectionNamePresent(sCollision+"2")&&
+                    PE.isSectionNamePresent(sCollision+"1")&&
+                    PE.isSectionNamePresent(sCollision+"0"))
+                {
+                    bDetected=true;
+
+                    break;
+                }
+            }
+        }
+
+        break;
+    }
+
+    if(bDetected)
+    {
+        if(PE.is64())
+        {
+            sVersion="2.XX-3.XX";
+        }
+
+        if(sVMPSectionName!="")
+        {
+            if((sVMPSectionName.substr(sVMPSectionName.length-1)=="0"))
+            {
+                sOptions="Min protection";
+            }
+        }
+
+        if(PE.isImportPositionHashPresent(-1,0x1ff3103f))
+        {
+            sVersion="1.70";
+        }
+        else if(PE.isImportPositionHashPresent(-1,0x0c16df2d))
+        {
+            sVersion="1.70";
+            sOptions="Max protection";
+        }
+        else if(PE.isImportPositionHashPresent(-1,0x9d12b153))
+        {
+            sVersion="2.0.3-2.13";
+        }
+        else if(PE.isImportPositionHashPresent(-1,0x1e5500c1))
+        {
+            sVersion="3.0.0";
+        }
+        else if(PE.isImportPositionHashPresent(-1,0xc5fb6a4b))
+        {
+            sVersion="3.0.9";
+        }
+        else if(PE.isImportPositionHashPresent(-1,0x5caa99c7))
+        {
+            sVersion="3.2.0-3.5.0";
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}
+
 function detectVMP(sSectionName)
 {
     if(PE.section[sSectionName])
@@ -97,7 +214,7 @@ function detectVMP2()
     return 0;
 }
 
-function detect(bShowType,bShowVersion,bShowOptions)
+function detect_old(bShowType,bShowVersion,bShowOptions)
 {
     var nSectionNumber=0;
     var nCharacteristics=0;
