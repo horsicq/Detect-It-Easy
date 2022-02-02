@@ -6,8 +6,6 @@
 Detect It Easy
 ==============
 
-![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/version.png "Version")
-
 * Download: https://github.com/horsicq/DIE-engine/releases
 * How to run: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/RUN.md
 * How to build: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/BUILD.md

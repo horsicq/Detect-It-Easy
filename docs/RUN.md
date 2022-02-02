@@ -7,9 +7,9 @@
 How to run portable version on Linux
 =======
 
-* download an appImage file https://github.com/horsicq/DIE-engine/releases/download/3.03/Detect_It_Easy-3.03-x86_64.AppImage
-* make the file executable (chmod +x Detect_It_Easy-3.03-x86_64.AppImage)
-* run it (./Detect_It_Easy-3.03-x86_64.AppImage)
+* download an appImage file https://github.com/horsicq/DIE-engine/releases/download/3.04/Detect_It_Easy-3.04-x86_64.AppImage
+* make the file executable (chmod +x Detect_It_Easy-3.04-x86_64.AppImage)
+* run it (./Detect_It_Easy-3.04-x86_64.AppImage)
 
 How to run on macOS
 =======
