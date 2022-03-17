@@ -184,6 +184,10 @@ For example **0x11223344** becomes **0x44332211**.
 **QString getSignature(qint64 nOffset,qint64 nSize)** Get a signature string from the file.
 
 ```
+```
+**QString calculateCRC32(qint64 nOffset,qint64 nSize)** Calculate the CRC32 hash of a region of the file.
+
+```
 var signature=Binary.getSignature(0,4);
 if(signature=="AA5411DD")
 {
