@@ -65,5 +65,14 @@ Telegram Bot
 
 You could find the Bot in Telegram @detectiteasy_bot or simply enter in the search for Telegram "Detect It Easy"
 
+
+Thank you to all the people who already contributed!
+
+<a href="https://github.com/horsicq/Detect-It-Easy/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=horsicq/Detect-It-Easy" />
+</a>
+
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/die.jpg "Mascot")
+
+
 
