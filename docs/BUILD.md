@@ -14,11 +14,12 @@ Install packages:
 - sudo apt-get install qtbase5-dev -y
 - sudo apt-get install qtscript5-dev -y
 - sudo apt-get install qttools5-dev-tools -y
+- sudo apt-get install libqt5svg5-dev -y
 - sudo apt-get install git -y
 - sudo apt-get install build-essential -y
 - sudo apt-get install qt5-default -y (Ubuntu 14.04-20.04)
-- sudo apt-get install qtchooser -y (Ubuntu 21.04-21.10)
-- sudo apt-get install qt5-qmake -y (Ubuntu 21.04-21.10)
+- sudo apt-get install qtchooser -y (Ubuntu 21.04-22.04)
+- sudo apt-get install qt5-qmake -y (Ubuntu 21.04-22.04)
 
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 
@@ -35,7 +36,7 @@ How to build on Linux(Automake)
 
 Qt framework has to be installed on the system.
 
-(Ubuntu)Install Qt Framework: **sudo apt-get install --quiet --assume-yes build-essential qt5-default qtbase5-dev qttools5-dev-tools qtscript5-dev**
+(Ubuntu)Install Qt Framework: **sudo apt-get install --quiet --assume-yes build-essential qt5-default qtbase5-dev qttools5-dev-tools qtscript5-dev libqt5svg5-dev**
 
 Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
