@@ -248,3 +248,11 @@ if(signature=="AA5411DD")
 
 ```
 ```
+**bool isDeepScan()**
+
+```
+```
+**bool isHeuristicScan()**
+
+```
+```
