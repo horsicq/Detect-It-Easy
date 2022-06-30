@@ -256,3 +256,52 @@ if(signature=="AA5411DD")
 
 ```
 ```
+
+**quint8 read_uint8(qint64 nOffset)*
+
+```
+```
+**qint8 read_int8(qint64 nOffset)
+
+```
+```
+**quint16 read_uint16(qint64 nOffset,bool bIsBigEndian)
+
+```
+```
+**qint16 read_int16(qint64 nOffset,bool bIsBigEndian)
+
+```
+```
+**quint32 read_uint32(qint64 nOffset,bool bIsBigEndian)
+
+```
+```
+**qint32 read_int32(qint64 nOffset,bool bIsBigEndian)
+
+```
+```
+**quint64 read_uint64(qint64 nOffset,bool bIsBigEndian)
+
+```
+```
+**qint64 read_int64(qint64 nOffset,bool bIsBigEndian)
+
+```
+```
+**QString read_ansiString(qint64 nOffset,qint64 nMaxSize=50)
+
+```
+```
+**QString read_unicodeString(qint64 nOffset,qint64 nMaxSize=50)
+
+```
+```
+**QString read_utf8String(qint64 nOffset,qint64 nMaxSize=50)
+
+```
+```
+**QString read_ucsdString(qint64 nOffset)
+
+```
+```
