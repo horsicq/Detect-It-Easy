@@ -305,3 +305,7 @@ if(signature=="AA5411DD")
 
 ```
 ```
+QString bytesCountToString(quint64 nValue)
+
+```
+```
