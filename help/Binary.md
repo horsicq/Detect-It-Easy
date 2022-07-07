@@ -256,7 +256,10 @@ if(signature=="AA5411DD")
 
 ```
 ```
+**bool isVerbose()**
 
+```
+```
 **quint8 read_uint8(qint64 nOffset)*
 
 ```
