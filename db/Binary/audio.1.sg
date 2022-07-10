@@ -1,5 +1,5 @@
 // DIE's signature file
-// Author: hypn0 <hypn0@mail.ru>
+// Authors: hypn0 <hypn0@mail.ru>, LinXP
 
 init("audio","");
 
@@ -15,10 +15,12 @@ function detect(bShowType,bShowVersion,bShowOptions)
         bDetected=1;
         sName="MIDI music (.MID)";
     }
-    else if(Binary.compare("'PSID'00"))
+    else if(Binary.compare("'PSID'00")||Binary.compare("RSID'00"))
     {
         bDetected=1;
-        sName="SID tune";
+        sName="SID tune (.SID)";
+        sVersion= "v"+Binary.readBEWord(0x4);
+        sOptions=sOptions.append("\"" + Binary.getString(0x36) +" - "+Binary.getString(0x16) + "\"", Binary.getString(0x56));
     }
     else if(Binary.compare("'.snd'00"))
     {
@@ -30,31 +32,54 @@ function detect(bShowType,bShowVersion,bShowOptions)
         bDetected=1;
         sName="MO3 MOD audio (.MO3)";
     }
-    else if(Binary.compare("00000000'8CHN'", 0x434))
+    else if(Binary.compare("0000'8CHN'", 0x436)||Binary.compare("0000'M.K.'",0x436))
     {
         bDetected=1;
         sName="MOD module (.MOD)";
+        sOptions="\"" + Binary.getString(0,20)+"\"";
     }
-    else if(Binary.compare("0020130200'SCRM'", 0x27))
+    else if(Binary.compare("'SCRM'", 0x2C)||Binary.compare("10", 0x1D))
     {
         bDetected=1;
         sName="ScreamTracker 3 module (.S3M)";
+        sOptions="\"" + Binary.getString(0,20)+"\"";
     }
     else if(Binary.compare("'IMPM'"))
     {
         bDetected=1;
         sName="Impulse Tracker module (.IT)";
+        sOptions="\"" + Binary.getString(4,26)+"\"";
     }
     else if(Binary.compare("'Extended Module:'"))
     {
         bDetected=1;
         sName="Fast Tracker 2 Extended module (.XM)";
+        sOptions=sOptions.append("\"" + Binary.getString(17,20).trim()+"\"", Binary.getString(0x26,20).trim());
+
     }
     else if(Binary.compare("3026b2758e66cf11a6d900aa0062ce6c"))
     {
         bDetected=1;
         sName="Windows Media (.WMV/WMA)";
     }
-
+    else if(Binary.compare("'ProTracker 3.'"))
+    {
+        bDetected=1;
+        sName="Pro Tracker 3 module (.PT3)";
+        sVersion=Binary.getString(0x0B,3);
+        sOptions=sOptions.append("\"" + Binary.getString(66,32).trim() +" - "+Binary.getString(30, 32).trim() + "\"");
+    }
+    else if(Binary.compare("'SNES-SPC700 Sound File Data v'........1A1A"))
+    {
+        bDetected=1;
+        sName="'SNES-SPC700 Sound File (.SPC)";
+        sVersion=Binary.getString(0x1C,5);
+        if(Binary.readByte(0x23) == 26) // Has ID666 Information
+        {
+                sOptions=sOptions.append("\"" + Binary.getString(0xB1,32).trim() +" - "+Binary.getString(0x2E, 32).trim() + "\""); // Artist of Song - Song Title  
+                sOptions=sOptions.append(Binary.getString(0x4E,32).trim()); // Game Title
+                sOptions=sOptions.append(Binary.getString(0x7E,32).trim()); // Comments
+        }
+    }
     return result(bShowType,bShowVersion,bShowOptions);
 }
