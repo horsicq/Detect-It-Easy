@@ -67,7 +67,7 @@ Telegram Bot
 You could find the Bot in Telegram @detectiteasy_bot or simply enter in the search for Telegram "Detect It Easy"
 
 
-Thank you to all the people who already contributed!
+Thanks to all the people who already contributed!
 =======
 
 <a href="https://github.com/horsicq/Detect-It-Easy/graphs/contributors">
