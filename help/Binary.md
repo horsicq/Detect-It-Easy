@@ -324,3 +324,7 @@ qint64 find_utf8String(qint64 nOffset,qint64 nSize,QString sString)
 
 ```
 ```
+QString read_UUID(qint64 nOffset)
+
+```
+```
