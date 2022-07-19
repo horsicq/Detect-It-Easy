@@ -1,52 +1,61 @@
 // Supplemental read functions.
+// Authors: Jason Hood, Kaens (TG @kaens)
+// Lots of legacy,
+// TODO update the old scripts to use the new functions,
+// and get rid of the functions themselves
+
+const _LE = true; const _BE = false; //endianness for read_uint16+
+
+// ---------- START OF PRE-v3.06 CODE --------------------
+
+//DO NOT BE CONFUSED BY HOW "LE" IS CALLED "BE" IN THE FUNCTION NAMES
 
 /**
- * Read a big-endian word.
+ * Read a LITTLE-endian word. Misleading naming
  * @param {UInt} nOffset - The offset in the file.
  * @returns {UShort} The word value.
  * @alias Binary.readBEWord
  */
 File.readBEWord = function(nOffset)
 {
-    return (File.readByte(nOffset) << 8) + File.readByte(nOffset+1);
+    return File.read_uint16(nOffset,_LE)
+//    return  (File.readByte(nOffset) << 8) + File.readByte(nOffset+1);
 }
 
 /**
- * Read a big-endian dword.
+ * Read a LITTLE-endian dword. Misleading naming
  * @param {UInt} nOffset - The offset in the file.
  * @returns {UInt} The dword value.
  * @alias Binary.readBEDword
  */
 File.readBEDword = function(nOffset)
 {
-    return File.swapBytes(File.readDword(nOffset));
+    return File.read_uint32(nOffset,_LE)
 }
-
 
 /**
  * Read a word, selecting endianness.
  * @param {UInt} nOffset - The offset in the file.
- * @param {Bool} bBE - True for big-endian.
+ * @param {Bool} bLE - True for LITTLE-endian.
  * @returns {UShort} The word value.
  * @alias Binary.readEWord
  */
-File.readEWord = function(nOffset,bBE)
+File.readEWord = function(nOffset,bLE)
 {
-    return bBE?File.readBEWord(nOffset):File.readWord(nOffset);
+    return File.read_uint16(nOffset,bLE)
 }
 
 /**
  * Read a dword, selecting endianness.
  * @param {UInt} nOffset - The offset in the file.
- * @param {Bool} bBE - True for big-endian.
+ * @param {Bool} bLE - True for LITTLE-endian.
  * @returns {UInt} The dword value.
  * @alias Binary.readEDWord
  */
-File.readEDword = function(nOffset,bBE)
+File.readEDword = function(nOffset,bLE)
 {
-    return bBE?File.readBEDword(nOffset):File.readDword(nOffset);
+    return File.read_uint16(nOffset,bLE)
 }
-
 
 /**
  * Read a short (signed 16-bit) value.
@@ -56,5 +65,102 @@ File.readEDword = function(nOffset,bBE)
  */
 File.readShort = function(nOffset)
 {
-    return (File.readWord(nOffset)<<16)>>16;
+    return File.read_int16(nOffset,_BE)
 }
+
+// -------- END OF PRE-v3.06 CODE
+
+const CP950="ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜø£Ø×ƒáíóúñÑªº¿®¬½¼¡«»░▒▓│┤ÁÂÀ©╣║╗╝¢¥┐"+
+    "└┴┬├─┼ãÃ╚╔╩╦╠═╬¤ðÐÊËÈıÍÎÏ┘┌█▄¦Ì▀ÓßÔÒõÕµþÞÚÛÙýÝ¯´-±‗¾¶§÷¸°¨·¹³²■ ";
+const CP1252="€?‚?„…†‡?‰Š‹ŚŤŽŹ?‘’“”•–—?™š›śťžź?ˇ˘Ł¤Ą¦§¨©Ş«¬-®Ż°±˛ł´µ¶·¸ąş»Ľ˝ľżŔÁÂĂÄĹ"+
+    "ĆÇČÉĘËĚÍÎĎĐŃŇÓÔŐÖ×ŘŮÚŰÜÝŢßŕáâăäĺćçčéęëěíîďđńňóôőö÷řůúűüýţ˙";
+const CP866="АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмноп"+
+    "░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀рстуфхцчшщъыьэюяЁёЄєЇїЎў°∙·√№¤■?";
+
+/**
+ * Derive a string hexadecimal value, zero-padded.
+ * @param {Int} a - the numerical value.
+ * @param {UInt} padz (optional,default=2) - how many characters to zero-pad.
+ * @returns {String} The hex value, capital letters A~F, ending with "h".
+ */
+function Hex(a,padz) {
+    if(padz==undefined) padz=2;
+    var minus=""; if(a<0) { a=-a; minus="-" }
+    var r = a.toString(16).toUpperCase(); var pads="";
+    if(r.length < padz) pads = Array(padz - r.length).join('0');
+    return minus+pads+r+"h"
+}
+
+/**
+ * Read a byte array from file.
+ * @param {UInt} ofs - the offset to start from.
+ * @param {ByteArray} len - the amount of bytes to read.
+ * @returns {[uint8]} The file slice. If you go beyond EoF, read_uint8 only knows what happens.
+ */
+function readBytes(ofs,len) { //for now; feels like this should be a system function
+    var s=[];
+    for (i=0;i<len;i++) s.push(File.read_uint8(ofs+i));
+    return s;
+}
+
+/**
+ * Decode a 1-byte encoding from a byte array using the 128-byte-long table given.
+ * @param {[uint8]} ansi - an array returned by readBytes.
+ * @param {String[0x80]} dectbl - a decoding table; just make a const here in db/read for that
+ * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
+ * @returns {String} a string value usable with js.
+ */
+function decEncoding(ansi,dectbl,zstop) {
+    if(zstop==undefined) zstop=true;
+    var s="";
+    for(i=0; i<ansi.length; i++)
+        if ((ansi[i]==0) && zstop) break; else
+        if(ansi[i] < 0x80) s+=String.fromCharCode(ansi[i]);
+        else s+=dectbl[ansi[i]-0x80];
+    return s;
+}
+
+/**
+ * Decode a 1-byte encoding from file using the 128-byte-long table given.
+ * @param {UInt} ofs - the offset to start from.
+ * @param {ByteArray} len - the amount of bytes to read.
+ * @param {String[0x80]} dectbl - a decoding table; just make a const here in db/read for that
+ * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
+ * @returns {String} a string value usable with js.
+ */
+function decAnsi(ofs,len,dectbl,zstop) {
+    var s="";
+    if(zstop==undefined) zstop=true;
+    for (i=0;i<len;i++) {
+        b = Binary.read_uint8(ofs+i);
+        if ((b==0) && zstop) break; else
+        if(b < 0x80) s+=String.fromCharCode(b);
+        else s+=dectbl[b-0x80];
+    }
+    return s;
+}
+
+/**
+ * sOptions.append a string (optionally prefixed) if the space-trimmed string is not empty.
+ * @param {variant} a - the string to output (safe to accidentally drop a non-string in)
+ * @param {String} prefix (optional) - what to put in front of the output string
+ */
+function sOptionT(a,prefix) { if ((""+a).trim() != "")
+  if(prefix != undefined) sOptions = sOptions.append(prefix+a.trim())
+  else sOptions = sOptions.append((""+a).trim()) }
+
+/**
+ * sOptions.append a string (optionally prefixed) if the string is not empty.
+ * @param {variant} a - the string to output (safe to accidentally drop a non-string in)
+ * @param {String} prefix (optional) - what to put in front of the output string
+ */
+function sOption(a,prefix) { if ((""+a) != "")
+  if(prefix != undefined) sOptions = sOptions.append(prefix+a)
+  else sOptions = sOptions.append(""+a) }
+
+/**
+ * A shorthand for the situation where you compare the file suffix to what you'd expect. Use as the option to isHeuristicScan being true.
+ * @param {String} a - the expected file suffix, case-insensitive, no heading period unlike Python
+ * @returns {bool} if a match is reached
+ */
+function extIs(a) { return Binary.getFileSuffix().toLowerCase() == a.toLowerCase() }
