@@ -1,0 +1,39 @@
+// https://github.com/horsicq/Detect-It-Easy signature file
+// Author: Kaens (TG @kaens)
+
+init("format","Protein Data Bank file");
+
+includeScript("read");
+
+function detect(bShowType,bShowVersion,bShowOptions) {
+    if(Binary.compare("'HEADER'") && (Binary.isHeuristicScan() || extIs("pdb"))){
+        //ref http://www.wwpdb.org/documentation/file-format-content/format33/sect1.html
+        L= ['','','','','']; ttl='';
+        L[0] = Binary.read_ansiString(0, Binary.findSignature(0, 81, "0A"));
+        if( /[\x20-\x7F]{65,}/.test(L[0]) ) {
+            bDetected = 1;
+            if(Binary.isVerbose()){
+                p=L[0].length+1;
+                for(i=1;i<L.length;i++){
+                    L[i]=Binary.read_ansiString(p, Binary.findSignature(p, 81, "0A")-p);
+                    p+=L[i].length+1;
+                }
+                for(i=0;i<L.length;i++){
+                    switch(L[i].substr(0,6)){
+                        case "HEADER":
+                            sOptionT(L[i].substr(10,40),"Classification: ");
+                            sOptionT(L[i].substr(62,10),"ID: "); //4 is the format, but 10 for future-proofing
+                            sOptionT(L[i].substr(50,9),"dep. ");
+                            break;
+                        case "TITLE ":
+                            ttl += ' '+L[i].substr(10,70).trim();
+                            break;
+                    }
+                }
+                sOptionT(ttl, "Title: ")
+            }
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}
