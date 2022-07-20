@@ -328,3 +328,11 @@ QString read_UUID(qint64 nOffset)
 
 ```
 ```
+float read_float(qint64 nOffset,bool bIsBigEndian=false)
+
+```
+```
+double read_double(qint64 nOffset,bool bIsBigEndian=false)
+
+```
+```
