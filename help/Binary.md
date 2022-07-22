@@ -308,7 +308,7 @@ if(signature=="AA5411DD")
 
 ```
 ```
-QString bytesCountToString(quint64 nValue)
+QString bytesCountToString(quint64 nValue,quint32 nBase=1024)
 
 ```
 ```
@@ -328,11 +328,23 @@ QString read_UUID(qint64 nOffset)
 
 ```
 ```
+QString read_UUID2(qint64 nOffset,bool bIsBigEndian=false)
+
+```
+```
 float read_float(qint64 nOffset,bool bIsBigEndian=false)
 
 ```
 ```
 double read_double(qint64 nOffset,bool bIsBigEndian=false)
+
+```
+```
+float read_float32(qint64 nOffset,bool bIsBigEndian=false)
+
+```
+```
+float read_float64(qint64 nOffset,bool bIsBigEndian=false)
 
 ```
 ```
