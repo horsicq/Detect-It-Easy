@@ -73,13 +73,15 @@ File.readShort = function(nOffset)
 
 // -------- END OF PRE-v3.06 CODE
 
-const CP950="ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜø£Ø×ƒáíóúñÑªº¿®¬½¼¡«»░▒▓│┤ÁÂÀ©╣║╗╝¢¥┐"+
+const CP850="ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜø£Ø×ƒáíóúñÑªº¿®¬½¼¡«»░▒▓│┤ÁÂÀ©╣║╗╝¢¥┐"+
     "└┴┬├─┼ãÃ╚╔╩╦╠═╬¤ðÐÊËÈıÍÎÏ┘┌█▄¦Ì▀ÓßÔÒõÕµþÞÚÛÙýÝ¯´-±‗¾¶§÷¸°¨·¹³²■ ";
-const CP1252="€?‚?„…†‡?‰Š‹ŚŤŽŹ?‘’“”•–—?™š›śťžź?ˇ˘Ł¤Ą¦§¨©Ş«¬-®Ż°±˛ł´µ¶·¸ąş»Ľ˝ľżŔÁÂĂÄĹ"+
-    "ĆÇČÉĘËĚÍÎĎĐŃŇÓÔŐÖ×ŘŮÚŰÜÝŢßŕáâăäĺćçčéęëěíîďđńňóôőö÷řůúűüýţ˙";
+const CP1252="€-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—˜™š›œ¢žŸ ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾"+
+    "¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
 const CP866="АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмноп"+
     "░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀рстуфхцчшщъыьэюяЁёЄєЇїЎў°∙·√№¤■?";
-
+const JISX0201="→-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—˜™š›œ¢žŸ"+//decided to mix it with cp1252
+    "→｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ"+
+    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ"
 
 /**
  * Derive a string hexadecimal value, zero-padded.
@@ -116,10 +118,17 @@ function readBytes(ofs,len) { //for now; feels like this should be a system func
  */
 function decEncoding(ansi,dectbl,zstop) {
     if(zstop==undefined) zstop=true;
-    var s="";
+    var s=""; var bit8=0;
     for(i=0; i<ansi.length; i++)
         if ((ansi[i]==0) && zstop) break; else
-        if(ansi[i] < 0x80) s+=String.fromCharCode(ansi[i]);
+        if(ansi[i] < 0x80)
+            switch(ansi[i]) { // 7-bit variation processing
+                case 0x0E: if(dectbl == "JISX0201") bit8=0x80; break;
+                case 0x0F: if(dectbl == "JISX0201") bit8=0; break;
+                case 0x5C: if(dectbl == "JISX0201") s+="¥"; break;
+                case 0x7E: if(dectbl == "JISX0201") s+="‾"; break;
+                default: s += String.fromCharCode(bit8+ansi[i]);
+            }
         else s+=dectbl[ansi[i]-0x80];
     return s;
 }
