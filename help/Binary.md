@@ -365,7 +365,7 @@ if(signature=="AA5411DD")
 ```
 ```
 
-**QString Binary_Script::read_codePageString(QString sCodePage, qint64 nOffset, qint64 nMaxByteSize)**
+**QString read_codePageString(QString sCodePage, qint64 nOffset, qint64 nMaxByteSize)**
 
 ```
 System
