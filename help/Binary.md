@@ -356,6 +356,10 @@ if(signature=="AA5411DD")
 
 ```
 ```
+**float read_float16(qint64 nOffset,bool bIsBigEndian=false)**
+
+```
+```
 **float read_float32(qint64 nOffset,bool bIsBigEndian=false)**
 
 ```
