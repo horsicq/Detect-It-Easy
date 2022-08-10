@@ -1,5 +1,5 @@
 // DIE's signature file
-// Authors: hypn0 <hypn0@mail.ru>, Kaens (TG@kaens)
+// Authors: hypn0 <hypn0@mail.ru>, Kaens (TG@kaens), LinXP
 
 init("archive","");
 
@@ -62,18 +62,35 @@ function detect(bShowType,bShowVersion,bShowOptions)
     }
     else if(Binary.compare("....'-lh'..2d")||Binary.compare("....'-lz'..2d"))
     {
-        sName="LHA";
-        switch(Binary.readByte(0x5))
+        sVersion = Binary.getString(2,5)
+        bDetected=true;
+        switch(Binary.getString(3,3))
         {
-        case 0x30: bDetected=1; break;
-        case 0x31: bDetected=1; break;
-        case 0x32: bDetected=1; break;
-        case 0x33: bDetected=1; break;
-        case 0x34: bDetected=1; break;
-        case 0x35: bDetected=1; break;
-        case 0x36: bDetected=1; break;
-        case 0x64: bDetected=1; break;
-        case 0x73: bDetected=1; break;
+        case "lh0":
+        case "lh1":
+        case "lh2":
+        case "lh3":
+        case "lh4":
+        case "lh5":
+        case "lh6":
+        case "lh7":
+        case "lhd": sName="LHA archive (.LHA)"; break;
+        case "lh8":
+        case "lh9":
+        case "lha":
+        case "lhb":
+        case "lhc":
+        case "lhe": sName="LHA archive, Joe Jared ext (.LHA)"; break;
+        case "lhx": sName="LHA archive, UNLHA32 ext (.LHA)"; break;
+        case "lzs":
+        case "lz2":
+        case "lz3":
+        case "lz4":
+        case "lz5":
+        case "lz6":
+        case "lz7":
+        case "lz8": sName="LHA archive, LArc ext (.LZS)"; break;
+        default: bDetected=false;
         }
     }
     else if(Binary.compare("'mflh'0100"))
@@ -135,8 +152,15 @@ function detect(bShowType,bShowVersion,bShowOptions)
     else if(Binary.compare("'IsZ!@'01"))
     {
         bDetected=1;
-        sName="ISZ";
-        sOptions="Iso Zipped";
+        sName="Zipped ISO Disk Image (.ISZ)";
+        switch(Binary.read_uint32(0x10))
+        {
+        case  0:  sOptions="no password";       break;
+        case  1:  sOptions="password";          break;
+        case  2:  sOptions="password, aes128";  break;
+        case  3:  sOptions="password, aes182";  break;
+        case  4:  sOptions="password, aes256";  break;
+        }
     }
     else if(Binary.compare("aa59f0000002"))
     {
@@ -324,6 +348,26 @@ function detect(bShowType,bShowVersion,bShowOptions)
         sOptions=sOptions.append(Binary.getString(12,32));
         sOptions=sOptions.append("& other "+(Binary.readDword(8)-1)+" files");
     }
-
+    else if(Binary.compare("FF060000'sNaPpY'")) {
+        bDetected=true;
+        sName="Snappy compressed data (.SZ)";
+    }
+    else if(Binary.compare("'blkzip'00")) {
+        bDetected=true;
+        sName="BulkZip Archive (.BULK)";
+    }
+    else if(Binary.compare("AE01'NanoZip 0.09 alpha'")) {
+        bDetected=true;
+        sName="NanoZip Archive (.NZ)";
+        sVersion = "0.09 alpha";
+    }
+    else if(Binary.compare("'CM'2805060000")) {
+        bDetected=true;
+        sName="RAZOR Archive (.RZ)";
+    }
+    else if(Binary.compare("28B52FFD")) {
+        bDetected=true;
+        sName="Facebook Zstandard/ZSTD compressed data (.ZST)";
+    }
     return result(bShowType,bShowVersion,bShowOptions);
 }

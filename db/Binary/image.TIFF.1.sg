@@ -1,79 +1,160 @@
 // DIE's signature file
+// Author: LinXP
+// Status: WIP
+// doc-ref: 
 
-init("image","TIFF");
+init("image","Tagged Image File Format (.TIFF)");
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
-    if(Binary.getSize()>=8)
+    function ReadTagValue(nType)
     {
-        var nOffset=Binary.readDword(4);
-        var bBE=0;
-        if(Binary.compare("'II'2A00"))
+        var nTempValue=0, nTempOffset=0;
+        switch(nType)
         {
-            sOptions="little endian";
-            bDetected=1;
+            case 1: // eBYTE 
+                break;
+            case 2: // eASCII
+                nTempOffset = Binary.read_uint32(nOffset+8,bEndian);
+                nTempValue =  Binary.getString(nTempOffset, nCount);
+                return nTempValue;
+                break;
+            case 3: // eSHORT
+                if (nCount == 1)
+                {
+                    nTempValue = Binary.read_uint16(nOffset+8,bEndian);
+                    return nTempValue;
+                }
+                else
+                {
+                    nTempOffset = Binary.read_uint32(nOffset+8,bEndian);
+                    while(nCount--)
+                    {
+                        nTempValue = Binary.read_uint16(nTempOffset,bEndian); nTempOffset+=2;                        
+                    }
+                    return nTempValue;
+                }
+                break;
+            case 4: // eLONG
+                if (nCount == 1)
+                {
+                    nTempValue = Binary.read_uint32(nOffset+8,bEndian);
+                    return nTempValue;
+                }
+                else
+                {
+                    nTempOffset = Binary.read_uint32(nOffset+8,bEndian);
+                    while(nCount--)
+                    {
+                        nTempValue = Binary.read_uint32(nTempOffset,bEndian); nTempOffset+=4;                        
+                    }
+                    return nTempValue;
+                }
+                break;
+            case 5: // eRATIONAL 
+                break;
+            case 6: // eSBYTE 
+                break;
+            case 7: // eUNDEF 
+                break;
+            case 8: // eSSHORT 
+                break;
+            case 9: // eSLONG 
+                break;
+            case 10: // eSRATIONAL 
+                break;
+            case 11: // eFLOAT 
+                break;
+            case 12: // eDOUBLE 
+                break;
+            }
+
+    }
+
+    if(Binary.getSize()>=0x0E)
+    {
+        bDetected=true;
+        switch(Binary.read_uint32(0x00,_BE))
+        {
+            case 0x4D4D002A:  var bEndian=_BE; sOption("BE"); break;
+            case 0x49492A00:  var bEndian=_LE; sOption("LE"); break;
+            default: bDetected=false;
         }
-        else if(Binary.compare("'MM'002A"))
+
+        if(bDetected) 
         {
-            sOptions="big endian";
-            nOffset=Binary.swapBytes(nOffset);
-            bBE=1;
-            bDetected=1;
-        }
-        if(bDetected&&bShowOptions)
-        {
-            var nCount=Binary.readEWord(nOffset,bBE);
-            var nWidth=0,nHeight=0,nBPS=1,nCol=0,nComp=1;
-            nOffset+=2;
-            while(nCount--)
+            var nOffset = Binary.read_uint32(0x04,bEndian);
+            var nTagCount  = Binary.read_uint16(nOffset,bEndian); nOffset+=2;
+            var nWidth, nHeight, nBPS, nCol,nComp;
+            while(nTagCount--)
             {
-                var nTag=Binary.readEWord(nOffset,bBE);
-                var nType=Binary.readEWord(nOffset+2,bBE);
+                var nTag   = Binary.read_uint16(nOffset,  bEndian);
+                var nType  = Binary.read_uint16(nOffset+2,bEndian);
+                var nCount = Binary.read_uint32(nOffset+4,bEndian);
                 switch(nTag)
                 {
-                case 0x100: nWidth=(nType==3)?Binary.readEWord(nOffset+8)
-                                             :Binary.readEDword(nOffset+8);
-                            break;
-                case 0x101: nHeight=(nType==3)?Binary.readEWord(nOffset+8)
-                                              :Binary.readEDword(nOffset+8);
-                            break;
-                case 0x102: nBPS=Binary.readEDword(nOffset+4)==1
-                                 ?Binary.readEWord(nOffset+8)
-                                 :Binary.readEWord(Binary.readEDword(nOffset+8));
-                            // assume all samples are the same size
-                            break;
-                case 0x103: nComp=Binary.readEWord(nOffset+8);
-                            break;
-                case 0x106: nCol=Binary.readEWord(nOffset+8);
-                            break;
+                case 0x100: // ImageWidth (256)
+                    nWidth  = ReadTagValue(nType);
+                    break;
+
+                case 0x101: // ImageLength (257)
+                    nHeight = ReadTagValue(nType);
+                    break;
+
+                case 0x102: // BitsPerSample (258)
+                    nBPS = nCount * ReadTagValue(nType);
+                    break;
+
+                case 0x103: // Compression (259)
+                    nComp = ReadTagValue(nType);
+                    break;
+
+                case 0x106: // PhotometricInterpretation (262)
+                    nCol = ReadTagValue(nType);
+                    break;
+
+                case 271: // Make (271)
+                    sOption("Make:"+ReadTagValue(nType));
+                    break;
+
+                case 50706: // DNGVersion (50706)
+                    sName = "Digital Negative (.DNG)"
+                    break;
+                default: 
+
                 }
-                nOffset+=12;
+                nOffset+= 0x0C;
+
             }
+
+
             switch(nComp)
             {
-            case     1: sOptions=sOptions.append("Uncompressed"); break;
-            case     2: sOptions=sOptions.append("Huffman");      break;
-            case     3: sOptions=sOptions.append("Group 3");      break;
-            case     4: sOptions=sOptions.append("Group 4");      break;
-            case     5: sOptions=sOptions.append("LZW");          break;
-            case     6: sOptions=sOptions.append("embedded JPEG (602Photo software)"); break;
-            case     7: sOptions=sOptions.append("JPEG");         break;
-            case 32771: sOptions=sOptions.append("Alchemy software type 6 unknown compression"); break;
-            case 32773: sOptions=sOptions.append("PackBits");     break;
-            case 32946: sOptions=sOptions.append("Deflate");      break;
-            case 34690: sOptions=sOptions.append("LDF bitonal");  break;
+            case     1: sOption("Uncompressed"); break;
+            case     2: sOption("Huffman");      break;
+            case     3: sOption("Group 3");      break;
+            case     4: sOption("Group 4");      break;
+            case     5: sOption("LZW");          break;
+            case     6: sOption("embedded JPEG (602Photo software)"); break;
+            case     7: sOption("JPEG");         break;
+            case 32771: sOption("Alchemy software type 6 unknown compression"); break;
+            case 32773: sOption("PackBits");     break;
+            case 32946: sOption("Deflate");      break;
+            case 34690: sOption("LDF bitonal");  break;
+            case 65000: sOption("Kodak DCR");
+                        sName = "Kodak DCS Pro SLR (.DCR)";       break;
             }
             if(nWidth!=0&&nHeight!=0)
             {
-                sOptions=sOptions.append(nWidth+"x"+nHeight);
+                sOption(nWidth+"x"+nHeight);
             }
-            sOptions=sOptions.append(nBPS+"-bit ");
+            sOption(nBPS+"-bit ");
             switch(nCol)
             {
-            case 0: sOptions+="W/B";   break;
-            case 1: sOptions+="B/W";   break;
-            case 2: sOptions+="RGB";   break;
-            case 3: sOptions+="index"; break;
+                case 0: sOption("W/B");   break;
+                case 1: sOption("B/W");   break;
+                case 2: sOption("RGB");   break;
+                case 3: sOption("index"); break;
             }
         }
     }

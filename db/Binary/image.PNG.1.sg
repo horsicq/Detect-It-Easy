@@ -1,6 +1,8 @@
 // DIE's signature file
+// Author: LinXP
+// doc-ref: http://www.libpng.org/pub/png/spec/1.2/PNG-Contents.html
 
-init("image","PNG");
+init("image","");
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
@@ -8,25 +10,27 @@ function detect(bShowType,bShowVersion,bShowOptions)
     {
         if(Binary.compare("89'PNG\r\n'1A0A........'IHDR'"))
         {
-            if(Binary.readByte(28))
+            bDetected=true;
+            sName = "Portable Network Graphics (.PNG)";
+            sOption(Binary.read_uint32(0x10,_BE)+"x"+Binary.read_uint32(0x14,_BE));
+            switch(Binary.read_uint8(0x19))
             {
-                sOptions="interlaced";
+                case 0: sOption("Grey");       break;
+                case 2: sOption("RGB");        break;
+                case 3: sOption("Indexed");    break;
+                case 4: sOption("Grey+Alpha"); break;
+                case 6: sOption("RGBA");       break;
+                default: bDetected=false;
             }
-            sOptions=sOptions.append(Binary.readBEDword(16)+"x"+Binary.readBEDword(20));
-            var sColor="";
-            switch(Binary.readByte(25))
+            if(Binary.read_uint8(0x1C))
             {
-            case 0: sColor="grey";       break;
-            case 2: sColor="RGB";        break;
-            case 3: sColor="index";      break;
-            case 4: sColor="grey+alpha"; break;
-            case 6: sColor="RGBA";       break;
+                sOption("Interlaced");
             }
-            if(sColor!="")
+            if(Binary.compare("00000008'acTL'",0x21))
             {
-                sOptions=sOptions.append(Binary.readByte(24)+"-bit "+sColor);
+                sName = "Animated Portable Network Graphics (.PNG)"
+                sOption("frames:" + Binary.read_uint32(0x29,_BE));  
             }
-            bDetected=1;
         }
     }
 

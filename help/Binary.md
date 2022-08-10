@@ -368,7 +368,14 @@ if(signature=="AA5411DD")
 
 ```
 ```
+**quint32 read_uint24(qint64 nOffset,bool bIsBigEndian=false)**
 
+```
+```
+**qint32 read_int24(qint64 nOffset,bool bIsBigEndian=false)**
+
+```
+```
 **QString read_codePageString(qint64 nOffset,qint64 nMaxByteSize=256,QString sCodePage="System")**
 
 ```
