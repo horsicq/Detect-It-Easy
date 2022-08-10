@@ -1,0 +1,43 @@
+// DIE's signature file
+// Author: LinXP
+// doc-ref: https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/
+
+init("image","Adobe Photoshop");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(Binary.getSize()>=0x20)
+    {
+        if(Binary.compare("'8BPS'")) 
+        {
+            bDetected=true;
+            switch(File.read_uint16(0x04, _BE)) // Version check
+            {
+                case 1: sName +=" (.PSD)";     sVersion="v1.0"; break;
+                case 2: sName +=" BIG (.PSB)"; sVersion="v2.0"; break;
+                default: bDetected=false;
+            }
+            var channelCount   = Binary.read_uint16(0x0C,_BE);
+            var imageHeight    = Binary.read_uint32(0x0E,_BE);
+            var imageWidth     = Binary.read_uint32(0x12,_BE);
+            var bitsPerChannel = Binary.read_uint16(0x16,_BE);
+            var colorMode      = Binary.read_uint16(0x18,_BE);
+            sOption(imageWidth +"x"+ imageHeight);
+            switch(colorMode)
+            {
+                case 0:  sOption("Bitmap"); break;
+                case 1:  sOption("Gray-scale"); break;
+                case 2:  sOption("Indexed"); break;
+                case 3:  sOption("RGB"); break;
+                case 4:  sOption("CMYK"); break;
+                case 7:  sOption("Multichannel"); break;
+                case 8:  sOption("Duotone"); break;
+                case 9:  sOption("Lab"); break;
+                default: bDetected=false;
+            }
+            sOption((channelCount * bitsPerChannel)+"-bit"); 
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

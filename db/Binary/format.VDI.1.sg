@@ -1,0 +1,38 @@
+// DIE's signature file
+// Author: LinXP
+// Status: WIP
+// doc-ref: https://www.virtualbox.org/browser/vbox/trunk/src/VBox/Storage/VDICore.h
+
+init("format","");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(Binary.getSize()>=0x200)
+    {
+        if(Binary.compare("7F10DABE", 0x40))
+        {
+            sName="Virtual Disk Image (.VDI)";
+            sVersion="v"+Binary.read_uint16(0x44) +"."+  Binary.read_uint16(0x46);
+            var sImgText=Binary.getString(0);
+            var aImgName=sImgText.match(/<<< (.*?)\ >>>/);
+            if(aImgName)
+            {
+                sOptions="\"" + sOptions.append(aImgName[1]) + "\"";
+                bDetected=true;
+            }
+            if (bDetected && Binary.isVerbose())
+            {
+                switch(Binary.read_uint16(0x4C))
+                {
+                    case  1: sOption("Normal dynamically");    break;
+                    case  2: sOption("Preallocated fixed size");    break;
+                    case  3: sOption("Dynamically growing for undo/commit changes");    break;
+                    case  4: sOption("Dynamically growing for differencings");    break;
+                }
+                sOption("Size:" + Binary.bytesCountToString(Binary.read_uint64(0x0170)));
+            }
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

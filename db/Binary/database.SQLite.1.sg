@@ -1,0 +1,43 @@
+// DIE's signature file
+// Author: LinXP
+// doc-ref: https://www.sqlite.org/fileformat.html
+
+init("format","");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(Binary.compare("'SQLite format 3'00"))
+    {
+        sName="SQLite 3 database (.SQLITE)";
+        bDetected=true;
+        var nTextEncoding        = Binary.read_uint32(0x38, _BE)
+        var nAppID               = Binary.read_uint32(0x44, _BE);
+        var nSQLiteVersionNumber = Binary.read_uint32(0x60, _BE);
+        var nChangeCount         = Binary.read_uint32(0x18, _BE);
+
+        var nMajor   = nSQLiteVersionNumber/1000000>>0;
+        var nMinor   = (nSQLiteVersionNumber-nMajor*1000000)/1000>>0;
+        var nRelease = nSQLiteVersionNumber-(nMajor*1000000)-(nMinor*1000)>>0;
+        sVersion     = nMajor + "." + nMinor + "." + nRelease;
+
+        switch(nTextEncoding)
+        {
+            case  1: sOption("UTF-8"); break;
+            case  2: sOption("UTF-16LE"); break;
+            case  3: sOption("UTF-16BE"); break;
+            default: bDetected=false;
+        }
+
+        if(nAppID && Binary.isVerbose())
+        {
+            sOption("AppID:"+nAppID);
+        }
+
+        if(nChangeCount && Binary.isVerbose())
+        {
+            sOption("Changes:"+nChangeCount);
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

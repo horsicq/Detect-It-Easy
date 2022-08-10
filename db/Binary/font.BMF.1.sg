@@ -1,0 +1,56 @@
+// DIE's signature file
+// Author: LinXP
+// doc-ref: https://www.angelcode.com/products/bmfont/doc/file_format.html
+
+init("font","AngelCode Bitmap Font (.FNT)");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(Binary.getSize()>=0x30)
+    {
+        if(Binary.compare("'BMF'"))
+        {
+            bDetected=true;
+            switch(Binary.read_uint8(0x03))
+            {
+                case 1: sVersion = "v1"; sOptionT("Binary"); break;
+                case 2: sVersion = "v2"; sOptionT("Binary"); break;
+                case 3: sVersion = "v3"; sOptionT("Binary"); break;
+                default:  bDetected=false;
+            }
+            if (bDetected && Binary.isVerbose())
+            {
+                var nOffset = 0x04;
+                
+                while(nOffset < Binary.getSize()) {
+                    var nBlockTypeIdentifier = Binary.read_uint8(nOffset) ; nOffset +=1;
+                    var nBlockSize           = Binary.read_uint32(nOffset); nOffset +=4;
+                    switch(nBlockTypeIdentifier)
+                    {
+                        case 1: sOptionT('"'+Binary.getString(nOffset+0xE)+'"');
+                                sOptionT("Size:"+Binary.read_int16(nOffset)); // fontSize
+                                break;
+                        case 2: sOptionT("pages:"+Binary.read_int16(nOffset+4)+"x"+Binary.read_int16(nOffset+6)+"x"+Binary.read_int16(nOffset+8)); // scaleW, scaleH, pages
+                                break;
+                        case 3: break;
+                        case 4: sOptionT("chars:" + nBlockSize / 20);
+                                break;
+                        case 5: sOptionT("kerning_pairs:" + nBlockSize / 10);
+                                break;
+                    }
+                    nOffset += nBlockSize;
+                }
+            }
+        }
+        else if(Binary.isPlainText() && Binary.find_utf8String(0,200,"info face") >=0 && Binary.find_utf8String(0,200,"stretchH")>=0)
+        {
+            bDetected=true;
+            if (Binary.find_utf8String(0,200,"<?xml") >=0)
+            {sOptionT("XML")}
+            else
+            (sOptionT("Text"))
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}

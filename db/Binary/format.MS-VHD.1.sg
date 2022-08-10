@@ -1,0 +1,48 @@
+// DIE's signature file
+// Author: LinXP
+// Status: WIP
+
+init("format","Microsoft Virtual Hard Disk (.VHD)");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(Binary.getSize()>=0x200)
+    {
+        if(Binary.compare("'conectix'", Binary.getSize() - 0x200))
+        {
+            bDetected=true;
+            nOffset = Binary.getSize() - 0x200
+            sVersion="v"+  Binary.read_uint16(nOffset+0xC,_BE) + "." +  Binary.read_uint16(nOffset+0xE,_BE);
+            switch(Binary.read_uint32(nOffset+0x3C,_BE))
+            {
+               // case  1: sOption("deprecate");    break;
+                case  2: sOption("Fixed");         break;
+                case  3: sOption("Dynamically");   break;
+                case  4: sOption("Differencings"); break;
+                default: bDetected=false;
+            }
+            if (bDetected)
+            {
+                sOption("OrginalSize:" + Binary.bytesCountToString(Binary.read_uint64(nOffset+0x28,_BE)));
+                sOption("CurrentSize:" + Binary.bytesCountToString(Binary.read_uint64(nOffset+0x30,_BE)));
+                if (Binary.isVerbose())
+                {
+                    sOption("CreaterApp:" + Binary.getString(nOffset+0x1C, 4));
+                    sOption("v" + Binary.read_uint16(nOffset+0x20,_BE) + "." + Binary.read_uint16(nOffset+0x22,_BE));
+                    switch(Binary.read_uint32(nOffset+0x24,_BE))
+                    {
+                        case  0x57693272: sOption("WI2R");      break;
+                        case  0x5769326B: sOption("WINDOWS");   break;
+                        case  0x57327275: sOption("W2RU");      break;
+                        case  0x57326B75: sOption("W2KU");      break;
+                        case  0x4D616320: sOption("MACINTOSH"); break;
+                        case  0x4D163258: sOption("MACX");      break;
+                        default: bDetected=false;
+                    }
+                }
+            }
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}
