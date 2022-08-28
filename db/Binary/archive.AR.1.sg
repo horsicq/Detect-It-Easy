@@ -1,9 +1,9 @@
 // DIE's signature file
 // Author: LinXP
 // Status: WIP
+// doc-ref: https://en.wikipedia.org/wiki/Ar_(Unix)
 includeScript("archive");
 init("archive","The archiver (.AR)");
-
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
@@ -11,19 +11,20 @@ function detect(bShowType,bShowVersion,bShowOptions)
     function ParseLibInfo() {
         sType="format"; 
         sName = "COFF Library (.LIB)"
-        if (Binary.compare("0000FFFF",nOffset)) {
-            var nMachine = Binary.read_uint16(nOffset+6)} // long format
+        var nMachineOffset=Binary.read_uint32(0x48,_BE)+0x3C;
+        if (Binary.compare("0000FFFF",nMachineOffset)) {
+            var nMachine = Binary.read_uint16(nMachineOffset+6)} // long format
         else {
-            var nMachine = Binary.read_uint16(nOffset)}   // short format
+            var nMachine = Binary.read_uint16(nMachineOffset)}   // short format
         switch(nMachine)
         {
-            case  0x014c: sOption("I386");   break; // Intel 386 or later processors and compatible processors
-            case  0x0162: sOption("R3000");  break; // MIPS little-endian, 0x160 big-endian
-            case  0x01c0: sOption("ARM");    break; // ARM little-endian
-            case  0x8664: sOption("AMD64");  break; // x64
-            case  0xAA64: sOption("ARM64");  break; // ARM64 little-endian
-            case  0x01c4: sOption("ARMNT");  break; // Arm Thumb-2 little-endian
-            //default: bDetected=false;
+            case  0x014c: sVersion = "I386";   break; // Intel 386 or later processors and compatible processors
+            case  0x0162: sVersion = "R3000";  break; // MIPS little-endian, 0x160 big-endian
+            case  0x01c0: sVersion = "ARM";    break; // ARM little-endian
+            case  0x8664: sVersion = "AMD64";  break; // x64
+            case  0xAA64: sVersion = "ARM64";  break; // ARM64 little-endian
+            case  0x01c4: sVersion = "ARMNT";  break; // Arm Thumb-2 little-endian
+            default: sVersion = "Unknown";
         }
     }
 
@@ -48,8 +49,9 @@ function detect(bShowType,bShowVersion,bShowOptions)
                     nOffset +=0x02; //endMarker
                 switch(sFileName)
                 {
-                    case  "/0":            ParseLibInfo(); break;
+                    case  "/":             ParseLibInfo(); break;
                     case  "debian-binary": ParseDebInfo(); break;
+                    case  "/\/":                           break;
                     default: Archive.add(nFileSize,nFileSize);
                 }
                     nOffset +=nFileSize;
@@ -57,8 +59,8 @@ function detect(bShowType,bShowVersion,bShowOptions)
                 nItemCount+=1
             }
 
-            // sOption(nItemCount);
-            if (Binary.isVerbose()) sOption(Archive.contents());
+            //sOption("Items:" + nItemCount);
+            if (Binary.isVerbose()) sOption(Archive.contents()); // TODO: parse DIR\FILES
     }
     return result(bShowType,bShowVersion,bShowOptions);
 }
