@@ -74,7 +74,7 @@ Thanks to all the people who already contributed!
   <img src="https://contrib.rocks/image?repo=horsicq/Detect-It-Easy" />
 </a>
 
-![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/die.jpg "Mascot")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/logo.png "Mascot")
 
 
 
