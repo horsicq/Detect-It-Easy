@@ -3,6 +3,10 @@
 [![GitHub All Releases](https://img.shields.io/github/downloads/horsicq/DIE-engine/total.svg)](http://ntinfo.biz)
 [![gitlocalized ](https://gitlocalize.com/repo/4736/whole_project/badge.svg)](https://github.com/horsicq/XTranslation)
 
+![OS Linux](https://img.shields.io/badge/os-linux-brightgreen)
+![OS Windows](https://img.shields.io/badge/os-windows-brightgreen)
+![OS MacOS](https://img.shields.io/badge/os-macos-brightgreen)
+
 Detect It Easy
 ==============
 
