@@ -3,9 +3,9 @@
 [![GitHub All Releases](https://img.shields.io/github/downloads/horsicq/DIE-engine/total.svg)](http://ntinfo.biz)
 [![gitlocalized ](https://gitlocalize.com/repo/4736/whole_project/badge.svg)](https://github.com/horsicq/XTranslation)
 
-![OS Linux](https://img.shields.io/badge/os-linux-brightgreen)
-![OS Windows](https://img.shields.io/badge/os-windows-brightgreen)
-![OS MacOS](https://img.shields.io/badge/os-macos-brightgreen)
+[![OS Linux](https://img.shields.io/badge/os-linux-brightgreen)](https://github.com/horsicq/DIE-engine/releases)
+[![OS Windows](https://img.shields.io/badge/os-windows-brightgreen)](https://github.com/horsicq/DIE-engine/releases)
+[![OS MacOS](https://img.shields.io/badge/os-macos-brightgreen)](https://github.com/horsicq/DIE-engine/releases)
 
 Detect It Easy
 ==============
