@@ -1,0 +1,50 @@
+// DIE's signature file
+// Author: nicholasmckinney
+
+init("shellcode","Donut", "0.9.2");
+
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+	bDetected = 0;
+	
+	// https://github.com/TheWover/donut/blob/dafea1702ce2e71d5139c4d583627f7ee740f3ae/donut.c#L1235
+	var bInstCall = Binary.readByte(0);
+	if (bInstCall != 0xE8) {
+		return result(bShowType, bShowVersion, bShowOptions);
+	}
+	
+	if (Binary.readWord(1) != Binary.readWord(5)) {
+		return result(bShowType, bShowVersion, bShowOptions);
+	}
+	
+	var callDest = Binary.readDword(1)
+	
+	// https://github.com/TheWover/donut/blob/dafea1702ce2e71d5139c4d583627f7ee740f3ae/donut.c#L1239
+	var popECXOffset = callDest + 5; // 1 byte for E8 (call opcode) and 4 bytes for destination offset
+	
+	if (Binary.readByte(popECXOffset) != 0x59) {
+		return result(bShowType, bShowVersion, bShowOptions);
+	}
+	
+	bDetected = 1;
+	
+	var archDetectionOffset = popECXOffset + 1;
+	var archDetectBytes = Binary.readDword(archDetectionOffset) & 0x00ffffff;
+	
+	switch(archDetectBytes) {
+		// https://github.com/TheWover/donut/blob/dafea1702ce2e71d5139c4d583627f7ee740f3ae/donut.c#L1242-L1248
+		case 0x52515a:
+			sOptions = "x86";
+			break;
+			
+		// https://github.com/TheWover/donut/blob/dafea1702ce2e71d5139c4d583627f7ee740f3ae/donut.c#L1270-L1273
+		case 0x48c031:
+			sOptions = "x86 + AMD64";
+			break;
+		default:
+			sOptions = "AMD64";
+	}
+	
+	return result(bShowType, bShowVersion, bShowOptions);
+}
