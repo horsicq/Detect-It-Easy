@@ -1,0 +1,69 @@
+// DIE's signature file
+// Author: @justmazz_
+
+init("protector","Byfron Technologies");
+
+var bContainsRunExport = false;
+var bContainsTextSection = false;
+var bContainsByfronCodeSection = false;
+var bContainsByfronDataSection = false;
+
+function detectExports() {
+    if(PE.isExportFunctionPresent("run")) {
+        bContainsRunExport = true;
+    }
+}
+
+function detectSections() {
+    var FLAGS_RX = 0x60000020;
+    var FLAGS_INITIALIZED_DATA_DISCARDABLE = 0x02000040;
+
+    for(var i = PE.nLastSection; i >= 0; i--)
+    {
+        var sectionName = PE.getSectionName(i);
+        var sectionCharacteristics = PE.getSectionCharacteristics(i);
+
+        if(sectionName == ".text") {
+            bContainsTextSection = true;
+            continue;
+        }
+
+        if((sectionName == ".byfron") && (sectionCharacteristics == FLAGS_RX)) {
+            bContainsByfronCodeSection=true;
+            continue;
+        }
+
+        if((sectionName == ".byfron1") && 
+           (sectionCharacteristics == FLAGS_INITIALIZED_DATA_DISCARDABLE)) {
+            bContainsByfronDataSection=true;
+            continue;
+        }
+    }
+}
+
+function validateDetection() {
+    // Byfron usually has the following:
+    // an export called 'run'
+    // no .text section as it's replaced by one or both of the following:
+    //      .byfron - code section, RX
+    //      .byfron1 - data/mem discarded section
+    if(bContainsRunExport) {
+        if(!bContainsTextSection) {
+            if((bContainsByfronCodeSection || bContainsByfronDataSection)) {
+                bDetected = true;
+                return;
+            }
+        }
+    }
+
+    bDetected = false;
+}
+
+function detect(bShowType, bShowVersion, bShowOptions)
+{
+    detectExports();
+    detectSections();
+    validateDetection();
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}
