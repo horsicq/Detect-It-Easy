@@ -3,6 +3,7 @@
 // 16:27 26.01.2013 detect improved //ajax
 //  2:30 27.01.2013 bugfixes
 // 14:14 27.01.2013 bugfixes
+// 2022/10 new detect hypn0 <hypn0@mail.ru>
 
 init("protector","VMProtect");
 
@@ -117,6 +118,64 @@ function detect(bShowType,bShowVersion,bShowOptions)
         else if(PE.isImportPositionHashPresent(-1,0x5caa99c7))
         {
             sVersion="3.2.0-3.5.0";
+        }
+    }
+    
+    if((!bDetected)&&(PE.isDeepScan()))
+    {
+        var da = "";
+        var das = "";
+        var res = 0;
+        var jmp = 0;
+        var ep = PE.OffsetToVA(PE.getEntryPointOffset());
+        var count = 0;
+
+        while ((das.substr(0,das.indexOf('+')) != "MOV EDX, DWORD PTR [EAX*4 ") &&
+               (das.substr(0,das.indexOf('+')) != "MOV EBX, DWORD PTR [EAX*4 ") &&
+               (das.substr(0,das.indexOf('+')) != "MOV ECX, DWORD PTR [EAX*4 ") && count < 1000)
+        {
+            count++;
+            var byte = PE.readByte(PE.VAToOffset(ep));
+            var da = PE.getDisasmString(ep);
+            var das = da;
+
+            if(da.indexOf(' ') !=-1)
+            {
+                da=da.substr(0,da.indexOf(' '));
+            }
+
+            if((byte==0xFF && da =="JMP") || ((byte==0xC3 || byte==0xC2) && da =="RET"))
+            {
+                var fresh=1; break;
+            }
+
+            if(byte==0xFF && da =="CALL") {break;}
+
+            if(da.indexOf(' ') !=-1)
+            {
+                da=da.substr(0,da.indexOf(' '));
+            }
+
+            if(da=="CLC" || da=="CMC") {res++;}
+            if(da=="PUSHFD") {res++;}
+            if(da=="PUSHAL") {res++;}
+            if(da=="XOR") {res++;}
+            if(da=="NEG" || da=="NOT") {res++;}
+            if(da=="SAR" || da=="SAL") {res++;}
+            if(da=="JMP" || da=="CALL") {jmp++;}
+            if(da=="BT" || da=="BTR" || da=="BTS" || da=="BTC") {res++;}
+            if(da=="BSF" || da=="BSR" || da=="BSWAP") {res++;}
+            if(da=="ROL" || da=="ROR" || da=="RCL" || da=="RCR") {res++;}
+
+            ep = PE.getDisasmNextAddress(ep);
+        }
+
+        if(res > 10 && count < 200)
+        {
+            sOptions = "count "+count;
+            if(fresh==1) {sVersion = "new " + res+" jmp "+jmp;} else {sVersion = "old " + res+" jmp "+jmp;}
+            bDetected=1;
+            sOptions="DS";
         }
     }
 
