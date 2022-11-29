@@ -440,3 +440,16 @@ iscii-tlg
 iscii-knd
 iscii-mlm
 ```
+**bool isJpeg()**
+
+```
+```
+**QString getJpegComment()**
+
+```
+```
+
+**QString getJpegDqtMD5()**
+
+```
+```
