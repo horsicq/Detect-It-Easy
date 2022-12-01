@@ -448,8 +448,12 @@ iscii-mlm
 
 ```
 ```
-
 **QString getJpegDqtMD5()**
 
 ```
 ```
+**bool isJpegChunkPresent(qint32 nID)**
+
+```
+```
+
