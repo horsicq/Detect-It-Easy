@@ -456,4 +456,12 @@ iscii-mlm
 
 ```
 ```
+**isJpegExifPresent()**
 
+```
+```
+
+**getJpegExifCameraName()**
+
+```
+```
