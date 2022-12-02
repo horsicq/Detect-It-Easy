@@ -52,7 +52,7 @@ Wait for your edits to be merged before proceeding.
 
 <hr>
 
-Hurray! <b>You've made a significant contribution! :partying_face:🎉<b>
+Hurray! <b>You have made a significant contribution! :partying_face:🎉<b>
 
   
   <Small>Thank You </small>

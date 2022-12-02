@@ -3,15 +3,14 @@
 * diel GUI lite version
 
 
-How to run portable version on Linux
-=======
+# How to run portable version on Linux
+
 
 * download an appImage file https://github.com/horsicq/DIE-engine/releases/download/3.06/Detect_It_Easy-3.06-x86_64.AppImage
 * make the file executable (chmod +x Detect_It_Easy-3.06-x86_64.AppImage)
 * run it (./Detect_It_Easy-3.06-x86_64.AppImage)
 
-Run with Docker
-=======
+# Run with Docker
 
 You can also run DIE with [Docker](https://www.docker.com/community-edition)! Of course, this requires that you have git and Docker installed.
 

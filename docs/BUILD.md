@@ -1,13 +1,12 @@
-How to build on Docker
-=======
+# How to build on Docker
+
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 
 cd DIE-engine
 
 docker build .
 
-How to build on Linux based on Debian
-=======
+# How to build on Linux based on Debian
 
 Install packages:
 
@@ -31,8 +30,7 @@ Install deb package: sudo dpkg -i release/die_[Version].deb
 
 Run DiE: *die [FileName] or diec [FileName] or diel [FileName]*
 
-How to build on Linux(Automake)
-=======
+# How to build on Linux(Automake)
 
 Qt framework has to be installed on the system.
 
@@ -47,8 +45,7 @@ Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
 Run DiE: *die [FileName] or diec [FileName] or diel [FileName]*
 
-How to build on OSX
-=======
+# How to build on OSX
 
 Install Qt 5.15.2: https://github.com/horsicq/build_tools
 
@@ -58,8 +55,7 @@ Edit build_mac.sh ( check QMAKE_PATH variable)
 
 Run build script: bash -x build_mac.sh
 
-How to build on Windows(XP)
-=======
+# How to build on Windows(XP)
 
 Install Visual Studio 2013: https://github.com/horsicq/build_tools
 
@@ -73,8 +69,7 @@ Edit build_winxp.bat ( check VSVARS_PATH,  SEVENZIP_PATH, QMAKE_PATH variables)
 
 Run build_winxp.bat
 
-How to build on Windows(7-10)
-=======
+# How to build on Windows(7-10)
 
 Install Visual Studio 2019: https://github.com/horsicq/build_tools
 
@@ -92,8 +87,7 @@ Run build_win32.bat
 
 Run build_win64.bat
 
-How to build with CMAKE
-=======
+# How to build with CMAKE
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 
 cd DIE-engine
