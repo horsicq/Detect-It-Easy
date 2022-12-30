@@ -64,6 +64,7 @@ Packages
 - Parrot OS: Package name **detect-it-easy** (Thanks **Nong Hoang Tu**(https://github.com/dmknght))
 - Arch Linux: https://aur.archlinux.org/packages/detect-it-easy-git/ (Thanks **Arnaud Dovi**(https://github.com/class101))
 - REMnux https://remnux.org/ (Thanks **REMnux team**(https://twitter.com/REMnux/status/1401935989266919426))
+- openSUSE https://build.opensuse.org/package/show/home:mnhauke/detect-it-easy (Thanks Martin Hauke)
 
 Telegram Bot
 =======
