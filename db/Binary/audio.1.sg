@@ -628,6 +628,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
                 cv = "?"; bDetected = 1; sName = "unknown Furnace Tracker file"
         }
         nV = Binary.read_uint16(0x10,_LE);
+        //ref https://github.com/tildearrow/furnace/blob/master/papers/format.md
         if (nV<12) sVersion = "["+nV+"]"; else
         if (nV<=14) sVersion = "v0.2.X"; else
         if (nV<=16) sVersion = "v0.3.X"; else
@@ -638,7 +639,13 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         if (nV==75) sVersion = "v.dev75/April Fools' 0.6pre0"; else
         if (nV<=99) sVersion = "v.dev"+nV; else
         if (nV==100) sVersion = "v0.6pre1"; else
-        if (nV==101) sVersion = "v0.6pre1 (dev101)";
+        if (nV==101) sVersion = "v0.6pre1 (dev101)"; else
+        if (nV==102) sVersion = "v0.6pre1 (dev102)"; else
+        if (nV<=115) sVersion = "v.dev"+nV; else
+        if (nV==116) sVersion = "v.0.6pre1.5"; else
+        if (nV<=131) sVersion = "v.dev"+nV; else
+        if (nV==132) sVersion = "v.0.6pre2"; else
+        if (nV==133) sVersion = "v.0.6pre3";
         else sVersion = "["+nV+"]";
         if(cV==='i') {
             p = Binary.read_uint32(0x14,_LE);
@@ -688,24 +695,124 @@ function detect(bShowType,bShowVersion,bShowOptions) {
             } //verbose inst
         } //inst
         if(cV==='m' && Binary.isVerbose()) {
-            p = Binary.read_uint32(0x14,_LE);
+            p = File.read_uint32(0x14,_LE);
             if(p>0 && Binary.compare("'INFO'",p)) {
-                t = Binary.read_utf8String(p+0x100,0x200);
-                p1 = Binary.findSignature(p+0x100,0x200,"00")+1;
-                a = Binary.read_utf8String(p1,0x200);
-                p1 = Binary.findSignature(p1,0x200,"00")+1;
-                ins = Binary.read_uint16(p+0x16,_LE);
-                wvt = Binary.read_uint16(p+0x18,_LE);
-                smp = Binary.read_uint16(p+0x1A,_LE);
-                ptng = Binary.read_uint32(p+0x1C,_LE);
-                freq = Binary.read_float(p+0x0C,_LE);
-                A4freq = Binary.read_float(p1,_LE);
+                t = File.read_utf8String(p+0x100,0x200);
+                p1 = File.findSignature(p+0x100,0x200,"00")+1;
+                a = File.read_utf8String(p1,0x200);
+                p1 = File.findSignature(p1,0x200,"00")+1;
+                ins = File.read_uint16(p+0x16,_LE);
+                wvt = File.read_uint16(p+0x18,_LE);
+                smp = File.read_uint16(p+0x1A,_LE);
+                ptng = File.read_uint32(p+0x1C,_LE);
+                freq = File.read_float(p+0x0C,_LE);
+                A4freq = File.read_float(p1,_LE);
                 s1spd = File.read_uint8(p+9)+"/"+File.read_uint8(p+0x0A);
-                s1ptn = Binary.read_uint16(p+0x10);
-                s1ord = Binary.read_uint16(p+0x12);
+                s1ptn = File.read_uint16(p+0x10);
+                s1ord = File.read_uint16(p+0x12);
                 sOptionT(t);
                 sOptionT(a,"by: ");
-                sOption("Ticks="+freq+"Hz, A4="+A4freq+"Hz");
+                chips=[]; el=false; i=0;
+                while(!el && (i<32)) {
+                    switch(File.read_uint8(p+0x20+i)) {
+                    case 0: el=true; break;
+                    case 0x01: chips[i] = "YMU759 (17ch)"; break;
+                    case 0x02: chips[i] = "Genesis (10ch comp.)"; break;
+                    case 0x03: chips[i] = "SMS (SN76489) (4ch)"; break;
+                    case 0x04: chips[i] = "Game Boy (4ch)"; break;
+                    case 0x05: chips[i] = "PC Engine (6ch)"; break;
+                    case 0x06: chips[i] = "NES (5ch)"; break;
+                    case 0x07: chips[i] = "C64 (8580) (3ch)"; break;
+                    case 0x08: chips[i] = "Arcade (YM2151+SegaPCM) (13ch)"; break;
+                    case 0x09: chips[i] = "Neo Geo CD (YM2610) (13ch)"; break;
+                    case 0x42: chips[i] = "Genesis extended (13ch)"; break;
+                    case 0x43: chips[i] = "SMS (SN76489) + OPLL (YM2413) (13ch comp.)"; break;
+                    case 0x46: chips[i] = "NES+VRC7 (11ch)"; break;
+                    case 0x47: chips[i] = "C64 (6581) (3ch)"; break;
+                    case 0x49: chips[i] = "Neo Geo CD extended (16ch)"; break;
+                    case 0x80: chips[i] = "AY-3-8910 (3ch)"; break;
+                    case 0x81: chips[i] = "Amiga (4ch)"; break;
+                    case 0x82: chips[i] = "YM2151 (8ch)"; break;
+                    case 0x83: chips[i] = "YM2612 (6ch)"; break;
+                    case 0x84: chips[i] = "TIA (2ch)"; break;
+                    case 0x85: chips[i] = "VIC-20 (4ch)"; break;
+                    case 0x86: chips[i] = "PET (1ch)"; break;
+                    case 0x87: chips[i] = "SNES (8ch)"; break;
+                    case 0x88: chips[i] = "VRC6 (3ch)"; break;
+                    case 0x89: chips[i] = "OPLL (YM2413) (9ch)"; break;
+                    case 0x8A: chips[i] = "FDS (1ch)"; break;
+                    case 0x8B: chips[i] = "MMC5 (3ch)"; break;
+                    case 0x8C: chips[i] = "Namco 163 (8ch)"; break;
+                    case 0x8D: chips[i] = "YM2203 (6ch)"; break;
+                    case 0x8E: chips[i] = "YM2608 (16ch)"; break;
+                    case 0x8F: chips[i] = "OPL (YM3526) (9ch)"; break;
+                    case 0x90: chips[i] = "OPL2 (YM3812) (9ch)"; break;
+                    case 0x91: chips[i] = "OPL3 (YMF262) (18ch)"; break;
+                    case 0x92: chips[i] = "MultiPCM (28ch)"; break;
+                    case 0x93: chips[i] = "Intel 8253 (beeper) (1ch)"; break;
+                    case 0x94: chips[i] = "POKEY (4ch)"; break;
+                    case 0x95: chips[i] = "RF5C68 (8ch)"; break;
+                    case 0x96: chips[i] = "WonderSwan (4ch)"; break;
+                    case 0x97: chips[i] = "Philips SAA1099 (6ch)"; break;
+                    case 0x98: chips[i] = "OPZ (YM2414) (8ch)"; break;
+                    case 0x99: chips[i] = "Pokémon Mini (1ch)"; break;
+                    case 0x9A: chips[i] = "AY8930 (3ch)"; break;
+                    case 0x9B: chips[i] = "SegaPCM (16ch)"; break;
+                    case 0x9C: chips[i] = "Virtual Boy (6ch)"; break;
+                    case 0x9D: chips[i] = "VRC7 (6ch)"; break;
+                    case 0x9E: chips[i] = "YM2610B (16ch)"; break;
+                    case 0x9F: chips[i] = "ZX Spectrum (beeper) (6ch)"; break;
+                    case 0xA0: chips[i] = "YM2612 extended (9ch)"; break;
+                    case 0xA1: chips[i] = "Konami SCC (5ch)"; break;
+                    case 0xA2: chips[i] = "OPL drums (YM3526) (11ch)"; break;
+                    case 0xA3: chips[i] = "OPL2 drums (YM3812) (11ch)"; break;
+                    case 0xA4: chips[i] = "OPL3 drums (YMF262) (20ch)"; break;
+                    case 0xA5: chips[i] = "Neo Geo (YM2610) (14ch)"; break;
+                    case 0xA6: chips[i] = "Neo Geo extended (YM2610) (17ch)"; break;
+                    case 0xA7: chips[i] = "OPLL drums (YM2413) (11ch)"; break;
+                    case 0xA8: chips[i] = "Atari Lynx (4ch)"; break;
+                    case 0xA9: chips[i] = "SegaPCM (DefleMask compat.) (5ch)"; break;
+                    case 0xAA: chips[i] = "MSM6295 (4ch)"; break;
+                    case 0xAB: chips[i] = "MSM6258 (1ch)"; break;
+                    case 0xAC: chips[i] = "Commander X16 (VERA) (17ch)"; break;
+                    case 0xAD: chips[i] = "Bubble System WSG (2ch)"; break;
+                    case 0xAE: chips[i] = "OPL4 (YMF278B) (42ch)"; break;
+                    case 0xAF: chips[i] = "OPL4 drums (YMF278B) (44ch)"; break;
+                    case 0xB0: chips[i] = "Seta/Allumer X1-010 (16ch)"; break;
+                    case 0xB1: chips[i] = "Ensoniq ES5506 (32ch)"; break;
+                    case 0xB2: chips[i] = "Yamaha Y8950 (10ch)"; break;
+                    case 0xB3: chips[i] = "Yamaha Y8950 drums (12ch)"; break;
+                    case 0xB4: chips[i] = "Konami SCC+ (5ch)"; break;
+                    case 0xB5: chips[i] = "tildearrow Sound Unit (8ch)"; break;
+                    case 0xB6: chips[i] = "YM2203 extended (9ch)"; break;
+                    case 0xB7: chips[i] = "YM2608 extended (19ch)"; break;
+                    case 0xB8: chips[i] = "YMZ280B (8ch)"; break;
+                    case 0xB9: chips[i] = "Namco WSG (3ch)"; break;
+                    case 0xBA: chips[i] = "Namco 15xx (8ch)"; break;
+                    case 0xBB: chips[i] = "Namco CUS30 (8ch)"; break;
+                    case 0xBC: chips[i] = "MSM5232 (8ch)"; break;
+                    case 0xBD: chips[i] = "YM2612 extra features extended (11ch)"; break;
+                    case 0xBE: chips[i] = "YM2612 extra features (7ch)"; break;
+                    case 0xBF: chips[i] = "T6W28 (4ch)"; break;
+                    case 0xC0: chips[i] = "PCM DAC (1ch)"; break;
+                    case 0xC1: chips[i] = "YM2612 CSM (10ch)"; break;
+                    case 0xC2: chips[i] = "Neo Geo CSM (YM2610) (18ch)"; break;
+                    case 0xC3: chips[i] = "YM2203 CSM (10ch)"; break;
+                    case 0xC4: chips[i] = "YM2608 CSM (20ch)"; break;
+                    case 0xC5: chips[i] = "YM2610B CSM (20ch)"; break;
+                    case 0xC6: chips[i] = "K007232 (2ch)"; break;
+                    case 0xC7: chips[i] = "GA20 (4ch)"; break;
+                    case 0xDE: chips[i] = "YM2610B extended (19ch)"; break;
+                    case 0xE0: chips[i] = "QSound (19ch)"; break;
+                    case 0xFC: chips[i] = "Pong (1ch)"; break;
+                    case 0xFD: chips[i] = "Dummy System (8ch)"; break;
+                    case 0xFE: case 0xFF: chips[i] = "reserved for development"; break;
+                    default: chips[i]="unk.";
+                    }
+                    if(!el) i++;
+                }
+                sOption("chips: "+chips.join("+"));
+                sOption("ticks="+freq+"Hz, A4="+A4freq+"Hz");
                 sOption("ins:"+ins+" wvt:"+wvt+" smp:"+smp+" glob.ptn:"+ptng);
                 sOption("1st song's spd:"+s1spd+" ptn:"+s1ptn+" ord:"+s1ord);
             } //verbose mod
@@ -1091,14 +1198,10 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         sVersion = "v"+Binary.read_uint8(0);
         if(Binary.isVerbose() && sVersion=="v0") {
             p = Binary.getSize()-0x0E;
-            title_ = File.read_ansiString(File.read_uint16(p+4,_LE)+1,0x100).length;
-            artist_ = File.read_ansiString(File.read_uint16(p+6,_LE)+1,0x100).length;
-            arenji_ = File.read_ansiString(File.read_uint16(p+8,_LE)+1,0x100).length;
-            rem_ = File.read_ansiString(File.read_uint16(p+10,_LE)+1,0x100).length;
-            title = File.read_codePageString(File.read_uint16(p+4,_LE)+1,title_,"Shift_JIS");
-            artist = File.read_codePageString(File.read_uint16(p+6,_LE)+1,artist_,"Shift_JIS");
-            arenji = File.read_codePageString(File.read_uint16(p+8,_LE)+1,arenji_,"Shift_JIS");
-            rem = File.read_codePageString(File.read_uint16(p+10,_LE)+1,rem_,"Shift_JIS");
+            title = File.read_codePageString(File.read_uint16(p+4,_LE)+1,0x100,"Shift_JIS");
+            artist = File.read_codePageString(File.read_uint16(p+6,_LE)+1,0x100,"Shift_JIS");
+            arenji = File.read_codePageString(File.read_uint16(p+8,_LE)+1,0x100,"Shift_JIS");
+            rem = File.read_codePageString(File.read_uint16(p+10,_LE)+1,0x100,"Shift_JIS");
             sOption(title,"name: ");
             sOption(artist,"by: ");
             sOption(arenji,"mixed by: ");
@@ -1266,7 +1369,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         sVersion=File.read_ansiString(0x438,4);
         if(Binary.isVerbose())
             sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by: ")
+            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
     }
     else if(/FA\d\d/.test(Binary.read_ansiString(0x438,4))) {
         bDetected = 1;
@@ -1274,7 +1377,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         sVersion = "v030";
         if(Binary.isVerbose()) {
             sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by: ")
+            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
         }
     }
     else if(/^(\dCHN|\d\dCH)$/.test(File.read_ansiString(0x438,4))) {
@@ -1283,24 +1386,24 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         sVersion=File.read_ansiString(0x438,4);
         if(Binary.isVerbose()) {
             sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by: ")
+            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
         }
     }
-    else if(/FLT[48]/.test(Binary.read_ansiString(0x438,4))) {
+    else if(/^(FLT[48]|EXO4$)/.test(Binary.read_ansiString(0x438,4))) {
         bDetected = 1;
         sName="StarTrekker module (.MOD)";
         sVersion=File.read_ansiString(0x438,4);
         if(Binary.isVerbose()) {
             sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by: ")
+            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
         }
     }
-    else if(/CD[0-9]1/.test(Binary.read_ansiString(0x438,4))) {
+    else if(/^CD[0-9]1$/.test(Binary.read_ansiString(0x438,4))) {
         sName="Octalyser module (.MOD)"; bDetected = 1;
         sVersion=File.read_ansiString(0x438,4);
         if(Binary.isVerbose()) {
             sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by: ")
+            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
         }
     }
     else if(Binary.compare("000000000000'MTN'000000", 0x5B2)) {
@@ -1557,6 +1660,10 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         sName="Organya module (.ORG)";
         sVersion="v2";
     }
+    else if(Binary.compare("'OBISYNTHPACK'")) {
+        bDetected = 1;
+        sName="Synth Pack module (.OSP)";
+    }
     else if(Binary.compare("'PACG'")) {
         bDetected = 1;
         sName="SBStudio module (.PAC)";
@@ -1614,7 +1721,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
     }
     else if(Binary.compare("'PSF'")) {
         //ref https://gist.github.com/SaxxonPike/a0b47f8579aad703b842001b24d40c00
-        pv = [0x01,0x02,0x11,0x12,0x22,0x24,0x41].indexOf(Binary.read_uint8(3));
+        pv = [0x01,0x02,0x11,0x12,0x22,0x23,0x24,0x41].indexOf(Binary.read_uint8(3));
         if(pv>=0) {
             bDetected = 1;
             sName = "Playstation Sound Format module (.";
@@ -1624,8 +1731,9 @@ function detect(bShowType,bShowVersion,bShowOptions) {
                 case 2: sName += "SSF,.MINISSF)"; sVersion="Saturn"; break;
                 case 3: sName += "DSF,.MINIDSF)"; sVersion="Dreamcast"; break;
                 case 4: sName += "GSF,.MINIGSF)"; sVersion='Gameboy'; break;
-                case 5: sName += "2SF,.MINI2SF)"; sVersion='Nintendo DS'; break;
-                case 6: sName += "QSF,.MINIQSF)"; sVersion='Capcom Q-Sound'
+                case 5: sName += "SNSF,.MINISNSF)"; sVersion='Super Nintendo'; break;
+                case 6: sName += "2SF,.MINI2SF)"; sVersion='Nintendo DS'; break;
+                case 7: sName += "QSF,.MINIQSF)"; sVersion='Capcom Q-Sound'
             }
             if (Binary.isVerbose()) {
                 //fs1 = Math.max(Binary.getSize()-0x200,0); fs2 = Math.min(Binary.getSize(),0x200);
@@ -1804,8 +1912,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
                 hkhd = File.read_ansiString(p,8); hksz = File.read_uint32(p+8,_LE);
                 switch (hkhd) {
                     case "PROJECT=":
-                        t_ = File.read_ansiString(p+0x0C,0x10).length; //TODO remove when readcpstring is fixed
-                        t = File.read_codePageString(p+12,t_,"Shift_JIS"); //TODO replace for CP932 once available
+                        t = File.read_codePageString(p+12,0x10,"Shift_JIS"); //TODO replace for CP932 once available
                         btempo = File.read_float32(p+0x1C,_LE).toFixed(0);
                         bclock = File.read_int16(p+0x20,_LE);
                         bnum = File.read_int16(p+0x22,_LE);
@@ -2290,20 +2397,6 @@ function detect(bShowType,bShowVersion,bShowOptions) {
       && Binary.compare("177C00", 0xEA) && Binary.compare("2BFF", 0x1D9) && Binary.compare("000667", 0x4D4))) {
         bDetected = 1; sName = "Sound Master II module (.SM3)"; sVersion = "v3"
     }
-    else if(Binary.compare("'SPU'00") || Binary.compare("'SPU1'")) {
-        bDetected = 1; sName = "Sony Playstation SPU module (.SPU)";
-        if(File.read_uint8(3)==0) sVersion = "v0"; else sVersion = "v1";
-        if(Binary.isVerbose()) {
-            game = File.read_codePageString(4,0x40,"Shift_JIS");
-            title = File.read_codePageString(0x44,0x40,"Shift_JIS");
-            sOptionT(title); sOptionT(game, "game: ");
-            artist = File.read_codePageString(0x84,0x20,"Shift_JIS"); sOptionT(artist,"by: ");
-            cmt = File.read_codePageString(0xA4,0xF00,"Shift_JIS"); sOptionT(cmt);
-        }
-    }
-    else if(Binary.compare("'SPEEDY-SYSTEM'")) {
-        bDetected = 1; sName = "Speedy System module (.SS)"; sVersion = "v1"
-    }
     else if(Binary.compare("'<track'") && (Binary.findString(6,0x100,"rowhighliohtingminor=")>0)) {
         bDetected = 1;
         sName="Picatune module v1 (.SMUFI) or v2 (.PT2)";
@@ -2366,18 +2459,28 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         sVersion = "v"+File.read_ansiString(3,1)
         sName = "Richard Joseph's module (.SNG)";
     }
+    else if(Binary.compare("'SYNC'") || Binary.compare("'SYNB'")) {
+        bDetected = 1;
+        sVersion = "ver."+File.read_ansiString(3,1)
+        sName = "Synder SNG-player module (.SNG)";
+        if(Binary.isVerbose()) sOption(File.read_ansiString(0x10,0x200))
+    }
+    else if(Binary.compare("'SYND'....'S0'")) {
+        bDetected = 1;
+        sVersion = "ver."+File.read_ansiString(3,1)
+        sName = "Synder Tracker module (.SNG)";
+        if(Binary.isVerbose()) sOption(File.read_ansiString(0x10,0x200))
+    }
+    else if(Binary.compare("'SYND'") || Binary.compare("'SYNF'") || Binary.compare("'SYNH'")) {
+        bDetected = 1;
+        sVersion = "ver."+File.read_ansiString(3,1)
+        sName = "Synder SNG-player Stereo module (.SNG)";
+        if(Binary.isVerbose()) sOption(File.read_ansiString(0x10,0x200))
+    }
     else if(Binary.compare("'RJP'3. 0000 0000")) {
         bDetected = 1;
         sVersion = "v"+File.read_ansiString(3,1)
         sName = "Richard Joseph's module instruments (.INS)";
-    }
-    else if(Binary.compare("'TRK01/TV.ES.'")) {
-        bDetected = 1;
-        sName="RamTracker module (.TRK)";
-        if(Binary.isVerbose()) {
-            sOptionT(File.read_codePageString(0x0F,0x20,"CP850"));
-            sOptionT(File.read_codePageString(0x2F,0x20,"CP850"),"by: ");
-        }
     }
     else if(Binary.compare("'SNES-SPC700 Sound File Data'")) {
         // ref http://snesmusic.org/files/spc_file_format.txt   and snippets from
@@ -2446,6 +2549,13 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         }
     }
   if(!bDetected) {
+    if(Binary.compare("'STK'..'.'..'SONG")) {
+        sName="Starkos module (.SKS)"; sVersion = "v"+File.read_ansiString(3,3); bDetected = 1;
+        if(Binary.isVerbose()) {
+            sOptionT(File.read_ansiString(0x14,0x20));
+            sOptionT(File.read_ansiString(0x0A,0x0A),"by: ")
+        }
+    }
     if(Binary.compare("'Nu!SOPROL!'", 0x22)) {
         sName="Sound Programming Language module (.SPL)"; bDetected = 1;
         if(Binary.isVerbose()) {
@@ -2455,9 +2565,40 @@ function detect(bShowType,bShowVersion,bShowOptions) {
             sOptionT(t); sOptionT(a,"by: "); sOptionT(c)
         }
     }
+    if(Binary.compare("'SPM'0.")) {
+        //ref http://aminet.net/mus/edit/stonefree1.lha
+        sName="Stonetracker tune file (.SPM)"; bDetected = 1; sVersion="v"+File.read_uint8(3);
+        if(Binary.isVerbose()) {
+            sOptionT(File.read_ansiString(4,0x20));
+            //TODO find pointer and read the extra stuff
+        }
+    }
+    if(Binary.compare("'SPS'0.0.")) {
+        sName="Stonetracker samples file (.SPS)"; bDetected = 1; sVersion="v"+File.read_uint8(3);
+        if(Binary.isVerbose()) {
+            smp=File.read_uint8(5);
+            sOption(smp,"smp:")
+            for(i=0; i < Math.min(10,smp); i++)
+                sOptionT(File.read_ansiString(0x20*i+6,8))
+        }
+    }
+    else if(Binary.compare("'SPU'00") || Binary.compare("'SPU1'")) {
+        bDetected = 1; sName = "Sony Playstation SPU module (.SPU)";
+        if(File.read_uint8(3)==0) sVersion = "v0"; else sVersion = "v1";
+        if(Binary.isVerbose()) {
+            game = File.read_codePageString(4,0x40,"Shift_JIS");
+            title = File.read_codePageString(0x44,0x40,"Shift_JIS");
+            sOptionT(title); sOptionT(game, "game: ");
+            artist = File.read_codePageString(0x84,0x20,"Shift_JIS"); sOptionT(artist,"by: ");
+            cmt = File.read_codePageString(0xA4,0xF00,"Shift_JIS"); sOptionT(cmt);
+        }
+    }
     else if(Binary.isHeuristicScan() && Binary.compare("'2a'16'I'FA",0x17)
       && Binary.compare("'2a'0C'I'FA",0x21) && Binary.compare("'Ff'EE'J@g'06')K'",0x45)) {
         sName = "Quartet PSG module (.SQT)"; bDetected = 1;
+    }
+    else if(Binary.compare("'SPEEDY-SYSTEM'")) {
+        bDetected = 1; sName = "Speedy System module (.SS)"; sVersion = "v1"
     }
     else if(Binary.compare("'ZXAYST11'")) {
         sName = "Sound Tracker module (.ST1, .ST11)"; sVersion = "v1.1/uncompiled";
@@ -2479,11 +2620,164 @@ function detect(bShowType,bShowVersion,bShowOptions) {
     else if(Binary.compare("'STP3'")) {
         sName="Soundtracker Pro II module (.STP)"; bDetected = 1;
     }
+    else if(Binary.compare("48E7FFFE4DFA")) {
+        bDetected = 1; sName = "SunTronic module (.SUN)";
+    }
+    else if(Binary.compare("'SVOX'00000000")) {
+        bDetected = 1; sName = "SunVox module (.SUNVOX)";
+        if(Binary.isVerbose()) {
+            p=8;
+            t=''; ef=false; bpm=0; spd=0; tme=0; ptn=0; gen=0;
+            while (p<File.getSize()) {
+                hkhd = File.read_ansiString(p,4);
+                hksz = File.read_uint32(p+4,_LE);
+                p+=0x08; //chunk header = 4xfourcc + 4xsize
+                switch (hkhd) {
+                    case "VERS":
+                        nV = File.read_uint32(p,_LE); aV=[];
+                        for(i=0;i<4;i++) aV[3-i]=(nV>>(8*i))%256; 
+                        sVersion += "v"+aV.join("."); break;
+                    case "BVER":
+                        nB = File.read_uint32(p,_LE);
+                        if(nB!=nV) { aV=[];
+                            for(i=0;i<4;i++) aV[3-i]=(nB>>(8*i))%256; 
+                            sVersion += "/v"+aV.join(".");
+                        }
+                        break;
+                    case "NAME": t = File.read_ansiString(p,hksz); break;
+                    case "BPM ": bpm = File.read_uint32(p,_LE); break;
+                    case "SPED": spd = File.read_uint32(p,_LE); break;
+                    case "TIME": tme = File.read_uint32(p,_LE); break;
+                    case "LGEN": gen = File.read_uint32(p,_LE); break;
+                    case "PATN": ptn = File.read_uint32(p,_LE); break;
+                    case "PDTA": ef = true; p = File.getSize(); break
+                }
+                if(ef) break; p += hksz;
+            }
+            sOptionT(t);
+            if(bpm>0)sOption(bpm,"bpm:"); if(spd>0)sOption(spd,"spd:");
+            if(tme>0)sOption(tme,"time:"); if(ptn>0)sOption(ptn,"ptn:"); if(gen>0)sOption(gen,"gen:");
+        }
+    }
+    else if(Binary.compare("'SymM'")) {
+        //ref https://github.com/OpenMPT/openmpt/blob/master/soundlib/Load_symmod.cpp
+        bDetected = 1; sName = "Symphonie module (.SYMMOD)";
+        sVersion = "v"+File.read_uint32(4,_BE);
+        if(Binary.isVerbose()) {
+            p=8;
+            t=''; ef=false; ch=0; len=0; extsmp=false; pro=false;
+            while (p<File.getSize()) {
+                if(ef) break;
+                hkhd = File.read_int32(p,_BE); hkhx = Hex(File.read_uint32(p,_BE)); hksz=4;
+                p+=0x04; //chunk header = 4xtype (the following will change by chunk type)
+                switch (hkhd) {
+                    case -16: pklen=File.read_uint32(p,_BE); hksz+=pklen; o=4; //InfoText RLE-COMPRESSED YO
+                      if((pklen>=10) && Binary.compare(p+o,"'PACK'FFFF")) { o+=6;
+                        _log("yes we're FUCKING doing this. The algo's 100% from openMPT");
+                        unplen=File.read_uint32(p+o,_BE); o+=4;
+                        maxlen=pklen-10; if(4294967295/170>=maxlen) maxlen+=170; else maxlen=4294967295;
+                        if(unplen>maxlen) unplen=maxlen;
+                        done=false; ofs=0; left=unplen;
+                        while((!done) && (o<hksz)) {
+                            tp=File.read_int8(p+o); o++;
+                            switch(tp) {
+                            case 0:
+                                l=File.read_uint8(p+o); o++;
+                                if(left>=l) {
+                                    t+=File.read_ansiString(p+o,l);
+                                    o+=l; left-=l;
+                                } else done=true;
+                                break;
+                            case 1:
+                                l=FIle.read_uint8(p+o); o++;
+                                dw=File(read_ansiString(p+o,4)); o+=4;
+                                if(left >= (l*4) && (o<pklen)) {
+                                    left-=l*4;
+                                    while(l--) t+=dw;
+                                } else done=true;
+                                break;
+                            case 2:
+                                dw=File(read_ansiString(p+o,4)); o+=4;
+                                if(left >= (l*4) && (o<pklen)) {
+                                    unp+=dw+dw;
+                                    left-=8;
+                                } else done=true;
+                                break;
+                            case 3:
+                                l=File.read_uint8(p+o); o++;
+                                if(left>=l) left-=l;
+                                else done=true;
+                                break;
+                            case -1: done=true; break;
+                            default: sVersion+=" malformed"; done=true; break;
+                            }//switch
+                        }
+                      } else //if no RLE sig:
+                      t=File.read_codePageString(p+o,hksz,"CP1252"); break;
+                    case -1: ch=File.read_int32(p,_BE); break; //NumChannels
+                    case -2: len=File.read_int32(p,_BE); if(len>1024) len="malformed"; break; //TrackLength
+                    case -3: case -4: case -5: break;
+                    case -7: extsmp=true; break; //ExternalSamples
+                    case 10: case 11: case 12: pro=true; break; //Sample Boost/Detune/Phase
+                    case -6: tmp=Math.round(1.24*Math.min(File.read_int32(p,_BE),800)); break; //Tempo
+                    case -12: hksz=0; break; //EmptySample
+                    case -10: case -11: case -13: case -14: case -15: case -17: case -18:
+                    case -19: case -20: case -21: hksz+=File.read_int32(p,_BE); break;
+                    default: _log(Hex(p,8)+": "+hkhd+"/"+hkhx+" ("+Hex(hksz,8)+"): ?!?!?!?!?!");
+                }
+                p += hksz;
+            }
+        }
+        sOption(t); sOption(ch,"ch:"); sOption(len,"len:"); sOption(tmp,"tmp:");
+        if(extsmp) sOption("extsmp"); if(pro) sVersion+="/Pro"
+    }
+    else if(Binary.compare("'Synth'")) {
+        bDetected = 1;
+        sName = "Synthesis module (.SYN)";
+        if(Binary.compare("'Synth'",0x1F0E)) {
+            sVersion = "v"+File.read_ansiString(0x1F13,3);
+            if(Binary.isVerbose()) {
+                sOptionT(File.read_ansiString(0x1F32,0x1B));
+                sOptionT(File.read_ansiString(0x1F4E,0x100))
+            }
+        } else {
+            sVersion = "v"+File.read_ansiString(5,3);
+            if(Binary.isVerbose()) {
+                sOptionT(File.read_ansiString(0x24,0x1B));
+                sOptionT(File.read_ansiString(0x40,0x100))
+            }
+        }
+    }
+    else if(Binary.compare("'SYNTRACKER-SONG:'00")) {
+        bDetected = 1;
+        sName = "SynTracker module (.SYNMOD)";
+        if(Binary.isVerbose()) {
+            t1 = File.read_codePageString(0x14,0x20,"CP1252"); sOptionT(t1,"title/inst: ");
+            t2 = File.read_codePageString(0x34,0x20,"CP1252"); sOptionT(t2);
+            t3 = File.read_codePageString(0x54,0x20,"CP1252"); sOptionT(t3);
+        }
+    }
+    else if(Binary.compare("'AN COOL'")) {
+        bDetected = 1;
+        sName = "TCB Tracker module (.TCB)";
+    }
+    else if(Binary.compare("'TFMfmtV2'")) {
+        bDetected = 1;
+        sName = "TFM Music Maker module (.TFE)";
+    }
+    else if(Binary.compare("'TRK01/TV.ES.'")) {
+        bDetected = 1;
+        sName = "RamTracker module (.TRK)";
+        if(Binary.isVerbose()) {
+            sOptionT(File.read_codePageString(0x0F,0x20,"CP850"));
+            sOptionT(File.read_codePageString(0x2F,0x20,"CP850"),"by: ");
+        }
+    }
     else if(/UN\d{2}/.test(Binary.read_ansiString(0,4))) {
         bDetected = 1;
-        sName="MikMod UNITRK module (.UNI)";
+        sName = "MikMod UNITRK module (.UNI)";
         v = Binary.read_ansiString(3,1);
-        sVersion="v"+Binary.read_ansiString(2,1)+"."+v;
+        sVersion = "v"+Binary.read_ansiString(2,1)+"."+v;
         if(Binary.isVerbose()) {
             if(v<0x35) pn=0x130; else pn=0x131;
             ts = Binary.read_uint16(pn,_LE);
@@ -2760,10 +3054,11 @@ function isSTCompiled() { //this detection is based purely on sanity checks
     ornofs = File.read_uint16(3,_LE); if (ornofs>File.getSize()) return false; //ornofs
     ptnofs = File.read_uint16(5,_LE); if (ptnofs>File.getSize()) return false; //ptnofs
     if(File.read_uint8(27)>15) return false; //samp1 idx
-    len = File.read_uint8(posofs); posofs++;
+    len = File.read_uint8(posofs);
     //sanity of pattern channel offsets ↓
     for(i=0; i<len; i++) {
-        if(File.read_uint8(ptnofs+i*7,_LE)==0xFF) break;
+        if(ptnofs+i*7>File.getSize()-7) return false;
+        if(File.read_uint8(ptnofs+i*7)==0xFF) break;
         chofs = File.read_uint16(ptnofs+i*7+1,_LE);
         if ((chofs<0x1B) || (chofs>=File.getSize())) return false;
         chofs = File.read_uint16(ptnofs+i*7+3,_LE);
@@ -2780,19 +3075,19 @@ if(!bDetected && Binary.isHeuristicScan() && isSTCompiled()) {
 
 function isETracker() { //more sanity-check detections
     if(File.getSize()<96) return false; //just because modland's collection didn't have anything smaller
+    //...but we have a signature this time too. Except it's not always there so TODO
+    if(Binary.compare('"ETracker (C) BY ESI."',10)) return true;
     if(File.read_uint8(1)>0x7F) return false;
     if(File.read_uint8(3)>0x7F) return false;
     if(File.read_uint8(5)>0x7F) return false;
     if(File.read_uint8(7)>0x7F) return false;
     if(File.read_uint8(9)>0x7F) return false;
-    //...but we have a signature this time too. Except it's not always there so TODO
-    if(Binary.compare('"ETracker (C) BY ESI."',10)) return true;
 
     return true
 }
 if(!bDetected && Binary.isHeuristicScan() && isETracker()) {
     bDetected = 1;
-    sName = "Sam Coupe/E-Tracker file (.COP,.SNG)";
+    sName = "SAM Coupe/E-Tracker file (.COP,.SNG)";
     //sVersion = "v1.x"
 }
 

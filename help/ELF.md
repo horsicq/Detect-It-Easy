@@ -94,3 +94,7 @@
 
 ```
 ```
+**bool isLibraryPresent(QString sLibraryName)**
+
+```
+```
