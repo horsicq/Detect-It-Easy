@@ -6,9 +6,9 @@
 How to run portable version on Linux
 =======
 
-* download an appImage file https://github.com/horsicq/DIE-engine/releases/download/0.05/Detect_It_Easy-0.05-x86_64.AppImage
-* make the file executable (chmod +x Detect_It_Easy-0.05-x86_64.AppImage)
-* run it (./Detect_It_Easy-0.05-x86_64.AppImage)
+* download an appImage file https://github.com/horsicq/DIE-engine/releases/download/3.07/Detect_It_Easy-3.07-x86_64.AppImage
+* make the file executable (chmod +x Detect_It_Easy-3.07-x86_64.AppImage)
+* run it (./Detect_It_Easy-3.07-x86_64.AppImage)
 
 Run with Docker
 =======
