@@ -2719,10 +2719,10 @@ function detect(bShowType,bShowVersion,bShowOptions) {
             if(t!="Some SoundTracker Song") sOption(t);
         }
     }
-    else if(Binary.compare("'SOUND TRACKER v1.3'", 0x07)) {
+/*    else if(Binary.compare("'SOUND TRACKER v1.3'", 0x07)) {
         sName = "Sound Tracker module (.STC, .ST13)"; sVersion = "v1.3";
         bDetected = 1;
-    }
+    }  moved to the heuristics down the file */
     else if(Binary.compare("'KSA SOFTWARE COMPILATION OF '",0x0A) && (File.getSize()<0x2800)) {
         sName="Sound Tracker Pro module (.STP)"; sVersion="compiled"; bDetected = 1;
         if(Binary.isVerbose())
@@ -3286,29 +3286,48 @@ function isGMC() { //GMC detection is based purely on sanity checks
         sName = "Game Music Creator module (.GMC)";
     }
 
-function isProTracker1() { //PT1 detection is based purely on sanity checks, taken from zxtune
-    tmp = File.read_uint8(0); if((tmp<2)||(tmp>15)) return false;
-    len = File.read_uint8(1); if(len==0) return false;
-    loop = File.read_uint8(2); if(loop>len) return false;
-    for(i=0;i<0x20;i++) if(File.read_uint16(0x03+i*2,_LE)>File.getSize()-2) return false; //TODO or it points at 0 or anyway too small
-    if(File.read_uint8(0x44) > 1) return false;
-    for(ord=0;ord<=0xFF;ord++) {
-        if(0x63+ord>File.getSize()-2) return false;
-        posn=File.read_uint8(0x63+ord);
-        if(posn==0xFF) break;
+function isProTracker1() { //PT1 detection is based purely on sanity checks
+    //ref zxtune src\formats\chiptune\aym\
+    // & https://bulba.untergrund.net/Ay_Emul29.src.7z/Formats.pas -> FoundPT1
+    if(File.getSize() < 0x66) return false;
+    tempo = File.read_uint8(0); if((tempo < 2) || (tempo > 15)) return false; //delay
+    ptntp = File.read_uint16(0x43,_LE); if(ptntp >= File.getSize()) return false; //patterns table pointer
+    numofpos = File.read_uint8(1);// if(len == 0) return false; //numofpositions, can be corrupted?
+    loop = File.read_uint8(2);
+    j = 0; j1 = 65535;
+    for(i=0; i < 0x10; i++) { //samples pointers
+        sp = File.read_uint16(3+i*2,_LE); if(sp > File.getSize()) return false;
+        if (j < sp) j=sp;
+        op = File.read_uint16(0x23+i*2,_LE); if(op > File.getSize()) return false;
+        if(op != 0 && j1 > op) j1 = op
     }
-    if((ord==0) || (ord>0xFF)) return false;
-    return (ord==len)
+    if((j1 < 0x67) || (j < 0x67) || (j > 65534) || (j > File.getSize())
+      || (j + File.read_uint8(j) * 3 + 2 != j1)) return false;
+    j = 0;
+    for(i=0; i < 0x10; i++) { //ornaments pointers
+        op = File.read_uint16(0x23+i*2,_LE); if(op > File.getSize()) return false;
+        if(j < op) j = op
+    }
+    if(j<0x67) return false;
+    len = j+0x40; if(len>65536) return false; if(len>File.getSize()+1) return false;
+    j = 0x63;
+    while(j <= ptntp && File.read_uint8(j) < 0xFF) j++;
+    if(j+1 != ptntp) return false;
+    ord = j-0x63;
+    if(loop > ord) return false;
+
+    return true //return (ord==numofpos)
 }
 if(!bDetected && Binary.isHeuristicScan() && isProTracker1()) {
     sName = "ProTracker module (.PT1)"; sVersion = "v1.x"; bDetected = 1;
     if(Binary.isVerbose()) {
-        sOptionT(File.read_ansiString(0x45,0x1E));
-        sOption("tmp:"+tmp+" ord:"+len)
+        sOptionT(File.read_ansiString(0x45,0x1E)); //musicname
+        sOption("tempo:"+tempo+" ord:"+ord+" len:"+len)
     }
 }
 
-function isProTracker2() { //PT2 detection is based purely on sanity checks, taken from zxtune
+function isProTracker2() { //PT2 detection is based purely on sanity checks
+    //ref zxtune src\formats\chiptune\aym\
     tmp = File.read_uint8(0); if((tmp<2)||(tmp>15)) return false;
     len = File.read_uint8(1); if(len==0) return false;
     loop = File.read_uint8(2); if(loop>len) return false;
@@ -3331,6 +3350,7 @@ if(!bDetected && Binary.isHeuristicScan() && isProTracker2()) {
 }
 
 function isProTracker3() { //PT3's detection, ALSO sanity checks because SOME people -_-
+    //ref zxtune src\formats\chiptune\aym\
     ftn = File.read_uint8(0x63); //0=Pro Tracker, 1=Sound Tracker, 2=ASM or PSC, 3=RealSound.
     tmp = File.read_uint8(0x64); if((tmp<3)||(tmp>63)) return false;
     len = File.read_uint8(0x65); if(len>0x55) return false;
@@ -3394,7 +3414,6 @@ function isSoundTrackerPro() { //this detection is based purely on sanity checks
     tabl3 = File.read_uint16(5,_LE); if (File.getSize()-2 < tabl3) return false; //ornament offsets
     tabl4 = File.read_uint16(7,_LE); if (File.getSize()-2 < tabl4) return false; //sample offsets
     len = File.read_uint8(tabl1); if (tabl2 != tabl1+2+len*2) return false;
-    //_log("len="+len+" t1="+Hex(tabl1)+" t2="+Hex(tabl2)+" t3="+Hex(tabl3)+" t4="+Hex(tabl4));
     for(i=0;i<len;i++)  if (File.getSize() < File.read_uint16(tabl2+i*2,_LE)) return false;
     if (File.getSize() < tabl4+30) return false;
     for(i=0;i<15;i++)  if (File.getSize() < File.read_uint16(tabl4+i*2,_LE)) return false;
@@ -3408,12 +3427,6 @@ if(!bDetected && Binary.isHeuristicScan() && isSoundTrackerPro()) {
 
 function isSQTracker() { //this detection is based purely on sanity checks
     //ref https://bulba.untergrund.net/Ay_Emul29.src.7z/Players.pas -> FoundSQT
-    /*
-      MIN_MODULE_SIZE = 256; MAX_MODULE_SIZE = 0x3600; // MAX_POSITIONS_COUNT = 120;
-      MIN_PATTERN_SIZE = 11; MAX_PATTERN_SIZE = 64; MAX_PATTERNS_COUNT = 99;
-      MAX_SAMPLES_COUNT = 26; MAX_ORNAMENTS_COUNT = 26; SAMPLE_SIZE = 32;
-      ORNAMENT_SIZE = 32;
-    */
     if (File.getSize()<17 || File.getSize()>0x3600) return false;
     //sz = File.read_uint16(0,_LE); if (File.getSize() != sz) return false; //nobody seems to check this!
     smptp = File.read_uint16(0x02,_LE); if(smptp < 10) return false; //samples table ptr
@@ -3455,32 +3468,78 @@ if(!bDetected && Binary.isHeuristicScan() && isSQTracker()) {
     sOption("ord:"+ord+" ptn:"+ptn)//+" len:"+len)
 }
 
-function isSTCompiled() { //this detection is based purely on sanity checks
-    // taken from zxtune src\formats\chiptune\aym\soundtracker_compiled.cpp
-    // and https://bulba.untergrund.net/STDocs.7z/ST11FMT.TXT
-    if (File.getSize()<128) return false;
-    tmp = File.read_uint8(0); if ((tmp==0)||(tmp>0x20)) return false; //delay
-    posofs = File.read_uint16(1,_LE); if (posofs>File.getSize()) return false; //for posofs
-    ornofs = File.read_uint16(3,_LE); if (ornofs>File.getSize()) return false; //ornofs
-    ptnofs = File.read_uint16(5,_LE); if (ptnofs>File.getSize()) return false; //ptnofs
-    if(File.read_uint8(27)>15) return false; //samp1 idx
-    len = File.read_uint8(posofs);
-    //sanity of pattern channel offsets ↓
-    for(i=0; i<len; i++) {
-        if(ptnofs+i*7>File.getSize()-7) return false;
-        if(File.read_uint8(ptnofs+i*7)==0xFF) break;
-        chofs = File.read_uint16(ptnofs+i*7+1,_LE);
-        if ((chofs<0x1B) || (chofs>=File.getSize())) return false;
-        chofs = File.read_uint16(ptnofs+i*7+3,_LE);
-        if ((chofs<0x1B) || (chofs>=File.getSize())) return false;
-        chofs = File.read_uint16(ptnofs+i*7+5,_LE);
-        if ((chofs<0x1B) || (chofs>=File.getSize())) return false;
+function isST() { //this detection is based purely on sanity checks
+    //ref https://bulba.untergrund.net/Ay_Emul29.src.7z/Players.pas -> FoundST
+    if (File.getSize() < 6) return false;
+    tempo = File.read_uint8(0); if ((tempo == 0) || (tempo > 0x20)) return false; //delay
+    postp = File.read_uint16(1,_LE); if (postp > File.getSize()) return false; //positions pointer
+    orntp = File.read_uint16(3,_LE); //ornaments pointer
+    ptntp = File.read_uint16(5,_LE); if(ptntp > File.getSize()) return false; //patterns pointer
+    ord = File.read_uint8(postp);
+    j2 = ptntp - orntp; if(j2 = 0) return false; //j2<0: ST, >0: S_SONIC
+    fID = false;
+    if(j2 > 0) { if(j2%0x21 > 0) return false; }
+    else if(j2%0x21 > 0) {
+        if((j1<55) || ((j1-55)%0x21 > 0)) return false;
+        fID = true; //we'll check for a preset ID at the end;
     }
+    j = File.read_uint8(postp)*2+3;
+    if(j2 < 0) { if(j+j2 != 0) return false; }
+    else if(j+postp-orntp != 0) {
+        if((ptntp < 82) || (j+postp-ptntp+55 != 0)) return false;
+        fID = true;
+    } 
+    j = orntp+0x21;
+    if(j > 65535 || j > File.getSize()) return false;
+    while(j) { j--; if(File.read_uint8(j) > 0) return false; if(j == orntp) break }
+    j = ptntp; j1 = 0; j2 = 0; ptn = 0;
+    while((j+6 <= File.getSize()) && (j+6 < 65536) && (File.read_uint8(j) < 0xFF)) {
+        //find the highest channel data pointer
+        j++; //ptn #
+        j2 = File.read_uint16(j,_LE); if(j1 < j2) j1 = j2; j+=2; //channel A data ofs
+        j2 = File.read_uint16(j,_LE); if(j1 < j2) j1 = j2; j+=2; //ditto B
+        j2 = File.read_uint16(j,_LE); if(j1 < j2) j1 = j2; j+=2; //ditto C
+        ptn++
+    }
+    if((File.read_uint8(j) < 0xFF) ) return false;
+    if(j1 > File.getSize()) return false;
+    if (File.read_uint8(j1-1) < 0xFF) return false;
+    malformed = 0; //some modules are a bit more broken! Like "- unknown/ay5.stc"
+    while(1) { //scan through the channel data at the end of file
+        if(0x83 <= File.read_uint8(j1) <= 0x8E) j1++; //I don't get what this does, no docs either
+        j1++;
+        if(j1 > 65535) return false;
+        if(j1 > File.getSize()) {malformed = 1; break } //return false; 
+        if((File.read_uint8(j1) == 0xFF) || (j1 == File.getSize())) break
+    }
+    if(File.read_uint8(j1) == 0xFF) len = j1+1;
+    // len = File.read_uint16(0x19,_LE); // because ~somebody~ used it for names
+    if(fID)
+      if( (File.read_ansiString(ptntp-55,29) != 'SOUND TRACKER COMPILATION OF ') &&
+        (File.read_ansiString(ptntp-55,28) != 'KSA SOFTWARE COMPILATION OF ') ) return false;
+
     return true;
 }
-if(!bDetected && Binary.isHeuristicScan() && isSTCompiled()) {
-    sName = "SoundTracker module (.STC)"; sVersion  = "v1.x/compiled"; bDetected = 1;
-    sOption(len,"ord:"); sOptionT(File.read_ansiString(7,18),"id: ")
+if(!bDetected && Binary.isHeuristicScan() && isST()) {
+    sName = "SoundTracker module (.STC)"; sVersion  = "v1.x"; bDetected = 1;
+    if(malformed) sVersion += "/malformed"+malformed;
+    sz = File.read_uint16(0x19,_LE); i_d = File.read_ansiString(7,18);
+    if (['SONG BY ST COMPILE','SONG BY MB COMPILE','SONG BY ST-COMPILE',
+      'SOUND TRACKER v1.1','S.T.FULL EDITION  ','SOUND TRACKER v1.3'].indexOf(i_d)>=0)
+        msg = '';
+    else
+        msg = i_d;
+    if(sz != File.getSize()) { //the message must've hit the size field, HAPPENS
+        if(Binary.isVerbose()) sOption("ord:"+ord+" ptn:"+ptn+" len:"+len);
+        if(32 <= (sz&0xFF) <= 0x7F) {
+            msg += String.fromCharCode(sz&0xFF);
+            if(32 <= (sz>>8) <= 0x7F) msg += String.fromCharCode(sz>>8)
+        }
+    } else
+        if(sz == len) if(Binary.isVerbose()) sOption("ord:"+ord+" ptn:"+ptn+" len:"+sz); else;
+        else if(Binary.isVerbose())
+          sOption("ord:"+ord+" ptn:"+ptn+" sz:"+sz+" calc.len:"+len); //keeping len in: debug
+    if(Binary.isVerbose()) sOptionT(msg,"msg: ");
 }
 
 function isV2M() { //this detection is based purely on sanity checks
@@ -3524,7 +3583,7 @@ if(!bDetected && Binary.isHeuristicScan() && isV2M()) {
 
 function isETracker() { //more sanity-check detections
     if(File.getSize()<96) return false; //just because modland's collection didn't have anything smaller
-    //...but we have a signature this time too. Except it's not always there so TODO
+    //...but we have a signature this time too. Except it's not always there...
     if(Binary.compare('"ETracker (C) BY ESI."',10)) return true;
     if(File.read_uint8(1)>0x7F) return false;
     if(File.read_uint8(3)>0x7F) return false;
@@ -3589,6 +3648,62 @@ if(!bDetected && Binary.isHeuristicScan() && isADXAHX()) {
 //     //sOption(len,"ord:"); sOptionT(File.read_ansiString(7,18),"id: ")
 // }
 
+
+
+function isFLS() {
+    //this detection is based purely on sanity checks
+    //  AND a tiiiiiny ~bruteforce~ of membase, which is why it comes in last
+    //ref https://bulba.untergrund.net/Ay_Emul29.src.7z/Players.pas -> FoundFLS
+    if(File.getSize() < 6) return false;
+    postp = File.read_uint16(0x00,_LE); orntp = File.read_uint16(0x02,_LE); //positions & ornaments table ptrs
+    smptp = File.read_uint16(0x04,_LE); ptnp = 6; //samples table ptr & patterns
+    j = postp - smptp; if((j < 0) || ((j&3) != 0)) return false;
+    j = orntp-16; if(j < 0) return false;
+    while(1) {
+        j2 = smptp+2-j;
+        if(j2 > File.getSize()+6) return false; // tentatively
+        if(8 <= j2 < File.getSize()) {
+            j3 = File.read_uint16(j2,_LE);
+            j1 = j3 - j;
+            if(8 <= j1 < File.getSize()) {
+                j3 = File.read_uint16(j2 - 4);
+                j2 = j3 - j;
+                if(6 <= j2 < File.getSize())
+                    if(j1-j2 == 0x20) {
+                        j2 = File.read_uint16(ptnp+2,_LE)-j;
+                        if(21 < j2 < File.getSize()) {
+                            j1 = File.read_uint16(ptnp,_LE)-j;
+                            if(20 < j1 < File.getSize())
+                                if (!File.read_uint8(j1-1)) {
+                                    while((j1 <= File.getSize()) && (File.read_uint8(j1) < 0xFF)) {
+                                        while(1) {
+                                            bt = File.read_uint8(j1);
+                                            if((bt <= 0x5F) || (bt == 0x80) || (bt == 0x81)) { j1++; break }
+                                            else if(0x82 <= bt <= 0x8E) j1++;
+                                            if(j1>File.getSize()) break;
+                                        }
+                                    }
+                                }
+                                if(j1+1 == j2) break;
+                        }
+                    }
+            }
+        }
+        j--; if(j < 0) break;
+    }
+    if(j < 0) return false;
+    if((postp-j > File.getSize()) || (postp-j < 16)) return false;
+    len = File.read_uint16(postp-j-2,_LE)+0x60-j;
+    if(len <= postp-j) return false;
+    if(len > File.getSize()+1) return false;
+    if(((smptp-j)&1) != 0) return false;
+    membase = j;
+    return true;
+}
+if(!bDetected && Binary.isHeuristicScan() && isFLS()) {
+    sName = "Flash Tracker module (.FLS)"; bDetected = 1; sVersion = "@"+Hex(j);
+    if(Binary.isVerbose()) sOption(len,"len:")
+}
 
     return result(bShowType,bShowVersion,bShowOptions);
 }
