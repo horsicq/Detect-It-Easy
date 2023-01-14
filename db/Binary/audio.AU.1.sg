@@ -1,0 +1,61 @@
+// https://github.com/horsicq/Detect-It-Easy signature file
+// Author: Kaens TG@kaens
+
+init("audio","Next/SUN Au waveform audio (.AU,.SND)");
+includeScript("read");
+
+function detect(bShowType,bShowVersion,bShowOptions) {
+
+    //ref https://en.wikipedia.org/wiki/Au_file_format
+    // & https://sox.sourceforge.net/AudioFormats-11.html#ss11.2
+    // & http://soundfile.sapp.org/doc/NextFormat/soundstruct.h
+    // & https://sox.sourceforge.net/AudioFormats-11.html
+    if(!Binary.compare("'.snd'")) return false; malformed = 0;
+_log("   1" );
+    dataofs = File.read_uint32(4,_BE);
+_log(Hex(dataofs));
+    if(dataofs<0x18 || dataofs>File.getSize()) return false;
+    if(dataofs<0x1C) malformed = "dtofs="+Hex(dataofs);
+_log("   2");
+    datasz = File.read_uint32(8,_BE);
+    if(datasz != 0xFFFFFFFF && datasz > File.getSize()) malformed = "dtsz="+Hex(datasz);
+    bDetected = 1;
+    switch(File.read_int32(0x0C,_BE)) {
+    case 0x00: sVersion = "unspecified format"; break;
+    case 0x01: sVersion = "8-bit G.711 μ-law"; break;
+    case 0x02: sVersion = "8-bit linear PCM"; break;
+    case 0x03: sVersion = "16-bit linear PCM"; break;
+    case 0x04: sVersion = "24-bit linear PCM"; break;
+    case 0x05: sVersion = "32-bit linear PCM"; break;
+    case 0x06: sVersion = "32-bit IEEE floating point"; break;
+    case 0x07: sVersion = "64-bit IEEE floating point"; break;
+    case 0x08: sVersion = "Fragmented sample data"; break;
+    case 0x0A: sVersion = "DSP program"; break;
+    case 0x0B: sVersion = "8-bit fixed point"; break;
+    case 0x0C: sVersion = "16-bit fixed point"; break;
+    case 0x0D: sVersion = "24-bit fixed point"; break;
+    case 0x0E: sVersion = "32-bit fixed point"; break;
+    case 0x10: sVersion = "Sound Kit's visual data"; break;
+    case 0x11: sVersion = "MULAW_SQUELCH"; break;
+    case 0x12: sVersion = "16-bit linear w/emphasis"; break;
+    case 0x13: sVersion = "16-bit linear compressed"; break;
+    case 0x14: sVersion = "16-bit linear w/emphasis compressed"; break;
+    case 0x15: sVersion = "Music Kit DSP commands"; break;
+    case 0x17: sVersion = "ITU-T G.721 4-bit ADPCM"; break;
+    case 0x18: sVersion = "ITU-T G.722 4-bit SB-ADPCM"; break;
+    case 0x19: sVersion = "ITU-T G.723 3-bit SB-ADPCM"; break;
+    case 0x1A: sVersion = "ITU-T G.723 5-bit SB-ADPCM"; break;
+    case 0x1B: sVersion = "8-bit G.711 A-law"; break;
+    case 0x1B: sVersion = "AES"; break;
+    case 0x1C: sVersion = "8-bit Delta μ-law"; break;
+    default: sVersion = "unknown"
+    }
+    if(malformed) sVersion += ", malformed "+malformed;
+    if(Binary.isVerbose()) {
+        sr = (File.read_uint32(0x10,_BE)/1000).toFixed(1); ch = File.read_uint32(0x14,_BE);
+        if(dataofs >= 0x1C) sOption(File.read_ansiString(0x18,Math.min(File.getSize()-0x18,0x100)));
+        sOption("ch:"+ch+" s/r:"+sr+"kHz");
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}
