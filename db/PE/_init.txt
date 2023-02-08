@@ -1,0 +1,156 @@
+var File=PE;
+
+includeScript("result");
+
+
+/**
+ * The file offset of the entry point.
+ */
+PE.nEP=PE.getEntryPointOffset();
+
+/**
+ * Get the signature at an offset of the entry point.
+ * @see Binary.getSignature
+ */
+PE.getEPSignature = function(nOffset,nSize)
+{
+    return PE.getSignature(PE.nEP+nOffset,nSize);
+}
+
+
+/**
+ * Add console and/or administrator requirement to the general options.
+ * @returns {String}
+ */
+PE.getGeneralOptionsEx = function()
+{
+    sResult=PE.getGeneralOptions();
+    if(PE.isConsole())
+    {
+        sResult=sResult.append("console");
+    }
+    if(/requireAdministrator/.test(PE.getManifest()))
+    {
+        sResult=sResult.append("admin");
+    }
+    if(PE.isSignedFile())
+    {
+        sResult=sResult.append("signed");
+    }
+    return sResult;
+}
+
+
+/**
+ * Locate the first library matching a pattern.
+ * @returns {?Array} <code>null</code> if not found, otherwise:
+ * <br><code>[-1]</code> is the number of the library;
+ * <br><code>[0]</code> is the name of the library (lower cased);
+ * <br><code>[1]</code> onwards are the captured subpatterns.
+ */
+PE.isLibraryPresentExp = function(sLibraryPattern)
+{
+    var aMatch=null;
+    for (var n=0;n<PE.getNumberOfImports();n++)
+    {
+        aMatch=PE.getImportLibraryName(n).match(sLibraryPattern);
+        if(aMatch)
+        {
+            aMatch[-1]=n;
+            aMatch[0]=PE.getImportLibraryName(n).toLowerCase();
+            break;
+        }
+    }
+
+    return aMatch;
+}
+
+
+// Create an array of sections.
+
+/**
+ * The number of the last section.
+ */
+PE.nLastSection=PE.getNumberOfSections()-1;
+
+function Section(number, name, virtsize, rva, filesize, offset, characteristics)
+{
+    this.Number          = number;
+    this.Name            = name;
+    this.VirtualSize     = virtsize;
+    this.VirtualAddress  = rva;
+    this.FileSize        = filesize;
+    this.FileOffset      = offset;
+    this.Characteristics = characteristics;
+}
+
+/**
+ * An array of sections, indexed by number and name (if not numeric). Members are the same as the functions.
+ * @example
+ * var nOffset=PE.section[".rsrc"].FileOffset;
+ */
+PE.section=[];
+for(var i=0;i<=PE.nLastSection;i++)
+{
+    PE.section[i] = new Section(i,
+                                PE.getSectionName(i),
+                                PE.getSectionVirtualSize(i),
+                                PE.getSectionVirtualAddress(i),
+                                PE.getSectionFileSize(i),
+                                PE.getSectionFileOffset(i),
+                                PE.getSectionCharacteristics(i));
+    if(PE.section[i].Name)
+    {
+        var name=PE.section[i].Name;
+        // Don't do numeric names, as they are always treated as an index.
+        if((+name).toString() != name) // parseInt crashes the application if Delphi project uses diedll :(
+        {
+            PE.section[name] = PE.section[i];
+        }
+    }
+}
+
+// Create dummy sections for the few files that need them.
+PE.section[-1] = new Section(-1,"\0",0,0,0,PE.getSize(),0);
+if(PE.nLastSection==-1)
+{
+    PE.section[0]=PE.section[-1];
+}
+
+
+// Create an array of resources.
+
+function Resource(number, id, name, offset, size, type)
+{
+    this.Number = number;
+    this.Id     = id;
+    this.Name   = name;
+    this.Offset = offset;
+    this.Size   = size;
+    this.Type   = type;
+}
+
+/**
+ * An array of resources, indexed by number and name (if not numeric). Members are the same as the functions.
+ * @example
+ * var nOffset=PE.resource["PACKAGEINFO"].Offset;
+ */
+PE.resource=[];
+for(var i=0;i<PE.getNumberOfResources();i++)
+{
+    PE.resource[i] = new Resource(i,
+                                  PE.getResourceIdByNumber(i),
+                                  PE.getResourceNameByNumber(i),
+                                  PE.getResourceOffsetByNumber(i),
+                                  PE.getResourceSizeByNumber(i),
+                                  PE.getResourceTypeByNumber(i));
+    if(PE.resource[i].Name)
+    {
+        var name=PE.resource[i].Name;
+        // Don't do numeric names, as they are always treated as an index.
+        if((+name).toString() != name) // parseInt crashes the application if Delphi project uses diedll :(
+        {
+            PE.resource[name] = PE.resource[i];
+        }
+    }
+}
