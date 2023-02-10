@@ -15,6 +15,8 @@ Detect It Easy
 * How to build: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/BUILD.md
 * Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
 
+You can help with translation: https://github.com/horsicq/XTranslation
+
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/1.png "1")
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/2.png "2")
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/3.png "3")
