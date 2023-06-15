@@ -1,0 +1,561 @@
+// This file has a lot of results
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    var sLinkerName = "";
+    var sLinkerVersion = "";
+    var sLinkerOptions = "";
+    var sCompilerName = "";
+    var sCompilerVersion = "";
+    var sCompilerOptions = "";
+    var sNET = "";
+    var sTool = "";
+    var sMFC = "";
+    
+    if(PE.isRichSignaturePresent()) {
+        sLinkerName="Microsoft Linker";
+    }
+    
+    var bCCP = 0;
+    var bWmain=0;
+    var aMSVCRT=PE.isLibraryPresentExp(/^MSVCR/i);
+    if(aMSVCRT)
+    {
+        bWmain=PE.isLibraryFunctionPresent(aMSVCRT[0],"__wgetmainargs");
+    }
+
+    if(!PE.isPEPlus())
+    {
+        if(PE.compareEP("558BEC51C745FC01000000837D0C007510833D"))
+        {
+            if(PE.compareEP("00",-4))
+            {
+                sOptions=sOptions.append("libcd");
+            }
+            else if(PE.compareEP("00",-8))
+            {
+                sOptions=sOptions.append("libcmtd");
+            }
+            else
+            {
+                sOptions=sOptions.append("msvcrtd");
+            }
+            sCompilerVersion="6.0";
+            bCCP=1;
+        }
+        else if(PE.compareEP("558BEC538B5D08568B750C578B7D1085F67509833D"))
+        {
+            if(PE.compareEP("CA",-1))
+            {
+                sCompilerOptions=sCompilerOptions.append("libc");
+            }
+            else if(PE.compareEP("59",-7))
+            {
+                sCompilerOptions=sCompilerOptions.append("libcmt");
+            }
+            else
+            {
+                sCompilerOptions=sCompilerOptions.append("msvcrt");
+            }
+            sCompilerVersion="6.0";
+            bCCP=1;
+        }
+        else if(PE.compareEP("558BEC6AFF68........68........64A100000000506489250000000083"))
+        {
+            var nOfs;
+            switch(PE.readByte(PE.nEP+31))
+            {
+            case 0x10:
+                if(PE.compareEP("83",107))
+                {
+                    sCompilerOptions=sCompilerOptions.append("libc");
+                    nOfs=116;
+                }
+                else
+                {
+                    sCompilerOptions=sCompilerOptions.append("libcmt");
+                    nOfs=133;
+                }
+                if(PE.compareEP("E8",nOfs))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wmain");
+                    --nOfs;
+                }
+                if(PE.compareEP("FF",nOfs+25))
+                {
+                    sCompilerOptions=sCompilerOptions.append("glob");
+                }
+                break;
+            case 0x20:
+                sCompilerOptions=sCompilerOptions.append("msvcrt");
+                if(bWmain)
+                {
+                    sCompilerOptions=sCompilerOptions.append("wmain");
+                }
+                if(PE.compareEP("FF",109))
+                {
+                    sCompilerOptions=sCompilerOptions.append("glob");
+                }
+                break;
+            case 0x58:
+                if(PE.compareEP("33",87))
+                {
+                    sCompilerOptions=sCompilerOptions.append("libc");
+                    nOfs=116;
+                }
+                else
+                {
+                    sCompilerOptions=sCompilerOptions.append("libcmt");
+                    nOfs=134;
+                }
+                if(PE.compareEP("E8",nOfs))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+                break;
+            case 0x68:
+                sCompilerOptions=sCompilerOptions.append("msvcrt");
+                if(PE.compareEP("5F",45))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+                break;
+            case 0x90:
+                sCompilerOptions=sCompilerOptions.append("libcd");
+                if(PE.compareEP("E8",241))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+                break;
+            case 0x94:
+                sCompilerOptions=sCompilerOptions.append("msvcrtd");
+                if(PE.compareEP("83",233))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+                break;
+            case 0xA4:
+                if(PE.compareEP("00",125))
+                {
+                    sCompilerOptions=sCompilerOptions.append("libcd");
+                    nOfs=160;
+                }
+                else
+                {
+                    sCompilerOptions=sCompilerOptions.append("libcmtd");
+                    nOfs=179;
+                }
+                if(PE.compareEP("E8",nOfs))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+                break;
+            case 0xE0:
+                switch(PE.readByte(PE.nEP+38))
+                {
+                case 0xB8:
+                    sCompilerOptions=sCompilerOptions.append("libcd");
+                    if(PE.compareEP("E8",241))
+                    {
+                        sCompilerOptions=sCompilerOptions.append("wmain");
+                    }
+                    break;
+                case 0xC7:
+                    sCompilerOptions=sCompilerOptions.append("msvcrtd");
+                    if(bWmain)
+                    {
+                        sCompilerOptions=sCompilerOptions.append("wmain");
+                    }
+                    if(PE.compareEP("FF",121))
+                    {
+                        sCompilerOptions=sCompilerOptions.append("glob");
+                    }
+                    break;
+                }
+                break;
+            case 0xE8:
+                sCompilerOptions=sCompilerOptions.append("libcd");
+                break;
+            case 0xF0:
+                if(PE.compareEP("00",125))
+                {
+                    sCompilerOptions=sCompilerOptions.append("libcd");
+                    nOfs=160;
+                }
+                else
+                {
+                    sCompilerOptions=sCompilerOptions.append("libcmtd");
+                    nOfs=179;
+                }
+                if(PE.compareEP("E8",nOfs))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wmain");
+                    --nOfs;
+                }
+                if(PE.compareEP("FF",nOfs+25))
+                {
+                    sCompilerOptions=sCompilerOptions.append("glob");
+                }
+                break;
+            }
+            sCompilerVersion="5.0-2003";
+            bCCP=1;
+        }
+        else if(PE.compareEP("6A0C68........E8........33C0408945E48B750C33FF3BF7750C393D"))
+        {
+            switch(PE.readByte(PE.nEP-1))
+            {
+            case 0xC0: sCompilerOptions=sCompilerOptions.append("libc");   break;
+            case 0x00: sCompilerOptions=sCompilerOptions.append("libcmt"); break;
+            }
+            sCompilerVersion="2003";
+            bCCP=1;
+        }
+        else if(PE.compareEP("6A..68........E8........66813D"))
+        {
+            sCompilerVersion="2003";
+            bCCP=1;
+        }
+        else if(PE.compareEP("6A..68........E8........BF940000008BC7E8"))
+        {
+            nOfs=0;
+            var sMain;
+            switch(PE.readByte(PE.nEP+1))
+            {
+            case 0x18:
+                sMain="wmain";
+                nOfs=197;
+                break;
+            case 0x60:
+                sMain="wWinMain";
+                nOfs=199;
+                break;
+            }
+            if(nOfs)
+            {
+                if(PE.compareEP("6A",nOfs))
+                {
+                    sCompilerOptions=sCompilerOptions.append("libcmt");
+                    nOfs+=62;
+                }
+                else
+                {
+                    sCompilerOptions=sCompilerOptions.append("libc");
+                    nOfs+=69;
+                }
+                if(PE.compareEP("E8",nOfs))
+                {
+                    sCompilerOptions=sCompilerOptions.append(sMain);
+                }
+            }
+            sCompilerVersion="2003";
+            bCCP=1;
+        }
+        else if(PE.compareEP("8BFF558BEC837D0C017505E8"))
+        {
+            if(PE.compareEP("8B",16))
+            {
+                sCompilerOptions=sCompilerOptions.append(PE.compareEP("E8",74)?"libcmtd":"msvcrtd");
+            }
+            else
+            {
+                sCompilerOptions=sCompilerOptions.append(PE.compareEP("8B",35)?"libcmt":"msvcrt");
+            }
+            sCompilerVersion="2008-2010";
+            bCCP=1;
+        }
+        else if(PE.compareEP("8BFF558BECE8......00E8......005DC3"))
+        {
+            switch(PE.readByte(PE.nEP+58))
+            {
+            case 0x88:
+                sCompilerOptions=sCompilerOptions.append("msvcrtd","wWinMain");
+                sCompilerVersion="2008";
+                break;
+            case 0x8C:
+                sCompilerOptions=sCompilerOptions.append("msvcrtd");
+                sCompilerVersion="2008";
+                break;
+            case 0x90:
+                sCompilerOptions=sCompilerOptions.append("msvcrtd");
+                if(bWmain)
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+                sCompilerVersion="2010";
+                break;
+            case 0x94:
+                sCompilerOptions=sCompilerOptions.append("libcmtd");
+                if(PE.compareEP("52",145))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+                sCompilerVersion="2008";
+                break;
+            case 0x98:
+                sCompilerOptions=sCompilerOptions.append("libcmtd");
+                if(PE.compareEP("6A",645))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+                sCompilerVersion="2010";
+                break;
+            case 0xE4:
+                sCompilerOptions=sCompilerOptions.append("msvcrtd");
+                if(bWmain)
+                {
+                    sCompilerOptions=sCompilerOptions.append("wmain");
+                }
+                if(PE.compareEP("FF",-0x9B))
+                {
+                    sCompilerOptions=sCompilerOptions.append("glob");
+                }
+                sCompilerVersion="2008-2010";
+                break;
+            case 0xE8:
+                sCompilerOptions=sCompilerOptions.append("libcmtd");
+                if(PE.compareEP("E8",92))
+                {
+                    if(PE.compareEP("E8",184))
+                    {
+                        sCompilerOptions=sCompilerOptions.append("wmain");
+                        bWmain=1;
+                    }
+                    sCompilerVersion="2008";
+                }
+                else
+                {
+                    if(PE.compareEP("E8$$$$$$$$8BFF558BEC83EC10",213))
+                    {
+                        sCompilerOptions=sCompilerOptions.append("wmain");
+                        bWmain=1;
+                    }
+                    sCompilerVersion="2010";
+                }
+                if(bWmain)
+                {
+                    if(PE.compareEP("10",-6))
+                    {
+                        sCompilerOptions=sCompilerOptions.append("glob");
+                    }
+                }
+                else
+                {
+                    if(PE.compareEP("CC",-2))
+                    {
+                        sCompilerOptions=sCompilerOptions.append("glob");
+                    }
+                }
+                break;
+            }
+            bCCP=1;
+        }
+        else if(PE.compareEP("E8......00E9$$$$$$$$6A..68........E8"))
+        {
+            var nEP=PE.nEP;
+            nEP+=10+~~PE.readDword(nEP+6);
+            if(PE.compare("10",nEP+1))
+            {
+                sCompilerOptions=sCompilerOptions.append("msvcrt");
+                if(bWmain)
+                {
+                    sCompilerOptions=sCompilerOptions.append("wmain");
+                }
+                if(PE.compareEP("FF",-48))
+                {
+                    sCompilerOptions=sCompilerOptions.append("glob");
+                }
+            }
+            else if(PE.compare("33DB",nEP+12))
+            {
+                sCompilerOptions=sCompilerOptions.append("msvcrt");
+                if(PE.compare("89",nEP+53)||PE.compare("E0",nEP+60))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+            }
+            else if(PE.compare("3935",nEP+14))
+            {
+                sCompilerOptions=sCompilerOptions.append("libcmt");
+                if(PE.compareEP("E8$$$$$$$$8B",-150))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wmain");
+                }
+                if(PE.compareEP("FF",-0xA3))
+                {
+                    sCompilerOptions=sCompilerOptions.append("glob");
+                }
+            }
+            else if(PE.compare("8D4598",nEP+12))
+            {
+                sCompilerOptions=sCompilerOptions.append("libcmt");
+                if(PE.compareEP("51",15))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+            }
+            else if(PE.compare("33F68975FC",nEP+12))
+            {
+                sCompilerOptions=sCompilerOptions.append("libcmt");
+                if(PE.compare("E8",nEP+170))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wWinMain");
+                }
+            }
+            else if(PE.compare("B8'MZ'",nEP+12))
+            {
+                sCompilerOptions=sCompilerOptions.append("libcmt");
+                if(PE.compare("E8",nEP+149))
+                {
+                    sCompilerOptions=sCompilerOptions.append("wmain");
+                    --nEP;
+                }
+                if(PE.compare("FF",nEP+174))
+                {
+                    sCompilerOptions=sCompilerOptions.append("glob");
+                }
+            }
+            sCompilerVersion="2008-2010";
+            bCCP=1;
+        }
+        else if(PE.compareEP("64A100000000558BEC6AFF68"))
+        {
+            bCCP=1;
+        }
+        else if(PE.compareEP("64A100000000506489250000000083C4A8535657"))
+        {
+            sCompilerVersion="5.0";
+            bCCP=1;
+        }
+        else if(PE.compareEP("535657BB........8B......553BFB75"))
+        {
+            sCompilerVersion="2.0";
+            bCCP=1;
+        }
+        else if(PE.compareEP("56E8........8BF0E8........68........68........E8........6A..68........56E8"))
+        {
+            sCompilerVersion="2.0";
+            bCCP=1;
+        }
+        else if(PE.compareEP("53B8........8B......565785DB5575"))
+        {
+            sCompilerVersion="4.2";
+            bCCP=1;
+        }
+        else if(PE.compareEP("558BEC83EC4456FF15........6A018BF0FF15"))
+        {
+            sCompilerVersion="6.0";
+            bCCP=1;
+        }
+        else if(PE.compareEP("558BEC83EC4456FF15........8BF08A063C22"))
+        {
+            sCompilerVersion="6.0";
+            bCCP=1;
+        }
+        else if(PE.compareEP("558D6C....81EC........8B45..83F801560F84........85C00F84"))
+        {
+            sCompilerVersion="6.0";
+            bCCP=1;
+        }
+        //else if(PE.compareEP("837C24080175098B442404A3....0010E88BFFFFFF")) // Pure Basic 4.0
+        //{
+        //    sCompilerVersion="6.0";
+        //    bCCP=1;
+        //}
+        else if(PE.compareEP("558BEC538B5D08568B750C85F6578B7D10"))
+        {
+            sCompilerVersion="2002";
+            bCCP=1;
+        }
+        else if(PE.compareEP("833D........00741A68........E8........85C059740BFF742404FF15........59E8........68........68........E8........85C059597554565768........E8........BE........8BC6BF"))
+        {
+            sCompilerVersion="2005";
+            bCCP=1;
+        }
+        else if(PE.compareEP("6A1468........E8........BB94000000536A008B..........FFD750FF..........8BF085F6750A6A12E8........59EB18891E56FF..........5685C0751450FFD750FF..........B8"))
+        {
+            sCompilerVersion="2005";
+            bCCP=1;
+        }
+        else if(PE.compareEP("8BFF558BEC538B5D08568B750C85F6578B7D100F84....000083FE01"))
+        {
+            sCompilerVersion="2005";
+            bCCP=1;
+        }
+        else if(PE.compareEP("8BFF558BEC538B5D08568B750C85F6578B7D107509833D........00EB2683FE01740583FE027522A1........85C07409575653FFD085C0740C575653E8......FF85C0750433C0EB4E575653E8......FF83FE0189450C750C85C07537575053E8......FF85F6740583FE037526575653E8......FF85C0750321450C837D0C007411A1........85C07408575653FFD089450C8B450C5F5E5B5DC20C00"))
+        {
+            sCompilerVersion="2005";
+            bCCP=1;
+        }
+        else if(PE.compareEP("558BEC83EC10A1........8365F8008365FC005357BF4EE640BB3BC7BB0000FFFF740D85C37409F7D0A3........EB60568D45F850FF15........8B75FC3375F8FF15........33F0FF15........33F0FF15........33F08D45F050FF15........8B45F43345F033F03BF77507BE4FE640BBEB0B85F375078BC6C1E0100BF08935........F7D68935........5E5F5BC9C3"))
+        {
+            sCompilerVersion="2005";
+            bCCP=1;
+        }
+        else if(PE.compareEP("558BEC83EC245356578965F8"))
+        {
+            bCCP=1;
+        }
+    }
+    else
+    {
+        if(PE.compareEP("4883EC2885D248895C243048896C243848897424408BDA488BE9498BF0751E3915"))
+        {
+            sCompilerVersion="2005";    // DLL
+            bCCP=1;
+        }
+        else if(PE.compareEP("4883EC5848895C247048897C247866813D"))
+        {
+            sCompilerVersion="2005";    // console, msvcrt
+            bCCP=1;
+        }
+        else if(PE.compareEP("4883EC3848895C245048897C2458FF15"))
+        {
+            sCompilerVersion="2005";    // console, static
+            bCCP=1;
+        }
+        else if(PE.compareEP("488BC44881EC........4889581848897820488D4888FF15"))
+        {
+            sCompilerVersion="2005";    // GUI
+            bCCP=1;
+        }
+        else if(PE.compareEP("4883EC28E8........4883C428E9$$$$$$$$48895C24"))
+        {
+            sCompilerVersion="2010";
+            bCCP=1;
+        }
+        else if(PE.compareEP("4883EC28E8........E8........4883C428C3"))
+        {
+            sCompilerVersion="2010";    // debug
+            bCCP=1;
+        }
+        else if(PE.compareEP("48895C24084889742410574883EC20498BF88BDA488BF183FA017505E8"))
+        {
+            sCompilerVersion="2010";    // DLL
+            bCCP=1;
+        }
+        else if(PE.compareEP("4C894424188954241048894C24084883EC28837C2438017505E8"))
+        {
+            sCompilerVersion="2010";    // DLL debug
+            bCCP=1;
+        }
+    }
+    
+    if (bCCP) {
+        sLinkerName = "Microsoft Linker";
+        sCompilerName = "Microsoft Visual C/C++";
+    }
+    
+    // Rich
+    
+    if (PE.isVerbose()) {
+        if (sCompilerName != "") {
+            _setResult("compiler", sCompilerName, sCompilerVersion, sCompilerOptions); 
+        }
+        if (sLinkerName != "") {
+            _setResult("linker", sLinkerName, sLinkerVersion, sLinkerOptions); 
+        }
+    }
+
+    return ""; // No need
+}
