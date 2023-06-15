@@ -42,3 +42,11 @@
 
 ```
 ```
+**quint32 getRichVersion(qint32 nPosition)**
+
+```
+```
+**quint32 getRichID(qint32 nPosition)**
+
+```
+```
