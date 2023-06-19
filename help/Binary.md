@@ -476,8 +476,23 @@ iscii-mlm
 
 ```
 ```
-
 **getJpegExifCameraName()**
+
+```
+```
+**QString getOperationSystemName()**
+
+```
+```
+**QString getOperationSystemVersion()**
+
+```
+```
+**QString getOperationSystemOptions()**
+
+```
+```
+**bool isSigned()**
 
 ```
 ```

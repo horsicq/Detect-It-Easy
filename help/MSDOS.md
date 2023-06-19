@@ -50,3 +50,8 @@
 
 ```
 ```
+
+**quint32 getRichCount(qint32 nPosition)**
+
+```
+```
