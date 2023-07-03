@@ -3,6 +3,7 @@
 // Microsoft Visual C/C++
 // Visual Basic
 // MASM
+// MFC
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
@@ -561,6 +562,26 @@ function detect(bShowType,bShowVersion,bShowOptions)
         sLinker_Name="Microsoft Linker";
     }
     
+    var  aMFC = PE.isLibraryPresentExp(/^MFC(\d+?)(u?)(d?)\.dll/i);
+    
+    if (aMFC) {
+        sLibraryMFC_Version = (aMFC[1]/10).toFixed(1);
+        if (aMFC[2]) {
+            sLibraryMFC_Options = "Unicode";
+        }
+        if (aMFC[3]) {
+            sLibraryMFC_Options = sOptions.append("debug");
+        }
+        sLibraryMFC_Name = "MFC";
+    }
+    
+    if (PE.isDeepScan() && (sLibraryMFC_Name == "")) {
+        if(PE.section[".data"]&&PE.isSignatureInSectionPresent(PE.section[".data"].Number,"'CMFCComObject'")) {
+            sLibraryMFC_Name = "MFC";
+            sLibraryMFC_Options = "static";
+        }
+    }
+    
     if(PE.isNET()) {
         if(PE.isNETStringPresent("Microsoft.VisualBasic")) {
             sCompilerVB_Name="VB.NET";
@@ -892,6 +913,10 @@ function detect(bShowType,bShowVersion,bShowOptions)
                 sCompilerCPP_Name = "Microsoft Visual C/C++";
                 // TODO Version
             }
+            if (sLinker_Name == "") {
+                sLinker_Name = "Microsoft Linker";
+                // TODO Version
+            }
         }
     
         if ((sCompilerCPP_Name != "") || (_sCompilerVB_Name != "") || (sCompilerMASM_Name != "")) {
@@ -970,11 +995,11 @@ function detect(bShowType,bShowVersion,bShowOptions)
         }
 		
 		if (sLibraryDot_Name != "") {
-            _setResult("library", sLibraryDot_Name, sLibraryDot_Name, sLibraryDot_Name); 
+            _setResult("library", sLibraryDot_Name, sLibraryDot_Version, sLibraryDot_Options); 
         }
         
         if (sLibraryMFC_Name != "") {
-            _setResult("library", sLibraryMFC_Name, sLibraryMFC_Name, sLibraryMFC_Name); 
+            _setResult("library", sLibraryMFC_Name, sLibraryMFC_Version, sLibraryMFC_Options); 
         }
         
         if (sLinker_Name != "") {
