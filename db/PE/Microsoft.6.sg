@@ -13,13 +13,13 @@ function detect(bShowType,bShowVersion,bShowOptions)
     var sCompilerCPP_Name = "";
     var sCompilerCPP_Version = "";
     var sCompilerCPP_Options = "";
-	var sCompilerMASM_Name = "";
+    var sCompilerMASM_Name = "";
     var sCompilerMASM_Version = "";
     var sCompilerMASM_Options = "";
-	var sCompilerVB_Name = "";
+    var sCompilerVB_Name = "";
     var sCompilerVB_Version = "";
     var sCompilerVB_Options = "";
-	var sLibraryDot_Name = "";
+    var sLibraryDot_Name = "";
     var sLibraryDot_Version = "";
     var sLibraryDot_Options = "";
     var sLibraryMFC_Name = "";
@@ -28,6 +28,15 @@ function detect(bShowType,bShowVersion,bShowOptions)
     var sTool_Name = "";
     var sTool_Version = "";
     var sTool_Options = "";
+    
+    if (PE.isNET()) {
+        sLibraryDot_Name = ".NET";
+        sLibraryDot_Version=PE.getNETVersion();
+    
+        if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000")) {
+            sLinker_Name="Microsoft Linker";
+        }
+    }
     
     var bCCP = 0;
     var bWmain=0;
@@ -902,7 +911,12 @@ function detect(bShowType,bShowVersion,bShowOptions)
     if (PE.isVerbose()) {
         if (_sCompilerCPP_Name == "") {
             if (PE.isLibraryPresent("msvcrt.dll")) {
-                sCompilerCPP_Name = "Microsoft Visual C/C++";
+                var nMajorLinkerVersion = PE.getMajorLinkerVersion();
+                var nMinorLinkerVersion = PE.getMinorLinkerVersion();
+
+                if ((nMajorLinkerVersion >= 3) && (nMajorLinkerVersion <= 14) && (nMinorLinkerVersion < 40)) {
+                    sCompilerCPP_Name = "Microsoft Visual C/C++";
+                }
             }
         }
     }
@@ -921,7 +935,12 @@ function detect(bShowType,bShowVersion,bShowOptions)
     
         if ((sCompilerCPP_Name != "") || (_sCompilerVB_Name != "") || (sCompilerMASM_Name != "")) {
             if (sLinker_Name == "") {
-                sLinker_Name = "Microsoft Linker";
+                var nMajorLinkerVersion = PE.getMajorLinkerVersion();
+                var nMinorLinkerVersion = PE.getMinorLinkerVersion();
+
+                if ((nMajorLinkerVersion >= 3) && (nMajorLinkerVersion <= 14) && (nMinorLinkerVersion < 40)) {
+                    sLinker_Name = "Microsoft Linker";
+                }
             }
         }
     }
@@ -985,30 +1004,28 @@ function detect(bShowType,bShowVersion,bShowOptions)
         sTool_Version = "8-11";
     }
     
-    if (PE.isVerbose()) {
-        if (sCompilerVB_Name != "") {
-            _setResult("compiler", sCompilerVB_Name, sCompilerVB_Version, sCompilerVB_Options); 
-        } else if (sCompilerCPP_Name != "") {
-            _setResult("compiler", sCompilerCPP_Name, sCompilerCPP_Version, sCompilerCPP_Options); 
-        } else if (sCompilerMASM_Name != "") {
-            _setResult("compiler", sCompilerMASM_Name, sCompilerMASM_Version, sCompilerMASM_Options); 
-        }
-		
-		if (sLibraryDot_Name != "") {
-            _setResult("library", sLibraryDot_Name, sLibraryDot_Version, sLibraryDot_Options); 
-        }
-        
-        if (sLibraryMFC_Name != "") {
-            _setResult("library", sLibraryMFC_Name, sLibraryMFC_Version, sLibraryMFC_Options); 
-        }
-        
-        if (sLinker_Name != "") {
-            _setResult("linker", sLinker_Name, sLinker_Version, sLinker_Options); 
-        }
-        
-        if (sTool_Name != "") {
-            _setResult("tool", sTool_Name, sTool_Version, sTool_Options); 
-        }
+    if (sCompilerVB_Name != "") {
+        _setResult("compiler", sCompilerVB_Name, sCompilerVB_Version, sCompilerVB_Options); 
+    } else if (sCompilerCPP_Name != "") {
+        _setResult("compiler", sCompilerCPP_Name, sCompilerCPP_Version, sCompilerCPP_Options); 
+    } else if (sCompilerMASM_Name != "") {
+        _setResult("compiler", sCompilerMASM_Name, sCompilerMASM_Version, sCompilerMASM_Options); 
+    }
+    
+    if (sLibraryDot_Name != "") {
+        _setResult("library", sLibraryDot_Name, sLibraryDot_Version, sLibraryDot_Options); 
+    }
+    
+    if (sLibraryMFC_Name != "") {
+        _setResult("library", sLibraryMFC_Name, sLibraryMFC_Version, sLibraryMFC_Options); 
+    }
+    
+    if (sLinker_Name != "") {
+        _setResult("linker", sLinker_Name, sLinker_Version, sLinker_Options); 
+    }
+    
+    if (sTool_Name != "") {
+        _setResult("tool", sTool_Name, sTool_Version, sTool_Options); 
     }
 
     return ""; // No need
