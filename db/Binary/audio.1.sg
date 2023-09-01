@@ -197,7 +197,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
                     case "NAME": t = File.read_codePageString(p,hksz,"CP1252"); break;
                     case "AUTH": a = File.read_codePageString(p,hksz,"CP1252"); break;
                     case "DATE": d = File.read_codePageString(p,hksz,"CP1252"); break;
-                    case "RMRK": c = File.read_codePageString(p,hksz,"CP1252"); break; //apparently intended to be 78ch per line, maybe TODO auto-wrap (wihtout left trimming!)
+                    case "RMRK": c = File.read_codePageString(p,hksz,"CP1252"); break; //apparently intended to be 78ch per line, maybe TODO auto-wrap (without left trimming!)
                     case "PLST": ord = hksz; break;
                 }
                 p += hksz;
@@ -276,15 +276,41 @@ function detect(bShowType,bShowVersion,bShowOptions) {
     else if(Binary.compare("'BRTF'")) {
         bDetected = 1;
         sName = "BeRoTracker module (.BRT)";
-        if(Binary.isVerbose()) //TODO actually read chunks
-            if(File.read_ansiString(8,4) == "NAME") {
-                tsz = File.read_uint8(0x10);
-                sOptionT(File.read_ansiString(0x11,tsz));
-                if(File.read_ansiString(0x11+tsz,4)=="MESS") {
-                    msz = File.read_uint32(0x11+tsz+8,_LE);
-                    sOptionT(Binary .getString(0x11+tsz+12,msz))
+        if(Binary.isVerbose()) {
+            p = 8; t = ''; c = ''; q = ''; instmsg = []; sainmsg = [];
+            ins = 0; smp = 0; ord = 0; //TODO figure out how to get ptn 
+            bpm0 = 0; spd0 = 0; st0 = 0; mvol = 0; rowsperbeat = 0; hltu = 0; hltd = 0;
+            while (p < File.getSize()) {
+                hkhd = File.read_ansiString(p,4);
+                hksz = File.read_uint32(p+4,_LE);
+                p += 8;
+                switch (hkhd) {
+                    case "NAME": t = File.read_ucsdString(p); break;
+                    case "MESS": c = File.read_codePageString(p+2,File.read_uint32(p,_LE),"CP1252"); break;
+                    case "BPMI": rpb = File.read_uint8(p); break;
+                    case "INFO":
+                        spd0 = File.read_uint8(p+4); bpm0 = File.read_uint8(p+5);
+                        st0 = File.read_uint8(p+6); mvol = File.read_uint8(p+10);
+                        break;
+                    case "PORD": ord = File.read_uint8(p); break;
+                    case "PAIN": hltu = File.read_uint8(p+1); hltd = File.read_uint8(p+2); break;
+                    case "SAIN":
+                        smp++;
+                        q = File.read_ucsdString(p+2); if(q.trim().length) sainmsg.push(q);
+                        break;
+                    case "INST":
+                        if(File.read_uint8(p)) ins++;
+                        q = File.read_ucsdString(p+1); if(q.trim().length) instmsg.push(q);
+                        break;
+                    case "DONE": p = File.getSize(); break;
                 }
+                p += hksz;
             }
+            sOption(t); sOption(c);
+            sOption("ord:"+ord+" ins:"+ins+" smp:"+smp+" hlt:"+hltu+"/"+hltd+
+                " RPB:"+rpb+" spd0:"+spd0+" bpm0:"+bpm0+" st.sep0:"+st0+" mixvol:"+mvol);
+            sOption(instmsg.join("\n"),"ins.text:\n"); sOption(sainmsg.join("\n"),"smp.text:\n");
+        }
     }
     else if(Binary.compare("FFFFFFFF",0x34) && Binary.compare("1027",0x15C)
       && Binary.compare("1027",0x164)) {
