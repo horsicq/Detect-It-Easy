@@ -1,0 +1,103 @@
+// DIE's signature file
+// Author: KDSS-Research
+
+init("cryptor","PEUnion");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    //32bit RUNPE stub
+    if (!PE.isNET()){
+        bDetected = 1;
+        if (PE.isPEPlus()){
+            bDetected = 0;
+        }
+        if(!PE.isLibraryFunctionPresent("KERNEL32.DLL", "GetProcAddress") ||
+           !PE.isLibraryFunctionPresent("KERNEL32.DLL", "ExitProcess") ||
+           !PE.isLibraryFunctionPresent("KERNEL32.DLL", "GetModuleFileNameA") ||
+           !PE.isLibraryFunctionPresent("KERNEL32.DLL", "GetComputerNameA") ||
+           !PE.isLibraryFunctionPresent("KERNEL32.DLL", "VirtualAllocExNuma") ||
+           !PE.isLibraryFunctionPresent("Shlwapi.DLL", "PathFindFileNameA")){
+            bDetected = 0;
+        }
+
+        if (!PE.isSectionNamePresent(".rsrc") || !PE.isSectionNamePresent(".idata") || !PE.isSectionNamePresent(".text")){
+            bDetected = 0;        
+        }
+        
+        if (PE.getNumberOfSections() != 3) {
+            bDetected = 0;        
+        }
+        
+        var n1=PE.findString(PE.section[".rsrc"].FileOffset,PE.section[".rsrc"].FileSize,"</assembly>");
+        if (n1==-1){
+           bDetected = 0; 
+        }
+        
+        if (!(PE.getSectionVirtualSize(1)+PE.getSectionVirtualSize(2) < PE.getSectionVirtualSize(0))){
+           bDetected = 0;        
+        }
+        sOptions += "Native"
+        
+    
+    }
+    if (PE.isNET()){
+        bDetected = 1;
+        if (validateReferences(
+                isPositive = true,
+                references = [
+                    "System.Runtime.InteropServices",
+                    "System.Runtime.CompilerServices",
+                    "System.IO",
+                    "System.Reflection",
+                    "System.Resources",
+                    "System.Collections.Generic",
+                    "System.Core",
+                    "System.Linq"
+
+                ]
+            )) {
+            bDetected = 0;
+            return null; // end
+        } 
+
+        if (!PE.isNETStringPresent("IEnumerable`1") ||
+            !PE.isNETStringPresent("MarshalAsAttribute") ||
+            !PE.isNETStringPresent("GetExecutingAssembly") ||
+            !PE.isNETStringPresent("Assembly") ||
+            !PE.isNETStringPresent("IDisposable") ||
+            !PE.isNETStringPresent("<>c__DisplayClass1") ||
+            !PE.isNETStringPresent("GetEntryAssembly") ||
+            !PE.isNETStringPresent("Func`2") ||
+            !PE.isNETStringPresent("op_Explicit") ||
+            !PE.isNETStringPresent("op_Equality") ||
+            !PE.isNETStringPresent("get_MachineName") ||
+            !PE.isNETStringPresent("STAThreadAttribute")){
+            bDetected = 0;
+        }
+        if (PE.isNETStringPresent("BeginInvoke") ||
+            PE.isNETStringPresent("EndInvoke")){
+            sOptions += ".NET Invoke"
+        }
+        
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}
+
+
+// validateReferences by DosX
+function validateReferences(isPositive, references) {
+    for (var i = 0; i < references.length; i++) {
+        var sign = "00'" + references[i] + "'00";
+        if (isPositive == true) {
+            if (!PE.isSignatureInSectionPresent(0, sign)) {
+                return true;
+            }
+        } else { // negative
+            if (PE.isSignatureInSectionPresent(0, sign)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
