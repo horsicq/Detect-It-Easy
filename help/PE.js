@@ -383,7 +383,7 @@ PE.getSize=function(){}
  */
 PE.getSizeOfCode=function(){}
 /**
- * Get the size of uninitialized data.
+ * Get the size of unitialized data.
  * @returns {Int}
  */
 PE.getSizeOfUninitializedData=function(){}
