@@ -8,7 +8,7 @@ docker build .
 
 # How to build on Linux based on Debian
 
-Install packages:
+#### Install packages:
 
 ```bash
 sudo apt-get install qtbase5-dev qtscript5-dev qttools5-dev-tools libqt5svg5-dev git build-essential -y
@@ -26,41 +26,64 @@ sudo apt-get install qt5-default -y
 sudo apt-get install qtchooser qt5-qmake -y
 ```
 
-Clone this repo recursively:
+#### Clone this repo recursively:
 
 ```bash
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 cd DIE-engine
 ```
 
-Run build script:
+#### Run build script:
 
 ```bash
 bash -x build_dpkg.sh
 ```
 
-Install deb package:
+#### Install deb package:
 
 ```bash
 sudo dpkg -i release/$(ls release)
 ```
 
-Run DiE: _die [FileName] or diec [FileName] or diel [FileName]_
+### Usage
+
+```bash
+die [FileName] or diec [FileName] or diel [FileName]
+```
 
 # How to build on Linux(Automake)
 
-Qt framework has to be installed on the system.
+### Qt framework has to be installed on the system.
 
-(Ubuntu)Install Qt Framework: **sudo apt-get install --quiet --assume-yes build-essential qt5-default qtbase5-dev qttools5-dev-tools qtscript5-dev libqt5svg5-dev**
+#### (Ubuntu) Install Qt Framework:
 
-Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
+```bash
+sudo apt-get install --quiet --assume-yes build-essential qt5-default qtbase5-dev qttools5-dev-tools qtscript5-dev libqt5svg5-dev
+```
 
-- chmod a+x configure
-- ./configure
-- make
-- sudo make install
+#### Clone this repo recursively:
 
-Run DiE: _die [FileName] or diec [FileName] or diel [FileName]_
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+#### Build
+
+Might require sudo privileges
+
+```bash
+chmod a+x configure
+./configure
+make -j4
+sudo make install
+```
+
+### Usage
+
+```bash
+die [FileName] or diec [FileName] or diel [FileName]
+```
 
 # How to build on OSX
 
@@ -106,10 +129,18 @@ Run build_win64.bat
 
 # How to build with CMAKE
 
+#### Clone this repo recursively:
+
+```bash
 git clone --recursive https://github.com/horsicq/DIE-engine.git
-
 cd DIE-engine
+```
 
-cmake .
+#### Build
 
-make
+```bash
+mkdir -p build
+cmake . -B build
+cd build
+make -j4
+```
