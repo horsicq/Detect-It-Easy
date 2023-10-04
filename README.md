@@ -22,7 +22,6 @@ You can help with translation: https://github.com/horsicq/XTranslation
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/3.png "3")
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/4.png "4")
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/5.png "5")
-![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/6.png "6")
 
 Detect It Easy, or abbreviated "DIE" is a program for determining types of files.
 
