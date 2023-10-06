@@ -9,25 +9,29 @@ function detect() {
     if (PE.isNET()) {
         const detected = validateReferencesStr(
             isPositive = false,
-            references = [ // WinAPI
+            references = [
+                // WinAPI
                 checkRemoteDebuggerPresent,
-                isDebuggerPresent
+                isDebuggerPresent,
             ]
-        )
+        );
 
         if (detected != "") {
             antiDebuggerDetect(detected);
         } else {
-            const debuggerObject = "Debugger",
-                isAttached = "get_IsAttached";
+            const debuggerObject = "Debugger", // MSIL: 'System.Diagnostics.Debugger' from System.Diagnostics.dll
+                isAttached = "get_IsAttached", // MSIL: '*.Debugger::get_IsAttached()'
+                isLogging = "IsLogging" // MSIL: '*.Debugger::IsLogging()'
 
-            if (( // .NET Functions
-                    PE.isNETStringPresent(debuggerObject) ||
-                    PE.isNETUnicodeStringPresent(debuggerObject)
+            if (
+                // .NET Functions
+                (
+                    PE.isNETStringPresent(debuggerObject) || PE.isNETUnicodeStringPresent(debuggerObject) // Check for 'Debugger'
                 ) && (
-                    PE.isNETStringPresent(isAttached) ||
-                    PE.isNETUnicodeStringPresent(isAttached)
-                )) {
+                    (PE.isNETStringPresent(isAttached) || PE.isNETUnicodeStringPresent(isAttached)) || // Check for 'get_IsAttached' property
+                    (PE.isNETStringPresent(isLogging) || PE.isNETUnicodeStringPresent(isLogging)) // Check for 'IsLogging' function
+                )
+            ) {
                 antiDebuggerDetect("System.Diagnostics.Debugger");
             }
         }
@@ -35,14 +39,13 @@ function detect() {
         const kLib = "kernel32";
 
         const detected = validateNativeImportsStr( // I hope this crutch will be fixed in the future'
-            isPositive = false,
             references = [
                 [kLib + ".dll", checkRemoteDebuggerPresent],
                 [kLib + ".dll", isDebuggerPresent],
                 [kLib, checkRemoteDebuggerPresent],
                 [kLib, isDebuggerPresent],
             ]
-        )
+        );
 
         if (detected != "") {
             antiDebuggerDetect(detected);
@@ -51,22 +54,20 @@ function detect() {
 }
 
 function antiDebuggerDetect(options) {
-    _setResult("protection", "Anti-Debug detected!", "", options);
+    _setResult("protection", "Anti-Debugger", "", options);
 }
 
-function validateNativeImportsStr(isPositive, references) { // references[2]
+function validateNativeImportsStr(references) { // references[2]
     for (var i = 0; i < references.length; i++) {
         var importSign = references[i],
             library = importSign[0],
             entry = importSign[1];
-        if (isPositive == true) {
-            if (!PE.isLibraryFunctionPresent(library, entry)) {
-                return entry;
-            }
-        } else { // negative
-            if (PE.isLibraryFunctionPresent(library, entry)) {
-                return entry;
-            }
+
+
+        if (PE.isLibraryFunctionPresent(library, entry)) {
+            return entry;
+        } else if (PE.findSignature(0, PE.getSize(), "'" + entry + "'00") != -1) {
+            return "sign: " + entry;
         }
     }
     return "";
@@ -76,15 +77,21 @@ function validateReferencesStr(isPositive, references) {
     for (var i = 0; i < references.length; i++) {
         var currentReference = references[i],
             sign = "00'" + currentReference + "'00";
-        if (isPositive) {
-            if (!PE.isSignatureInSectionPresent(0, sign)) {
-                return currentReference;
-            }
-        } else { // negative
-            if (PE.isSignatureInSectionPresent(0, sign)) {
-                return currentReference;
+
+        for (var x = 0; x < PE.getNumberOfSections() - 1; x++) {
+            const section = x;
+            if (isPositive) {
+                if (!PE.isSignatureInSectionPresent(section, sign)) {
+                    return currentReference;
+                }
+            } else {
+                // negative
+                if (PE.isSignatureInSectionPresent(section, sign)) {
+                    return currentReference;
+                }
             }
         }
+
     }
     return "";
 }
