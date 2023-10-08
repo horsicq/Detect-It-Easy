@@ -7,13 +7,9 @@
 [![OS Windows](https://img.shields.io/badge/os-windows-brightgreen)](https://github.com/horsicq/DIE-engine/releases)
 [![OS MacOS](https://img.shields.io/badge/os-macos-brightgreen)](https://github.com/horsicq/DIE-engine/releases)
 
-Detect It Easy
-==============
+# Detect It Easy
 
-* Download: https://github.com/horsicq/DIE-engine/releases
-* How to run: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/RUN.md
-* How to build: https://github.com/horsicq/Detect-It-Easy/blob/master/docs/BUILD.md
-* Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
+- Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
 
 You can help with translation: https://github.com/horsicq/XTranslation
 
@@ -52,28 +48,61 @@ in the folder "db". If you open this folder, nested sub-folders will be found
 First, DIE determines the type of file, and then sequentially loads all the signatures,
 which lie in the corresponding folder. Currently the program defines the following types:
 
-* MSDOS executable files MS-DOS
-* PE executable files Windows
-* ELF executable files Linux
-* MACH executable files Mac OS
-* Binary all other files
+- MSDOS executable files MS-DOS
+- PE executable files Windows
+- ELF executable files Linux
+- MACH executable files Mac OS
+- Binary all other files
 
-Packages
-=======
+# Downlods
 
-- Chocolatey(Windows): https://community.chocolatey.org/packages/die (Thanks **chtof**(https://github.com/chtof) and **Rob Reynolds**(https://github.com/ferventcoder))
-- Parrot OS: Package name **detect-it-easy** (Thanks **Nong Hoang Tu**(https://github.com/dmknght))
-- Arch Linux: https://aur.archlinux.org/packages/detect-it-easy-git/ (Thanks **Arnaud Dovi**(https://github.com/class101))
-- REMnux https://remnux.org/ (Thanks **REMnux team**(https://twitter.com/REMnux/status/1401935989266919426))
-- openSUSE https://build.opensuse.org/package/show/home:mnhauke/detect-it-easy (Thanks Martin Hauke)
+Detect-It-Easy can be downloaded from the [release](https://github.com/horsicq/DIE-engine/releases) page.
 
-Telegram Bot
-=======
+### Portable version (Linux)
+
+```bash
+wget https://github.com/horsicq/DIE-engine/releases/download/3.08/Detect_It_Easy-3.08-x86_64.AppImage
+```
+
+# Installing
+
+### Using installation packages
+
+- Windows: [die](https://community.chocolatey.org/packages/die) on Chocolatey (Thanks [**chtof**](https://github.com/chtof) and [**Rob Reynolds**](https://github.com/ferventcoder))
+- Parrot OS: Package name **detect-it-easy** (Thanks [**Nong Hoang Tu**](https://github.com/dmknght))
+- Arch Linux: Aur package [detect-it-easy-git](https://aur.archlinux.org/packages/detect-it-easy-git/) (Thanks [**Arnaud Dovi**](https://github.com/class101))
+- [REMnux](https://remnux.org): (Thanks [**REMnux team**](https://twitter.com/REMnux/status/1401935989266919426))
+- openSUSE: [detect-it-easy](https://build.opensuse.org/package/show/home:mnhauke/detect-it-easy) (Thanks Martin Hauke)
+
+### Build from source
+
+Build instructions can be found in [BUILD.md](docs/BUILD.md).
+
+### Docker install
+
+You can also run DIE with [Docker](https://www.docker.com/community-edition)! Of course, this requires that you have git and Docker installed.
+
+```bash
+git clone --recursive https://github.com/horsicq/Detect-It-Easy
+cd Detect-It-Easy/
+docker build . -t horsicq:diec
+```
+
+# Usage
+
+### detect-it-easy has 3 variants
+
+- `die` GUI version
+- `diec` console version
+- `diel` GUI lite version
+
+Detailed usage instructions can be found in [RUN.md](docs/RUN.md).
+
+# Telegram Bot
 
 You could find the Bot in Telegram @detectiteasy_bot or simply enter in the search for Telegram "Detect It Easy"
 
-Thanks to all the people who already contributed!
-=======
+# Thanks to all the people who already contributed!
 
 <a href="https://github.com/horsicq/Detect-It-Easy/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=horsicq/Detect-It-Easy" />
@@ -84,6 +113,3 @@ Thanks to all the people who already contributed!
 - [PELock Software Protection & Reverse Engineering](https://www.pelock.com)
 
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/logo.png "Mascot")
-
-
-

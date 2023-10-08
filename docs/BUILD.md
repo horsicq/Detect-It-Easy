@@ -1,10 +1,10 @@
 # How to build on Docker
 
-git clone --recursive https://github.com/horsicq/DIE-engine.git
-
+```bash
+git clone https://github.com/horsicq/DIE-engine.git
 cd DIE-engine
-
-docker build .
+docker build . -t horsicq:diec
+```
 
 # How to build on Linux based on Debian
 
@@ -45,12 +45,6 @@ bash -x build_dpkg.sh
 sudo dpkg -i release/$(ls release)
 ```
 
-### Usage
-
-```bash
-die [FileName] or diec [FileName] or diel [FileName]
-```
-
 # How to build on Linux(Automake)
 
 ### Qt framework has to be installed on the system.
@@ -77,12 +71,6 @@ chmod a+x configure
 ./configure
 make -j4
 sudo make install
-```
-
-### Usage
-
-```bash
-die [FileName] or diec [FileName] or diel [FileName]
 ```
 
 # How to build on OSX
@@ -143,4 +131,6 @@ mkdir -p build
 cmake . -B build
 cd build
 make -j4
+# To use it as a command, uncomment the following line:
+# sudo make install -j4
 ```
