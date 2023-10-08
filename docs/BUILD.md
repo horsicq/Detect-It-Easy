@@ -1,10 +1,16 @@
 # How to build on Docker
 
-git clone --recursive https://github.com/horsicq/DIE-engine.git
-
+```bash
+git clone https://github.com/horsicq/DIE-engine.git
 cd DIE-engine
+docker build . -t horsicq:diec
+```
 
-docker build .
+### Usage
+
+```bash
+docker/diec.sh [FileName]
+```
 
 # How to build on Linux based on Debian
 
