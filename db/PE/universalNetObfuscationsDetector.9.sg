@@ -8,36 +8,80 @@ function detect() {
 
     var options = "";
 
+    var isEntryPointModified = false;
     if (isVbNet) {
-        if (!PE.isNETStringPresent("MyApplication")) {
-            options += "Modified classes"; // Only for VB.NET EXE and DLL
+        if (!PE.isNETStringPresent("MyApplication") && // MSIL: '*.My.MyApplication'
+            (!PE.isNETStringPresent("Main") && !PE.isNETStringPresent("main") && !PE.isNETStringPresent("MAIN"))) {
+            isEntryPointModified = true; // Only for VB.NET EXE and DLL
         }
-    } else { // non-VB apps
-        if (!PE.isDll() &&
+    } else {
+        if (!PE.isDll() && // only .exe
             !PE.isNETStringPresent("Main")) {
-            options += "Modified EP";
+            isEntryPointModified = true;
         }
     }
+
+    if (isEntryPointModified) options += "Modified EP";
 
     if (PE.getNumberOfSections() > 3 ||
         PE.getSectionName(0) != ".text" ||
         !PE.isSectionNamePresent(".reloc")) {
-        options += (options != "" ? " + " : "") + "Strange sections";
+
+        if (!(
+                PE.getNumberOfSections() == 4 &&
+                PE.isSectionNamePresent(".reloc") &&
+                PE.isSectionNamePresent(".text") &&
+                PE.isSectionNamePresent(".rsrc") &&
+                (
+                    PE.isSectionNamePresent(".sdata") ||
+                    PE.isSectionNamePresent(".rdata") ||
+                    PE.isSectionNamePresent(".pdata"))
+            )) options += (options != "" ? " + " : "") + "Strange sections";
     }
 
+    // https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.suppressildasmattribute
     if (PE.isNETStringPresent("SuppressIldasmAttribute")) {
         options += (options != "" ? " + " : "") + "Anti ILDASM";
     }
 
-    if (PE.isNETStringPresent("System.Reflection") &&
-        PE.isNETStringPresent("OpCode") &&
-        PE.isNETStringPresent("GetILGenerator")) {
-        options += (options != "" ? " + " : "") + "Virtualization"
+    if (
+        isAllNetReferencesPresent([
+            "System.Reflection", // System.Reflection.dll
+            "GetILGenerator", // MSIL: 'System.Reflection.Emit.DynamicMethod::GetILGenerator()'
+            "BeginInvoke",
+            "EndInvoke",
+            "GetMethod", // MSIL: 'System.Type::GetMethod( ... )"
+            "OpCode" // MSIL: 'System.Reflection.Emit.OpCode'
+        ]) &&
+        validateSignature("'Pointer'") // MSIL: 'System.Reflection.Pointer' // 'System.Type::get_IsPointer()' ... [etc] ...
+    ) {
+        options += (options != "" ? " + " : "") + "Virtualization";
+    }
+
+    if (validateSignature(
+            "FE06????000A" + // MSIL OPCODE: 'ldftn'
+            "29??000011" // MSIL OPCODE: 'calli'
+        )) {
+        options += (options != "" ? " + " : "") + "Calli Invokes";
     }
 
     if (options != "") {
         _setResult("protection", "Obfuscation", "", options);
     }
+}
+
+function validateSignature(sign) {
+    return PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign) != -1;
+}
+
+function isAllNetReferencesPresent(references) {
+    for (var i = 0; i < references.length; i++) {
+        var ref = references[i];
+        if (!PE.isNETStringPresent(ref)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // Every time I start writing bad code I get hit with my head on the keybofewuihdsowefjfqodgsa79dowqhdsioefurogrwhuoguethuhofrwyi
