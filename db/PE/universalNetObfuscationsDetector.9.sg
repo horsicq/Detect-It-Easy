@@ -11,26 +11,31 @@ function detect() {
 
     var isEntryPointModified = false;
     if (!PE.isDll() && validateSignature("00'_CorExeMain'00")) {
-        if (!PE.isNETStringPresent("Main")) {
-            if (isVbNet) {
-                if (!PE.isNETStringPresent("main") &&
-                    !PE.isNETStringPresent("MAIN")) {
-                    isEntryPointModified = true;
-                }
-            } else {
+        if (isVbNet) {
+            if (!PE.isNETStringPresent("Main") &&
+                !PE.isNETStringPresent("main") &&
+                !PE.isNETStringPresent("MAIN")) {
                 isEntryPointModified = true;
             }
+        } else if (!PE.isNETStringPresent("Main")) {
+            isEntryPointModified = true;
         }
     }
 
+
     if (isEntryPointModified) options += "Modified EP";
+
+
+    if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") == -1) {
+        options += (options != "" ? " + " : "") + "Modified DOS";
+    }
 
 
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
 
     var strangeSections = false;
 
-    if (PE.getNumberOfSections() > 6 || PE.getSectionName(0) != ".text") {
+    if (PE.getNumberOfSections() > 6 || !PE.isSectionNamePresent(".text") || !PE.isSectionNamePresent(".reloc")) {
         strangeSections = true;
     } else {
         for (var i = 0; i != PE.getNumberOfSections(); i++) {
@@ -60,7 +65,7 @@ function detect() {
             "GetILGenerator", // MSIL: 'System.Reflection.Emit.DynamicMethod::GetILGenerator()'
             "BeginInvoke",
             "EndInvoke",
-            "GetMethod", // MSIL: 'System.Type::GetMethod( ... )"
+            "GetMethod", // MSIL: 'System.Type::GetMethod( ... )'
             "OpCode" // MSIL: 'System.Reflection.Emit.OpCode'
         ]) &&
         validateSignature("'Pointer'") // MSIL: 'System.Reflection.Pointer' // 'System.Type::get_IsPointer()' ... [etc] ...
@@ -102,10 +107,13 @@ function detect() {
         )) { options += (options != "" ? " + " : "") + "Calli Invokes"; }
 
 
-    // I'll find a use for this later...
-    /* if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") == -1) {
-        options += (options != "" ? " + " : "") + "Custom DOS Stub";
-    } */
+    if (validateSignature("'Obfuscated'") ||
+        validateSignature("'obfuscated'") ||
+        validateSignature("'ByAttribute'") ||
+        validateSignature("'ObfuscatorAttribute'") ||
+        PE.isNETStringPresent("ObfuscationAttribute")) { // System.Reflection.ObfuscationAttribute
+        options += (options != "" ? " + " : "") + "Watermark";
+    }
 
 
     if (options != "") {
