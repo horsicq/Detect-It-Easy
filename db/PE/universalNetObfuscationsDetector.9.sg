@@ -1,48 +1,58 @@
 // DIE's signature file
 // Author: DosX; Telegram: @DosX_Plus
+// This smart analysis will help identify the presence of obfuscation through complex checks
 
 function detect() {
-    if (!PE.isNET()) return null; // only .NET binaries supported
+    if (!PE.isNET()) return null; // Only .NET binaries supported...
 
     const isVbNet = PE.isNETStringPresent("Microsoft.VisualBasic");
 
     var options = "";
 
     var isEntryPointModified = false;
-    if (isVbNet) {
-        if (!PE.isNETStringPresent("MyApplication") && // MSIL: '*.My.MyApplication'
-            (!PE.isNETStringPresent("Main") && !PE.isNETStringPresent("main") && !PE.isNETStringPresent("MAIN"))) {
-            isEntryPointModified = true; // Only for VB.NET EXE and DLL
-        }
-    } else {
-        if (!PE.isDll() && // only .exe
-            !PE.isNETStringPresent("Main")) {
-            isEntryPointModified = true;
+    if (!PE.isDll() && validateSignature("00'_CorExeMain'00")) {
+        if (!PE.isNETStringPresent("Main")) {
+            if (isVbNet) {
+                if (!PE.isNETStringPresent("main") &&
+                    !PE.isNETStringPresent("MAIN")) {
+                    isEntryPointModified = true;
+                }
+            } else {
+                isEntryPointModified = true;
+            }
         }
     }
 
     if (isEntryPointModified) options += "Modified EP";
 
-    if (PE.getNumberOfSections() > 3 ||
-        PE.getSectionName(0) != ".text" ||
-        !PE.isSectionNamePresent(".reloc")) {
 
-        if (!(
-                PE.getNumberOfSections() == 4 &&
-                PE.isSectionNamePresent(".reloc") &&
-                PE.isSectionNamePresent(".text") &&
-                PE.isSectionNamePresent(".rsrc") &&
-                (
-                    PE.isSectionNamePresent(".sdata") ||
-                    PE.isSectionNamePresent(".rdata") ||
-                    PE.isSectionNamePresent(".pdata"))
-            )) options += (options != "" ? " + " : "") + "Strange sections";
+    const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
+
+    var strangeSections = false;
+
+    if (PE.getNumberOfSections() > 6 || PE.getSectionName(0) != ".text") {
+        strangeSections = true;
+    } else {
+        for (var i = 0; i != PE.getNumberOfSections(); i++) {
+            var sectionName = PE.getSectionName(i);
+            if (sectionName[0] != ".") { // Checks if the first char is "."
+                strangeSections = true;
+                break;
+            }
+
+            for (var x = 1; x < sectionName.length; x++) { // Reads all chars after "."
+                for (var d = 0; d < badChars.length; d++) {
+                    if (sectionName[x] == badChars[d]) {
+                        strangeSections = true;
+                        break;
+                    }
+                }
+            }
+        }
     }
 
-    // https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.suppressildasmattribute
-    if (PE.isNETStringPresent("SuppressIldasmAttribute")) {
-        options += (options != "" ? " + " : "") + "Anti ILDASM";
-    }
+    if (strangeSections) options += (options != "" ? " + " : "") + "Strange sections";
+
 
     if (
         isAllNetReferencesPresent([
@@ -54,16 +64,49 @@ function detect() {
             "OpCode" // MSIL: 'System.Reflection.Emit.OpCode'
         ]) &&
         validateSignature("'Pointer'") // MSIL: 'System.Reflection.Pointer' // 'System.Type::get_IsPointer()' ... [etc] ...
-    ) {
-        options += (options != "" ? " + " : "") + "Virtualization";
+    ) { options += (options != "" ? " + " : "") + "Virtualization"; }
+
+
+    // https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.suppressildasmattribute
+    if (PE.isNETStringPresent("SuppressIldasmAttribute")) {
+        options += (options != "" ? " + " : "") + "Anti ILDASM";
     }
 
-    if (validateSignature(
+
+    const debuggerObject = "Debugger", // MSIL: 'System.Diagnostics.Debugger' from System.Diagnostics.dll
+        isAttached = "get_IsAttached", // MSIL: '*.Debugger::get_IsAttached()'
+        isLogging = "IsLogging" // MSIL: '*.Debugger::IsLogging()'
+
+    if (
+        ( // .NET Functions
+            PE.isNETStringPresent(debuggerObject) || PE.isNETUnicodeStringPresent(debuggerObject) // Check for 'Debugger'
+        ) && (
+            (PE.isNETStringPresent(isAttached) || PE.isNETUnicodeStringPresent(isAttached)) || // Check for 'get_IsAttached' property
+            (PE.isNETStringPresent(isLogging) || PE.isNETUnicodeStringPresent(isLogging)) // Check for 'IsLogging' function
+        ) ||
+        ( // Native (WinAPI) functions
+            PE.isNETStringPresent("CheckRemoteDebuggerPresent") || PE.isNETStringPresent("IsDebuggerPresent")
+        )
+    ) { options += (options != "" ? " + " : "") + "Anti Debug"; }
+
+
+    const calliOpCode = "29??000011"; // MSIL OPCODE: 'calli'
+
+    if (validateSignature( // samples by: MindLated
             "FE06????000A" + // MSIL OPCODE: 'ldftn'
-            "29??000011" // MSIL OPCODE: 'calli'
-        )) {
-        options += (options != "" ? " + " : "") + "Calli Invokes";
-    }
+            calliOpCode
+        ) ||
+        validateSignature( // samples by: ArmDot
+            "97" + // MSIL OPCODE: 'ldelem.i'
+            calliOpCode
+        )) { options += (options != "" ? " + " : "") + "Calli Invokes"; }
+
+
+    // I'll find a use for this later...
+    /* if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") == -1) {
+        options += (options != "" ? " + " : "") + "Custom DOS Stub";
+    } */
+
 
     if (options != "") {
         _setResult("protection", "Obfuscation", "", options);
