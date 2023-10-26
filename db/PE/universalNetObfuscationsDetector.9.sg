@@ -22,8 +22,24 @@ function detect() {
         }
     }
 
-
     if (isEntryPointModified) options += "Modified EP";
+
+
+    var isNativeEntryPointModified = false;
+    if (!PE.isDll()) {
+        if (!PE.is64()) {
+            // FF2500????00: jmp dword ptr [ ... ]
+            if (!PE.compareEP("FF 25 ?? ?? ?? 00")) {
+                isNativeEntryPointModified = true;
+            }
+            // } else { // AMD64
+            //     if (!PE.compareEP("4D 5A 90")) {
+            //         isNativeEntryPointModified = true;
+            //     }
+        }
+    }
+
+    if (isNativeEntryPointModified) options += (options != "" ? " + " : "") + "Modified native EP";
 
 
     if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") == -1) {
@@ -35,12 +51,12 @@ function detect() {
 
     var strangeSections = false;
 
-    if (PE.getNumberOfSections() > 6 || !PE.isSectionNamePresent(".text") || !PE.isSectionNamePresent(".reloc")) {
+    if (PE.getNumberOfSections() > 6 || !PE.isSectionNamePresent(".text")) {
         strangeSections = true;
     } else {
         for (var i = 0; i != PE.getNumberOfSections(); i++) {
             var sectionName = PE.getSectionName(i);
-            if (sectionName[0] != ".") { // Checks if the first char is "."
+            if (sectionName[0] != "." && sectionName.length < 4) { // Checks if the first char is "." and length more than 4
                 strangeSections = true;
                 break;
             }
