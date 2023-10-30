@@ -1,3 +1,18 @@
+/*
+  ██╗██╗      ███████╗███╗   ███╗ █████╗ ██████╗ ████████╗      ██╗██╗  
+ ██╔╝╚██╗     ██╔════╝████╗ ████║██╔══██╗██╔══██╗╚══██╔══╝     ██╔╝╚██╗ 
+██╔╝  ╚██╗    ███████╗██╔████╔██║███████║██████╔╝   ██║       ██╔╝  ╚██╗
+╚██╗  ██╔╝    ╚════██║██║╚██╔╝██║██╔══██║██╔══██╗   ██║       ╚██╗  ██╔╝
+ ╚██╗██╔╝     ███████║██║ ╚═╝ ██║██║  ██║██║  ██║   ██║        ╚██╗██╔╝ 
+  ╚═╝╚═╝      ╚══════╝╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝         ╚═╝╚═╝  
+███████╗██╗ ██████╗ ███╗   ██╗ █████╗ ████████╗██╗   ██╗██████╗ ███████╗
+██╔════╝██║██╔════╝ ████╗  ██║██╔══██╗╚══██╔══╝██║   ██║██╔══██╗██╔════╝
+███████╗██║██║  ███╗██╔██╗ ██║███████║   ██║   ██║   ██║██████╔╝█████╗  
+╚════██║██║██║   ██║██║╚██╗██║██╔══██║   ██║   ██║   ██║██╔══██╗██╔══╝  
+███████║██║╚██████╔╝██║ ╚████║██║  ██║   ██║   ╚██████╔╝██║  ██║███████╗
+╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝
+*/
+
 // DIE's signature file
 // Author: DosX; Telegram: @DosX_Plus
 // This smart analysis will help identify the presence of obfuscation through complex checks
@@ -10,7 +25,7 @@ function detect() {
     var options = "";
 
     var isEntryPointModified = false;
-    if (!PE.isDll() && validateSignature("00'_CorExeMain'00")) {
+    if (!PE.isDll() && validateSignature("'_CorExeMain'00")) {
         if (isVbNet) {
             if (!PE.isNETStringPresent("Main") &&
                 !PE.isNETStringPresent("main") &&
@@ -57,7 +72,7 @@ function detect() {
     } else {
         for (var i = 0; i != PE.getNumberOfSections(); i++) {
             var sectionName = PE.getSectionName(i);
-            if (sectionName[0] != "." && sectionName.length < 4) { // Checks if the first char is "." and length more than 4
+            if (sectionName[0] != "." && sectionName.length < 3) { // Checks if the first char is "." and length more than 4
                 strangeSections = true;
                 break;
             }
@@ -82,10 +97,12 @@ function detect() {
             "GetILGenerator", // MSIL: 'System.Reflection.Emit.DynamicMethod::GetILGenerator()'
             "BeginInvoke",
             "EndInvoke",
-            "GetMethod", // MSIL: 'System.Type::GetMethod( ... )'
             "OpCode" // MSIL: 'System.Reflection.Emit.OpCode'
         ]) &&
-        validateSignature("'Pointer'") // MSIL: 'System.Reflection.Pointer' // 'System.Type::get_IsPointer()' ... [etc] ...
+        (
+            validateSignature("'Ldarg_0'") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
+            validateSignature("'CreateDelegate'") // MSIL: 'System.Delegate.CreateDelegate'
+        )
     ) { options += (options != "" ? " + " : "") + "Virtualization"; }
 
 
@@ -112,10 +129,10 @@ function detect() {
     ) { options += (options != "" ? " + " : "") + "Anti Debug"; }
 
 
-    const calliOpCode = "29??000011"; // MSIL OPCODE: 'calli'
+    const calliOpCode = "29 ?? 00 00 11"; // MSIL OPCODE: 'calli'
 
     if (validateSignature( // samples by: MindLated
-            "FE06????000A" + // MSIL OPCODE: 'ldftn'
+            "FE 06 ?? ?? 00 0A" + // MSIL OPCODE: 'ldftn'
             calliOpCode
         ) ||
         validateSignature( // samples by: ArmDot
@@ -144,7 +161,7 @@ function validateSignature(sign) {
 
 function isAllNetReferencesPresent(references) {
     for (var i = 0; i < references.length; i++) {
-        var ref = references[i];
+        const ref = references[i];
         if (!PE.isNETStringPresent(ref)) {
             return false;
         }
