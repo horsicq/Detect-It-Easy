@@ -27,18 +27,28 @@ function detect() {
     var isEntryPointModified = false;
     if (!PE.isDll()) {
         if (isVbNet) {
-            if (!PE.isNETStringPresent("Main") &&
-                !PE.isNETStringPresent("main") &&
-                !PE.isNETStringPresent("MAIN") &&
-                !PE.isNETStringPresent("MyApplication")) {
+            if (isAllNetReferencesMissing(
+                    [
+                        "Main",
+                        "main",
+                        "MAIN",
+                        "MyApplication"
+                    ]
+                )) {
                 isEntryPointModified = true;
             }
-        } else if (!PE.isNETStringPresent("Main")) {
+        } else if (isAllNetReferencesMissing(
+                [
+                    "Main",
+                    "<Main>$" // For programs with top-level operators
+                ]
+            )) {
             isEntryPointModified = true;
         }
     }
 
     if (isEntryPointModified) options += "Modified EP";
+
 
 
     var isNativeEntryPointModified = false;
@@ -58,9 +68,11 @@ function detect() {
     if (isNativeEntryPointModified) options += (options != "" ? " + " : "") + "Modified native EP";
 
 
+
     if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") == -1) {
         options += (options != "" ? " + " : "") + "Modified DOS";
     }
+
 
 
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
@@ -91,6 +103,7 @@ function detect() {
     if (strangeSections) options += (options != "" ? " + " : "") + "Strange sections";
 
 
+
     if (
         isAllNetReferencesPresent([
             "System.Reflection", // System.Reflection.dll
@@ -106,10 +119,20 @@ function detect() {
     ) { options += (options != "" ? " + " : "") + "Virtualization"; }
 
 
+
     // https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.suppressildasmattribute
-    if (PE.isNETStringPresent("SuppressIldasmAttribute")) {
-        options += (options != "" ? " + " : "") + "Anti ILDASM";
-    }
+    if (
+        PE.isNETStringPresent("SuppressIldasmAttribute")
+    ) { options += (options != "" ? " + " : "") + "Anti ILDASM"; }
+
+
+
+    // Anti de4dot via inheritance
+    if (
+        validateSignature("'Form'??????00'Form'??????00'Form'??????00") || // samples by: NetShield
+        PE.isNETStringPresent("Form0") // samples by: MindLated
+    ) { options += (options != "" ? " + " : "") + "Anti de4dot"; }
+
 
 
     const debuggerObject = "Debugger", // MSIL: 'System.Diagnostics.Debugger' from System.Diagnostics.dll
@@ -129,6 +152,7 @@ function detect() {
     ) { options += (options != "" ? " + " : "") + "Anti Debug"; }
 
 
+
     const calliOpCode = "29 ?? 00 00 11"; // MSIL OPCODE: 'calli'
 
     if (validateSignature( // samples by: MindLated
@@ -141,13 +165,34 @@ function detect() {
         )) { options += (options != "" ? " + " : "") + "Calli Invokes"; }
 
 
-    if (validateSignature("'Obfuscated'") ||
-        validateSignature("'obfuscated'") ||
-        validateSignature("'ByAttribute'") ||
-        validateSignature("'ObfuscatorAttribute'") ||
-        PE.isNETStringPresent("ObfuscationAttribute")) { // System.Reflection.ObfuscationAttribute
-        options += (options != "" ? " + " : "") + "Watermark";
+
+    const obfuscatorsAttributes = [
+        "DotfuscatorAttribute",
+        "ObfuscatedByGoliath",
+        "ConfusedByAttribute",
+        "BabelAttribute",
+        "YanoAttribute",
+        "ZYXDNGuarder",
+        "PoweredByAttribute"
+    ]
+    var signaturesCounter = 0;
+    for (var t = 0; t < obfuscatorsAttributes.length; t++) {
+        if (PE.isNETStringPresent(obfuscatorsAttributes[t]))
+            signaturesCounter++;
     }
+    if (signaturesCounter > 1) {
+        options += (options != "" ? " + " : "") + "Fake signatures";
+    } else {
+        // "Watermark" is only possible in the absence of fake signatures
+        if (signaturesCounter == 1 ||
+            validateSignature("'Obfuscated'") ||
+            validateSignature("'obfuscated'") ||
+            validateSignature("'ByAttribute'") ||
+            validateSignature("'ObfuscatorAttribute'") ||
+            PE.isNETStringPresent("ObfuscationAttribute")) // System.Reflection.ObfuscationAttribute
+        { options += (options != "" ? " + " : "") + "Watermark"; }
+    }
+
 
 
     if (options != "") {
@@ -159,6 +204,17 @@ function validateSignature(sign) {
     return PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign) != -1;
 }
 
+function isAllNetReferencesMissing(references) {
+    for (var i = 0; i < references.length; i++) {
+        const ref = references[i];
+        if (PE.isNETStringPresent(ref)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function isAllNetReferencesPresent(references) {
     for (var i = 0; i < references.length; i++) {
         const ref = references[i];
@@ -166,6 +222,7 @@ function isAllNetReferencesPresent(references) {
             return false;
         }
     }
+
     return true;
 }
 
