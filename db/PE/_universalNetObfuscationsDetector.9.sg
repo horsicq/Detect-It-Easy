@@ -180,23 +180,29 @@ function detect() {
 
 
 
-    const intConfusionXorPattern = opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.ldc_i4;
+    // If a mathematical operation on two static numbers is found in a file,
+    // this means obfuscation. The compiler would automatically optimize this
 
-    if (validateSignature(intConfusionXorPattern)) {
-        if (validateSignature( // samples by: Inx Obfuscator
-                intConfusionXorPattern +
-                (opCodes.bne_un_s + opCodes.dc_i4_2 + opCodes.stloc_0 + opCodes.sizeof + opCodes.add)
-            ) ||
-            validateSignature( // samples by: MindLated, NetShield
-                intConfusionXorPattern +
-                (opCodes.bne_un + opCodes.ldc_i4 + opCodes.stloc + opCodes.sizeof + opCodes.add)
-            ) ||
-            validateSignature( // samples by: VavilonProtect
-                intConfusionXorPattern +
-                (opCodes.bne_un + opCodes.ldc_i4_2 + opCodes.stloc_s + opCodes.sizeof + opCodes.add)
-            )
-        ) { options += (options != "" ? " + " : "") + "Int Confusion"; }
+    var isIntConfusionPresent = false;
+
+    const mathOpCodes = [
+        opCodes.add, opCodes.mul,
+        opCodes.div, opCodes.xor,
+        opCodes.shr, opCodes.shl,
+        opCodes.or, opCodes.not,
+        opCodes.and
+    ]
+
+    const ldc_i4__pattern = opCodes.ldc_i4 + opCodes.ldc_i4;
+
+    for (var e = 0; e < mathOpCodes.length; e++) {
+        if (validateSignature(ldc_i4__pattern + mathOpCodes[e])) {
+            isIntConfusionPresent = true;
+            break;
+        }
     }
+
+    if (isIntConfusionPresent) options += (options != "" ? " + " : "") + "Int Confusion";
 
 
 
@@ -342,40 +348,46 @@ function detect() {
 }
 
 function NetOpCodes() {
-    // Calli Invokes opcodes
-    this.calli = "29??000011"; // MSIL: 'calli'
-    this.ldftn = "FE06????????"; // MSIL: 'ldftn'
-    this.idelem_i = "97"; // MSIL: 'idelem.i'
-
-    // Int Confusion opcodes
-    this.ldc_i4 = "20????????"; // MSIL: 'ldc.i4'
-    this.xor = "61"; // MSIL: 'xor'
-    this.bne_un_s = "3309"; // MSIL: 'bne.un.s'
-    this.bne_un = "40????????"; // MSIL: 'bne.un'
-    this.ldc_i4_2 = "18"; // MSIL: 'ldc.i4.2'
-    this.stloc_0 = "0A"; // MSIL: 'stloc.0'
-    this.stloc_s = "1303"; // MSIL: 'stloc.s'
-    this.stloc = "FE0E????"; // MSIL: 'stloc'
     this.add = "58"; // MSIL: 'add'
-    this.sizeof = "FE1C????????"; // MSIL: 'sizeof'
-
-    // Ctrl Flow
-    this.ldloc_0 = "06"; // MSIL: 'ndloc_0'
-    this.nop = "00"; // MSIL: 'nop'
-    this.mul = "5A"; // MSIL: 'mul'
-    this.br_s = "2B??"; // MSIL: 'br.s'
-
-    this.ldsfld = "7E????????"; // MSIL: 'ldsfld'
-    this.brfalse = "39????????"; // MSIL: 'brfalse'
-    this.pop = "26"; // MSIL: 'pop'
+    this.and = "5F"; // MSIL: 'and'
+    this.bne_un = "40????????"; // MSIL: 'bne.un'
+    this.bne_un_s = "3309"; // MSIL: 'bne.un.s'
     this.br = "38????????"; // MSIL: 'br'
-    this.ldloc = "FE??????"; // MSIL: 'ldloc'
-    this.ldc_i4_1 = "1A"; // MSIL: 'ldc.i4.1'
+    this.br_s = "2B??"; // MSIL: 'br.s'
+    this.brfalse = "39????????"; // MSIL: 'brfalse'
     this.call = "28????????"; // MSIL: 'call'
-    this.ret = "2A"; // MSIL: 'ret'
+    this.calli = "29??000011"; // MSIL: 'calli'
     this.ceq = "FE01"; // MSIL: 'ceq'
-    this.stloc_2 = "0C"; // MSIL: 'stloc.2'
+    this.div = "5B"; // MSIL: 'div'
+    this.idelem_i = "97"; // MSIL: 'idelem.i'
+    this.ldc_i4 = "20????????"; // MSIL: 'ldc.i4'
+    this.ldc_i4_1 = "1A"; // MSIL: 'ldc.i4.1'
+    this.ldc_i4_2 = "18"; // MSIL: 'ldc.i4.2'
+    this.ldftn = "FE06????????"; // MSIL: 'ldftn'
+    this.ldloc = "FE??????"; // MSIL: 'ldloc'
+    this.ldloc_0 = "06"; // MSIL: 'ldloc.0'
+    this.ldloc_1 = "07"; // MSIL: 'ldloc.1'
     this.ldloc_2 = "08"; // MSIL: 'ldloc.2'
+    this.ldloc_3 = "09"; // MSIL: 'ldloc.3'
+    this.ldsfld = "7E????????"; // MSIL: 'ldsfld'
+    this.ldstr = "72????????"; // MSIL: 'ldstr'
+    this.mul = "5A"; // MSIL: 'mul'
+    this.nop = "00"; // MSIL: 'nop'
+    this.not = "66"; // MSIL: 'not'
+    this.or = "60"; // MSIL: 'or'
+    this.pop = "26"; // MSIL: 'pop'
+    this.ret = "2A"; // MSIL: 'ret'
+    this.shl = "62"; // MSIL: 'shl'
+    this.shr = "63"; // MSIL: 'shr'
+    this.sizeof = "FE1C????????"; // MSIL: 'sizeof'
+    this.stloc = "FE0E????"; // MSIL: 'stloc'
+    this.stloc_0 = "0A"; // MSIL: 'stloc.0'
+    this.stloc_1 = "0B"; // MSIL: 'stloc.1'
+    this.stloc_2 = "0C"; // MSIL: 'stloc.2'
+    this.stloc_3 = "0D"; // MSIL: 'stloc.3'
+    this.stloc_s = "1303"; // MSIL: 'stloc.s'
+    this.xor = "61"; // MSIL: 'xor'
+
 
     // setStrict sets the strict value of the opcode for substitution
     // btw I like what I do
