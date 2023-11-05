@@ -110,6 +110,32 @@ function detect() {
 
 
 
+    const opCodes = new NetOpCodes();
+
+
+
+
+    const intConfusionXorPattern = opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.ldc_i4;
+
+    if (validateSignature(intConfusionXorPattern)) {
+        if (validateSignature( // samples by: Inx Obfuscator
+                intConfusionXorPattern +
+                (opCodes.bne_un_s + opCodes.dc_i4_2 + opCodes.stloc_0 + opCodes.sizeof + opCodes.add)
+            ) ||
+            validateSignature( // samples by: MindLated, NetShield
+                intConfusionXorPattern +
+                (opCodes.bne_un + opCodes.ldc_i4 + opCodes.stloc + opCodes.sizeof + opCodes.add)
+            ) ||
+            validateSignature( // samples by: VavilonProtect
+                intConfusionXorPattern +
+                (opCodes.bne_un + opCodes.ldc_i4_2 + opCodes.stloc_s + opCodes.sizeof + opCodes.add)
+            )
+        ) { options += (options != "" ? " + " : "") + "Int Confusion"; }
+    }
+
+
+
+
     if (
         isAllNetReferencesPresent(
             references = [
@@ -123,7 +149,7 @@ function detect() {
         (
             validateSignature("'Ldarg_0'") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
             validateSignature("'CreateDelegate'") // MSIL: 'System.Delegate.CreateDelegate'
-        )
+        ) && !isFrameworkComponent()
     ) { options += (options != "" ? " + " : "") + "Virtualization"; }
 
 
@@ -151,67 +177,35 @@ function detect() {
         isLogging = "IsLogging" // MSIL: '*.Debugger::IsLogging()'
 
     if (
-        ( // .NET Functions
-            PE.isNETStringPresent(debuggerObject) || PE.isNETUnicodeStringPresent(debuggerObject) // Check for 'Debugger'
-        ) && (
-            (PE.isNETStringPresent(isAttached) || PE.isNETUnicodeStringPresent(isAttached)) || // Check for 'get_IsAttached' property
-            (PE.isNETStringPresent(isLogging) || PE.isNETUnicodeStringPresent(isLogging)) // Check for 'IsLogging' function
-        ) ||
-        ( // Native (WinAPI) functions
-            PE.isNETStringPresent("CheckRemoteDebuggerPresent") || PE.isNETStringPresent("IsDebuggerPresent")
-        )
+        (( // .NET Functions
+                PE.isNETStringPresent(debuggerObject) || PE.isNETUnicodeStringPresent(debuggerObject) // Check for 'Debugger'
+            ) && (
+                (PE.isNETStringPresent(isAttached) || PE.isNETUnicodeStringPresent(isAttached)) || // Check for 'get_IsAttached' property
+                (PE.isNETStringPresent(isLogging) || PE.isNETUnicodeStringPresent(isLogging)) // Check for 'IsLogging' function
+            ) ||
+            ( // Native (WinAPI) functions
+                PE.isNETStringPresent("CheckRemoteDebuggerPresent") || PE.isNETStringPresent("IsDebuggerPresent")
+            )) && !isFrameworkComponent()
     ) { options += (options != "" ? " + " : "") + "Anti Debug"; }
 
 
 
 
-    const opCodes = new NetOpCodes();
-
-
     if (validateSignature( // samples by: MindLated
             opCodes.setStrict_2b(opCodes.ldftn, "?? ?? 00 0A") +
-            opCodes.calli
+            opCodes.setStrict(opCodes.calli, "?? 00 00 11")
         ) ||
         validateSignature( // samples by: ArmDot, DarksProtector
             opCodes.idelem_i +
-            opCodes.calli
+            opCodes.setStrict(opCodes.calli, "?? 00 00 11")
         )) { options += (options != "" ? " + " : "") + "Calli Invokes"; }
 
 
 
 
-    // If a mathematical operation on two static numbers is found in a file,
-    // this means obfuscation. The compiler would automatically optimize this
-
-    var isIntConfusionPresent = false;
-
-    const mathOpCodes = [
-        opCodes.add, opCodes.mul,
-        opCodes.div, opCodes.xor,
-        opCodes.shr, opCodes.shl,
-        opCodes.or, opCodes.not,
-        opCodes.and
-    ]
-
-    const ldc_i4__pattern = opCodes.ldc_i4 + opCodes.ldc_i4;
-
-    for (var e = 0; e < mathOpCodes.length; e++) {
-        if (validateSignature(ldc_i4__pattern + mathOpCodes[e])) {
-            isIntConfusionPresent = true;
-            break;
-        }
-    }
-
-    if (isIntConfusionPresent) options += (options != "" ? " + " : "") + "Int Confusion";
-
-
-
-
     if (validateSignature( // samples by: ConfuserEx
+            opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s +
             opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s
-        ) ||
-        validateSignature( // samples by: SkiDzEX (ConfuserEx mod)
-            opCodes.ldc_i4 + opCodes.stloc_2 + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldloc_2 + opCodes.xor + opCodes.br_s
         ) ||
         validateSignature( // samples by: .NET Reactor
             opCodes.ldsfld + opCodes.brfalse + opCodes.pop +
@@ -285,6 +279,7 @@ function detect() {
         "NineRays.Obfuscator.Evaluation",
         "ObfuscatedByCliSecureAttribute",
         "BabelObfuscatorAttribute",
+        "AsStrongAsFuckAttribute",
         "Macrobject.Obfuscator",
         "DotfuscatorAttribute",
         "CodeWallTrialVersion",
@@ -319,12 +314,12 @@ function detect() {
         options += (options != "" ? " + " : "") + "Fake signatures";
     } else {
         // "Watermark" is only possible in the absence of fake signatures
-        if (signaturesCounter == 1 ||
-            validateSignature("'Obfuscated'") ||
-            validateSignature("'obfuscated'") ||
-            validateSignature("'ByAttribute'") ||
-            validateSignature("'ObfuscatorAttribute'") ||
-            PE.isNETStringPresent("ObfuscationAttribute")) // System.Reflection.ObfuscationAttribute
+        if ((signaturesCounter == 1 ||
+                validateSignature("'Obfuscated'") ||
+                validateSignature("'obfuscated'") ||
+                validateSignature("'ByAttribute'") ||
+                validateSignature("'ObfuscatorAttribute'") ||
+                PE.isNETStringPresent("ObfuscationAttribute")) && !isFrameworkComponent()) // System.Reflection.ObfuscationAttribute
         { options += (options != "" ? " + " : "") + "Watermark"; }
     }
 
@@ -332,7 +327,14 @@ function detect() {
 
 
     const protectorsLabelsToRemove = [ // Protectors with these names will be removed from results
-        "DNGuard", "Dotfuscator", "Goliath", "Babel .NET", "Yano", "Spices.Net", "Smart Assembly", "Xenocode Postbuild"
+        "Xenocode Postbuild",
+        "Smart Assembly",
+        "Dotfuscator",
+        "Babel .NET",
+        "Spices.Net",
+        "DNGuard",
+        "Goliath",
+        "Yano"
     ];
 
     if (isFakeSignaturesPresent) {
@@ -343,12 +345,28 @@ function detect() {
 
 
     if (options != "") {
-        _setResult("protection", "Obfuscation", "", options);
+        _setResult("protection", "Obfuscation", "", PE.isVerbose() ? options : "");
+    }
+
+    return null; // Coming soon...
+
+    if (PE.isHeuristicScan()) {
+        options = "";
+
+        const highEntropyValue = 7.2;
+
+        // Coming soon...
+
+        if (options != "") {
+            _setResult("protection", "Obfuscation", "Heuristic", options);
+        }
     }
 }
 
 function NetOpCodes() {
     this.add = "58"; // MSIL: 'add'
+    this.sub = "59"; // MSIL: 'sub'
+    this.mul = "5A"; // MSIL: 'mul'
     this.and = "5F"; // MSIL: 'and'
     this.bne_un = "40????????"; // MSIL: 'bne.un'
     this.bne_un_s = "3309"; // MSIL: 'bne.un.s'
@@ -356,7 +374,7 @@ function NetOpCodes() {
     this.br_s = "2B??"; // MSIL: 'br.s'
     this.brfalse = "39????????"; // MSIL: 'brfalse'
     this.call = "28????????"; // MSIL: 'call'
-    this.calli = "29??000011"; // MSIL: 'calli'
+    this.calli = "29????????"; // MSIL: 'calli'
     this.ceq = "FE01"; // MSIL: 'ceq'
     this.div = "5B"; // MSIL: 'div'
     this.idelem_i = "97"; // MSIL: 'idelem.i'
@@ -371,7 +389,6 @@ function NetOpCodes() {
     this.ldloc_3 = "09"; // MSIL: 'ldloc.3'
     this.ldsfld = "7E????????"; // MSIL: 'ldsfld'
     this.ldstr = "72????????"; // MSIL: 'ldstr'
-    this.mul = "5A"; // MSIL: 'mul'
     this.nop = "00"; // MSIL: 'nop'
     this.not = "66"; // MSIL: 'not'
     this.or = "60"; // MSIL: 'or'
@@ -401,11 +418,17 @@ function NetOpCodes() {
     }
 }
 
-
-function validateSignature(sign) {
-    return PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign) != -1;
+function isFrameworkComponent() {
+    return PE.isDll() && PE.compare("........00020200", PE.getOverlayOffset()) && PE.findSignature(PE.getOverlayOffset(), 300, "'Microsoft Corporation'") != -1
 }
 
+function validateSignature(sign) {
+    return validateSignatureRef(sign) != -1;
+}
+
+function validateSignatureRef(sign) {
+    return PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign);
+}
 
 function isAllNetReferencesMissing(references) {
     for (var i = 0; i < references.length; i++) {
