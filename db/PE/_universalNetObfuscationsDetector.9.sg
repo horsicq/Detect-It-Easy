@@ -226,8 +226,52 @@ function detect() {
         validateSignature( // samples by: Rose Obfuscator
             opCodes.setStrict(opCodes.ldc_i4, "00 00 00 00") + // MSIL: 'ldc.i4'
             opCodes.stloc + opCodes.br + opCodes.nop + opCodes.ldloc + opCodes.ldc_i4 + opCodes.ceq + opCodes.brfalse
+        ) ||
+        validateSignature( // samples by: Smart Assembly
+            opCodes.ldc_i4 + opCodes.br + opCodes.ldloc_s + opCodes.ldc_i4_s + opCodes.ldc_i4_0 + opCodes.stelem_i1 + opCodes.ldc_i4 + opCodes.br
         )
-    ) { options += (options != "" ? " + " : "") + "Ctrl Flow" }
+    ) { options += (options != "" ? " + " : "") + "Ctrl Flow"; }
+
+
+
+
+    const mathOpCodes = [
+        opCodes.add, opCodes.mul,
+        opCodes.div, opCodes.xor,
+        opCodes.shr, opCodes.shl,
+        opCodes.or, opCodes.not,
+        opCodes.and
+    ];
+
+    var isMutationsPresent = false;
+
+    for (var e = 0; e < mathOpCodes.length; e++) {
+
+        // TODO: array with patterns
+
+        const prefix = opCodes.ldc_i4 + opCodes.ldc_i4,
+            postfix = opCodes.stloc;
+
+        const pattern = prefix + mathOpCodes[e] + postfix;
+
+        if (validateSignature(pattern)) {
+            isMutationsPresent = true;
+            break;
+        }
+    }
+
+    if (isMutationsPresent) options += (options != "" ? " + " : "") + "Math mutations";
+
+
+
+
+    if (validateSignature(
+            opCodes.ldc_i4 +
+            opCodes.not + opCodes.neg +
+            opCodes.not + opCodes.neg +
+            opCodes.not + opCodes.neg +
+            opCodes.not + opCodes.neg
+        )) { options += (options != "" ? " + " : "") + "Math inversions"; }
 
 
 
@@ -264,7 +308,7 @@ function detect() {
                 ]
             )
         )
-    ) { options += (options != "" ? " + " : "") + "Anti Dump" }
+    ) { options += (options != "" ? " + " : "") + "Anti Dump"; }
 
 
 
@@ -379,18 +423,22 @@ function NetOpCodes() {
     this.div = "5B"; // MSIL: 'div'
     this.idelem_i = "97"; // MSIL: 'idelem.i'
     this.ldc_i4 = "20????????"; // MSIL: 'ldc.i4'
+    this.ldc_i4_0 = "16"; // MSIL: 'ldc.i4.0'
     this.ldc_i4_1 = "1A"; // MSIL: 'ldc.i4.1'
     this.ldc_i4_2 = "18"; // MSIL: 'ldc.i4.2'
+    this.ldc_i4_s = "1F??"; // MSIL: 'ldc.i4.s'
     this.ldftn = "FE06????????"; // MSIL: 'ldftn'
     this.ldloc = "FE??????"; // MSIL: 'ldloc'
     this.ldloc_0 = "06"; // MSIL: 'ldloc.0'
     this.ldloc_1 = "07"; // MSIL: 'ldloc.1'
     this.ldloc_2 = "08"; // MSIL: 'ldloc.2'
     this.ldloc_3 = "09"; // MSIL: 'ldloc.3'
+    this.ldloc_s = "11??"; // MSIL: 'ldloc.s'
     this.ldsfld = "7E????????"; // MSIL: 'ldsfld'
     this.ldstr = "72????????"; // MSIL: 'ldstr'
     this.nop = "00"; // MSIL: 'nop'
     this.not = "66"; // MSIL: 'not'
+    this.neg = "65"; // MSIL: 'neg'
     this.or = "60"; // MSIL: 'or'
     this.pop = "26"; // MSIL: 'pop'
     this.ret = "2A"; // MSIL: 'ret'
@@ -404,6 +452,7 @@ function NetOpCodes() {
     this.stloc_3 = "0D"; // MSIL: 'stloc.3'
     this.stloc_s = "1303"; // MSIL: 'stloc.s'
     this.xor = "61"; // MSIL: 'xor'
+    this.stelem_i1 = "9C"; // MSIL: 'stelem.i1'
 
 
     // setStrict sets the strict value of the opcode for substitution
