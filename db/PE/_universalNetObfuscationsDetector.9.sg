@@ -22,11 +22,22 @@
 function detect() {
     if (!PE.isNET()) return null; // Only .NET binaries supported...
 
+
+    vanillaScan();
+
+    if (PE.isHeuristicScan())
+        heuristicScan();
+
+}
+
+function vanillaScan() {
     const isVbNet = PE.isNETStringPresent("Microsoft.VisualBasic");
 
     var options = "";
 
+
     var isEntryPointModified = false;
+
     if (!PE.isDll()) {
         if (isVbNet) {
             if (isAllNetReferencesMissing(
@@ -55,6 +66,7 @@ function detect() {
 
 
     var isNativeEntryPointModified = false;
+
     if (!PE.isDll()) {
         if (!PE.is64()) {
             // FF2500????00: jmp dword ptr [ ... ]
@@ -130,7 +142,7 @@ function detect() {
                 intConfusionXorPattern +
                 (opCodes.bne_un + opCodes.ldc_i4_2 + opCodes.stloc_s + opCodes.sizeof + opCodes.add)
             )
-        ) { options += (options != "" ? " + " : "") + "Int Confusion"; }
+        ) { options += (options != "" ? " + " : "") + "Int confusion"; }
     }
 
 
@@ -158,7 +170,7 @@ function detect() {
     // https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.suppressildasmattribute
     if (
         PE.isNETStringPresent("SuppressIldasmAttribute")
-    ) { options += (options != "" ? " + " : "") + "Anti ILDASM"; }
+    ) { options += (options != "" ? " + " : "") + "Anti-ILDASM"; }
 
 
 
@@ -167,7 +179,7 @@ function detect() {
     if (
         validateSignature("'Form'??????00'Form'??????00'Form'??????00") || // samples by: NetShield
         PE.isNETStringPresent("Form0") // samples by: MindLated
-    ) { options += (options != "" ? " + " : "") + "Anti de4dot"; }
+    ) { options += (options != "" ? " + " : "") + "Anti-de4dot"; }
 
 
 
@@ -186,7 +198,7 @@ function detect() {
             ( // Native (WinAPI) functions
                 PE.isNETStringPresent("CheckRemoteDebuggerPresent") || PE.isNETStringPresent("IsDebuggerPresent")
             )) && !isFrameworkComponent()
-    ) { options += (options != "" ? " + " : "") + "Anti Debug"; }
+    ) { options += (options != "" ? " + " : "") + "Anti-debug"; }
 
 
 
@@ -218,13 +230,13 @@ function detect() {
             opCodes.ldc_i4 + opCodes.br
         ) ||
         validateSignature( // samples by: MindLated, NetShield
-            opCodes.setStrict(opCodes.ldc_i4, "00 00 00 00") + // MSIL: 'ldc.i4 0'
+            opCodes.setNullValue(opCodes.ldc_i4) + // MSIL: 'ldc.i4 0'
             opCodes.stloc + opCodes.br + opCodes.nop + opCodes.ldloc +
             opCodes.setStrict(opCodes.ldc_i4, "01 00 00 00") + // MSIL: 'ldc.i4 1'
             opCodes.ceq + opCodes.brfalse
         ) ||
         validateSignature( // samples by: Rose Obfuscator
-            opCodes.setStrict(opCodes.ldc_i4, "00 00 00 00") + // MSIL: 'ldc.i4'
+            opCodes.setNullValue(opCodes.ldc_i4) + // MSIL: 'ldc.i4'
             opCodes.stloc + opCodes.br + opCodes.nop + opCodes.ldloc + opCodes.ldc_i4 + opCodes.ceq + opCodes.brfalse
         ) ||
         validateSignature( // samples by: Smart Assembly
@@ -245,12 +257,14 @@ function detect() {
 
     var isMutationsPresent = false;
 
+    const prefix = opCodes.ldc_i4 + opCodes.ldc_i4,
+        postfix = opCodes.stloc;
+
     for (var e = 0; e < mathOpCodes.length; e++) {
 
-        // TODO: array with patterns
+        if (!validateSignature(prefix + "??" + postfix)) break;
 
-        const prefix = opCodes.ldc_i4 + opCodes.ldc_i4,
-            postfix = opCodes.stloc;
+        // TODO: array with patterns
 
         const pattern = prefix + mathOpCodes[e] + postfix;
 
@@ -323,7 +337,61 @@ function detect() {
                 ]
             )
         )
-    ) { options += (options != "" ? " + " : "") + "Anti Dump"; }
+    ) { options += (options != "" ? " + " : "") + "Anti-dump"; }
+
+
+
+
+    const antiDnSpyTriggers = [
+        "dnspy",
+        "dnSpy",
+        "DNSPY"
+    ];
+
+    var isAntiDnSpyPresent = false;
+
+    for (var l = 0; l < antiDnSpyTriggers.length; l++) {
+
+        const dnSpyName = antiDnSpyTriggers[l];
+
+        if (
+            validateSignature(generateUnicodeSignatureMask(dnSpyName)) ||
+            validateSignature("'" + dnSpyName + "'")
+        ) {
+            isAntiDnSpyPresent = true;
+            break;
+        }
+    }
+
+    if (isAntiDnSpyPresent) options += (options != "" ? " + " : "") + "Anti-dnSpy";
+
+
+
+
+    const sbieVariants = [
+        "sbiedll.",
+        "SbieDll.",
+        "SBIEDLL."
+    ];
+
+    var isAntiSbiePresent = false;
+
+    if (validateSignature("'GetModuleHandle'")) { // from 'kernel32.dll') {
+        for (var l = 0; l < sbieVariants.length; l++) {
+
+            const sbieLib = sbieVariants[l];
+
+            if (
+                validateSignature(generateUnicodeSignatureMask(sbieLib)) ||
+                validateSignature("'" + sbieLib + "'")
+            ) {
+                isAntiSbiePresent = true;
+                break;
+            }
+        }
+    }
+
+    if (isAntiSbiePresent) options += (options != "" ? " + " : "") + "Anti-SandBoxie";
 
 
 
@@ -403,22 +471,45 @@ function detect() {
     }
 
 
+
     if (options != "") {
         _setResult("protection", "Obfuscation", "", PE.isVerbose() ? options : "");
     }
+}
 
-    return null; // Coming soon...
+function heuristicScan() {
+    var options = "";
 
-    if (PE.isHeuristicScan()) {
-        options = "";
 
-        const highEntropyValue = 7.2;
+    // Many not-so-smart virus writers use base64 to pack
+    // or hide malicious code, but do not realize that this
+    // is very easily detected by heuristic analysis.
 
-        // Coming soon...
+    const signaturesVariants = [
+        "TVoAAAAAA", // MZ ~[00 00 00 00 00]
+        "TVqQAA" // MZ ~[90 00 03]
+    ];
 
-        if (options != "") {
-            _setResult("protection", "Obfuscation", "Heuristic", options);
+    var isPackedPeDetected = false;
+
+    for (var s = 0; s < signaturesVariants.length; s++) {
+
+        const trigger = signaturesVariants[s];
+
+        if (
+            validateSignature(generateUnicodeSignatureMask(trigger) + "00") || validateSignature("'" + trigger + "'")
+        ) {
+            isPackedPeDetected = true;
+            break;
         }
+    }
+
+    if (isPackedPeDetected) options = "Packed PE (base64)";
+
+
+
+    if (options != "") {
+        _setResult("protection", "Obfuscation", "Heuristic", PE.isVerbose() ? options : "");
     }
 }
 
@@ -472,27 +563,43 @@ function NetOpCodes() {
 
     // setStrict sets the strict value of the opcode for substitution
     // btw I like what I do
-    this.setStrict = function(opCodeHex, value) {
-        return opCodeHex.substr(0x00, 0x02) + value;
+    this.setStrict = function(opCodeMask, value) {
+        return opCodeMask.substr(0x00, 0x02) + value;
     }
 
     // setStrict for opcodes that weigh 2 bytes
-    this.setStrict_2b = function(opCodeHex, value) {
-        return opCodeHex.substr(0x00, 0x04) + value;
+    this.setStrict_2b = function(opCodeMask, value) {
+        return opCodeMask.substr(0x00, 0x04) + value;
+    }
+
+    // Sets the mask value to zero for the specified opcode
+    this.setNullValue = function(opCodeMask) {
+        return opCodeMask.replace("??", "00");
     }
 }
 
+
 function isFrameworkComponent() {
-    return PE.isDll() && PE.compare("........00020200", PE.getOverlayOffset()) && PE.findSignature(PE.getOverlayOffset(), 300, "'Microsoft Corporation'") != -1
+    return PE.isDll() && PE.isSigned() && PE.findSignature(PE.getOverlayOffset(), 300, "'Microsoft Corporation'") != -1
 }
+
 
 function validateSignature(sign) {
-    return validateSignatureRef(sign) != -1;
+    return PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign) != -1;
 }
 
-function validateSignatureRef(sign) {
-    return PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign);
+
+// "test" -> "'t'00'e'00's'00't'"
+function generateUnicodeSignatureMask(inputString) {
+    var output = "";
+
+    for (var c = 0; c < inputString.length; c++) {
+        output += (c != 0 ? "00" : "") + "'" + inputString[c] + "'";
+    }
+
+    return output;
 }
+
 
 function isAllNetReferencesMissing(references) {
     for (var i = 0; i < references.length; i++) {
