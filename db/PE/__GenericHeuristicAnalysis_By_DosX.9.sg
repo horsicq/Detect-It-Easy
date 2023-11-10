@@ -1,0 +1,914 @@
+/*
+             ██████╗ ███████╗███╗   ██╗███████╗██████╗ ██╗ ██████╗
+            ██╔════╝ ██╔════╝████╗  ██║██╔════╝██╔══██╗██║██╔════╝
+            ██║  ███╗█████╗  ██╔██╗ ██║█████╗  ██████╔╝██║██║     
+            ██║   ██║██╔══╝  ██║╚██╗██║██╔══╝  ██╔══██╗██║██║     
+            ╚██████╔╝███████╗██║ ╚████║███████╗██║  ██║██║╚██████╗
+             ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝╚═╝ ╚═════╝
+  ██╗    ██╗  ██╗███████╗██╗   ██╗██████╗ ██╗███████╗████████╗██╗ ██████╗    ██╗  
+ ██╔╝    ██║  ██║██╔════╝██║   ██║██╔══██╗██║██╔════╝╚══██╔══╝██║██╔════╝    ╚██╗ 
+██╔╝     ███████║█████╗  ██║   ██║██████╔╝██║███████╗   ██║   ██║██║          ╚██╗
+╚██╗     ██╔══██║██╔══╝  ██║   ██║██╔══██╗██║╚════██║   ██║   ██║██║          ██╔╝
+ ╚██╗    ██║  ██║███████╗╚██████╔╝██║  ██║██║███████║   ██║   ██║╚██████╗    ██╔╝ 
+  ╚═╝    ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝    ╚═╝  
+           █████╗ ███╗   ██╗ █████╗ ██╗  ██╗   ██╗███████╗██╗███████╗
+          ██╔══██╗████╗  ██║██╔══██╗██║  ╚██╗ ██╔╝██╔════╝██║██╔════╝
+          ███████║██╔██╗ ██║███████║██║   ╚████╔╝ ███████╗██║███████╗
+          ██╔══██║██║╚██╗██║██╔══██║██║    ╚██╔╝  ╚════██║██║╚════██║
+          ██║  ██║██║ ╚████║██║  ██║███████╗██║   ███████║██║███████║
+          ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝╚═╝   ╚══════╝╚═╝╚══════╝
+ */
+
+// DIE's signature file
+// Author: DosX; Telegram: @DosX_Plus
+// This smart analysis will help identify the presence of obfuscation or packer tricks through complex checks
+
+// Please do not read the code out loud unless you have exorcism skills
+
+function detect() {
+    stubForLegacyEngines();
+
+    if (PE.isHeuristicScan()) {
+        if (PE.isNET()) {
+            scanForObfuscations_NET();
+            scanForAntiAnalysis_NET();
+        } else {
+            scanForObfuscations_Native();
+        }
+
+        scanForPackersAndCryptors_NET_and_Native();
+    }
+}
+
+function stubForLegacyEngines() {
+    if (typeof PE.isNetObjectPresent === 'undefined') {
+        _setResult("DIE-Message", ">>> Update DIE Engine to 3.09 and higher for using Heuristic-analyser by DosX <<<", "", "");
+        return null;
+    }
+}
+
+function scanForObfuscations_NET() {
+    var options = "";
+
+
+    const isVbNet = isVbNetStandartLibraryPresent();
+
+
+    var isEntryPointModified = false;
+
+    if (!PE.isDll()) {
+        if (isVbNet) {
+            if (isAllNetReferencesMissing(
+                    [
+                        "Main",
+                        "main",
+                        "MAIN",
+                        "MyApplication"
+                    ]
+                )) {
+                isEntryPointModified = true;
+            }
+        } else if (isAllNetReferencesMissing(
+                [
+                    "Main",
+                    "<Main>$" // For programs with top-level operators
+                ]
+            )) {
+            isEntryPointModified = true;
+        }
+    }
+
+    if (isEntryPointModified) options += "Modified EP";
+
+
+
+
+    var isNativeEntryPointModified = false;
+
+    if (!PE.isDll()) {
+        if (!PE.is64()) {
+            // FF2500????00: jmp dword ptr [ ... ]
+            if (!PE.compareEP("FF 25 ?? ?? ?? 00")) {
+                isNativeEntryPointModified = true;
+            }
+        } else { // AMD64
+            if (PE.VAToOffset(PE.getAddressOfEntryPoint()) != 0x00) {
+                isNativeEntryPointModified = true;
+            }
+        }
+    }
+
+    if (isNativeEntryPointModified) options += (options != "" ? " + " : "") + "Modified native EP";
+
+
+
+
+    var isDosMessageModified = false;
+
+    if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") == -1) {
+        isDosMessageModified = true;
+    }
+
+    if (isDosMessageModified) options += (options != "" ? " + " : "") + "Modified DOS";
+
+
+
+
+    var strangeSections = false;
+
+    const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
+
+    if (PE.getNumberOfSections() > 6 || !PE.isSectionNamePresent(".text")) {
+        strangeSections = true;
+    } else {
+        for (var i = 0; i != PE.getNumberOfSections(); i++) {
+            var sectionName = PE.getSectionName(i);
+            if (sectionName[0] != "." && sectionName.length < 3) { // Checks if the first char is "." and length more than 4
+                strangeSections = true;
+                break;
+            }
+
+            for (var x = 1; x < sectionName.length; x++) { // Reads all chars after "."
+                for (var d = 0; d < badChars.length; d++) {
+                    if (sectionName[x] == badChars[d]) {
+                        strangeSections = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (strangeSections) options += (options != "" ? " + " : "") + "Strange sections";
+
+
+
+
+    const opCodes = new NetOpCodes();
+
+
+
+
+    var isIntConfusionPresent = false;
+
+    const intConfusionXorPattern = opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.ldc_i4;
+
+    if (validateSignature(intConfusionXorPattern)) {
+        if (validateSignature( // samples by: Inx Obfuscator
+                intConfusionXorPattern +
+                (opCodes.bne_un_s + opCodes.dc_i4_2 + opCodes.stloc_0 + opCodes.sizeof + opCodes.add)
+            ) ||
+            validateSignature( // samples by: MindLated, NetShield
+                intConfusionXorPattern +
+                (opCodes.bne_un + opCodes.ldc_i4 + opCodes.stloc + opCodes.sizeof + opCodes.add)
+            ) ||
+            validateSignature( // samples by: VavilonProtect
+                intConfusionXorPattern +
+                (opCodes.bne_un + opCodes.ldc_i4_2 + opCodes.stloc_s + opCodes.sizeof + opCodes.add)
+            )
+        ) {
+            isIntConfusionPresent = true;
+        }
+    }
+
+    if (isIntConfusionPresent) options += (options != "" ? " + " : "") + "Int confusion";
+
+
+
+
+    var isVirtualizationPresent = false;
+
+    if (
+        isAllNetReferencesPresent(
+            references = [
+                "System.Reflection", // System.Reflection.dll
+                "GetILGenerator", // MSIL: 'System.Reflection.Emit.DynamicMethod::GetILGenerator()'
+                "BeginInvoke",
+                "EndInvoke",
+                "OpCode" // MSIL: 'System.Reflection.Emit.OpCode'
+            ]
+        ) &&
+        (
+            validateSignature("'Ldarg_0'") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
+            validateSignature("'CreateDelegate'") // MSIL: 'System.Delegate.CreateDelegate'
+        ) && !isFrameworkComponent()
+    ) {
+        isVirtualizationPresent = true;
+    }
+
+    if (isVirtualizationPresent) options += (options != "" ? " + " : "") + "Virtualization";
+
+
+
+
+    // https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.suppressildasmattribute
+    var isAntiIldasmPresent = false;
+
+    if (PE.isNetObjectPresent("SuppressIldasmAttribute")) {
+        isAntiIldasmPresent = true;
+    }
+
+    if (isAntiIldasmPresent) options += (options != "" ? " + " : "") + "Anti-ILDASM";
+
+
+
+
+    // Anti de4dot via inheritance
+    var isAntiDe4dotPresent = false;
+
+    if (
+        validateSignature("'Form'??????00'Form'??????00'Form'??????00") || // samples by: NetShield
+        PE.isNetObjectPresent("Form0") // samples by: MindLated
+    ) {
+        isAntiDe4dotPresent = true;
+    }
+
+    if (isAntiDe4dotPresent) options += (options != "" ? " + " : "") + "Anti-de4dot";
+
+
+
+
+    var isCalliInvokesPresent = false;
+
+    if (validateSignature( // samples by: MindLated
+            opCodes.setStrict_2b(opCodes.ldftn, "?? ?? 00 0A") +
+            opCodes.setStrict(opCodes.calli, "?? 00 00 11")
+        ) ||
+        validateSignature( // samples by: ArmDot, DarksProtector
+            opCodes.idelem_i +
+            opCodes.setStrict(opCodes.calli, "?? 00 00 11")
+        )) {
+        isCalliInvokesPresent = true;
+    }
+
+    if (isCalliInvokesPresent) options += (options != "" ? " + " : "") + "Calli Invokes";
+
+
+
+
+    var isCtrlFlowPresent = false;
+
+    if (validateSignature( // samples by: ConfuserEx
+            opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s +
+            opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s
+        ) ||
+        validateSignature( // samples by: .NET Reactor
+            opCodes.ldsfld + opCodes.brfalse + opCodes.pop +
+            opCodes.setStrict(opCodes.ldc_i4, "01 00 00 00") + // MSIL: 'ldc.4 1'
+            opCodes.br + opCodes.nop
+        ) ||
+        validateSignature( // samples by: .NET Reactor (legacy~~)
+            opCodes.stloc + opCodes.ldloc +
+            "45 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00" + // OPCODE: 'switch ...'
+            opCodes.ldc_i4 + opCodes.br
+        ) ||
+        validateSignature( // samples by: MindLated, NetShield
+            opCodes.setNullValue(opCodes.ldc_i4) + // MSIL: 'ldc.i4 0'
+            opCodes.stloc + opCodes.br + opCodes.nop + opCodes.ldloc +
+            opCodes.setStrict(opCodes.ldc_i4, "01 00 00 00") + // MSIL: 'ldc.i4 1'
+            opCodes.ceq + opCodes.brfalse
+        ) ||
+        validateSignature( // samples by: Rose Obfuscator
+            opCodes.setNullValue(opCodes.ldc_i4) + // MSIL: 'ldc.i4'
+            opCodes.stloc + opCodes.br + opCodes.nop + opCodes.ldloc + opCodes.ldc_i4 + opCodes.ceq + opCodes.brfalse
+        ) ||
+        validateSignature( // samples by: Smart Assembly
+            opCodes.ldc_i4 + opCodes.br + opCodes.ldloc_s + opCodes.ldc_i4_s + opCodes.ldc_i4_0 + opCodes.stelem_i1 + opCodes.ldc_i4 + opCodes.br
+        )
+    ) {
+        isCtrlFlowPresent = true;
+    }
+
+    if (isCtrlFlowPresent) options += (options != "" ? " + " : "") + "Ctrl Flow";
+
+
+
+
+    const mathOpCodes = [
+        opCodes.add, opCodes.mul,
+        opCodes.div, opCodes.xor,
+        opCodes.shr, opCodes.shl,
+        opCodes.or, opCodes.not,
+        opCodes.and
+    ];
+
+    var isMutationsPresent = false;
+
+    const prefix = opCodes.ldc_i4 + opCodes.ldc_i4,
+        postfix = opCodes.stloc;
+
+    for (var e = 0; e < mathOpCodes.length; e++) {
+
+        if (!validateSignature(prefix + "??" + postfix)) break;
+
+        // TODO: array with patterns
+
+        const pattern = prefix + mathOpCodes[e] + postfix;
+
+        if (validateSignature(pattern)) {
+            isMutationsPresent = true;
+            break;
+        }
+    }
+
+    if (isMutationsPresent) options += (options != "" ? " + " : "") + "Math mutations";
+
+
+
+
+    var isMathInversionsPresent = false;
+
+    if (validateSignature(opCodes.ldc_i4 + opCodes.not) && (
+            validateSignature( // ~(-(~(-(~(-(~(-( num ))))))))
+                opCodes.ldc_i4 +
+                opCodes.not + opCodes.neg + opCodes.not + opCodes.neg +
+                opCodes.not + opCodes.neg + opCodes.not + opCodes.neg
+            ) ||
+            validateSignature( // ~(~(-(-(~(~( num ))))))
+                opCodes.ldc_i4 +
+                opCodes.not + opCodes.not + opCodes.neg + opCodes.neg +
+                opCodes.not + opCodes.not
+            ) ||
+            validateSignature( // ~(-(~(~(-(-( num ))))))
+                opCodes.ldc_i4 +
+                opCodes.not + opCodes.neg + opCodes.not + opCodes.not +
+                opCodes.neg + opCodes.neg
+            ) ||
+            validateSignature( // ~(-(~(-(~(~( num ))))))
+                opCodes.ldc_i4 +
+                opCodes.not + opCodes.neg + opCodes.not + opCodes.neg +
+                opCodes.not + opCodes.not
+            )
+        )) {
+        isMathInversionsPresent = true;
+    }
+
+    if (isMathInversionsPresent) options += (options != "" ? " + " : "") + "Math inversions";
+
+
+
+
+    const obfuscatorsAttributes = [
+        "Xenocode.Client.Attributes.AssemblyAttributes.ProcessedByXenocode",
+        "CryptoObfuscator.ProtectedWithCryptoObfuscatorAttribute",
+        "SecureTeam.Attributes.ObfuscatedByAgileDotNetAttribute",
+        "Xenocode.Client.Attributes.AssemblyAttributes",
+        "SmartAssembly.Attributes.PoweredByAttribute",
+        "ObfuscatedByAgileDotNetAttribute",
+        "NineRays.Obfuscator.Evaluation",
+        "ObfuscatedByCliSecureAttribute",
+        "BabelObfuscatorAttribute",
+        "AsStrongAsFuckAttribute",
+        "Macrobject.Obfuscator",
+        "DotfuscatorAttribute",
+        "CodeWallTrialVersion",
+        "ConfusedByAttribute",
+        "ObfuscatedByGoliath",
+        "NETSpider.Attribute",
+        "NineRays.Obfuscator",
+        "PoweredByAttribute", // Smart Assembly
+        "BabelAttribute",
+        "YanoAttribute",
+        "EMyPID_8234_",
+        "ZYXDNGuarder",
+        "Sixxpack",
+        "____KILL", // CodeVeil
+        "Reactor",
+    ];
+
+    var isFakeSignaturesPresent = false;
+
+    var isWatermarkPresent = false;
+
+    var signaturesCounter = 0;
+    for (var t = 0; t < obfuscatorsAttributes.length; t++) {
+        if (PE.isNetObjectPresent(obfuscatorsAttributes[t]))
+            signaturesCounter++;
+
+        if (signaturesCounter > 1) {
+            isFakeSignaturesPresent = true;
+            break;
+        }
+    }
+
+    if (isFakeSignaturesPresent) {
+        options += (options != "" ? " + " : "") + "Fake signatures";
+    } else {
+        // "Watermark" is only possible in the absence of fake signatures
+        if ((signaturesCounter == 1 ||
+                validateSignature("'Obfuscated'") ||
+                validateSignature("'obfuscated'") ||
+                validateSignature("'ByAttribute'") ||
+                validateSignature("'ObfuscatorAttribute'") ||
+                PE.isNetObjectPresent("ObfuscationAttribute")) && !isFrameworkComponent()) // System.Reflection.ObfuscationAttribute
+        {
+            isWatermarkPresent = true;
+        }
+    }
+
+    if (isWatermarkPresent) options += (options != "" ? " + " : "") + "Watermark";
+
+
+
+
+    const protectorsLabelsToRemove = [ // Protectors with these names will be removed from results
+        "Xenocode Postbuild",
+        "Smart Assembly",
+        "Dotfuscator",
+        "Babel .NET",
+        "Spices.Net",
+        "DNGuard",
+        "Goliath",
+        "Yano"
+    ];
+
+    if (isFakeSignaturesPresent) {
+        for (var d = 0; d < protectorsLabelsToRemove.length; d++) {
+            _removeResult("protector", protectorsLabelsToRemove[d]);
+        }
+    }
+
+
+    if (options != "") isDetected = true;
+
+
+    if (isDetected) {
+        _setResult("protection", "Obfuscation", "Heuristic", PE.isVerbose() ? options : "");
+    }
+}
+
+
+
+function scanForAntiAnalysis_NET() {
+    var options = "";
+
+
+    var isAntiDebugPresent = false;
+
+    const debuggerObject = "Debugger", // MSIL: 'System.Diagnostics.Debugger' from System.Diagnostics.dll
+        isAttached = "get_IsAttached", // MSIL: '*.Debugger::get_IsAttached()'
+        isLogging = "IsLogging" // MSIL: '*.Debugger::IsLogging()'
+
+    if (
+        (( // .NET Functions
+                PE.isNetObjectPresent(debuggerObject) || PE.isNETUnicodeStringPresent(debuggerObject) // Check for 'Debugger'
+            ) && (
+                (PE.isNetObjectPresent(isAttached) || PE.isNETUnicodeStringPresent(isAttached)) || // Check for 'get_IsAttached' property
+                (PE.isNetObjectPresent(isLogging) || PE.isNETUnicodeStringPresent(isLogging)) // Check for 'IsLogging' function
+            ) ||
+            ( // Native (WinAPI) functions
+                PE.isNetObjectPresent("CheckRemoteDebuggerPresent") || PE.isNetObjectPresent("IsDebuggerPresent")
+            )) && !isFrameworkComponent()
+    ) {
+        isAntiDebugPresent = true;
+    }
+
+    if (isAntiDebugPresent) options += (options != "" ? " + " : "") + "Anti-debug";
+
+
+
+
+    var isAntiDumpPresent = false;
+
+    if (
+        PE.isNetObjectPresent("VirtualProtect") && ( // from 'kernel32.dll', WinAPI
+            // Need to check
+            isAllNetReferencesPresent( // samples by: ConfuserEx, SkiDzEX
+                references = [
+                    "System.Runtime.InteropServices", // System.Runtime.InteropServices.dll
+                    "Marshal", // MSIL: '*.Marshal::GetHINSTANCE( ... )'
+                    "GetHINSTANCE", // MSIL: '*.Marshal::GetHINSTANCE( ... )'
+                    "IntPtr", // MSIL: 'System.IntPtr'
+                    "op_Explicit" // MSIL: 'System.IntPtr::op_Explicit'
+                ]
+            ) ||
+            isAllNetReferencesPresent( // samples by: Inx Obfuscator
+                references = [
+                    "System.Diagnostics", // System.Diagnostics
+                    "memcpy", // from 'msvcrt.dll', WinAPI
+                    "IntPtr", // MSIL: 'System.IntPtr'
+                    "get_MainModule", // MSIL: '*.Process::get_MainModule()'
+                    "get_BaseAddress" // MSIL: '*.ProcessModule::get_BaseAddress()'
+                ]
+            ) ||
+            isAllNetReferencesPresent( // samples by: MindLated
+                references = [
+                    "System.Runtime.InteropServices", // System.Runtime.InteropServices.dll
+                    "Marshal", // MSIL: '*.Marshal::GetHINSTANCE( ... )'
+                    "GetHINSTANCE", // MSIL: '*.Marshal::GetHINSTANCE( ... )'
+                    "IntPtr", // MSIL: 'System.IntPtr'
+                    "CopyBlock",
+                    "InitBlock"
+                ]
+            )
+        )
+    ) {
+        isAntiDumpPresent = true
+    }
+
+    if (isAntiDumpPresent) options += (options != "" ? " + " : "") + "Anti-dump";
+
+
+
+
+    const antiDnSpyTriggers = [
+        "dnspy",
+        "dnSpy",
+        "DNSPY"
+    ];
+
+    var isAntiDnSpyPresent = false;
+
+    for (var l = 0; l < antiDnSpyTriggers.length; l++) {
+
+        const dnSpyName = antiDnSpyTriggers[l];
+
+        if (
+            validateSignature(generateUnicodeSignatureMask(dnSpyName)) ||
+            validateSignature("'" + dnSpyName + "'")
+        ) {
+            isAntiDnSpyPresent = true;
+            break;
+        }
+    }
+
+    if (isAntiDnSpyPresent) options += (options != "" ? " + " : "") + "Anti-dnSpy";
+
+
+
+
+    const sbieVariants = [
+        "sbiedll.",
+        "SbieDll.",
+        "SBIEDLL."
+    ];
+
+    var isAntiSbiePresent = false;
+
+    if (validateSignature("'GetModuleHandle'")) { // from 'kernel32.dll') {
+        for (var l = 0; l < sbieVariants.length; l++) {
+
+            const sbieLib = sbieVariants[l];
+
+            if (
+                validateSignature(generateUnicodeSignatureMask(sbieLib)) ||
+                validateSignature("'" + sbieLib + "'")
+            ) {
+                isAntiSbiePresent = true;
+                break;
+            }
+        }
+    }
+
+    if (isAntiSbiePresent) options += (options != "" ? " + " : "") + "Anti-SandBoxie";
+
+
+
+
+    if (options != "") {
+        _setResult("protection", "Anti analysis", "Heuristic", PE.isVerbose() ? options : "");
+    }
+}
+
+
+
+function NetOpCodes() {
+    this.add = "58"; // MSIL: 'add'
+    this.sub = "59"; // MSIL: 'sub'
+    this.mul = "5A"; // MSIL: 'mul'
+    this.and = "5F"; // MSIL: 'and'
+    this.bne_un = "40????????"; // MSIL: 'bne.un'
+    this.bne_un_s = "3309"; // MSIL: 'bne.un.s'
+    this.br = "38????????"; // MSIL: 'br'
+    this.br_s = "2B??"; // MSIL: 'br.s'
+    this.brfalse = "39????????"; // MSIL: 'brfalse'
+    this.call = "28????????"; // MSIL: 'call'
+    this.calli = "29????????"; // MSIL: 'calli'
+    this.ceq = "FE01"; // MSIL: 'ceq'
+    this.div = "5B"; // MSIL: 'div'
+    this.idelem_i = "97"; // MSIL: 'idelem.i'
+    this.ldc_i4 = "20????????"; // MSIL: 'ldc.i4'
+    this.ldc_i4_0 = "16"; // MSIL: 'ldc.i4.0'
+    this.ldc_i4_1 = "1A"; // MSIL: 'ldc.i4.1'
+    this.ldc_i4_2 = "18"; // MSIL: 'ldc.i4.2'
+    this.ldc_i4_s = "1F??"; // MSIL: 'ldc.i4.s'
+    this.ldftn = "FE06????????"; // MSIL: 'ldftn'
+    this.ldloc = "FE??????"; // MSIL: 'ldloc'
+    this.ldloc_0 = "06"; // MSIL: 'ldloc.0'
+    this.ldloc_1 = "07"; // MSIL: 'ldloc.1'
+    this.ldloc_2 = "08"; // MSIL: 'ldloc.2'
+    this.ldloc_3 = "09"; // MSIL: 'ldloc.3'
+    this.ldloc_s = "11??"; // MSIL: 'ldloc.s'
+    this.ldsfld = "7E????????"; // MSIL: 'ldsfld'
+    this.ldstr = "72????????"; // MSIL: 'ldstr'
+    this.nop = "00"; // MSIL: 'nop'
+    this.not = "66"; // MSIL: 'not'
+    this.neg = "65"; // MSIL: 'neg'
+    this.or = "60"; // MSIL: 'or'
+    this.pop = "26"; // MSIL: 'pop'
+    this.ret = "2A"; // MSIL: 'ret'
+    this.shl = "62"; // MSIL: 'shl'
+    this.shr = "63"; // MSIL: 'shr'
+    this.sizeof = "FE1C????????"; // MSIL: 'sizeof'
+    this.stloc = "FE0E????"; // MSIL: 'stloc'
+    this.stloc_0 = "0A"; // MSIL: 'stloc.0'
+    this.stloc_1 = "0B"; // MSIL: 'stloc.1'
+    this.stloc_2 = "0C"; // MSIL: 'stloc.2'
+    this.stloc_3 = "0D"; // MSIL: 'stloc.3'
+    this.stloc_s = "1303"; // MSIL: 'stloc.s'
+    this.xor = "61"; // MSIL: 'xor'
+    this.stelem_i1 = "9C"; // MSIL: 'stelem.i1'
+
+
+    // setStrict sets the strict value of the opcode for substitution
+    // btw I like what I do
+    this.setStrict = function(opCodeMask, value) {
+        return opCodeMask.substr(0x00, 0x02) + value;
+    }
+
+    // setStrict for opcodes that weigh 2 bytes
+    this.setStrict_2b = function(opCodeMask, value) {
+        return opCodeMask.substr(0x00, 0x04) + value;
+    }
+
+    // Sets the mask value to zero for the specified opcode
+    this.setNullValue = function(opCodeMask) {
+        return opCodeMask.replace("??", "00");
+    }
+
+}
+
+
+
+// This feature was originally intended only for .NET, but
+// now partially works with Native files.
+function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native apps
+    var options = "";
+
+    var isDetected = false,
+        isCryptor = false;
+
+
+
+
+    if (PE.isNET()) {
+        if (isAllNetReferencesPresent(
+                references = [
+                    "System.Reflection", // System.Reflection.dll
+                    "Assembly", // MSIL: 'System.Reflection.Assembly' from System.Reflection.dll
+                    "Load", // MSIL: '*.Assembly::Load(uint8[])'
+                    "get_EntryPoint", // MSIL: '*.Assembly::get_EntryPoint()'
+                    "Invoke" // MSIL: '*.MethodBase::Invoke(object, object[])'
+                ]
+            )) {
+            isDetected = true;
+        } else {
+            return null;
+        }
+
+
+
+
+        if (findAndMark("System.Security.Cryptography", isFullName = false) != "") { // for cryptors
+            const cryptoClasses = [
+                "TripleDESCryptoServiceProvider",
+                "RSACryptoServiceProvider",
+                "DSACryptoServiceProvider",
+                "DESCryptoServiceProvider",
+                "AesCryptoServiceProvider",
+                "Rfc2898DeriveBytes",
+                "SHA256Managed",
+                "TripleDES",
+                "Rijndael",
+                "ECDsaCng",
+                "AesAEAD",
+                "Aes192Cbc",
+                "Aes256Cbc",
+                "Aes128Cbc",
+                "AesManaged",
+                "AesCng",
+                "SHA256",
+                "SHA512",
+                "SHA1CryptoServiceProvider",
+                "SHA512CryptoServiceProvider",
+                "RC2CryptoServiceProvider",
+                "SHA384CryptoServiceProvider",
+                // "MD5CryptoServiceProvider",
+                "SHA256CryptoServiceProvider",
+                "RNGCryptoServiceProvider"
+            ];
+
+            for (var i = 0; i < cryptoClasses.length; i++) {
+                var cryptoClassSign = cryptoClasses[i],
+                    result = findAndMark(
+                        sign = cryptoClassSign,
+                        isFullName = true
+                    );
+
+                if (result != "") {
+                    isCryptor = true;
+                    options = cryptoClassSign;
+                    break;
+                }
+            }
+        }
+
+
+
+
+        if ((findAndMark("System.IO.Compression", isFullName = false) != "")) {
+            const compressionClasses = [
+                "DeflateStream",
+                "GZipStream"
+            ];
+
+            for (var i = 0; i < compressionClasses.length; i++) {
+                var compressionClassSign = compressionClasses[i],
+                    result = findAndMark(compressionClassSign, isFullName = true);
+
+                if (result != "") {
+
+                    if (isCryptor) {
+                        options += " + " + compressionClassSign
+                    } else {
+                        options = compressionClassSign;
+                    }
+
+                    break;
+                }
+            }
+        }
+
+    }
+
+
+
+
+    // Many not-so-smart virus writers use base64 to pack
+    // or hide malicious code, but do not realize that this
+    // is very easily detected by heuristic analysis.
+
+    const signaturesVariants = [
+        "TVoAAAAAA", // MZ ~[00 00 00 00 00]
+        "TVqQAA" // MZ ~[90 00 03]
+    ];
+
+    var isPackedPeDetected = false;
+
+    for (var s = 0; s < signaturesVariants.length; s++) {
+
+        const trigger = signaturesVariants[s];
+
+        if (
+            validateSignature(generateUnicodeSignatureMask(trigger) + "00") || validateSignature("'" + trigger + "'")
+        ) {
+            isDetected = true;
+            isCryptor = true;
+
+            isPackedPeDetected = true;
+
+            break;
+        }
+    }
+
+    if (isPackedPeDetected) options += (options != "" ? " + " : "") + "Base64";
+
+
+
+
+    var isHighEntropy = false;
+
+    if (PE.calculateEntropy(0x00, PE.getSize() - PE.getOverlaySize()) > 7.2) {
+        isDetected = true;
+
+        isHighEntropy = true;
+    }
+
+    if (isHighEntropy) options += (options != "" ? " +" : "") + "High entropy";
+
+
+    if (isDetected) {
+        // var typeToOutput = (isCryptor ? "cryptor" : "packer");
+        // _setResult(typeToOutput, "Packer detected!", "", options);
+
+        _setResult((isCryptor ? "cryptor" : "packer"), "Generic", "Heuristic", PE.isVerbose() ? options : "");
+
+    }
+}
+
+
+function isVbNetStandartLibraryPresent() {
+    return PE.isNetObjectPresent("Microsoft.VisualBasic");
+}
+
+
+function isFrameworkComponent() { return PE.isDll() && PE.isSigned() && PE.findSignature(PE.getOverlayOffset(), 300, "'Microsoft Corporation'") != -1 }
+
+
+function validateSignature(sign) { return PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign) != -1; }
+
+
+// "test" -> "'t'00'e'00's'00't'"
+function generateUnicodeSignatureMask(inputString) {
+    var output = "";
+
+    for (var c = 0; c < inputString.length; c++) {
+        output += (c != 0 ? "00" : "") + "'" + inputString[c] + "'";
+    }
+
+    return output;
+}
+
+
+function isAllNetReferencesMissing(references) {
+    for (var i = 0; i < references.length; i++) {
+        const ref = references[i];
+        if (PE.isNetObjectPresent(ref)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+function isAllNetReferencesPresent(references) {
+    for (var i = 0; i < references.length; i++) {
+        const ref = references[i];
+        if (!PE.isNetObjectPresent(ref)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+// "isFullName = true"  = 00'sign'00
+// "isFullName = false" = 00'sign'
+function findAndMark(sign, isFullName) {
+    if (PE.isSignatureInSectionPresent(0,
+            ("00'" + sign + "'") + // 00'string
+            (isFullName ? "00" : ""))) { // ... '00
+        return sign;
+    }
+    return "";
+}
+
+
+
+function scanForObfuscations_Native() {
+    var options = "";
+
+
+
+    if (PE.getNumberOfSections() > 1) {
+        var lastSectionAddress = PE.OffsetToVA(PE.getSectionFileOffset(PE.getNumberOfSections() - 1)),
+            entryPointAddress = PE.getAddressOfEntryPoint();
+
+        if (entryPointAddress >= lastSectionAddress) {
+            options = "Last section EP";
+        }
+    }
+
+
+
+    var strangeSections = false;
+
+    const badChars = '-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>'; // Very very bad!
+
+    for (var i = 0; i != PE.getNumberOfSections(); i++) {
+        var sectionName = PE.getSectionName(i);
+
+        if (sectionName.length < 2) break;
+
+        for (var x = 1; x < sectionName.length; x++) { // Reads all chars after "."
+            for (var d = 0; d < badChars.length; d++) {
+                if (sectionName[x] == badChars[d]) {
+                    strangeSections = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (strangeSections) options += (options != "" ? " + " : "") + "Strange sections";
+
+
+
+
+    var isNopPaddingPresent = false;
+
+    if (PE.compareEP("00")) {
+        isNopPaddingPresent = true;
+    }
+
+    if (isNopPaddingPresent) options += (options != "" ? " + " : "") + "nop EP padding";
+
+
+    if (options != "") {
+        _setResult("protection", "Generic", "Heuristic", PE.isVerbose() ? options : "");
+    }
+}
+
+// Every time I start writing bad code I get hit with my head on the keybofewuihdsowefjfqodgsa79dowqhdsioefurogrwhuoguethuhofrwyi
