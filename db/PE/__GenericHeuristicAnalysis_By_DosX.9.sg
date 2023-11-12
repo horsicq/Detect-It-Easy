@@ -20,8 +20,23 @@
  */
 
 // DIE's signature file
-// Author: DosX; Telegram: @DosX_Plus
-// This smart analysis will help identify the presence of obfuscation or packer tricks through complex checks
+
+// =================== [ ABOUT ] ===================
+// This heuristic analysis will help
+// identify the presence of obfuscation
+// or wrapper tricks through advanced
+// complex checks. Static emulation,
+// signature analysis, smart checks
+// and much more!
+// ================================================
+
+// ================= [ CONTACTS ] =================
+// Author: DosX
+// E-Mail: collab@kay-software.ru
+// Telegram: @DosX_Plus
+// ================================================
+// If I don't respond to email, message to Telegram
+// ================================================
 
 // Please do not read the code out loud unless you have exorcism skills
 
@@ -369,6 +384,7 @@ function scanForObfuscations_NET() {
         "NETSpider.Attribute",
         "NineRays.Obfuscator",
         "PoweredByAttribute", // Smart Assembly
+        "RustemSoft.Skater",
         "BabelAttribute",
         "YanoAttribute",
         "EMyPID_8234_",
@@ -574,6 +590,7 @@ function scanForAntiAnalysis_NET() {
 
 
 
+// .NET OpCodes for static emulations
 function NetOpCodes() {
     this.add = "58"; // MSIL: 'add'
     this.sub = "59"; // MSIL: 'sub'
@@ -665,8 +682,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 ]
             )) {
             isDetected = true;
-        } else {
-            return null;
         }
 
 
@@ -747,6 +762,37 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    var entryLikePacker = false;
+
+    const entries = [
+        "53565755488D35........488DBE", // samples by: UPX (x64)
+        "60BE........8DBE", // samples by: UPX (x32)
+        "B8........6A..68", // samples by: Petite (x32)
+        "669C60508BD803", // samples by: Petite (x32)
+        "57565351524150", // samples by: mpress (x64)
+        "B8........60", // samples by: Petite, Themida (x32)
+        "B8........66", // samples by: Petite (x32)
+        "60EB..5D", // samples by: ASPack (x32)
+        "60EB..E8", // samples by: G!X Protector
+        "60E8" // samples by: mpress, Packman, Pack Master, Yodas Crypter (x32)
+    ];
+
+    for (var e = 0; e < entries.length; e++) {
+        const entryToCheck = entries[e];
+
+        if (PE.compareEP(entryToCheck)) {
+            isDetected = true;
+
+            entryLikePacker = true;
+            break;
+        }
+    }
+
+    if (entryLikePacker) options += (options.length != 0 ? " + " : "") + "EntryPoint";
+
+
+
+
     // Many not-so-smart virus writers use base64 to pack
     // or hide malicious code, but do not realize that this
     // is very easily detected by heuristic analysis.
@@ -774,7 +820,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         }
     }
 
-    if (isPackedPeDetected) options += (options.length != 0 ? " + " : "") + "Base64";
+    if (isPackedPeDetected) options += (options.length != 0 ? " + " : "") + "Base64 payload";
 
 
 
@@ -865,14 +911,18 @@ function scanForObfuscations_Native() {
 
 
 
+    var isLastSectionEP = false;
+
     if (PE.getNumberOfSections() > 1) {
         var lastSectionAddress = PE.OffsetToVA(PE.getSectionFileOffset(PE.getNumberOfSections() - 1)),
             entryPointAddress = PE.getAddressOfEntryPoint();
 
         if (entryPointAddress >= lastSectionAddress) {
-            options = "Last section EP";
+            isLastSectionEP = true;
         }
     }
+
+    if (isLastSectionEP) options = "Last section EP";
 
 
 
@@ -885,7 +935,7 @@ function scanForObfuscations_Native() {
 
         if (sectionName.length < 2) break;
 
-        for (var x = 1; x < sectionName.length; x++) { // Reads all chars after "."
+        for (var x = 1; x < sectionName.length; x++) { // Reads all chars after first char
             for (var d = 0; d < badChars.length; d++) {
                 if (sectionName[x] == badChars[d]) {
                     strangeSections = true;
@@ -948,18 +998,57 @@ function scanForObfuscations_Native() {
         isStartsWithBreakPoint = true;
     }
 
-    if (isStartsWithBreakPoint) options += (options.length != 0 ? " + " : "") + "Suspicious break in EP";
+    if (isStartsWithBreakPoint) options += (options.length != 0 ? " + " : "") + "Suspicious break at EP";
 
 
 
 
-    var isJmpPresent = false;
+    var isStartsWithJmp = false;
 
     if (PE.compareEP("EB") || PE.compareEP("E9")) { // jmp
-        isJmpPresent = true;
+        isStartsWithJmp = true;
     }
 
-    if (isJmpPresent) options += (options.length != 0 ? " + " : "") + "Suspicious jump in EP";
+    if (isStartsWithJmp) options += (options.length != 0 ? " + " : "") + "Suspicious jump at EP";
+
+
+
+
+    var isStartsWithCall = false;
+
+    if (PE.compareEP("E8")) { // call
+        isStartsWithCall = true;
+    }
+
+    if (isStartsWithCall) options += (options.length != 0 ? " + " : "") + "Suspicious call at EP";
+
+
+
+
+    var isStartsWithStackOperation = false;
+
+    const strangeOperations = [
+        "58", // pop
+        "60", // pusha
+        "61", // popa
+        "58", // pop eax
+        "59", // pop ecx
+        "5A", // pop edx
+        "5B", // pop ebx
+        "5C", // pop esp
+        "5D", // pop ebp
+        "5E", // pop esi
+        "5F", // pop edi
+    ];
+
+    for (var o = 0; o < strangeOperations.length; o++) {
+        if (PE.compareEP(strangeOperations[o])) {
+            isStartsWithStackOperation = true;
+            break;
+        }
+    }
+
+    if (isStartsWithStackOperation) options += (options.length != 0 ? " + " : "") + "Strange stack ops at EP";
 
 
 
