@@ -63,6 +63,8 @@ function stubForLegacyEngines() {
     }
 }
 
+
+
 function scanForObfuscations_NET() {
     var options = "";
 
@@ -468,6 +470,8 @@ function scanForObfuscations_NET() {
     if (options.length != 0) isDetected = true;
 
 
+
+
     if (isDetected) {
         _setResult("protection", "Obfuscation", "Heuristic", PE.isVerbose() ? options : "");
     }
@@ -673,9 +677,11 @@ function NetOpCodes() {
         opCodeMask = opCodeMask.split(" ").join("");
         value = value.split(" ").join("");
 
-        var isOpCodeMaskHasBody = opCodeMask.indexOf("??") !== -1;
+        var indexOfSpecialPattern = opCodeMask.indexOf("??");
 
-        var opCodeInHex = isOpCodeMaskHasBody ? opCodeMask.substr(0x00, opCodeMask.indexOf("??")) : opCodeMask;
+        var isOpCodeMaskHasBody = indexOfSpecialPattern !== -1; // -1 if not found
+
+        var opCodeInHex = isOpCodeMaskHasBody ? opCodeMask.substr(0x00, indexOfSpecialPattern) : opCodeMask;
 
         if (isOpCodeMaskHasBody && opCodeMask.substr(opCodeInHex.length).length != value.length) {
             throw "The size of the input values ​​does not match.";
@@ -730,7 +736,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                     "Invoke" // MSIL: '*.MethodBase::Invoke(object, object[])'
                 ]
             )) {
-            isDetected = true;
+            options = "Assembly invoke";
         }
 
 
@@ -774,7 +780,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
                 if (result != "") {
                     isCryptor = true;
-                    options = cryptoClassSign;
+
+                    options += (options.length != 0 ? " + " : "") + cryptoClassSign;
+
                     break;
                 }
             }
@@ -795,11 +803,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
                 if (result != "") {
 
-                    if (isCryptor) {
-                        options += " + " + compressionClassSign
-                    } else {
-                        options = compressionClassSign;
-                    }
+                    if (isCryptor) options += (options.length != 0 ? " + " : "") + compressionClassSign;
 
                     break;
                 }
@@ -840,8 +844,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             const entryToCheck = entries[e];
 
             if (PE.compareEP(entryToCheck)) {
-                isDetected = true;
-
                 entryLikePacker = true;
                 break;
             }
@@ -871,7 +873,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         if (
             validateSignature(generateUnicodeSignatureMask(trigger) + "00") || validateSignature("'" + trigger + "'")
         ) {
-            isDetected = true;
             isCryptor = true;
 
             isPackedPeDetected = true;
@@ -885,22 +886,51 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    var isMzSignatureDetected = false;
+
+    if (PE.compareOverlay("'MZ'")) {
+        isMzSignatureDetected = true;
+    }
+
+    if (isMzSignatureDetected) options += (options.length != 0 ? " + " : "") + "PE in overlay";
+
+
+
+
+    var hasStrangeOverlay = false;
+
+    if (!isMzSignatureDetected && !PE.isSigned() && PE.isOverlayPresent()) {
+        if (
+            PE.getOverlaySize() > 150 && PE.calculateEntropy(PE.getOverlayOffset(), PE.getOverlaySize()) > 7 ||
+            PE.getOverlaySize() > (PE.getSize() - PE.getOverlaySize())
+        ) {
+            hasStrangeOverlay = true;
+        }
+    }
+
+    if (hasStrangeOverlay) options += (options.length != 0 ? " + " : "") + "Strange overlay";
+
+
+
+
     var isHighEntropy = false;
 
     if (PE.calculateEntropy(0x00, PE.getSize() - PE.getOverlaySize()) > 7.2) {
-        isDetected = true;
-
         isHighEntropy = true;
     }
 
     if (isHighEntropy) options += (options.length != 0 ? " + " : "") + "High entropy";
 
 
-    if (isDetected) {
-        // var typeToOutput = (isCryptor ? "cryptor" : "packer");
-        // _setResult(typeToOutput, "Packer detected!", "", options);
 
-        _setResult((isCryptor ? "cryptor" : "packer"), "Generic", "Heuristic", PE.isVerbose() ? options : "");
+
+    if (options.length != 0) isDetected = true;
+
+
+    if (isDetected) {
+        var detectedType = isCryptor ? "cryptor" : "packer";
+
+        _setResult(detectedType, "Looks like a " + detectedType, "Heuristic", PE.isVerbose() ? options : "");
 
     }
 }
@@ -968,6 +998,8 @@ function findAndMark(sign, isFullName) {
 
 function scanForObfuscations_Native() {
     var options = "";
+
+    var isDetected = false;
 
 
 
@@ -1099,7 +1131,10 @@ function scanForObfuscations_Native() {
     }
 
 
-    if (options.length != 0) {
+    if (options.length != 0) isDetected = true;
+
+
+    if (isDetected) {
         _setResult("protection", "Generic", "Heuristic", PE.isVerbose() ? options : "");
     }
 }
