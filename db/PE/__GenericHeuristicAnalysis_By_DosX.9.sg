@@ -33,6 +33,7 @@
 // ================= [ CONTACTS ] =================
 // Author: DosX
 // E-Mail: collab@kay-software.ru
+// GitHub: https://github.com/DosX-dev
 // Telegram: @DosX_Plus
 // ================================================
 // If I don't respond to email, message to Telegram
@@ -248,7 +249,7 @@ function scanForObfuscations_NET() {
     var isCalliInvokesPresent = false;
 
     if (validateSignature( // samples by: MindLated
-            opCodes.setStrict_2b(opCodes.ldftn, "?? ?? 00 0A") +
+            opCodes.setStrict(opCodes.ldftn, "?? ?? 00 0A") +
             opCodes.setStrict(opCodes.calli, "?? 00 00 11")
         ) ||
         validateSignature( // samples by: ArmDot, DarksProtector
@@ -269,14 +270,22 @@ function scanForObfuscations_NET() {
             opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s +
             opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s
         ) ||
+        validateSignature( // samples by: ConfuserEx (neo mod)
+            opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.dup + opCodes.stloc_0 + opCodes.ldc_i4_3 + opCodes.rem_un + "45"
+        ) ||
         validateSignature( // samples by: .NET Reactor
             opCodes.ldsfld + opCodes.brfalse + opCodes.pop +
             opCodes.setStrict(opCodes.ldc_i4, "01 00 00 00") + // MSIL: 'ldc.4 1'
             opCodes.br + opCodes.nop
         ) ||
+        validateSignature(
+            opCodes.setNullValue(opCodes.ldc_i4) +
+            opCodes.ldsfld + opCodes.brtrue + opCodes.pop + opCodes.ldc_i4 +
+            opCodes.br
+        ) ||
         validateSignature( // samples by: .NET Reactor (legacy~~)
             opCodes.stloc + opCodes.ldloc +
-            "45 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00" + // OPCODE: 'switch ...'
+            opCodes.setStrict(opCodes.switch__nobody, "?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00") +
             opCodes.ldc_i4 + opCodes.br
         ) ||
         validateSignature( // samples by: MindLated, NetShield
@@ -290,7 +299,16 @@ function scanForObfuscations_NET() {
             opCodes.stloc + opCodes.br + opCodes.nop + opCodes.ldloc + opCodes.ldc_i4 + opCodes.ceq + opCodes.brfalse
         ) ||
         validateSignature( // samples by: Smart Assembly
-            opCodes.ldc_i4 + opCodes.br + opCodes.ldloc_s + opCodes.ldc_i4_s + opCodes.ldc_i4_0 + opCodes.stelem_i1 + opCodes.ldc_i4 + opCodes.br
+            opCodes.ldc_i4 + opCodes.br + opCodes.ldloc_s + opCodes.ldc_i4_s + opCodes.ldc_i4_0 + opCodes.stelem_i1 +
+            opCodes.ldc_i4 + opCodes.br
+        ) ||
+        validateSignature( // samples by: ConfuserEx (Beds mod)
+            opCodes.ldc_i4 + opCodes.ldc_i4 + "??" + opCodes.ldc_i4 + "??" + opCodes.stloc_0 + opCodes.nop + opCodes.ldloc_0 +
+            opCodes.ldc_i4 + opCodes.ldc_i4 + "??" + opCodes.ldc_i4 + "??" + opCodes.ceq + opCodes.brfalse_s
+        ) ||
+        validateSignature( // samples by: DotNetPatcher
+            opCodes.setStrict(opCodes.stloc_s, "05") + opCodes.nop + opCodes.ldloc_s + "??" + opCodes.ceq + opCodes.brfalse_s + "??" +
+            opCodes.setStrict(opCodes.stloc_s, "05") + opCodes.nop + opCodes.ldloc_s + "??" + opCodes.ceq + opCodes.brfalse_s
         )
     ) {
         isCtrlFlowPresent = true;
@@ -601,15 +619,20 @@ function NetOpCodes() {
     this.br = "38????????"; // MSIL: 'br'
     this.br_s = "2B??"; // MSIL: 'br.s'
     this.brfalse = "39????????"; // MSIL: 'brfalse'
+    this.brfalse_s = "2C??"; // MSIL: 'brfalse.s'
+    this.brtrue = "3A????????"
     this.call = "28????????"; // MSIL: 'call'
     this.calli = "29????????"; // MSIL: 'calli'
     this.ceq = "FE01"; // MSIL: 'ceq'
     this.div = "5B"; // MSIL: 'div'
+    this.dup = "25"; // MSIL: 'dup'
     this.idelem_i = "97"; // MSIL: 'idelem.i'
     this.ldc_i4 = "20????????"; // MSIL: 'ldc.i4'
     this.ldc_i4_0 = "16"; // MSIL: 'ldc.i4.0'
-    this.ldc_i4_1 = "1A"; // MSIL: 'ldc.i4.1'
+    this.ldc_i4_1 = "17"; // MSIL: 'ldc.i4.1'
     this.ldc_i4_2 = "18"; // MSIL: 'ldc.i4.2'
+    this.ldc_i4_3 = "19"; // MSIL: 'ldc.i4.2'
+    this.ldc_i4_4 = "1A"; // MSIL: 'ldc.i4.4'
     this.ldc_i4_s = "1F??"; // MSIL: 'ldc.i4.s'
     this.ldftn = "FE06????????"; // MSIL: 'ldftn'
     this.ldloc = "FE??????"; // MSIL: 'ldloc'
@@ -626,6 +649,7 @@ function NetOpCodes() {
     this.or = "60"; // MSIL: 'or'
     this.pop = "26"; // MSIL: 'pop'
     this.ret = "2A"; // MSIL: 'ret'
+    this.rem_un = "5E"; // MSIL: 'rem.un'
     this.shl = "62"; // MSIL: 'shl'
     this.shr = "63"; // MSIL: 'shr'
     this.sizeof = "FE1C????????"; // MSIL: 'sizeof'
@@ -634,28 +658,53 @@ function NetOpCodes() {
     this.stloc_1 = "0B"; // MSIL: 'stloc.1'
     this.stloc_2 = "0C"; // MSIL: 'stloc.2'
     this.stloc_3 = "0D"; // MSIL: 'stloc.3'
-    this.stloc_s = "1303"; // MSIL: 'stloc.s'
+    this.stloc_s = "13??"; // MSIL: 'stloc.s'
     this.xor = "61"; // MSIL: 'xor'
     this.stelem_i1 = "9C"; // MSIL: 'stelem.i1'
+
+    this.switch__nobody = "45"; // MSIL: 'switch'
 
 
 
     // setStrict sets the strict value of the opcode for substitution
     // btw I like what I do
     this.setStrict = function(opCodeMask, value) {
-        return opCodeMask.substr(0x00, 0x02) + value;
-    }
 
-    // setStrict for opcodes that weigh 2 bytes
-    this.setStrict_2b = function(opCodeMask, value) {
-        return opCodeMask.substr(0x00, 0x04) + value;
+        opCodeMask = opCodeMask.split(" ").join("");
+        value = value.split(" ").join("");
+
+        var isOpCodeMaskHasBody = opCodeMask.indexOf("??") !== -1;
+
+        var opCodeInHex = isOpCodeMaskHasBody ? opCodeMask.substr(0x00, opCodeMask.indexOf("??")) : opCodeMask;
+
+        if (isOpCodeMaskHasBody && opCodeMask.substr(opCodeInHex.length).length != value.length) {
+            throw "The size of the input values ​​does not match.";
+        }
+
+        return opCodeInHex + value;
+
     }
 
     // Sets the mask value to zero for the specified opcode
     this.setNullValue = function(opCodeMask) {
-        return opCodeMask.replace("??", "00");
+
+        if (opCodeMask.indexOf("??") === -1) {
+            throw "Instruction does not have a body to overwrite the value.";
+        }
+
+        return replaceAllInString(opCodeMask, "??", "00");
     }
 
+}
+
+
+
+function replaceAllInString(inputString, search, replacement) {
+    while (inputString.indexOf(search) !== -1) {
+        inputString = inputString.replace(search, replacement)
+    }
+
+    return inputString;
 }
 
 
@@ -762,33 +811,44 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
-    var entryLikePacker = false;
+    if (!PE.isDll()) {
+        var entryLikePacker = false;
 
-    const entries = [
-        "53565755488D35........488DBE", // samples by: UPX (x64)
-        "60BE........8DBE", // samples by: UPX (x32)
-        "B8........6A..68", // samples by: Petite (x32)
-        "669C60508BD803", // samples by: Petite (x32)
-        "57565351524150", // samples by: mpress (x64)
-        "B8........60", // samples by: Petite, Themida (x32)
-        "B8........66", // samples by: Petite (x32)
-        "60EB..5D", // samples by: ASPack (x32)
-        "60EB..E8", // samples by: G!X Protector
-        "60E8" // samples by: mpress, Packman, Pack Master, Yodas Crypter (x32)
-    ];
+        const entries = [
+            "53565755488D35........488DBE", // samples by: UPX (x64)
+            "74..E9........60E8", // samples by: PE-PACK
+            "EB0668........C39C", // samples by: PECompact (x32)
+            "60BE........8DBE", // samples by: UPX (x32)
+            "B8........6A..68", // samples by: Petite (x32)
+            "BE........AD8BF8", // samples by: WinUPack (x32)
+            "68........9C60E8", // samples by: XComp, XPACK (x32)
+            "57565351524150", // samples by: mpress (x64)
+            "B8........5064", // samples by: PECompact (x32)
+            "B8........669C", // samples by: Petite (x32)
+            "B8........60", // samples by: Petite, Themida (x32)
+            "B8........66", // samples by: Petite (x32)
+            "8B44240456", // samples by: ASDPack (x32)
+            "EB..9C60E8", // samples by: PECompact (x32)
+            "9C60E8CA", // samples by: Petite (x??)
+            "60EB..5D", // samples by: ASPack (x32)
+            "60EB..E8", // samples by: G!X Protector
+            "669C60", // samples by: Petite (x??)
+            "60E8" // samples by: mpress, Packman, Pack Master, Yodas Crypter (x32)
+        ];
 
-    for (var e = 0; e < entries.length; e++) {
-        const entryToCheck = entries[e];
+        for (var e = 0; e < entries.length; e++) {
+            const entryToCheck = entries[e];
 
-        if (PE.compareEP(entryToCheck)) {
-            isDetected = true;
+            if (PE.compareEP(entryToCheck)) {
+                isDetected = true;
 
-            entryLikePacker = true;
-            break;
+                entryLikePacker = true;
+                break;
+            }
         }
-    }
 
-    if (entryLikePacker) options += (options.length != 0 ? " + " : "") + "EntryPoint";
+        if (entryLikePacker) options += (options.length != 0 ? " + " : "") + "EntryPoint";
+    }
 
 
 
@@ -833,7 +893,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         isHighEntropy = true;
     }
 
-    if (isHighEntropy) options += (options.length != 0 ? " +" : "") + "High entropy";
+    if (isHighEntropy) options += (options.length != 0 ? " + " : "") + "High entropy";
 
 
     if (isDetected) {
@@ -1003,33 +1063,12 @@ function scanForObfuscations_Native() {
 
 
 
-    var isStartsWithJmp = false;
-
-    if (PE.compareEP("EB") || PE.compareEP("E9")) { // jmp
-        isStartsWithJmp = true;
-    }
-
-    if (isStartsWithJmp) options += (options.length != 0 ? " + " : "") + "Suspicious jump at EP";
-
-
-
-
-    var isStartsWithCall = false;
-
-    if (PE.compareEP("E8")) { // call
-        isStartsWithCall = true;
-    }
-
-    if (isStartsWithCall) options += (options.length != 0 ? " + " : "") + "Suspicious call at EP";
-
-
-
-
     var isStartsWithStackOperation = false;
 
     const strangeOperations = [
         "58", // pop
         "60", // pusha
+        "9C", // pushf
         "61", // popa
         "58", // pop eax
         "59", // pop ecx
