@@ -1,0 +1,94 @@
+// DIE's signature file
+// Author: Levis <levintaeyeon@live.com>, LinXP
+// doc-ref: https://docs.oracle.com/javase/specs/jvms/se18/html/jvms-4.html
+init("format","Java Class File (.CLASS)");
+
+function detect(bShowType,bShowVersion,bShowOptions)
+{
+    if(Binary.getSize()>=8)
+    {
+        if(Binary.compare("CAFEBABE"))
+        {
+            var nMinor=Binary.read_uint16(0x04,_BE);
+            var nMajor=Binary.read_uint16(0x06,_BE);
+            bDetected=true;
+            switch(nMajor)
+            {
+                case 45: sVersion="JDK 1.1";     break; // February 1997
+                case 46: sVersion="JDK 1.2";     break; // December 1998
+                case 47: sVersion="JDK 1.3";     break; // May 2000
+                case 48: sVersion="JDK 1.4";     break; // February 2002
+                case 49: sVersion="Java SE 5.0"; break; // September 2004
+                case 50: sVersion="Java SE 6";   break; // December 2006
+                case 51: sVersion="Java SE 7";   break; // July 2011
+                case 52: sVersion="Java SE 8";   break; // March 2014
+                case 53: sVersion="Java SE 9";   break; // September 2017
+                case 54: sVersion="Java SE 10";  break; // March 2018
+                case 55: sVersion="Java SE 11";  break; // September 2018
+                case 56: sVersion="Java SE 12";  break; // March 2019
+                case 57: sVersion="Java SE 13";  break; // September 2019
+                case 58: sVersion="Java SE 14";  break; // March 2020
+                case 59: sVersion="Java SE 15";  break; // September 2020
+                case 60: sVersion="Java SE 16";  break; // March 2021
+                case 61: sVersion="Java SE 17";  break; // September 2021
+                case 62: sVersion="Java SE 18";  break; // March 2022
+                case 63: sVersion="Java SE 19";  break; // September 2022
+                case 64: sVersion="Java SE 20";  break; // March 2023
+                case 65: sVersion="Java SE 21";  break; // September 2023
+                default: bDetected=false;
+            }
+            if (bDetected && Binary.isVerbose())
+            {
+                var nOffset = 0x08;
+                var constant_pool_count = Binary.read_uint16(nOffset,_BE); nOffset+=2;
+                for (pool = 1; pool < constant_pool_count; pool++) {
+                    switch(Binary.read_uint8(nOffset)) // Tag
+                    {
+                        case  1: // CONSTANT_Utf8
+                            nOffset +=1+2 + Binary.read_uint16(nOffset+1,_BE);
+                            break;
+                        case  3: // CONSTANT_Integer
+                        case  4: // CONSTANT_Float
+                            nOffset +=1+4;
+                            break;
+                        case  5: // CONSTANT_Long
+                        case  6: // CONSTANT_Double
+                            nOffset +=1+4+4;
+                            break;
+                        case  7: // CONSTANT_Class
+                        case  8: // CONSTANT_String
+                        case 16: // CONSTANT_MethodType
+                            nOffset +=1+2;
+                            break;
+                        case 9:  // CONSTANT_Fieldref
+                        case 10: // CONSTANT_Methodref
+                        case 11: // CONSTANT_InterfaceMethodref
+                        case 12: // CONSTANT_NameAndType
+                        case 18: // CONSTANT_InvokeDynamic
+                            nOffset +=1+2+2;
+                            break;
+                        case 15: // CONSTANT_MethodHandle_info
+                            nOffset +=1+1+2;
+                            break;
+                        default: sOption("err unk tag:"+nOffset);
+                    }
+                }
+                var nAccessFlagss = Binary.read_uint16(nOffset,_BE);
+                if (nAccessFlagss & 0x0001)  {sOption("ACC_PUBLIC"); }
+                if (nAccessFlagss & 0x0002)  {sOption("ACC_PRIVATE"); }
+                if (nAccessFlagss & 0x0004)  {sOption("ACC_PROTECTED"); }
+                if (nAccessFlagss & 0x0008)  {sOption("ACC_STATIC"); }
+                if (nAccessFlagss & 0x0010)  {sOption("ACC_FINAL"); }
+                if (nAccessFlagss & 0x0020)  {sOption("ACC_SUPER"); }
+                if (nAccessFlagss & 0x0040)  {sOption("ACC_VOLATILE"); }
+                if (nAccessFlagss & 0x0080)  {sOption("ACC_TRANSIENT"); }
+                if (nAccessFlagss & 0x0100)  {sOption("ACC_NATIVE"); }
+                if (nAccessFlagss & 0x0200)  {sOption("ACC_INTERFACE"); }
+                if (nAccessFlagss & 0x0400)  {sOption("ACC_ABSTRACT"); }
+                if (nAccessFlagss & 0x0800)  {sOption("ACC_STRICT"); }
+            }
+        }
+    }
+
+    return result(bShowType,bShowVersion,bShowOptions);
+}
