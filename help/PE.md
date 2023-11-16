@@ -83,6 +83,10 @@
 
 ```
 ```
+**bool isNetUStringPresent(QString sString)**
+
+```
+```
 **qint32 getNumberOfImports()**
 
 ```
