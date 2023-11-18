@@ -42,7 +42,7 @@
 // Please do not read the code out loud unless you have exorcism skills
 
 function detect() {
-    stubForLegacyEngines();
+    if (stubForLegacyEngines()) return null; // old DIE version
 
     if (PE.isHeuristicScan()) {
         if (PE.isNET()) {
@@ -59,8 +59,10 @@ function detect() {
 function stubForLegacyEngines() {
     if (typeof PE.isNetObjectPresent === 'undefined') {
         _setResult("DIE-Message", ">>> Update DIE Engine to 3.09 and higher for using Heuristic-analyser by DosX <<<", "", "");
-        return null;
+        return true;
     }
+
+    return false;
 }
 
 
@@ -76,24 +78,23 @@ function scanForObfuscations_NET() {
 
     var isEntryPointModified = false;
 
+    const vbNetEntries = [
+            "Main",
+            "main",
+            "MAIN",
+            "MyApplication"
+        ],
+        defaultEntries = [ // like MSIL, C#, C++ NET etc
+            "Main",
+            "<Main>$" // For programs with top-level operators (C#)
+        ]
+
     if (!PE.isDll()) {
         if (isVbNet) {
-            if (isAllNetReferencesMissing(
-                    [
-                        "Main",
-                        "main",
-                        "MAIN",
-                        "MyApplication"
-                    ]
-                )) {
+            if (isAllNetReferencesMissing(vbNetEntries)) {
                 isEntryPointModified = true;
             }
-        } else if (isAllNetReferencesMissing(
-                [
-                    "Main",
-                    "<Main>$" // For programs with top-level operators
-                ]
-            )) {
+        } else if (isAllNetReferencesMissing(defaultEntries)) {
             isEntryPointModified = true;
         }
     }
@@ -730,6 +731,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
     if (PE.isNET()) {
+
+        var isAssemblyInvokeFound = false;
+
         if (isAllNetReferencesPresent(
                 references = [
                     "System.Reflection", // System.Reflection.dll
@@ -739,6 +743,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                     "Invoke" // MSIL: '*.MethodBase::Invoke(object, object[])'
                 ]
             )) {
+            isAssemblyInvokeFound = true;
+
             options = "Assembly invoke";
         }
 
@@ -781,7 +787,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                         isFullName = true
                     );
 
-                if (result != "") {
+                if (isAssemblyInvokeFound && result.length != 0) {
                     isCryptor = true;
 
                     options += (options.length != 0 ? " + " : "") + cryptoClassSign;
@@ -794,7 +800,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
-        if ((findAndMark("System.IO.Compression", isFullName = false) != "")) {
+        if ((findAndMark("System.IO.Compression", isFullName = false).length != 0)) {
             const compressionClasses = [
                 "DeflateStream",
                 "GZipStream"
@@ -804,7 +810,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 var compressionClassSign = compressionClasses[i],
                     result = findAndMark(compressionClassSign, isFullName = true);
 
-                if (result != "") {
+                if (isAssemblyInvokeFound && result.length != 0) {
 
                     if (isCryptor) options += (options.length != 0 ? " + " : "") + compressionClassSign;
 
@@ -891,7 +897,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isMzSignatureDetected = false;
 
-    if (PE.compareOverlay("'MZ'")) {
+    if (PE.isOverlayPresent() &&
+        PE.getOverlaySize() >= 100 &&
+        PE.compareOverlay("'MZ'")) {
         isMzSignatureDetected = true;
     }
 
