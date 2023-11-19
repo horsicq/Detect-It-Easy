@@ -42,7 +42,7 @@
 // Please do not read the code out loud unless you have exorcism skills
 
 function detect() {
-    if (stubForLegacyEngines()) return null; // old DIE version
+    // if (stubForLegacyEngines()) return null; // old DIE version
 
     if (PE.isHeuristicScan()) {
         if (PE.isNET()) {
@@ -100,6 +100,34 @@ function scanForObfuscations_NET() {
     }
 
     if (isEntryPointModified) options += "Modified EP";
+
+
+
+
+    var isStrangeEpPosition = false;
+
+    const netMetaHeaders = [
+            "~",
+            "Strings",
+            "US",
+            "GUID",
+            "Blob"
+        ],
+        defaultNetSection = 0;
+
+    if (PE.getNumberOfSections() > 1) {
+        for (var s = 0; s < netMetaHeaders.length; s++) {
+
+            const headerName = netMetaHeaders[s];
+
+            if (!PE.isSignatureInSectionPresent(defaultNetSection, "00'#" + headerName + "'00")) {
+                isStrangeEpPosition = true;
+                break;
+            }
+        }
+    }
+
+    if (isStrangeEpPosition) options += (options.length != 0 ? " + " : "") + "Strange EP position";
 
 
 
@@ -274,14 +302,14 @@ function scanForObfuscations_NET() {
             opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s
         ) ||
         validateSignature( // samples by: ConfuserEx (neo mod)
-            opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.dup + opCodes.stloc_0 + opCodes.ldc_i4_3 + opCodes.rem_un + "45"
+            opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.dup + opCodes.stloc_0 + opCodes.ldc_i4_3 + opCodes.rem_un + opCodes.switch__nobody
         ) ||
         validateSignature( // samples by: .NET Reactor
             opCodes.ldsfld + opCodes.brfalse + opCodes.pop +
             opCodes.setStrict(opCodes.ldc_i4, "01 00 00 00") + // MSIL: 'ldc.4 1'
             opCodes.br + opCodes.nop
         ) ||
-        validateSignature(
+        validateSignature( // samples by: .NET Reactor
             opCodes.setNullValue(opCodes.ldc_i4) +
             opCodes.ldsfld + opCodes.brtrue + opCodes.pop + opCodes.ldc_i4 +
             opCodes.br
@@ -737,10 +765,10 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         if (isAllNetReferencesPresent(
                 references = [
                     "System.Reflection", // System.Reflection.dll
-                    "Assembly", // MSIL: 'System.Reflection.Assembly' from System.Reflection.dll
-                    "Load", // MSIL: '*.Assembly::Load(uint8[])'
                     "get_EntryPoint", // MSIL: '*.Assembly::get_EntryPoint()'
-                    "Invoke" // MSIL: '*.MethodBase::Invoke(object, object[])'
+                    "Assembly", // MSIL: 'System.Reflection.Assembly' from System.Reflection.dll
+                    "Invoke", // MSIL: '*.MethodBase::Invoke(object, object[])'
+                    "Load" // MSIL: '*.Assembly::Load(uint8[])'
                 ]
             )) {
             isAssemblyInvokeFound = true;
@@ -829,23 +857,34 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         const entries = [
             "53565755488D35........488DBE", // samples by: UPX (x64)
+            "60..................E8", // samples by: Anticrack Software (x32)
             "74..E9........60E8", // samples by: PE-PACK
             "EB0668........C39C", // samples by: PECompact (x32)
+            "93071F05....8ED0BC", // samples by: aPack (x32)
             "60BE........8DBE", // samples by: UPX (x32)
             "B8........6A..68", // samples by: Petite (x32)
             "BE........AD8BF8", // samples by: WinUPack (x32)
             "68........9C60E8", // samples by: XComp, XPACK (x32)
+            "BD........C745", // samples by: kkrunchy (x32)
             "57565351524150", // samples by: mpress (x64)
             "B8........5064", // samples by: PECompact (x32)
+            "6068........68", // samples by: BeRo (x32)
+            "8CCBBA....03DA", // // samples by: aPack (x32)
             "B8........669C", // samples by: Petite (x32)
             "B8........60", // samples by: Petite, Themida (x32)
             "B8........66", // samples by: Petite (x32)
             "8B44240456", // samples by: ASDPack (x32)
+            "558BEC83C4", // samples by: Anskya NTPacker Generator (x32)
+            "1E068CC88E", // samples by: aPack (x32)
+            "1E068CCBBA", // samples by: aPack (x32)
+            "1E068CC88E", // samples by: aPack (x32)
             "EB..9C60E8", // samples by: PECompact (x32)
             "9C60E8CA", // samples by: Petite (x??)
+            "60FCBED4", // samples by: ANDPakk (x32)
             "60EB..5D", // samples by: ASPack (x32)
             "60EB..E8", // samples by: G!X Protector
             "669C60", // samples by: Petite (x??)
+            "EB..60", // samples by: kkryptor, dePACK (x32)
             "60E8" // samples by: mpress, Packman, Pack Master, Yodas Crypter (x32)
         ];
 
@@ -860,6 +899,41 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         if (entryLikePacker) options += (options.length != 0 ? " + " : "") + "EntryPoint";
     }
+
+
+
+
+    var isCollisionInSectionsPresent = false;
+
+    const sectionNameCollision = PE.getSectionNameCollision("0", "1");
+
+    if (sectionNameCollision.length != 0) {
+        isCollisionInSectionsPresent = true;
+    }
+
+    if (isCollisionInSectionsPresent) options += (options.length != 0 ? " + " : "") + "Sections collision (" + sectionNameCollision + ")";
+
+
+
+
+    var isCollisionInSectionsPresent = false;
+
+    var sectionNamesDictionary = {};
+
+    for (var i = 0; i < PE.getNumberOfSections(); i++) {
+        const sectionName = PE.getSectionName(i);
+
+        if (sectionNamesDictionary[sectionName]) {
+            isCollisionInSectionsPresent = true;
+            break;
+        } else {
+            sectionNamesDictionary[sectionName] = true;
+        }
+    }
+
+    sectionNamesDictionary = undefined;
+
+    if (isCollisionInSectionsPresent) options += (options.length != 0 ? " + " : "") + "Section names repeating";
 
 
 
@@ -926,7 +1000,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isHighEntropy = false;
 
-    if (PE.calculateEntropy(0x00, PE.getSize() - PE.getOverlaySize()) > 7.2) {
+    if (!PE.isDll() && PE.isSectionNamePresent(".rdata") && // .dll with resources
+        PE.calculateEntropy(0x00, PE.getSize() - PE.getOverlaySize()) > 7.2) {
         isHighEntropy = true;
     }
 
