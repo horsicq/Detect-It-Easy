@@ -42,7 +42,8 @@
 // Please do not read the code out loud unless you have exorcism skills
 
 function detect() {
-    // if (stubForLegacyEngines()) return null; // old DIE version
+
+    if (stubForLegacyEngines()) return null; // old DIE version
 
     if (PE.isHeuristicScan()) {
         if (PE.isNET()) {
@@ -137,7 +138,7 @@ function scanForObfuscations_NET() {
     if (!PE.isDll()) {
         if (!PE.is64()) {
             // FF2500????00: jmp dword ptr [ ... ]
-            if (!PE.compareEP("FF 25 ?? ?? ?? 00")) {
+            if (getFirstEpAsmOpCode() !== "JMP") {
                 isNativeEntryPointModified = true;
             }
         } else { // AMD64
@@ -857,6 +858,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         const entries = [
             "53565755488D35........488DBE", // samples by: UPX (x64)
+            "B8........68........64", // samples by: Petite (x32)
             "60..................E8", // samples by: Anticrack Software (x32)
             "33C08BC068........68", // samples by: ExE Pack (x32)
             "74..E9........60E8", // samples by: PE-PACK
@@ -889,7 +891,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             "6033C0", // samples by: yzPack (x32)
             "669C60", // samples by: Petite (x??)
             "EB..60", // samples by: kkryptor, dePACK (x32)
-            "60E8", // samples by: mpress, Packman, Pack Master, Yodas Crypter, DxPack, ASPack (x32)
+            "60E8", // samples by: mpress, Packman, Pack Master, Yodas Crypter, DxPack, ASPack, MSLRH, tElock (x32)
             "6068" // samples by: BeRo, ExE Pack, AHPacker (x32)
         ];
 
@@ -939,6 +941,23 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     sectionNamesDictionary = undefined;
 
     if (isCollisionInSectionsPresent) options += (options.length != 0 ? " + " : "") + "Section names repeating";
+
+
+
+
+    var isStartsWithStackOperation = false;
+
+    const firstEpAsmOpCode = getFirstEpAsmOpCode();
+
+    switch (firstEpAsmOpCode) {
+        case "PUSHAL":
+        case "PUSHA":
+        case "PUSHF":
+        case "POPA":
+            isStartsWithStackOperation = true;
+    }
+
+    if (isStartsWithStackOperation) options += (options.length != 0 ? " + " : "") + "Strange \"" + firstEpAsmOpCode.toLowerCase() + "\" at EP";
 
 
 
@@ -1111,14 +1130,14 @@ function scanForObfuscations_Native() {
 
     var strangeSections = false;
 
-    const badChars = '-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>'; // Very very bad!
+    const badChars = '-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<> '; // Very very bad!
 
     for (var i = 0; i != PE.getNumberOfSections(); i++) {
         var sectionName = PE.getSectionName(i);
 
         if (sectionName.length < 2) break;
 
-        for (var x = 1; x < sectionName.length; x++) { // Reads all chars after first char
+        for (var x = 0; x < sectionName.length; x++) {
             for (var d = 0; d < badChars.length; d++) {
                 if (sectionName[x] == badChars[d]) {
                     strangeSections = true;
@@ -1164,20 +1183,9 @@ function scanForObfuscations_Native() {
 
 
 
-    var isNopPaddingPresent = false;
-
-    if (PE.compareEP("90")) { // nop
-        isNopPaddingPresent = true;
-    }
-
-    if (isNopPaddingPresent) options += (options.length != 0 ? " + " : "") + "Nop EP padding";
-
-
-
-
     var isStartsWithBreakPoint = false;
 
-    if (PE.compareEP("CC") || PE.compareEP("CD 03")) { // int 3
+    if (getFirstEpAsmInstruction() == "INT 3") { // int 3 (CC or CD 03)
         isStartsWithBreakPoint = true;
     }
 
@@ -1186,31 +1194,24 @@ function scanForObfuscations_Native() {
 
 
 
-    var isStartsWithStackOperation = false;
+    var isStartsWithNop = false;
 
-    const strangeOperations = [
-        "58", // pop
-        "60", // pusha
-        "9C", // pushf
-        "61", // popa
-        "58", // pop eax
-        "59", // pop ecx
-        "5A", // pop edx
-        "5B", // pop ebx
-        "5C", // pop esp
-        "5D", // pop ebp
-        "5E", // pop esi
-        "5F", // pop edi
-    ];
-
-    for (var o = 0; o < strangeOperations.length; o++) {
-        if (PE.compareEP(strangeOperations[o])) {
-            isStartsWithStackOperation = true;
-            break;
-        }
+    if (getFirstEpAsmInstruction() == "NOP") { // nop (90)
+        isStartsWithNop = true;
     }
 
-    if (isStartsWithStackOperation) options += (options.length != 0 ? " + " : "") + "Strange stack ops at EP";
+    if (isStartsWithNop) options += (options.length != 0 ? " + " : "") + "Nop at EP";
+
+
+
+
+    var isNopPaddingPresent = false;
+
+    if (!isStartsWithNop && getEpAsmPattern(onlyOpCodes = true, numberOf = 5).indexOf(getInstructionAsmPattern("NOP|NOP")) !== -1) {
+        isNopPaddingPresent = true;
+    }
+
+    if (isNopPaddingPresent) options += (options.length != 0 ? " + " : "") + "Nop EP padding";
 
 
 
@@ -1229,5 +1230,63 @@ function scanForObfuscations_Native() {
         _setResult("protection", "Generic", "Heuristic", PE.isVerbose() ? options : "");
     }
 }
+
+const _patternSplitter = "|";
+
+
+// Makes it possible to disassemble the entry point code and output
+// a specified number of instructions through a splitter (_patternSplitter)
+
+function getEpAsmPattern(onlyOpCodes, numberOf) {
+    var result = _patternSplitter;
+
+    var toDisasm = PE.getAddressOfEntryPoint();
+
+    for (var i = 0; i < numberOf; i++) {
+
+        if (i >= 1) {
+            toDisasm = PE.getDisasmNextAddress(toDisasm);
+        }
+
+        result += (
+            onlyOpCodes ?
+            getAsmOpCode(PE.getDisasmString(toDisasm)) : // "MOV"
+            PE.getDisasmString(toDisasm) // "MOV EAX, 4"
+        ) + _patternSplitter;
+    }
+
+    return result;
+}
+
+
+// Makes it possible to get a subpattern to search for instructions in a
+// pattern divided through a separator (_patternSplitter)
+//
+// like "|OPCODE1|OPCODE2|OPCODE3|".indexOf("|OPCODE2|")
+// but  "|OPCODE1|OPCODE2|OPCODE3|".indexOf(getInstructionAsmPattern("OPCODE2"))
+
+function getInstructionAsmPattern(instruction) {
+    return _patternSplitter + instruction + _patternSplitter;
+}
+
+
+function getFirstEpAsmInstruction() {
+    const entryPointAddress = PE.getEntryPointOffset();
+
+    return PE.getDisasmString(PE.OffsetToVA(entryPointAddress));
+}
+
+
+function getAsmOpCode(instruction) {
+    return instruction.indexOf(" ") !== -1 ? instruction.split(" ")[0] : instruction;
+}
+
+
+// Returns only the name of the opcode used, without arguments
+
+function getFirstEpAsmOpCode() {
+    return getAsmOpCode(getFirstEpAsmInstruction());
+}
+
 
 // Every time I start writing bad code I get hit with my head on the keybofewuihdsowefjfqodgsa79dowqhdsioefurogrwhuoguethuhofrwyi
