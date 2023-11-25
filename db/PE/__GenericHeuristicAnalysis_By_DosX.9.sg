@@ -1207,7 +1207,7 @@ function scanForObfuscations_Native() {
 
     var isNopPaddingPresent = false;
 
-    if (!isStartsWithNop && getEpAsmPattern(onlyOpCodes = true, numberOf = 5).indexOf(getInstructionAsmPattern("NOP|NOP")) !== -1) {
+    if (!isStartsWithNop && getEpAsmPattern(onlyOpCodes = true, numberOf = 5).indexOf(getInstructionsAsmPattern(["NOP", "NOP"])) !== -1) {
         isNopPaddingPresent = true;
     }
 
@@ -1240,18 +1240,20 @@ const _patternSplitter = "|";
 function getEpAsmPattern(onlyOpCodes, numberOf) {
     var result = _patternSplitter;
 
-    var toDisasm = PE.getAddressOfEntryPoint();
+    var disasmAddress = PE.getAddressOfEntryPoint();
 
     for (var i = 0; i < numberOf; i++) {
 
         if (i >= 1) {
-            toDisasm = PE.getDisasmNextAddress(toDisasm);
+            disasmAddress = PE.getDisasmNextAddress(disasmAddress);
         }
+
+        const asmInstruction = PE.getDisasmString(disasmAddress);
 
         result += (
             onlyOpCodes ?
-            getAsmOpCode(PE.getDisasmString(toDisasm)) : // "MOV"
-            PE.getDisasmString(toDisasm) // "MOV EAX, 4"
+            getAsmOpCode(asmInstruction) : // "MOV"
+            asmInstruction // "MOV EAX, 4"
         ) + _patternSplitter;
     }
 
@@ -1263,10 +1265,19 @@ function getEpAsmPattern(onlyOpCodes, numberOf) {
 // pattern divided through a separator (_patternSplitter)
 //
 // like "|OPCODE1|OPCODE2|OPCODE3|".indexOf("|OPCODE2|")
-// but  "|OPCODE1|OPCODE2|OPCODE3|".indexOf(getInstructionAsmPattern("OPCODE2"))
+// but  "|OPCODE1|OPCODE2|OPCODE3|".indexOf(getInstructionsAsmPattern("OPCODE2"))
+//  or
+// like "|OPCODE1|OPCODE2|OPCODE3|".indexOf("|OPCODE2|OPCODE3|")
+// but  "|OPCODE1|OPCODE2|OPCODE3|".indexOf(getInstructionsAsmPattern(["OPCODE2", "OPCODE3"]))
 
-function getInstructionAsmPattern(instruction) {
-    return _patternSplitter + instruction + _patternSplitter;
+function getInstructionsAsmPattern(instruction) {
+    return _patternSplitter +
+        (
+            Array.isArray(instruction) ?
+            instruction.join(_patternSplitter) :
+            instruction
+        ) +
+        _patternSplitter;
 }
 
 
