@@ -34,6 +34,10 @@
 // Author: DosX
 // E-Mail: collab@kay-software.ru
 // GitHub: https://github.com/DosX-dev
+// Telegram: @DosX_Plus
+// ================================================
+// If I don't respond to email, message to Telegram
+// ================================================
 
 // Please do not read the code out loud unless you have exorcism skills
 
@@ -1033,7 +1037,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     // Clean up: release the dictionary
     sectionNamesDictionary = undefined;
 
-    // If there are repeating section names, add "Section names repeating" to options
     if (isCollisionInSectionsPresent) options += (options.length != 0 ? " + " : "") + "Section names repeating";
 
 
@@ -1054,7 +1057,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             isStartsWithStackOperation = true;
     }
 
-    // If the first instruction at entry point starts with a stack operation, add to options
     if (isStartsWithStackOperation) options += (options.length != 0 ? " + " : "") + "Strange \"" + firstEpAsmOpCode.toLowerCase() + "\" at EP";
 
 
@@ -1133,6 +1135,69 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     if (isHighEntropy) options += (options.length != 0 ? " + " : "") + "High entropy";
+
+
+
+
+    var isImportsLikePacker = false;
+
+    const dbCollectionDictionary = [
+        // packers
+        ["UPX", "0.59-0.93", 0, 0xd4fdcab1],
+        ["UPX", "0.94-1.93", 0, 0x1d51299a],
+        ["UPX", "1.94-2.03", 0, 0xb3318086],
+        ["UPX", "1.94-2.03", 0, 0x3778aab9],
+        ["UPX", "2.90-3.XX", 0, 0xf375ee03],
+        ["UPX", "2.90-3.XX", 0, 0xf737d853],
+        ["UPX", "3.91+", 0, 0xf737d853],
+        ["UPX", "3.91+", -1, 0x82a048fc],
+        ["UPX", "3.91+", -1, 0x554a1748],
+        ["NSPACK", "", 0, 0xf375ee03],
+        ["ASPack", "1.XX-2.XX", 0, 0x1272f45b],
+        ["MKFPACK", "", 0, 0x42b3e7f9],
+        ["MPRESS", "", 0, 0x174efb84],
+        ["PACKMAN", "0.0.0.1", 0, 0x174efb84],
+        ["PACKMAN", "1.0", 0, 0x69076a83],
+        ["PECompact", "1.30-1.40", 0, 0x9b3305ed],
+        ["PECompact", "1.40-1.84", 0, 0xcc5b2a3c],
+        ["PECompact", "2.40-3.XX", 0, 0x2652ce4f],
+        ["EXE32PACK", "1.3X-1.4X", 0, 0x174efb84],
+        ["EZIP", "1.0", -1, 0x051946f7],
+        ["JDPACK", "2.00", 0, 0xc002db0e],
+        ["CRINKLER", "", 0, 0x0b0e1fbf],
+        // protectors
+        ["ASProtect", "1.XX-2.XX", 0, 0x1272f45b],
+        ["SHRINKER", "3.2", 0, 0xb2a64858],
+        ["SHRINKER", "3.2", 0, 0x158af2d0],
+        ["SHRINKER", "3.2", 0, 0x49e8aa1f],
+        ["SHRINKER", "3.5", 0, 0xe9ea0851],
+        ["SHRINKER", "3.5", 0, 0x3344b95d],
+        ["SHRINKER", "3.5", 0, 0x586088f3],
+        ["Enigma", "1.00-3.60", 0, 0xc002db0e],
+        ["Enigma", "2.XX", 0, 0xdd92de10],
+        ["Enigma", "3.70+", 0, 0xd04c7a50],
+        ["PCGUARD", "5.04-5.05", 0, 0x5a169c7a],
+        ["PCGUARD", "5.04-5.05", 0, 0x0b0b2965],
+        ["eXPressor", "1.4.5.X", 0, 0x427816ab],
+        ["eXPressor", "1.4.5.X", 1, 0x0c16df2d],
+        ["VMProtect", "1.70", -1, 0x1ff3103f],
+        ["VMProtect", "1.70", -1, 0x0c16df2d],
+        ["VMProtect", "2.0.3-2.13", -1, 0x9d12b153],
+        ["VMProtect", "3.0.0", -1, 0x1e5500c1],
+        ["VMProtect", "3.0.9", -1, 0xc5fb6a4b],
+        ["VMProtect", "3.2.0-3.5.0", 0xFFFFFFFF, 0x5caa99c7]
+    ];
+
+    const hashResultPattern = validateImportHashes(dbCollectionDictionary);
+
+    if (hashResultPattern != null) {
+        isImportsLikePacker = true;
+    }
+
+    // Clean up: release the dictionary
+    dbCollectionDictionary = undefined;
+
+    if (isImportsLikePacker) options += (options.length != 0 ? " + " : "") + "Imports like " + hashResultPattern[0] + (hashResultPattern[1].length != 0 ? " v" + hashResultPattern[1] : "");
 
 
 
@@ -1458,6 +1523,25 @@ function getAsmOpCode(instruction) {
 
 function getFirstEpAsmOpCode() {
     return getAsmOpCode(getFirstEpAsmInstruction());
+}
+
+
+function validateImportHashes(dbCollection) {
+    for (var i = 0; i < dbCollection.length; i++) {
+        const currentIndex = i,
+            currentArrayPattern = dbCollection[currentIndex];
+
+        const name = currentArrayPattern[0],
+            version = currentArrayPattern[1],
+            hash1 = currentArrayPattern[2],
+            hash2 = currentArrayPattern[3];
+
+        if (PE.isImportPositionHashPresent(hash1, hash2)) {
+            return currentArrayPattern;
+        }
+    }
+
+    return null;
 }
 
 
