@@ -34,7 +34,7 @@
 // Author: DosX
 // E-Mail: collab@kay-software.ru
 // GitHub: https://github.com/DosX-dev
-// Telegram: @DosX_Plus
+// Telegram: @DosX_exe
 // ================================================
 // If I don't respond to email, message to Telegram
 // ================================================
@@ -161,7 +161,7 @@ function scanForObfuscations_NET() {
     var isDosMessageModified = false;
 
     // Check if the specified DOS message is not found in the DOS stub
-    if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") == -1) {
+    if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") === -1) {
         isDosMessageModified = true;
     }
 
@@ -192,7 +192,7 @@ function scanForObfuscations_NET() {
             for (var x = 1; x < sectionName.length; x++) {
                 // Check if the character is in the badChars list
                 for (var d = 0; d < badChars.length; d++) {
-                    if (sectionName[x] == badChars[d]) {
+                    if (sectionName[x] === badChars[d]) {
                         strangeSections = true;
                         break;
                     }
@@ -483,7 +483,7 @@ function scanForObfuscations_NET() {
         options += (options.length != 0 ? " + " : "") + "Fake signatures";
     } else {
         // "Watermark" is only possible in the absence of fake signatures
-        if ((signaturesCounter == 1 ||
+        if ((signaturesCounter === 1 ||
                 validateSignature("'Obfuscated'") ||
                 validateSignature("'obfuscated'") ||
                 validateSignature("'ByAttribute'") ||
@@ -959,6 +959,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             }
         }
 
+        if (entryLikePacker) options += (options.length != 0 ? " + " : "") + "EntryPoint";
+
 
 
 
@@ -985,13 +987,148 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         // Check for strange calls if entry point is in the last section
         var isStrangeCalls = false;
 
-        if (isLastSectionEP && getAsmOpCode(getAsmInstructionByIndex(1)) == "CALL") {
+        if (isLastSectionEP && getAsmOpCode(getAsmInstructionByIndex(1)) === "CALL") {
             isStrangeCalls = true;
         }
 
         if (isStrangeCalls) options += (options.length != 0 ? " + " : "") + "Strange call";
 
     }
+
+
+
+
+    var isImportsLikePacker = false;
+
+    var dbCollectionOfHashesDictionary = [
+        // packers
+        ["UPX", "0.59-0.93", 0, 0xd4fdcab1],
+        ["UPX", "0.94-1.93", 0, 0x1d51299a],
+        ["UPX", "1.94-2.03", 0, 0xb3318086],
+        ["UPX", "1.94-2.03", 0, 0x3778aab9],
+        ["UPX", "2.90-3.XX", 0, 0xf375ee03],
+        ["UPX", "2.90-3.XX", 0, 0xf737d853],
+        ["UPX", "3.91+", 0, 0xf737d853],
+        ["UPX", "3.91+", -1, 0x82a048fc],
+        ["UPX", "3.91+", -1, 0x554a1748],
+        ["NSPACK", "", 0, 0xf375ee03],
+        ["ASPack", "1.XX-2.XX", 0, 0x1272f45b],
+        ["MKFPACK", "", 0, 0x42b3e7f9],
+        ["MPRESS", "", 0, 0x174efb84],
+        ["PACKMAN", "0.0.0.1", 0, 0x174efb84],
+        ["PACKMAN", "1.0", 0, 0x69076a83],
+        ["PECompact", "0.90-0.91", -1, 0xbea416d1],
+        ["PECompact", "0.92-0.94", -1, 0x93312c2e],
+        ["PECompact", "0.97-0.971b", -1, 0xe6aa8495],
+        ["PECompact", "0.975-1.10b3", -1, 0x29188619],
+        ["PECompact", "1.10b7-1.34", -1, 0xe4c11305],
+        ["PECompact", "1.30-1.40", 0, 0x9b3305ed],
+        ["PECompact", "1.40-1.84", 0, 0xcc5b2a3c],
+        ["PECompact", "2.40-3.XX", 0, 0x2652ce4f],
+        ["PECompact", "2.40-3.XX", -1, 0xdb8fbb75],
+        ["EXE32PACK", "1.3X-1.4X", 0, 0x174efb84],
+        ["tElock", "1.0", -1, 0x051946f7],
+        ["JDPACK", "2.00", 0, 0xc002db0e],
+        ["CRINKLER", "", 0, 0x0b0e1fbf],
+        ["WinUpack", "", 0x134c8cd1e, 0x29188619],
+        ["YodasCrypter", "1.X", -1, 0x1303a51b],
+        ["XComp", "0.97-0.98", -1, 0xea1e66e4],
+        ["XPack", "0.97-0.98", -1, 0x2ac44dd2],
+        ["kkrunchy", "", -1, 0x29188619],
+        ["ANDPakk2", "0.18", -1, 0x29188619],
+        // protectors
+        ["ASProtect", "1.XX-2.XX", 0, 0x1272f45b],
+        ["SHRINKER", "3.2", 0, 0xb2a64858],
+        ["SHRINKER", "3.2", 0, 0x158af2d0],
+        ["SHRINKER", "3.2", 0, 0x49e8aa1f],
+        ["SHRINKER", "3.5", 0, 0xe9ea0851],
+        ["SHRINKER", "3.5", 0, 0x3344b95d],
+        ["SHRINKER", "3.5", 0, 0x586088f3],
+        ["Enigma", "1.00-3.60", 0, 0xc002db0e],
+        ["Enigma", "2.XX", 0, 0xdd92de10],
+        ["Enigma", "3.70+", 0, 0xd04c7a50],
+        ["PCGUARD", "5.04-5.05", 0, 0x5a169c7a],
+        ["PCGUARD", "5.04-5.05", 0, 0x0b0b2965],
+        ["eXPressor", "1.2", -1, 0x66b35c6e],
+        ["eXPressor", "1.2", -1, 0x32f4466c],
+        ["eXPressor", "1.3", -1, 0x921d0280],
+        ["eXPressor", "1.3", -1, 0xf51eba68],
+        ["eXPressor", "1.3", -1, 0xbc84ce09],
+        ["eXPressor", "1.4.5.X", 0, 0x427816ab],
+        ["eXPressor", "1.4.5.X", -1, 0x3c705cae],
+        ["eXPressor", "1.4.5.X", -1, 0x4d02e093],
+        ["eXPressor", "1.4.5.X", -1, 0x958a9ea2], // VB6
+        ["eXPressor", "1.4.5.X", 1, 0x0c16df2d],
+        ["eXPressor", "1.5.0.X", -1, 0x7ababb5a],
+        ["eXPressor", "1.5.0.X", -1, 0x95ca15e4],
+        ["eXPressor", "1.5.0.X", -1, 0xbd41da20],
+        ["eXPressor", "1.6", -1, 0xca58fa0c],
+        ["eXPressor", "1.6.1", -1, 0x48ffd359],
+        ["VMProtect", "1.70", -1, 0x1ff3103f],
+        // ["VMProtect", "1.70", -1, 0x0c16df2d],
+        ["VMProtect", "2.0.3-2.13", -1, 0x9d12b153],
+        ["VMProtect", "3.0.0", -1, 0x1e5500c1],
+        ["VMProtect", "3.0.9", -1, 0xc5fb6a4b],
+        ["VMProtect", "3.2.0-3.5.0", -1, 0x5caa99c7],
+        ["YodasProtector", "1.0b", -1, 0x1303a51b]
+    ];
+
+    const importValidatingResult = validateImportHashes(dbCollectionOfHashesDictionary);
+
+    if (importValidatingResult != null) {
+        isImportsLikePacker = true;
+    }
+
+    // Clean up: release the dictionary
+    dbCollectionOfHashesDictionary = undefined;
+
+    if (isImportsLikePacker) options += (options.length != 0 ? " + " : "") + "Imports like " + importValidatingResult[0] + (importValidatingResult[1].length != 0 ? " (v" + importValidatingResult[1] + ")" : "");
+
+
+
+
+    var isSectionNameLikePacker = false;
+
+    var dbCollectionOfSectionNamesDictionary = [
+        ["UPX", "", "UPX1"],
+        ["UPX", "", "UPX2"],
+        ["UPX", "", "UPX3"],
+        ["VMProtect", "", ".vmp"],
+        ["VMProtect", "", ".vmp0"],
+        ["VMProtect", "", ".vmp1"],
+        ["VMProtect", "", ".vmp2"],
+        ["VMProtect", "", ".vmp3"],
+        ["ASPack", "1.08-2.XX", ".adata"],
+        ["ASPack", "2.XX", ".aspack"],
+        ["Petite", "", ".petite"],
+        ["Petite", "", "petite"],
+        ["Enigma", "", ".enigma1"],
+        ["Enigma", "", ".enigma2"],
+        [".NET Reactor", "2.XX", ".reacto"],
+        ["Themida", "3.X", ".imports"],
+        ["Themida", "3.X", ".themida"],
+        ["Themida", "3.X", ".winlice"],
+        ["Themida", "3.X", ".loadcon"],
+        ["ASM Guard", "2.XX", "ASMGUARD"],
+        ["ASM Guard", "2.XX", ".asmg"],
+        ["tElock", "", "UPX!"], // ???
+        ["YodasProtector", "1.0b", ".yP"],
+        ["YodasCrypter", "1.X", "yC"],
+        ["MPRESS", "", ".MPRESS0"],
+        ["MPRESS", "", ".MPRESS1"],
+        ["DxPack", "1.0", "coderpub"]
+    ];
+
+    const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDictionary);
+
+    if (sectionNamesValidatingResult != null) {
+        isSectionNameLikePacker = true;
+    }
+
+    // Clean up: release the dictionary
+    dbCollectionOfSectionNamesDictionary = undefined;
+
+    if (isSectionNameLikePacker) options += (options.length != 0 ? " + " : "") + "Sections like " + sectionNamesValidatingResult[0] + (sectionNamesValidatingResult[1].length != 0 ? " (v" + sectionNamesValidatingResult[1] + ")" : "");
 
 
 
@@ -1057,7 +1194,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             isStartsWithStackOperation = true;
     }
 
-    if (isStartsWithStackOperation) options += (options.length != 0 ? " + " : "") + "Strange \"" + firstEpAsmOpCode.toLowerCase() + "\" at EP";
+    if (isStartsWithStackOperation) options += (options.length != 0 ? " + " : "") + "\"" + firstEpAsmOpCode.toLowerCase() + "\" at EP";
 
 
 
@@ -1129,75 +1266,12 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var isHighEntropy = false;
 
     // Checks for high entropy (ignore overlay)
-    if (!(PE.isDll() && PE.isSectionNamePresent(".rdata")) && // .dll with resources
+    if (!(PE.isDll() && (PE.isSectionNamePresent(".rdata") || PE.isSectionNamePresent(".rsrc"))) && // .dll with resources
         PE.calculateEntropy(0x00, PE.getSize() - PE.getOverlaySize()) > 7.2) {
         isHighEntropy = true;
     }
 
     if (isHighEntropy) options += (options.length != 0 ? " + " : "") + "High entropy";
-
-
-
-
-    var isImportsLikePacker = false;
-
-    const dbCollectionDictionary = [
-        // packers
-        ["UPX", "0.59-0.93", 0, 0xd4fdcab1],
-        ["UPX", "0.94-1.93", 0, 0x1d51299a],
-        ["UPX", "1.94-2.03", 0, 0xb3318086],
-        ["UPX", "1.94-2.03", 0, 0x3778aab9],
-        ["UPX", "2.90-3.XX", 0, 0xf375ee03],
-        ["UPX", "2.90-3.XX", 0, 0xf737d853],
-        ["UPX", "3.91+", 0, 0xf737d853],
-        ["UPX", "3.91+", -1, 0x82a048fc],
-        ["UPX", "3.91+", -1, 0x554a1748],
-        ["NSPACK", "", 0, 0xf375ee03],
-        ["ASPack", "1.XX-2.XX", 0, 0x1272f45b],
-        ["MKFPACK", "", 0, 0x42b3e7f9],
-        ["MPRESS", "", 0, 0x174efb84],
-        ["PACKMAN", "0.0.0.1", 0, 0x174efb84],
-        ["PACKMAN", "1.0", 0, 0x69076a83],
-        ["PECompact", "1.30-1.40", 0, 0x9b3305ed],
-        ["PECompact", "1.40-1.84", 0, 0xcc5b2a3c],
-        ["PECompact", "2.40-3.XX", 0, 0x2652ce4f],
-        ["EXE32PACK", "1.3X-1.4X", 0, 0x174efb84],
-        ["EZIP", "1.0", -1, 0x051946f7],
-        ["JDPACK", "2.00", 0, 0xc002db0e],
-        ["CRINKLER", "", 0, 0x0b0e1fbf],
-        // protectors
-        ["ASProtect", "1.XX-2.XX", 0, 0x1272f45b],
-        ["SHRINKER", "3.2", 0, 0xb2a64858],
-        ["SHRINKER", "3.2", 0, 0x158af2d0],
-        ["SHRINKER", "3.2", 0, 0x49e8aa1f],
-        ["SHRINKER", "3.5", 0, 0xe9ea0851],
-        ["SHRINKER", "3.5", 0, 0x3344b95d],
-        ["SHRINKER", "3.5", 0, 0x586088f3],
-        ["Enigma", "1.00-3.60", 0, 0xc002db0e],
-        ["Enigma", "2.XX", 0, 0xdd92de10],
-        ["Enigma", "3.70+", 0, 0xd04c7a50],
-        ["PCGUARD", "5.04-5.05", 0, 0x5a169c7a],
-        ["PCGUARD", "5.04-5.05", 0, 0x0b0b2965],
-        ["eXPressor", "1.4.5.X", 0, 0x427816ab],
-        ["eXPressor", "1.4.5.X", 1, 0x0c16df2d],
-        ["VMProtect", "1.70", -1, 0x1ff3103f],
-        ["VMProtect", "1.70", -1, 0x0c16df2d],
-        ["VMProtect", "2.0.3-2.13", -1, 0x9d12b153],
-        ["VMProtect", "3.0.0", -1, 0x1e5500c1],
-        ["VMProtect", "3.0.9", -1, 0xc5fb6a4b],
-        ["VMProtect", "3.2.0-3.5.0", 0xFFFFFFFF, 0x5caa99c7]
-    ];
-
-    const hashResultPattern = validateImportHashes(dbCollectionDictionary);
-
-    if (hashResultPattern != null) {
-        isImportsLikePacker = true;
-    }
-
-    // Clean up: release the dictionary
-    dbCollectionDictionary = undefined;
-
-    if (isImportsLikePacker) options += (options.length != 0 ? " + " : "") + "Imports like " + hashResultPattern[0] + (hashResultPattern[1].length != 0 ? " v" + hashResultPattern[1] : "");
 
 
 
@@ -1316,20 +1390,28 @@ function scanForObfuscations_Native() {
     for (var i = 0; i != PE.getNumberOfSections(); i++) {
         var sectionName = PE.getSectionName(i);
 
+        if (sectionName.length === 0 || sectionName[0] === " ") {
+            strangeSections = true;
+
+            break;
+        }
+
         // If section name is too short, skip to the next iteration
-        if (sectionName.length < 2) break;
+        if (sectionName.length > 1) {
+            for (var x = 0; x < sectionName.length; x++) {
+                for (var d = 0; d < badChars.length; d++) {
+                    // If forbidden character is found, set flag and break
+                    if (sectionName[x] === badChars[d]) {
+                        strangeSections = true;
 
-        for (var x = 0; x < sectionName.length; x++) {
-            for (var d = 0; d < badChars.length; d++) {
-                // If forbidden character is found, set flag and break
-                if (sectionName[x] == badChars[d]) {
-                    strangeSections = true;
-
-                    // Break the loop if a match is found
-                    break;
+                        // Break the loop if a match is found
+                        break;
+                    }
                 }
             }
         }
+
+
     }
 
     // If section names contain forbidden characters, add to options
@@ -1343,7 +1425,7 @@ function scanForObfuscations_Native() {
         isCustomDosPresent = false;
 
     // If DOS stub size is 0, set flag for missing DOS
-    if (PE.getDosStubSize() == 0) {
+    if (PE.getDosStubSize() === 0) {
         isDosMissing = true;
     } else {
         // Define messages to check for custom DOS
@@ -1379,7 +1461,7 @@ function scanForObfuscations_Native() {
     var isStartsWithBreakPoint = false;
 
     // If the first instruction is a breakpoint, set the flag to true
-    if (getFirstEpAsmInstruction() == "INT 3") // int 3 (CC or CD 03)
+    if (getFirstEpAsmInstruction() === "INT 3") // int 3 (CC or CD 03)
         isStartsWithBreakPoint = true;
 
     if (isStartsWithBreakPoint) options += (options.length != 0 ? " + " : "") + "Suspicious break at EP";
@@ -1391,7 +1473,7 @@ function scanForObfuscations_Native() {
     var isStartsWithNop = false;
 
     // Condition to check if the first instruction is NOP
-    if (getFirstEpAsmInstruction() == "NOP") { // nop (90)
+    if (getFirstEpAsmInstruction() === "NOP") { // nop (90)
         isStartsWithNop = true;
     }
 
@@ -1479,7 +1561,7 @@ function getAsmInstructionByIndex(index) {
         }
 
         // If the current iteration matches the specified index, retrieve the instruction
-        if (i == index) {
+        if (i === index) {
             const asmInstruction = PE.getDisasmString(disasmAddress);
 
             // Return the assembly instruction
@@ -1537,6 +1619,24 @@ function validateImportHashes(dbCollection) {
             hash2 = currentArrayPattern[3];
 
         if (PE.isImportPositionHashPresent(hash1, hash2)) {
+            return currentArrayPattern;
+        }
+    }
+
+    return null;
+}
+
+
+function validateSectionNames(dbCollection) {
+    for (var i = 0; i < dbCollection.length; i++) {
+        const currentIndex = i,
+            currentArrayPattern = dbCollection[currentIndex];
+
+        const name = currentArrayPattern[0],
+            version = currentArrayPattern[1],
+            sectionName = currentArrayPattern[2];
+
+        if (PE.isSectionNamePresent(sectionName)) {
             return currentArrayPattern;
         }
     }
