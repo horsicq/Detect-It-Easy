@@ -419,7 +419,8 @@ function detect(bShowType,bShowVersion,bShowOptions) {
             if(cp) sOptionT(File.read_ansiString(cp,0x100));
         }
     }
-    else if(Binary.compare("'NuS.PHIPPS'",0x22)) {
+    else if(Binary.compare("000003F3") && Binary.compare("70FF4E75'S.PHIPPS'",0x20) &&
+      0 < File.read_int32(0x40,_BE) < File.getSize() && 0 < File.read_int32(0x44,_BE) < File.getSize() ) {
         bDetected = 1;
         sName = "Code Design module (.CORE)";
         if(Binary.isVerbose()) {
@@ -1195,10 +1196,17 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         }
     }
     else if(Binary.compare("'GLUE'B8B3AABA")) {
+        //TODO reverse & find calcsize
         bDetected = 1;
         sName = "GlueMon module (.GLUE)";
-        if(Binary.isVerbose())
-            sOption(File.read_ansiString(8,8));
+        if(Binary.isVerbose()) {
+            sOptionT(File.read_ansiString(8,8));
+            ins = File.read_uint8(0x7F);
+            ord = File.read_uint8(0x9E); ptn = 0;
+            for(i=0; i < ord; i++) { t = File.read_uint8(0x9F+i); if(t != 0xFF && ptn < t) ptn = t }
+            ptn++;
+            sOption("ord:"+ord+" ptn:"+ptn+" ins:"+ins)
+        }
     }
     else if(Binary.compare("'NuFREDGRAY'",0x22)) {
         bDetected = 1;
@@ -1674,16 +1682,18 @@ function detect(bShowType,bShowVersion,bShowOptions) {
     }
     else if(Binary.compare("'FORM'........'MMV8SDAT'................'SE'")) {
         bDetected = 1;
-        sName = "Music Maker module (.MM8)";
+        sName = "Music Maker EXT module (.MM8,.MM4)";
         sVersion = "v8";
         if(Binary.isVerbose()) {
             sOptionT(File.read_ansiString(0x1A,0x14));
             sOptionT(File.read_ansiString(0x36,0x29));
+            sOption(File.read_int32(4,_BE)+8,"sz:")
         }
     }
-    else if(Binary.compare("'SEI1XX'")) { //TODO find more than 2 files to test on :)
+    //TODO insert the SDATA format of Music Maker
+    else if(Binary.compare("'SEI1XX'00")) { //TODO find more than 2 files to test on :)
         bDetected = 1;
-        sName = "Music Maker module (.IP)";
+        sName = "Music Maker STD instrument (.IP)";
         sVersion = "v8 old";
     }
     else if(Binary.compare("'SO31'",0x7C)) {
@@ -2720,6 +2730,35 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
             sOptionT(File.read_codePageString(0x8C,0x20,"CP1252"),"orig.: ")
         }
     }
+    if(Binary.compare("00000000 00000200",0x0C) && Binary.compare("00")
+      && File.read_uint16(0x18,_LE) === File.read_uint16(0x40,_LE)
+      && Binary.compare("00'ST-Module.'", 0x4B7)) {
+        sName = "Amstrad CPC Soundtrakker module (.STK)"; bDetected = 1;
+        datasz = File.read_uint16(0x18,_LE); sz = datasz + 0x80;
+        if(sz != File.getSize()) sVersion = "malformed";
+        if(Binary.isVerbose())
+            sOptionT(File.read_ansiString(1,8));
+            sOption("sz:"+sz)
+    }
+    else if(Binary.compare("00000000 00000200",0x0C) && Binary.compare("00")
+      && File.read_uint16(0x18,_LE) === File.read_uint16(0x40,_LE)
+      && File.read_ansiString(1,8) === File.read_ansiString(0xB10,8)) {
+        sName = "Amstrad CPC Soundtrakker 128K module (.128)"; bDetected = 1;
+        datasz = File.read_uint16(0x18,_LE); sz = datasz + 0x80;
+        if(sz != File.getSize()) sVersion = "malformed";
+        if(Binary.isVerbose())
+            sOptionT(File.read_ansiString(1,8));
+            inst = []; ins = 0;
+            for(i=0; i < 16; i++) if(![0,0x20].indexOf(File.read_uint8(0xB18+8*i))) {
+                ins++; inst.push(File.read_ansiString(0xB18+8*i,8).trim())
+            } //TODO confirm that that's how to count the instruments
+            sOption(inst);
+            sOption("ins:"+ins+" sz:"+sz)
+    }
+    else if(Binary.compare("00'ST-Module.'",0x437)) {
+        sName = "Amstrad CPC Soundtrakker module (.STK)"; bDetected = 1;
+        sVersion = "headerless"
+    }
     else if(Binary.compare("'SCRM'", 0x2C)) {
         //ref https://moddingwiki.shikadi.net/wiki/S3M_Format
         // & https://github.com/OpenMPT/openmpt/blob/master/soundlib/S3MTools.h & Load_s3m.cpp
@@ -3244,11 +3283,10 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
         bDetected = 1; sName = "SunVox module (.SUNVOX)";
         if(Binary.isVerbose()) {
             p=8;
-            t=''; ef=false; bpm=0; spd=0; tme=0; ptn=0; gen=0;
+            t=''; bpm=0; spd=0; tme=0; ptn=0; blk=0;
             while (p < File.getSize()) {
-                hkhd = File.read_ansiString(p,4);
-                hksz = File.read_uint32(p+4,_LE);
-                p += 0x08; //chunk header = 4xfourcc + 4xsize
+                hkhd = File.read_ansiString(p,4); p += 4;
+                hksz = File.read_uint32(p,_LE); p += 4;
                 switch(hkhd) {
                     case "VERS":
                         nV = File.read_uint32(p,_LE); aV=[];
@@ -3265,15 +3303,14 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
                     case "BPM ": bpm = File.read_uint32(p,_LE); break;
                     case "SPED": spd = File.read_uint32(p,_LE); break;
                     case "TIME": tme = File.read_uint32(p,_LE); break;
-                    case "LGEN": gen = File.read_uint32(p,_LE); break;
-                    case "PATN": ptn = File.read_uint32(p,_LE); break;
-                    case "PDTA": ef = true; p = File.getSize(); break
+                    case "SNAM": blk++; break;
+                    case "PDTA": ptn++; break;
                 }
-                if(ef) break; p += hksz;
+                p += hksz;
             }
             sOptionT(t);
             if(bpm > 0) sOption(bpm,"bpm:"); if(spd > 0) sOption(spd,"spd:");
-            if(tme > 0) sOption(tme,"time:"); if(ptn > 0) sOption(ptn,"ptn:"); if(gen > 0) sOption(gen,"gen:");
+            if(tme > 0) sOption(tme,"time:"); if(ptn > 0) sOption(ptn,"ptn:"); if(blk > 0) sOption(blk,"blk:");
         }
     }
     else if(Binary.compare("'SymM'")) {
@@ -3348,7 +3385,7 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
         sOption(t); sOption(ch,"ch:"); sOption(len,"len:"); sOption(tmp,"tmp:");
         if(extsmp) sOption("extsmp"); if(pro) sVersion+="/Pro"
     }
-    else if(Binary.compare("'Synth'")) {
+    else if(Binary.compare("'Synth'") && !Binary.compare("'esi'",5)) {
         bDetected = 1;
         sName = "Synthesis module (.SYN)";
         if(Binary.compare("'Synth'",0x1F0E)) {
@@ -5553,6 +5590,113 @@ if(!bDetected && Binary.isDeepScan() && isImagesMusicSystem()) {
         sOption("ord:"+ord+" ptn:"+ptn+" smp:"+smp+" sz:"+sz)
     }
 }
+
+function isSMUS() {
+    //from https://zakalwe.fi/uade/uade3/uade-3.03.tar.bz2 / uade/amigasrc/players/wanted_team/SonixMusicDriver/Sonix Music Driver_v1.asm
+    a0 = a1 = 0; title = "";
+    if(File.compare("'FORM'")) {
+        if(!File.compare("'SMUSSHDR'",8) || !File.read_uint8(0x17) || !File.compare("'NAME'",0x18))
+            return false;
+        d1 = File.read_uint32(0x1C,_BE); if(d1 >> 31) return false; t_ = d1;
+        d1 = (d1+1) & 0xFFFFFFFE; a1 = 0x20+d1;
+        if(!File.compare("'SNX1'",a1)) return false; a1 += 4;
+        d1 = File.read_uint32(a1,_BE); if(d1 >> 31) return false; a1 += 4;
+        d1 = (d1+1) & 0xFFFFFFFE; a1 += d1;
+        insinfp = a1;
+        realsmp = []; ins = 0;
+        do { //MoreIns
+            if(!File.compare("'INS1'",a1)) return false; a1 += 4;
+            d1 = File.read_uint32(a1,_BE); if(d1 >> 31) return false; a1 += 4;
+            d1 = (d1+1) & 0xFFFFFFFE; if((d1 >> 24) > 0x3F) return false;
+            if(File.read_uint8(a1+1)) return false;
+            realsmp.push(File.read_uint8(a1));
+            a1 += d1; ins++
+        } while(!File.compare("'TRAK'",a1));
+        title = File.read_ansiString(0x20,t_)
+        fmt = 2; sV = "smus"
+    }
+    else {
+        if(!(File.read_uint16(0,_BE) & 0xF0)) {
+            d3 = 20; d1 = 4;
+            while(d1) {
+                d2 = File.read_int32(a0,_BE); if(d2 <= 0 || (d2&1)) return false;
+                a0 += 4; d3 += d2; d1--
+            }
+            if(d3 >= File.getSize()) return false;
+            a0 += 4; d1 = 4;
+            while(d1) {
+                t = File.read_uint16(a0,_BE); if(!(t & 8000)) return false;
+                if(t != 0xFFFF) if((t >>16) > 0x84) return false;
+                a0 += File.read_int32(a1,_BE); a1 += 4; d1--
+            }
+            if(!File.read_uint8(a0)) return false;
+            fmt = 0; sV = "snx"
+        }
+        else { //TinyCheck
+            if(File.getSize() < 333) return false;
+            a1 = 0x30; if(File.read_int32(a1,_BE) != 0x140) return false;
+            a1 += 4; d1 = 3;
+            while(d1) { //NextPos2
+                d2 = File.read_int32(a1,_BE); a1 += 4;
+                if(d2 <= 0 || (d2&1) || d2 > File.getSize()) return false;
+                if(File.read_int16(d2,_BE) != -1) {
+                    if(File.read_int32(d2,_BE) || File.read_int16(d2+4,_BE)) return false;
+                    t = File.read_uint8(d2+6,_BE); if(!(t&0x80) || t > 0x82) return false
+                }
+                d1--
+            }
+            fmt = 1; sV = "tiny"
+        }
+    }
+    //TODO CalcSize
+    return true
+}
+if(!bDetected && Binary.isDeepScan() && isSMUS()) {
+    sName = " Sonix Music Driver module (.SMUS)"; sVersion = "f."+sV; bDetected = 1;
+    if(Binary.isVerbose()) {
+        if(title != "") sOption(title)
+    }
+}
+
+function isAMBK() {
+    //from https://zakalwe.fi/uade/uade3/uade-3.03.tar.bz2 / uade/amigasrc/players/ambk/AMOS.s
+    if(File.compare("'AmBk'")) a0 = p = 4; else if(File.compare("C0")) a0 = p = 0; else return false;
+    if(!File.compare("80",p+4)) return false;
+    if(!File.compare("'Music   '",p+8)) return false;
+    p += 0x14; p += File.read_int32(p,_BE);
+    if(File.read_int16(p,_BE) != 6) return false; p += 2;
+    p += File.read_int16(p,_BE);
+    p = File.read_int16(p,_BE); if(p && p != -2) return false;
+
+    if(a0) d3 = 4+(File.read_int32(a0+4,_BE) & 0xFFFFFF);
+    else d3 = File.read_int32(a0,_BE) & 0xFFFFFF; sz = d3+8;
+    p = a0+0x14; p += File.read_int32(p,_BE)+2;
+    p += File.read_int16(p+6,_BE);
+    d0 = 0;
+    while(p < File.getSize()) {
+        t = File.read_int16(p,_BE); p += 4; if(t < 0) break;
+        if(t > d0) d0 = t
+    }
+    d5 = d0; d0++;
+    if(!File.read_int16(p,_BE)) p += 2;
+    q = a0+0x20; d1 = File.read_int16(q,_BE)-1; q += 0x10;
+    d7 = 0;
+    while(t >= 0) {
+        d2 = File.read_int16(q,_BE);
+        if(!d2) d2 = File.read_int16(q-6,_BE);
+        d7 += d2 << 1; q += 0x20; t--
+    }
+    smpsz = d7;
+    songsz = sz-d7;
+    return true
+}
+if(!bDetected && Binary.isDeepScan() && isAMBK()) {
+    sName = " AMOS Music Bank module (.ABK)"; bDetected = 1;
+    if(Binary.isVerbose()) {
+        sOption("sz:"+sz+" smpsz:"+Hex(smpsz)+" songsz:"+Hex(songsz))
+    }
+}
+
 
 // function isTuneFish4() {
 //     // taken from tunefish src\tunefish4\source\synth\tfrecorder.cpp
