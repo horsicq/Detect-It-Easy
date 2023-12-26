@@ -1,5 +1,5 @@
 // DIE's signature file
-// Author: Jason Hood <jadoxa@yahoo.com.au>
+// Authors: Jason Hood <jadoxa@yahoo.com.au>, Kae <TG@kaens>
 
 init("image","Windows Cursor");
 
@@ -13,10 +13,16 @@ function detect(bShowType,bShowVersion,bShowOptions)
         {
             // Find the biggest, assuming square.
             var nCount=Binary.readWord(4);
-            var nWidth=0,nHeight=0,nBPP=0;
+            var nWidth=0,nHeight=0,nBPP=0,sz=6+nCount*16;
+            if(sz === 6 || sz > File.getSize()) return false;
             var nHotX, nHotY;
             for(var i=0;i<nCount;i++)
             {
+                if(Binary.read_uint8(9+i*16)) return false;
+                sz_ = Binary.read_uint32(14+i*16,_LE);
+                if(!sz_ || sz_ > File.getSize()-22)
+                    return false;
+                sz += sz_;
                 var w=Binary.readByte(6+i*16);
                 if(w>nWidth)
                 {
@@ -47,6 +53,7 @@ function detect(bShowType,bShowVersion,bShowOptions)
             {
                 sOptions=sOptions.append(nCount+" cursors");
             }
+            sOptions = sOptions.append("sz:"+sz);
             bDetected=1;
         }
     }
