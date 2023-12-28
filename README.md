@@ -58,10 +58,13 @@ which lie in the corresponding folder. Currently the program defines the followi
 
 Detect-It-Easy can be downloaded from the [release](https://github.com/horsicq/DIE-engine/releases) page.
 
+DIE library: https://github.com/horsicq/die_library
+
 ### Portable version (Linux)
 
 ```bash
 wget https://github.com/horsicq/DIE-engine/releases/download/3.08/Detect_It_Easy-3.08-x86_64.AppImage
+chmod +x Detect_It_Easy-3.08-x86_64.AppImage
 ```
 
 # Installing

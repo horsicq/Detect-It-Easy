@@ -81,11 +81,11 @@ function scanForObfuscations_NET() {
     var isEntryPointModified = false;
 
     const vbNetEntries = [
-        "Main",
-        "main",
-        "MAIN",
-        "MyApplication"
-    ],
+            "Main",
+            "main",
+            "MAIN",
+            "MyApplication"
+        ],
         defaultEntries = [ // like MSIL, C#, C++ NET etc
             "Main",
             "<Main>$" // For programs with top-level operators (C#)
@@ -143,7 +143,11 @@ function scanForObfuscations_NET() {
     if (!PE.isDll()) {
         if (!PE.is64()) {
             // FF2500????00: jmp dword ptr [ ... ]
-            if (getFirstEpAsmOpCode() !== "JMP") {
+            const firstOpCode = getFirstEpAsmOpCode();
+
+            if (firstOpCode !== "JMP") {
+                _log("Very strange EP pattern: " + getEpAsmPattern(onlyOpCodes = true, numberOf = 4).split("|").join(" .. "));
+
                 isNativeEntryPointModified = true;
             }
         } else { // AMD64
@@ -217,9 +221,9 @@ function scanForObfuscations_NET() {
 
     if (validateSignature(intConfusionXorPattern)) {
         if (validateSignature( // samples by: Inx Obfuscator
-            intConfusionXorPattern +
-            (opCodes.bne_un_s + opCodes.ldc_i4_2 + opCodes.stloc_0 + opCodes.sizeof + opCodes.add)
-        ) ||
+                intConfusionXorPattern +
+                (opCodes.bne_un_s + opCodes.ldc_i4_2 + opCodes.stloc_0 + opCodes.sizeof + opCodes.add)
+            ) ||
             validateSignature( // samples by: MindLated, NetShield
                 intConfusionXorPattern +
                 (opCodes.bne_un + opCodes.ldc_i4 + opCodes.stloc + opCodes.sizeof + opCodes.add)
@@ -263,6 +267,27 @@ function scanForObfuscations_NET() {
 
 
 
+    var callsEncrypt = false;
+
+    if (
+        isAllNetReferencesPresent(
+            references = [
+                "GetTypeFromHandle", // MSIL: 'System.Type::GetTypeFromHandle( ... )'
+                "BinaryReader", // MSIL: 'System.IO.BinaryReader'
+                "CreateDelegate", // MSIL: '[Delegate].CreateDelegate'
+                "MakeByRefType", // MSIL: 'System.Type::MakeByRefType()'
+                "DynamicMethod" // MSIL: 'System.Reflection.Emit.DynamicMethod'
+            ]
+        ) && !isFrameworkComponent()
+    ) {
+        callsEncrypt = true;
+    }
+
+    if (callsEncrypt) options += (options.length != 0 ? " + " : "") + "Calls encrypt";
+
+
+
+
     // https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.suppressildasmattribute
     var isAntiIldasmPresent = false;
 
@@ -293,9 +318,9 @@ function scanForObfuscations_NET() {
     var isCalliInvokesPresent = false;
 
     if (validateSignature( // samples by: MindLated
-        opCodes.setStrict(opCodes.ldftn, "?? ?? 00 0A") +
-        opCodes.setStrict(opCodes.calli, "?? 00 00 11")
-    ) ||
+            opCodes.setStrict(opCodes.ldftn, "?? ?? 00 0A") +
+            opCodes.setStrict(opCodes.calli, "?? 00 00 11")
+        ) ||
         validateSignature( // samples by: ArmDot, DarksProtector
             opCodes.idelem_i +
             opCodes.setStrict(opCodes.calli, "?? 00 00 11")
@@ -303,7 +328,7 @@ function scanForObfuscations_NET() {
         isCalliInvokesPresent = true;
     }
 
-    if (isCalliInvokesPresent) options += (options.length != 0 ? " + " : "") + "Calli Invokes";
+    if (isCalliInvokesPresent) options += (options.length != 0 ? " + " : "") + "Calli invokes";
 
 
 
@@ -311,9 +336,9 @@ function scanForObfuscations_NET() {
     var isCtrlFlowPresent = false;
 
     if (validateSignature( // samples by: ConfuserEx
-        opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s +
-        opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s
-    ) ||
+            opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s +
+            opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s
+        ) ||
         validateSignature( // samples by: ConfuserEx (neo mod)
             opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.dup + opCodes.stloc_0 + opCodes.ldc_i4_3 + opCodes.rem_un + opCodes.switch__nobody
         ) ||
@@ -358,7 +383,27 @@ function scanForObfuscations_NET() {
         isCtrlFlowPresent = true;
     }
 
-    if (isCtrlFlowPresent) options += (options.length != 0 ? " + " : "") + "Ctrl Flow";
+    if (isCtrlFlowPresent) options += (options.length != 0 ? " + " : "") + "Ctrl flow";
+
+
+
+
+    var isAntiTamperPresent = false;
+
+    if (
+        PE.isNetUStringPresent(" is tampered.") || // samples by: .NET Reactor
+        PE.isNetUStringPresent("ping 127.0.0.1 > nul") || // samples by: ConfuserEx (Trinity, SkiDzEx like)
+        validateSignature( // samples by: ConfuserEx
+            opCodes.ldloc_s + opCodes.ldc_i4_0 + opCodes.ldloc_s + opCodes.ldc_i4_0 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_0 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4 +
+            opCodes.ldloc_s + opCodes.ldc_i4_1 + opCodes.ldloc_s + opCodes.ldc_i4_1 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_1 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4 +
+            opCodes.ldloc_s + opCodes.ldc_i4_2 + opCodes.ldloc_s + opCodes.ldc_i4_2 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_2 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4 +
+            opCodes.ldloc_s + opCodes.ldc_i4_3 + opCodes.ldloc_s + opCodes.ldc_i4_3 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_3 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4
+        )
+    ) {
+        isAntiTamperPresent = true;
+    }
+
+    if (isAntiTamperPresent) options += (options.length != 0 ? " + " : "") + "Anti-tamper"
 
 
 
@@ -398,27 +443,27 @@ function scanForObfuscations_NET() {
     var isMathInversionsPresent = false;
 
     if (validateSignature(opCodes.ldc_i4 + opCodes.not) && (
-        validateSignature( // ~(-(~(-(~(-(~(-( num ))))))))
-            opCodes.ldc_i4 +
-            opCodes.not + opCodes.neg + opCodes.not + opCodes.neg +
-            opCodes.not + opCodes.neg + opCodes.not + opCodes.neg
-        ) ||
-        validateSignature( // ~(~(-(-(~(~( num ))))))
-            opCodes.ldc_i4 +
-            opCodes.not + opCodes.not + opCodes.neg + opCodes.neg +
-            opCodes.not + opCodes.not
-        ) ||
-        validateSignature( // ~(-(~(~(-(-( num ))))))
-            opCodes.ldc_i4 +
-            opCodes.not + opCodes.neg + opCodes.not + opCodes.not +
-            opCodes.neg + opCodes.neg
-        ) ||
-        validateSignature( // ~(-(~(-(~(~( num ))))))
-            opCodes.ldc_i4 +
-            opCodes.not + opCodes.neg + opCodes.not + opCodes.neg +
-            opCodes.not + opCodes.not
-        )
-    )) {
+            validateSignature( // ~(-(~(-(~(-(~(-( num ))))))))
+                opCodes.ldc_i4 +
+                opCodes.not + opCodes.neg + opCodes.not + opCodes.neg +
+                opCodes.not + opCodes.neg + opCodes.not + opCodes.neg
+            ) ||
+            validateSignature( // ~(~(-(-(~(~( num ))))))
+                opCodes.ldc_i4 +
+                opCodes.not + opCodes.not + opCodes.neg + opCodes.neg +
+                opCodes.not + opCodes.not
+            ) ||
+            validateSignature( // ~(-(~(~(-(-( num ))))))
+                opCodes.ldc_i4 +
+                opCodes.not + opCodes.neg + opCodes.not + opCodes.not +
+                opCodes.neg + opCodes.neg
+            ) ||
+            validateSignature( // ~(-(~(-(~(~( num ))))))
+                opCodes.ldc_i4 +
+                opCodes.not + opCodes.neg + opCodes.not + opCodes.neg +
+                opCodes.not + opCodes.not
+            )
+        )) {
         isMathInversionsPresent = true;
     }
 
@@ -462,10 +507,13 @@ function scanForObfuscations_NET() {
 
     var signaturesCounter = 0;
 
+    var obfuscatorAttributeFound = "";
+
     // Iterate through obfuscators attributes
     for (var t = 0; t < obfuscatorsAttributes.length; t++) {
-        // Check if the obfuscator attribute is present in the .NET object
+
         if (PE.isNetObjectPresent(obfuscatorsAttributes[t])) {
+            obfuscatorAttributeFound = obfuscatorsAttributes[t];
             signaturesCounter++;
         }
 
@@ -483,12 +531,19 @@ function scanForObfuscations_NET() {
         options += (options.length != 0 ? " + " : "") + "Fake signatures";
     } else {
         // "Watermark" is only possible in the absence of fake signatures
-        if ((signaturesCounter === 1 ||
-            validateSignature("'Obfuscated'") ||
-            validateSignature("'obfuscated'") ||
-            validateSignature("'ByAttribute'") ||
-            validateSignature("'ObfuscatorAttribute'") ||
-            PE.isNetObjectPresent("ObfuscationAttribute")) && !isFrameworkComponent()) // System.Reflection.ObfuscationAttribute
+
+        if (signaturesCounter === 1) {
+            _log("Watermark (Attribute) found: '" + obfuscatorAttributeFound + "'");
+            isWatermarkPresent = true;
+        }
+
+        if ((!isWatermarkPresent && (
+                validateSignature("'Obfuscated'") ||
+                validateSignature("'obfuscated'") ||
+                validateSignature("'ByAttribute'") ||
+                validateSignature("'ObfuscatorAttribute'") ||
+                PE.isNetObjectPresent("ObfuscationAttribute")
+            )) && !isFrameworkComponent()) // System.Reflection.ObfuscationAttribute
         {
             isWatermarkPresent = true;
         }
@@ -544,10 +599,10 @@ function scanForAntiAnalysis_NET() {
 
     if (
         (( // .NET Functions
-            PE.isNetObjectPresent(debuggerObject) || PE.isNETUnicodeStringPresent(debuggerObject) // Check for 'Debugger'
-        ) && (
-                (PE.isNetObjectPresent(isAttached) || PE.isNETUnicodeStringPresent(isAttached)) || // Check for 'get_IsAttached' property
-                (PE.isNetObjectPresent(isLogging) || PE.isNETUnicodeStringPresent(isLogging)) // Check for 'IsLogging' function
+                PE.isNetObjectPresent(debuggerObject) || PE.isNetUStringPresent(debuggerObject) // Check for 'Debugger'
+            ) && (
+                (PE.isNetObjectPresent(isAttached) || PE.isNetUStringPresent(isAttached)) || // Check for 'get_IsAttached' property
+                (PE.isNetObjectPresent(isLogging) || PE.isNetUStringPresent(isLogging)) // Check for 'IsLogging' function
             ) ||
             ( // Native (WinAPI) functions
                 PE.isNetObjectPresent("CheckRemoteDebuggerPresent") || PE.isNetObjectPresent("IsDebuggerPresent")
@@ -667,6 +722,17 @@ function scanForAntiAnalysis_NET() {
 
 
 
+    var isAntiVmPresent = false;
+
+    if (PE.isNetUStringPresent("vmware") || PE.isNetUStringPresent("VirtualBox")) {
+        isAntiVmPresent = true;
+    }
+
+    if (isAntiVmPresent) options += (options.length != 0 ? " + " : "") + "Anti-VM";
+
+
+
+
     if (options.length != 0) {
         _setResult("protection", "Anti analysis", "Heuristic", PE.isVerbose() ? options : "");
     }
@@ -709,6 +775,7 @@ function NetOpCodes() {
     this.ldloc_s = "11??"; // MSIL: 'ldloc.s'
     this.ldsfld = "7E????????"; // MSIL: 'ldsfld'
     this.ldstr = "72????????"; // MSIL: 'ldstr'
+    this.ldelem_u4 = "95"; // MSIL: 'ldelem.u4'
     this.nop = "00"; // MSIL: 'nop'
     this.not = "66"; // MSIL: 'not'
     this.neg = "65"; // MSIL: 'neg'
@@ -727,6 +794,7 @@ function NetOpCodes() {
     this.stloc_s = "13??"; // MSIL: 'stloc.s'
     this.xor = "61"; // MSIL: 'xor'
     this.stelem_i1 = "9C"; // MSIL: 'stelem.i1'
+    this.stelem_i4 = "9E"; // MSIL: 'stelem.i4'
 
     this.switch__nobody = "45"; // MSIL: 'switch'
 
@@ -734,7 +802,7 @@ function NetOpCodes() {
 
     // setStrict sets the strict value of the opcode for substitution
     // btw I like what I do
-    this.setStrict = function (opCodeMask, value) {
+    this.setStrict = function(opCodeMask, value) {
         // Remove spaces from opcode mask and value
         opCodeMask = removeSpaces(opCodeMask);
         value = removeSpaces(value);
@@ -758,7 +826,7 @@ function NetOpCodes() {
     }
 
     // Sets the mask value to zero for the specified opcode
-    this.setNullValue = function (opCodeMask) {
+    this.setNullValue = function(opCodeMask) {
 
         if (opCodeMask.indexOf("??") === -1) {
             throw "Instruction does not have a body to overwrite the value.";
@@ -801,14 +869,14 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         var isAssemblyInvokeFound = false;
 
         if (isAllNetReferencesPresent( // TODO: update [!!!]
-            references = [
-                "System.Reflection", // System.Reflection.dll
-                "get_EntryPoint", // MSIL: '*.Assembly::get_EntryPoint()'
-                "Assembly", // MSIL: 'System.Reflection.Assembly' from System.Reflection.dll
-                "Invoke", // MSIL: '*.MethodBase::Invoke(object, object[])'
-                "Load" // MSIL: '*.Assembly::Load(uint8[])'
-            ]
-        )) {
+                references = [
+                    "System.Reflection", // System.Reflection.dll
+                    "get_EntryPoint", // MSIL: '*.Assembly::get_EntryPoint()'
+                    "Assembly", // MSIL: 'System.Reflection.Assembly' from System.Reflection.dll
+                    "Invoke", // MSIL: '*.MethodBase::Invoke(object, object[])'
+                    "Load" // MSIL: '*.Assembly::Load(uint8[])'
+                ]
+            )) {
             isAssemblyInvokeFound = true;
 
             options = "Assembly invoke";
@@ -902,9 +970,74 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
 
-
+    // Self-Extracting archives
+    // TODO: Upgrade
+    var sfx = false;
 
     if (!PE.isDll()) {
+
+        if (PE.isOverlayPresent()) {
+            const overlayPatterns = [
+                "'Rar!'", // samples by: WinRAR
+                "'PK'03", // samples by: Zip SFX (by Intel)
+                "';!@Install@!UTF-8!'", "'7z'BCAF271C", "efbbbf';!@Install@!UTF-8!'" // samples by: 7z
+            ]
+
+            for (var l = 0; l < overlayPatterns.length; l++) {
+                if (PE.compareOverlay(overlayPatterns[l])) {
+                    sfx = true;
+                }
+            }
+
+
+            if (!sfx && !PE.isNET()) {
+                const sfxEntries = [
+                    // "e8$$$$$$$$558bec83ec..a1........8365....8365....5357bf........3bc7bb........74..85c374..f7d0", // samples by: WinZip
+                    // "558bec6a..68........68........64a1........50648925........83....5356578965..ff15", // samples by: Zip SFX
+                    // "e8$$$$$$$$558bec83ec..8365....8365....a1........5657bf........be........3bc7", // samples by: WinRAR Installer
+                    // "e8$$$$$$$$8bff558bec83ec..a1........8365....8365....5357bf........bb", // samples by: Zip SFX
+                    // "558bec83c4..b8........e8........33c05568........64ff30648920e8", // samples by: Zip SFX
+                    "4883ec..e8$$$$$$$$48895c24..55488bec4883ec..488365....48bb................488b05........483bc375", // samples by: WinRAR Installer
+                    "83ec..5657ff15........8bf08d4424..50c74424..........ff15........8a068b3d........3c..75..56ffd7", // samples by: Zip SFX
+                    "e9$$$$$$$$558bec81ec........830d..........5356576a..33dbbf........68........895d..881d", // samples by: Microsoft Cabinet
+                    "558bec83ec..56ff15........8bf08a003c..75..84c074..803e..74..46803e..75..803e..75..46eb", // samples by: Zip SFX
+                    "6a..33c0505050ff15........50e8$$$$$$$$55b8........8bece8........53b9........5657be", // samples by: Zip SFX
+                    "6a..68........e8........66813d............75..a1........81b8................75..", // samples by: Microsoft Cabinet
+                    "558bec83ec..565733ffff15........8bf0897d..8d45..50ff15........8a063c..75..56ff15", // samples by: Zip SFX
+                    "51526a..2eff15........506a..6a..2eff15........50e8........502eff15........5a59c3", // samples by: WinIMP
+                    "558bec81ec........535657ff15........a3........ff15........a1........6625....3d", // samples by: Microsoft Cabinet
+                    "558becb8........e8........5356be........578d45..5633db5053ff15........85c00f84", // samples by: Zip SFX
+                    "a1........c1e0..a3........575133c0bf........b9........3bcf76..2bcffcf3aa595f", // samples by: WinRAR Installer
+                    "558bec83c4..5356e8$$$$$$$$e8........6a..e8........8905........e8........8905", // samples by: Zip SFX
+                    "ff15........b1..380874..b1..4080....74..380874..4080....75..80....74..4033", // samples by: WinZip
+                    "53ff15........b3..38..74..80c3..4033d28a083aca74..3acb74..408a083aca75", // samples by: WinZip
+                    "558bec83c4..535657e8........e8........33c05568........64ff30648920e8", // samples by: WinRAR
+                    "53ff15........b3..38..74..80c3..8a48..4033d23aca74..3acb74..8a48..40", // samples by: WinZip
+                    "e8$$$$$$$$53bb........e8........85c074..33d28a1083fa..75..40eb", // samples by: WinRAR
+                    "fffe2a002a002a006d0065007300730061006700650073002a002a002a00", // samples by: WinRAR Installer
+                    "e8$$$$$$$$558bec83c4..b8........53", // samples by: WinRAR Installer
+                    "8A48014033D23ACA740A3ACB74068A4801" // samples by: WinZip
+                ]
+
+                if (PE.isSectionNamePresent("_winzip_")) {
+                    sfx = true;
+                }
+
+                for (var k = 0; k < sfxEntries.length; k++) {
+                    if (PE.compareEP(sfxEntries[k])) {
+                        _log("SFX entry pattern: " + sfxEntries[k]);
+
+                        sfx = true;
+                    }
+                }
+            }
+        }
+
+        if (sfx) options += (options.length != 0 ? " + " : "") + "SFX";
+
+
+
+
         var entryLikePacker = false;
 
         const entries = [
@@ -930,7 +1063,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             "8B44240456", // samples by: ASDPack (x32)
             "1E068CC88E", // samples by: aPack (x32)
             "1E068CCBBA", // samples by: aPack (x32)
-            "1E068CC88E", // samples by: aPack (x32)
             "EB..9C60E8", // samples by: PECompact (x32)
             "9C60E8CA", // samples by: Petite (x??)
             "60FCBED4", // samples by: ANDPakk (x32)
@@ -950,6 +1082,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
             // If the entry point matches the current entry, set the flag to true and break the loop
             if (PE.compareEP(entryToCheck)) {
+                _log("EP like a packer: '" + entryToCheck + "'");
+
                 entryLikePacker = true;
 
                 // Break the loop if a match is found
@@ -986,6 +1120,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         var isStrangeCalls = false;
 
         if (isLastSectionEP && getAsmOpCode(getAsmInstructionByIndex(1)) === "CALL") {
+            _log("Strange call to address: " + getAsmInstructionByIndex(1).split(" ")[1]);
             isStrangeCalls = true;
         }
 
@@ -1246,7 +1381,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var hasStrangeOverlay = false;
 
     // Conditions to check for a strange overlay
-    if (!isMzSignatureDetected && !PE.isSigned() && PE.isOverlayPresent()) {
+    if (!isMzSignatureDetected && !sfx && !PE.isSigned() && PE.isOverlayPresent()) {
         if (
             PE.getOverlaySize() > 150 && PE.calculateEntropy(PE.getOverlayOffset(), PE.getOverlaySize()) > 7 ||
             PE.getOverlaySize() > (PE.getSize() - PE.getOverlaySize())
@@ -1285,6 +1420,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 }
 
 
+
+
 function isVbNetStandartLibraryPresent() {
     return PE.isNetObjectPresent("Microsoft.VisualBasic");
 }
@@ -1297,7 +1434,9 @@ function isFrameworkComponent() {
 
 // Validate the presence of a signature in the file
 function validateSignature(sign) {
-    return PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign) != -1;
+    const result = PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign) != -1
+    if (result) _log("[*] Pattern validated: " + sign);
+    return result;
 }
 
 
@@ -1361,8 +1500,8 @@ function isAllNetReferencesPresent(references) {
 
 function findAndMark(sign, isFullName) {
     if (PE.isSignatureInSectionPresent(0,
-        ("00'" + sign + "'") + // 00'string
-        (isFullName ? "00" : ""))) { // ... '00
+            ("00'" + sign + "'") + // 00'string
+            (isFullName ? "00" : ""))) { // ... '00
         return sign;
     }
     return "";
@@ -1408,8 +1547,6 @@ function scanForObfuscations_Native() {
                     }
                 }
             }
-
-
         }
 
         if (isIdioticMinGwSectionsPresent) {
@@ -1559,8 +1696,8 @@ function getEpAsmPattern(onlyOpCodes, numberOf) {
         // Append either the opcode or the full instruction to the result
         result += (
             onlyOpCodes ?
-                getAsmOpCode(asmInstruction) : // "MOV"
-                asmInstruction // "MOV EAX, 4"
+            getAsmOpCode(asmInstruction) : // "MOV"
+            asmInstruction // "MOV EAX, 4"
         ) + _patternSplitter;
     }
 
@@ -1607,8 +1744,8 @@ function getInstructionsAsmPattern(instruction) {
     return _patternSplitter +
         (
             Array.isArray(instruction) ?
-                instruction.join(_patternSplitter) :
-                instruction
+            instruction.join(_patternSplitter) :
+            instruction
         ) +
         _patternSplitter;
 }
