@@ -393,17 +393,41 @@ function scanForObfuscations_NET() {
     if (
         PE.isNetUStringPresent(" is tampered.") || // samples by: .NET Reactor
         PE.isNetUStringPresent("ping 127.0.0.1 > nul") || // samples by: ConfuserEx (Trinity, SkiDzEx like)
+        PE.isNetUStringPresent("/C ping 1.1.1.1 -n 1 -w 3000 > Nul & Del \"") || // samples by: MindLated
         validateSignature( // samples by: ConfuserEx
             opCodes.ldloc_s + opCodes.ldc_i4_0 + opCodes.ldloc_s + opCodes.ldc_i4_0 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_0 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4 +
             opCodes.ldloc_s + opCodes.ldc_i4_1 + opCodes.ldloc_s + opCodes.ldc_i4_1 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_1 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4 +
             opCodes.ldloc_s + opCodes.ldc_i4_2 + opCodes.ldloc_s + opCodes.ldc_i4_2 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_2 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4 +
-            opCodes.ldloc_s + opCodes.ldc_i4_3 + opCodes.ldloc_s + opCodes.ldc_i4_3 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_3 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4
+            opCodes.ldloc_s + opCodes.ldc_i4_3 + opCodes.ldloc_s + opCodes.ldc_i4_3 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_3 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4 +
+            opCodes.ldloc_s + opCodes.ldc_i4_4 + opCodes.ldloc_s + opCodes.ldc_i4_4 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_4 + opCodes.ldelem_u4 + "??" + opCodes.stelem_i4
+        ) ||
+        validateSignature( // samples: ConfuserEx (Beds mod, private)
+            opCodes.ldloc_s + "??" + opCodes.shr_un + opCodes.ldloc_s + opCodes.ldc_i4_s + opCodes.shl + opCodes.or + opCodes.stloc_s +
+            opCodes.ldloc_s + "??" + opCodes.shr_un + opCodes.ldloc_s + opCodes.ldc_i4_s + opCodes.shl + opCodes.or + opCodes.stloc_s +
+            opCodes.ldloc_s + "??" + opCodes.shr_un + opCodes.ldloc_s + opCodes.ldc_i4_s + opCodes.shl + opCodes.or + opCodes.stloc_s
         )
     ) {
         isAntiTamperPresent = true;
     }
 
-    if (isAntiTamperPresent) options += (options.length != 0 ? " + " : "") + "Anti-tamper"
+    if (isAntiTamperPresent) options += (options.length != 0 ? " + " : "") + "Anti-tamper";
+
+
+
+
+    var isModuleCtorMultiple = false;
+
+    var currentCtorOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "00'<Module>'00");
+
+    if (currentCtorOffset != -1) {
+        var secondCtorNameOffset = PE.findSignature(currentCtorOffset + 10, PE.getSize() - PE.getOverlaySize(), "'<Module>'");
+
+        if (secondCtorNameOffset != -1 && PE.readByte(secondCtorNameOffset + 8) != 0x00) {
+            isModuleCtorMultiple = true;
+        }
+    }
+
+    if (isModuleCtorMultiple) options += (options.length != 0 ? " + " : "") + "Repeating .cctor name";
 
 
 
@@ -792,6 +816,7 @@ function NetOpCodes() {
     this.stloc_2 = "0C"; // MSIL: 'stloc.2'
     this.stloc_3 = "0D"; // MSIL: 'stloc.3'
     this.stloc_s = "13??"; // MSIL: 'stloc.s'
+    this.shr_un = "64"; // MSIL: 'shr.un'
     this.xor = "61"; // MSIL: 'xor'
     this.stelem_i1 = "9C"; // MSIL: 'stelem.i1'
     this.stelem_i4 = "9E"; // MSIL: 'stelem.i4'
@@ -1278,7 +1303,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     // If there is a collision, add "Sections collision" to options
-    if (isCollisionInSectionsPresent) options += (options.length != 0 ? " + " : "") + "Sections collision (" + sectionNameCollision + ")";
+    if (isCollisionInSectionsPresent) options += (options.length != 0 ? " + " : "") + "Sections collision (\"" + sectionNameCollision + "\")";
 
 
 
@@ -1409,6 +1434,23 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    var isCompressedSectionPresent = false;
+
+    var sectionNumber = 0;
+
+    for (var t = 0; t < PE.getNumberOfSections(); t++) {
+        sectionNumber = t;
+        if (PE.calculateEntropy(PE.getSectionFileOffset(sectionNumber), PE.getSectionFileSize(sectionNumber)) > 7.2) {
+            isCompressedSectionPresent = true;
+            break;
+        }
+    }
+
+    if (isCompressedSectionPresent) options += (options.length != 0 ? " + " : "") + "Section " + sectionNumber + " (\"" + PE.getSectionName(sectionNumber) + "\") compressed";
+
+
+
+
     if (options.length != 0) isDetected = true;
 
 
@@ -1434,7 +1476,7 @@ function isFrameworkComponent() {
 
 // Validate the presence of a signature in the file
 function validateSignature(sign) {
-    const result = PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), sign) != -1
+    const result = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), sign) != -1
     if (result) _log("[*] Pattern validated: " + sign);
     return result;
 }
