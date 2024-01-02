@@ -95,7 +95,7 @@
 
 ```
 ```
-**bool isLibraryPresent(QString sLibraryName)**
+**bool isLibraryPresent(QString sLibraryNameisLibraryPresent, bool bCheckCase = false)**
 
 ```
 ```
