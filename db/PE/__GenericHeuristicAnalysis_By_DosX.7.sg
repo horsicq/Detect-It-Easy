@@ -432,30 +432,34 @@ function scanForObfuscations_NET() {
 
 
 
-    const mathOpCodes = [
-        opCodes.add, opCodes.mul,
-        opCodes.div, opCodes.xor,
-        opCodes.shr, opCodes.shl,
-        opCodes.or, opCodes.not,
-        opCodes.and
-    ];
-
     var isMutationsPresent = false;
 
-    const prefix = opCodes.ldc_i4 + opCodes.ldc_i4,
-        postfix = opCodes.stloc;
+    const mathOpCodes = [
+        opCodes.add, opCodes.sub,
+        opCodes.mul, opCodes.div,
+        opCodes.xor, opCodes.shr,
+        opCodes.shl, opCodes.or,
+        opCodes.not, opCodes.and
+    ];
 
-    for (var e = 0; e < mathOpCodes.length; e++) {
+    const mathTemplates = [ // %s = math opcode
+        opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.stloc, // samples by: .NET Reactor
+        opCodes.ldloc_1 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.ldc_i4 + opCodes.ldc_i4 // samples by: SkiDzEX
+    ];
 
-        if (!validateSignature(prefix + "??" + postfix)) break;
+    for (var y = 0; y < mathTemplates.length; y++) {
+        const template = mathTemplates[y];
 
-        // TODO: array with patterns
+        for (var e = 0; e < mathOpCodes.length; e++) {
 
-        const pattern = prefix + mathOpCodes[e] + postfix;
+            if (e == 0 && !validateSignature(template.replace("%s", "??"))) break; // No math mutations
 
-        if (validateSignature(pattern)) {
-            isMutationsPresent = true;
-            break;
+            const pattern = template.replace("%s", mathOpCodes[e]);
+
+            if (validateSignature(pattern)) {
+                isMutationsPresent = true;
+                break;
+            }
         }
     }
 
