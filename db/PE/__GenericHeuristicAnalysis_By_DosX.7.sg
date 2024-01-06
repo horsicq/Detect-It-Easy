@@ -444,7 +444,9 @@ function scanForObfuscations_NET() {
 
     const mathTemplates = [ // %s = math opcode
         opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.stloc, // samples by: .NET Reactor
-        opCodes.ldloc_1 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.ldc_i4 + opCodes.ldc_i4 // samples by: SkiDzEX
+        opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.ldc_i4 + opCodes.add, // samples by: ConfuserEx (Beds mod)
+        opCodes.ldloc_1 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.ldc_i4 + opCodes.ldc_i4, // samples by: SkiDzEX
+        opCodes.ldloc + opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.stelem_i1 // samples by: .NET Reactor
     ];
 
     for (var y = 0; y < mathTemplates.length; y++) {
@@ -496,6 +498,24 @@ function scanForObfuscations_NET() {
     }
 
     if (isMathInversionsPresent) options += (options.length != 0 ? " + " : "") + "Math inversions";
+
+
+
+
+    var invalidOpCodes = false;
+
+    if (
+        validateSignature( // samples by: SugarGuard
+            opCodes.setStrict(opCodes.box, "?? 00 00 01") + opCodes.nop
+        ) ||
+        validateSignature( // samples by: ConfuserEx (Beds mod)
+            opCodes.setStrict(opCodes.calli, "FF FF FF FF") + opCodes.setStrict(opCodes.sizeof, "FF FF FF FF")
+        )
+    ) {
+        invalidOpCodes = true;
+    }
+
+    if (invalidOpCodes) options += (options.length != 0 ? " + " : "") + "Invalid OpCodes";
 
 
 
@@ -583,22 +603,31 @@ function scanForObfuscations_NET() {
 
 
     const protectorsLabelsToRemove = [ // Protectors with these names will be removed from results
-        "Xenocode Postbuild",
-        "Smart Assembly",
-        "Dotfuscator",
-        "Babel .NET",
-        "Spices.Net",
-        "Agile .NET",
-        "CliSecure",
-        "CodeWall",
-        "DNGuard",
-        "Goliath",
-        "Yano"
-    ];
+            "Xenocode Postbuild",
+            "Smart Assembly",
+            "Dotfuscator",
+            "Babel .NET",
+            "Agile .NET",
+            "Spices.Net",
+            "CliSecure",
+            "CodeWall",
+            "CodeVeil",
+            "Sixxpack",
+            "DNGuard",
+            "Goliath",
+            "Yano"
+        ],
+        packersLabelsToRemove = [
+            "NsPack"
+        ];
 
     if (isFakeSignaturesPresent) {
         for (var d = 0; d < protectorsLabelsToRemove.length; d++) {
             _removeResult("protector", protectorsLabelsToRemove[d]);
+        }
+
+        for (var d = 0; d < packersLabelsToRemove.length; d++) {
+            _removeResult("packer", packersLabelsToRemove[d]);
         }
     }
 
@@ -824,6 +853,7 @@ function NetOpCodes() {
     this.xor = "61"; // MSIL: 'xor'
     this.stelem_i1 = "9C"; // MSIL: 'stelem.i1'
     this.stelem_i4 = "9E"; // MSIL: 'stelem.i4'
+    this.box = "8C????????"; // MSIL: 'box'
 
     this.switch__nobody = "45"; // MSIL: 'switch'
 
@@ -1306,7 +1336,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         isCollisionInSectionsPresent = true;
     }
 
-    // If there is a collision, add "Sections collision" to options
     if (isCollisionInSectionsPresent) options += (options.length != 0 ? " + " : "") + "Sections collision (\"" + sectionNameCollision + "\")";
 
 
