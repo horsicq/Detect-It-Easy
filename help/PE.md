@@ -91,7 +91,7 @@
 
 ```
 ```
-**bool isSignatureInBlob_NETPresent(QString sSignature)**
+**bool isSignatureInBlobPresent_NET(QString sSignature)**
 
 ```
 ```
