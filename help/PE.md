@@ -87,6 +87,14 @@
 
 ```
 ```
+**qint64 findSignatureInBlob_NET(QString sSignature)**
+
+```
+```
+**bool isSignatureInBlob_NETPresent(QString sSignature)**
+
+```
+```
 **qint32 getNumberOfImports()**
 
 ```
