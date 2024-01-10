@@ -2,15 +2,13 @@
 // Authors:
 // Kaens TG@kaens (for all the https://en.wikipedia.org/wiki/Music_tracker stuff)
 // hypn0 <hypn0@mail.ru>
-// main to-dos:
-//      Ad-lib formats,
-//      wait on fb replies... 
 
 init("audio","");
 
 includeScript("read");
 
 function detect(bShowType,bShowVersion,bShowOptions) {
+// Due to the extreme script file size, many good code practices were sacrificed to ensure it loads  
 
     if(Binary.compare("'[1tracker module]'0D0A")) {
         bDetected = 1;
@@ -72,40 +70,6 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         bDetected = 1;
         sName = "Aero Tracker module (.AERO)";
         sVersion = "v"+File.read_uint8(0x0E);
-    }
-    else if(Binary.compare("'THX'0.")) {
-        // ref http://lclevy.free.fr/exotica/ahx/ahxformat.txt
-        bDetected = 1;
-        sName = "Abyss' Highest eXperience module (.AHX)";
-        var V = File.read_uint8(3);
-        if(!V) sVersion = "v1.00~1.27"; else sVersion = "v2.0+";
-        malformed = false;
-        var b6 = File.read_uint8(6);
-        trk0saved = b6 >> 7;
-        switch((b6 >> 4) & 7) {
-        case 0: if(V) spd = "50Hz"; else spd = ""; break;
-        case 1: spd = "100Hz"; break;
-        case 2: spd = "150Hz"; break;
-        case 3: spd = "200Hz"; break;
-        default: malformed = true;
-        }
-        len = File.read_uint16(6,_BE) & 0xFFF;
-        if(!len || len > 999) malformed = true;
-        lp = File.read_uint16(8,_BE);
-        if(lp >= len) malformed = true;
-        trl = File.read_uint8(10); if(!trl || trl > 64) malformed = true;
-        smp = File.read_uint8(12); if(smp > 63) malformed = true;
-        if(malformed) sVersion += "/malformed";
-        if(Binary.isVerbose()) {
-            if(File.getSize() < 0xFFFF) {
-                var ptitle = File.read_uint16(4,_BE);
-                sOption(File.read_ansiString(ptitle,0x20));
-            }
-            trk = File.read_uint8(11);
-            sub = File.read_uint8(13);
-            sOption("trk0_saved:"+trk0saved+" len:"+len+" sub:"+sub+" loop:"+lp+" trl:"+trl+" trk:"+trk+" smp:"+smp)
-            sOption(spd,"spd:")
-        }
     }
     else if(Binary.compare("'AM01'000000") && Binary.compare("'ASD1'00", 0x38)) {
         bDetected = 1;
@@ -1333,22 +1297,6 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         }
         */
     }
-    else if(Binary.compare("6000002A' **** Player by Jochen Hippel 1990 ****'")) {
-        //TODO not all of them can be found out like this
-        bDetected = 1;
-        sName = "Jochen Hippel's 7V module (.HIP7)";
-    }
-    else if(Binary.compare("'COSO'") && (Binary.compare("'MMME'",0x20) ||Binary.compare("'TFMX'",0x20))) {
-        bDetected = 1;
-        sName = "Jochen Hippel's COSO module (.HIPC,.SOC)";
-    }
-    else if(Binary.compare("'HVL'00") || Binary.compare("'HVL'01")) {
-        bDetected = 1;
-        sName = "Hively Tracker module (.HVL)";
-        sVersion = "v"+File.read_uint8(3);
-        if(Binary.isVerbose())
-            sOptionT(File.read_ansiString(File.read_uint16(4,_BE),0x20))
-    }
     else if(Binary.compare("'IM10'",0x3C) && File.read_uint8(0x30)
         && File.read_uint8(0x31) >= 0x20 && File.read_uint8(0x32) <= 0x40
         && File.read_uint8(0x33) >= 4 && File.read_uint8(0x33) < 0x80) {
@@ -1432,7 +1380,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
             sOptionT(File.read_ansiString(0xA6,0x40));
     }
     else if(File.getSize() >= 1984+256 && Binary.compare("'KRIS'",0x3B8)) {
-        //from //ref https://zakalwe.fi/uade/uade3/uade-3.03.tar.bz2 / uade/amigasrc/players/wanted_team/ChipTracker/ChipTracker_v3.asm
+        //from https://zakalwe.fi/uade/uade3/uade-3.03.tar.bz2 / uade/amigasrc/players/wanted_team/ChipTracker/ChipTracker_v3.asm
         sName = "Krister Wombell's ChipTracker module (.KRIS,.MOD)"; bDetected = 1;
         if(Binary.isVerbose()) {
             sOption(File.read_ansiString(0,16));
@@ -1702,57 +1650,14 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         bDetected = 1;
         sName = "MO3 MOD module (.MO3)";
     }
-    else if(Binary.compare("'M.K.'",0x438) || Binary.compare("'M&K&'",0x438) || Binary.compare("'M!K!'",0x438)) {
-        bDetected = 1;
-        sName = "Generic MOD module (.MOD)";
-        sVersion = File.read_ansiString(0x438,4);
-        if(Binary.isVerbose()) {
-            sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by: ")
-        }
-    }
     else if(Binary.compare("'RASP'",0x438)) {
         // TODO find out what format it was...
         bDetected = 1;
         sName = "Generic module (.MOD)";
         sVersion = File.read_ansiString(0x438,4);
-        if(Binary.isVerbose())
-            sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
-    }
-    else if(/FA\d\d/.test(File.read_ansiString(0x438,4))) {
-        bDetected = 1;
-        sName = "Digital Tracker module (.MOD)";
-        sVersion = "v030";
         if(Binary.isVerbose()) {
-            sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
-        }
-    }
-    else if(/^(\dCHN|\d\dCH)$/.test(File.read_ansiString(0x438,4))) {
-        bDetected = 1;
-        sName = "FastTracker module (.MOD)";
-        sVersion=File.read_ansiString(0x438,4);
-        if(Binary.isVerbose()) {
-            sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
-        }
-    }
-    else if(/^(FLT[48]|EXO4$)/.test(File.read_ansiString(0x438,4))) {
-        bDetected = 1;
-        sName = "StarTrekker module (.MOD)";
-        sVersion = File.read_ansiString(0x438,4);
-        if(Binary.isVerbose()) {
-            sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
-        }
-    }
-    else if(/^CD[0-9]1$/.test(File.read_ansiString(0x438,4))) {
-        sName = "Octalyser module (.MOD)"; bDetected = 1;
-        sVersion = File.read_ansiString(0x438,4);
-        if(Binary.isVerbose()) {
-            sOptionT(File.read_ansiString(0,0x14));
-            sOptionT(File.read_ansiString(0x14,0x16),"by/inst: ")
+            sOptionT(File.read_codePageString(0,0x14,"IBM850"));
+            sOptionT(File.read_codePageString(0x14,0x16,"IBM850"),"by/inst: ")
         }
     }
     else if(Binary.compare("000000000000'MTN'000000", 0x5B2)) {
@@ -2912,7 +2817,7 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
                 instnp = 0x15A;
                 ptn = File.read_uint16(0x448,_LE);
                 ord = File.read_uint8(0x44A);
-                ticks = FIle.read_uint8(0x44C)
+                ticks = File.read_uint8(0x44C)
             } else { //v5,6, 8,9 are the same
                 instnp = 0x1D6;
                 ptn = File.read_uint16(0x446,_LE);
@@ -2923,7 +2828,7 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
             for(i=0; i < 3 /*31*/; i++) //that's enough title info
                 inst.push(File.read_ucsdString(instnp+i*17).trim());
             t = inst.join(" ").trim(); if(t != "") t+="...";
-            sOption(t); sOption("rate,Hz:"+ticks+" ord:"+ord+" ptn:"+ptn)
+            sOption(t); sOption("rate:"+ticks+"Hz ord:"+ord+" ptn:"+ptn)
         }
     }
     else if(Binary.compare("'SC68 Music-file'")) {
@@ -3768,12 +3673,14 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
             sOptionT(File.read_ansiString(0x28,0x24),"by: ");
         }
     }
-    else if(Binary.compare("'Extended Module:'")) {
+    else if(Binary.compare("'Extended Module: '") & File.compare("1A",37)) {
         bDetected = 1;
         sName = "Fast Tracker 2 Extended module (.XM)";
         sVersion = File.read_ansiString(0x26,0x14).trim();
-        if(Binary.isVerbose())
+        if(Binary.isVerbose()) {
             sOptionT(File.read_ansiString(0x11,0x14));
+
+        }
     }
     else if(Binary.compare("'FORM'........'XDIRINFO'")) {
         bDetected = 1;
@@ -3885,9 +3792,17 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
     }
 }
 
+//pure signature detection end
+
+
+// AND NOW,
+// THE HEAVIEST STUFF GOES DOWN HERE
+// THE SANITY CHECK-STYLE DETECTION
+// (* It's still hella fast tho, no worries)
+
 function isAnders0land() {
     //ref https://zakalwe.fi/uade/uade3/uade-3.03.tar.bz2 / uade/amigasrc/players/wanted_team/Anders0land/SRC_Anders0land/Anders 0land_v1.asm
-    if(!File.compare("'mpl'")) return false; //Check2
+    if(!File.compare("'mpl'")) return false;
     p = File.read_uint32(4,_BE); if(p > File.getSize() || (p&1)) return false;
     songp = p+8;
     if(!File.compare("'mdt'",p)) return false;
@@ -3916,13 +3831,189 @@ if(!bDetected && isAnders0land()) {
     }
 }
 
-//signature-enabled detection end
+function isMOD() {
+    //from https://github.com/OpenMPT/openmpt/blob/master/soundlib/Load_mod.cpp
+    if(File.getSize() < 0x43C) return false;
+    var b = readBytes(0x438,4); var s = File.read_ansiString(0x438,4);
+    var isStarTrekker = false; var isGenericMCh = false; var isMdKd = false;
+    var maybeWOW = false;
+    var ibtrsh = 40; //typical threshold for invalid bytes (in samples); _FRAGILE is 1
 
+    //test signatures
+    if(["M.K.","M!K!","PATT","NSMS","LARD"].indexOf(s) >= 0) {
+        chn = 4; tracker = "generic ProTracker-compatible";
+        if(s === "M.K.") { isMdKd = true; maybeWOW = true } }
+    else if(["M&K!","FEST","N.T."].indexOf(s) >= 0) {
+        chn = 4; tracker = "NoiseTracker" }
+    else if(s === "OKTA" || s === "OCTA") {
+        chn = 8; tracker = "Oktalyzer" }
+    else if(s === "CD61" || s === "CD81") {
+        chn = b[2]-0x30; tracker = "Oktalyser (Atari)" }
+    else if(b === [0x4D,0,0,0] || b === [0x38,0,0,0]) {
+        if(b[0] === 0x38) chn = 8; else chn = 4; ibtrsh = 1; // fragile, needs more detects!
+        tracker = "Inconexia demo" }
+    else if(s.slice(0,3) === "FA0" && 0x34 <= b[3] <= 0x38 ) {
+        chn = b[3]-0x30; tracker = "Digital Tracker" }
+    else if(["FLT","EX0"].indexOf(s.slice[0,3]) > -1 && 0x34 <= b[3] <= 0x39 ) {
+        chn = b[3]-0x30; isStarTrekker = true; tracker = "Startrekker" }
+    else if(s.slice(1,4) === "CHN" && 0x31 <= b[0] <= 0x39 ) {
+        chn = b[0]-0x30; isGenericMCh = true; tracker = "generic MOD-compatible" }
+    else if(["CH","CN"].indexOf(s.slice(2,4)) > -1 && 0x31 <= b[0] <= 0x39 && 0x30 <= b[1] <= 0x39) {
+        chn = b[0]*10+b[1]-0x330; isGenericMCh = true; tracker = "generic MOD-compatible" }
+    else if(s.slice(0,3) === "TDZ" && 0x31 <= b[3] <= 0x39 ) {
+        chn = b[3]-0x30; tracker = "TakeTracker" }
+    else return false;
+    if(!chn) return false;
+    isFLT8 = isStarTrekker && chn == 8;
 
-// AND NOW,
-// THE HEAVIEST STUFF GOES DOWN HERE
-// THE SANITY CHECK-STYLE DETECTION
-// (* It's still hella fast tho, no worries)
+    //test samples
+    p = 0x14; wowsmpsz = 0; ib = 0;
+    for(var i=0; i < 31; i++) {
+        var ssz = File.read_uint16(p+0x16,_BE)*2; //length
+        wowsmpsz += ssz;
+        var sft = File.read_uint8(p+0x18);
+        if(sft) maybeWOW = false; if(sft & 0xF0) ib++; //finetune <= 15
+        var svol = File.read_uint8(p+0x19); if(svol > 0x40) ib++; //volume <= 64
+        if(ssz && svol != 0x40) maybeWOW = false;
+        if(File.read_uint16(p+0x1A,_BE)*2 > ssz) ib++; //loopstart. loopend gets weird, it's ok
+        if(ib > ibtrsh) return false;
+        p += 0x1E;
+    }
+    var smpsz31 = wowsmpsz;
+    var b32 = true; //TODO
+    if(b32) { hdr = 0x43C/*1084*/; plist = 0x3B8/*952*/; msmp = 0x1F;
+    } else { hdr = 0x258/*600*/; plist = 0x1D8; msmp = 0x0F }
+    if(File.read_uint8(plist-1)) { maybeWOW = false; wowsmpsz = 0 }
+
+    //test patterns
+    function cntBadPtnData(b32,ofs) {
+        if(b32) mask = 0xE0; else mask = 0xF0; bad = 0;
+        for(i = 0; i < chn*64; i++)
+            if(File.read_uint8(ofs+i) & mask) bad++;
+        return bad
+    }
+    function getNumPatterns(smpsz) {
+        ord = File.read_uint8(plist-2); if(!ord) return false;
+        if(ord > 128) ord = 128;
+        if(tracker === "Digital Tracker") plist = 0x3BB;
+        ptn = iptn = optn = 0; i = plist;
+        for(i=0; i < 0x80; i++) {
+            var p = File.read_uint8(plist+i);
+            if(p < 0x80 && p >= ptn) { ptn = p+1; if(ord > i) optn = ptn }
+            if(ptn >= iptn) iptn = ptn+1
+        }
+        //weirdness checks
+        if(wowsmpsz && (wowsmpsz+hdr+ptn*8*256 == (File.getSize() & ~1))) {
+            if(cntBadPtnData(true,hdr+ptn*4*256) < 16) chn = 8; //⚠no good for ripping -- best to err toward no WOW
+        } else
+        if(ptn != optn && cntBadPtnData(true,hdr+optn*chn*256) < 64) ptn = optn;
+        if(iptn > ptn && hdr+smpsz+iptn*chn*256 == File.getSize()) ptn = iptn;
+    }
+    //modsize
+    p = plist+0x80; getNumPatterns(smpsz31);
+    if(maybeWOW && chn === 8) { tracker = "Mod's Grave"; isGenericMCh = true }
+    sz = hdr+ptn*chn*256;
+    //_log("ch:"+chn+" ptn:"+ptn+", hdr+ptn:"+sz);
+    if(sz > File.getSize()) return false;
+    p = 0x14; smp = 0; songsz = sz; ib = 0; smpsz = 0;
+    while(msmp) {
+        t = File.read_uint16(p+0x16,_BE)*2;
+        if(t) smp++;
+        smpsz += t; p += 0x1E; msmp--
+    }
+    sz += smpsz;
+    return true
+}
+if(!bDetected && isMOD()) {
+    sName = "Generic module (.MOD)"; bDetected = 1;
+    sVersion = File.read_ansiString(0x438,4);
+    if(Binary.isVerbose()) {
+        sOptionT(File.read_codePageString(0,0x14,"IBM850"));
+        sOptionT(File.read_codePageString(0x14,0x16,"IBM850"),"by/smp0: ");
+        sOption(tracker,"in: ");
+        sOption("chn:"+chn+" ord:"+ord+" ptn:"+ptn+" smp:"+smp+" sz:"+sz)
+    }
+}
+
+function isAHX() {
+    //ref http://lclevy.free.fr/exotica/ahx/ahxformat.txt
+    // & https://github.com/pete-gordon/hivelytracker/blob/master/Replayer_Windows/hvl_replay.c
+    if(File.getSize() < 30) return false;
+    if(Binary.compare("'THX'0.")) fmt = "ahx";
+    else if(Binary.compare("'HVL'0.")) fmt = "hvl";
+    else return false;
+    malformed = 0;
+    var b6 = File.read_uint8(6);
+    trk0saved = b6 >> 7;
+    switch((b6 >> 4) & 7) {
+    case 0: spd = "50Hz"; break;
+    case 1: spd = "100Hz"; break;
+    case 2: spd = "150Hz"; break;
+    case 3: spd = "200Hz"; break;
+    default: malformed++;
+    }
+    ord = File.read_uint16(6,_BE) & 0xFFF;
+    if(ord > 999) malformed++; if(!ord || ord > 1024) malformed++;
+    if(fmt === "ahx") {
+        lp = File.read_uint16(8,_BE); if(lp >= ord) malformed++;
+    }
+    else chn = (File.read_uint8(8) >> 2)+4;
+    if(malformed > 1) return false;
+    trl = File.read_uint8(10); if(!trl || trl > 64) return false;
+    trk = File.read_uint8(11);
+    ins = File.read_uint8(12); if(ins > 63) return false;
+    sub = File.read_uint8(13);
+    if(fmt === "ahx") {
+        sz = 14+sub*2+ord*8+trk*trl*3; if(!trk0saved) sz += trl*3
+        for(i=0; i < ins; i++) {
+            var spls = File.read_uint8(sz+21);
+            sz += 22+spls*4;
+        }
+    }
+    else {
+        sz = 16+sub*2+ord*chn*2;
+        if(trk0saved) i = 1; else i = 0;
+        for(; i <= trk; i++)
+            for(j=0; j < trl; j++) {
+                if(File.read_uint8(sz) == 0x3F) { sz++; continue }
+                sz += 5;
+            }
+        for(i=0; i < ins; i++) {
+            var spls = File.read_uint8(sz+21);
+            sz += 22+spls*5;
+        }
+    }
+    title = "";
+    for(i=0;i <= ins;i++) { var r = sz;
+        while(File.read_uint8(sz) && sz<File.getSize()) sz++;
+        if(!i) title = File.read_ansiString(r,sz-r); sz++
+    }
+    if(sz > File.getSize()) malformed++;
+    return true
+}
+if(!bDetected && isAHX()) {
+    if(fmt === "ahx") {
+        sName = "Abyss' Highest eXperience module (.AHX)";
+        if(!File.read_uint8(3)) sVersion = "v1.00~1.27"; else sVersion = "v2.0+";
+    }
+    else
+        sName = "Hively Tracker module (.HVL)";
+    bDetected = 1;
+    if(malformed) sVersion += "/malformed#"+malformed;
+    if(Binary.isVerbose()) {
+        if(title != "") sOption(title); if(sub) sOption(sub,"x");
+        n=0; p = 14+sub*2+ord*8; c = trk*trl; if(!trk0saved) c += trl; hp = false;
+        for(i=0;i < c;i++) {
+            note = File.read_uint8(p+i*3)>>2; if(note) n++;
+            if(note > 60) if(fmt == "ahx") hp = true;
+        }
+        if(hp) sVersion += "/hi-pitch!"
+        if(fmt === "ahx")
+            sOption("spd:"+spd+" ord:"+ord+" lp:"+lp+" trk:"+trk+" ins:"+ins+" notes:"+n+" sz:"+sz)
+        else
+            sOption("ch:"+chn+" spd:"+spd+" ord:"+ord+" trk:"+trk+" ins:"+ins+" notes:"+n+" sz:"+sz)
+    }
+}
 
 function isASC1() { //basically ASC0 + loop pos
     //ref https://bulba.untergrund.net/Ay_Emul29.src.7z/Players.pas -> FoundASC1
@@ -4481,7 +4572,7 @@ function isSidMon1() {
     }
     return true;
 }
-if(!bDetected && isSidMon1()) {
+if(!bDetected && Binary.isDeepScan() && isSidMon1()) {
     sName = "SIDMON module (.SID)"; sVersion  = "v1"; bDetected = 1;
     if(malformed) sVersion += "/malformed";
     if(Binary.isVerbose()) {
@@ -4565,7 +4656,7 @@ function isADXAHX() { //non-module! sanity check a bit because 8000 is too broad
     if([3,4,5].indexOf(nV)<0) return false;
     return true;
 }
-if(!bDetected && Binary.isDeepScan() && isADXAHX()) {
+if(!bDetected && Binary.isHeuristicScan() && isADXAHX()) {
     //from https://wiki.multimedia.cx/index.php/CRI_ADX_file
     bDetected = 1;
     sVersion = "";
@@ -5717,7 +5808,157 @@ if(!bDetected && Binary.isDeepScan() && isTuneFish4()) {
         sOption("ins:"+ins+" tempo:"+File.read_uint16(2,_LE)+" sz:"+sz+" songsz:"+Hex(songsz))
 }
 
+function isJH7V() {
+    //from https://zakalwe.fi/uade/uade3/uade-3.03.tar.bz2 / uade/amigasrc/players/wanted_team/Jochen_Hippel_7V/Jochen Hippel 7V_v2.asm
+    p = 0;
+    if(File.compare("6000")) { p = 2;
+        d1 = File.read_int16(p,_BE); if(d1 <= 0 || (d1&1)) return false; p = d1+2;
+        p = 4+File.findSignature(p,20,"308141FA"); if(p < 4) return false;
+        d1 = File.read_int16(p,_BE); if(d1 <= 0 || (d1&1)) return false;
+        p += d1;
+    }
+    if(!File.compare("'TFMX'00",p)) return false;
+    d0 = d1 = ( 2+File.read_int16(p+4,_BE) + File.read_int16(p+6,_BE) ) << 6;
+    d0 += 0x20;
+    ptn = d2 = File.read_int16(p+8,_BE)+1;
+    d3 = (File.read_int16(p+0x0A,_BE)+1)*0x1C;
+    d2 *= File.read_int16(p+0x0C,_BE);
+    d0 += d2;
+    d1 += d2 + d3;
+    if(File.read_uint8(p+4+d0)) txt = File.read_ansiString(p+4+d0,24);
+    else txt = "";
+    x = File.read_int16(p+0x10,_BE);
+    d2 = (x+1) << 3;
+    ins = File.read_int16(p+0x12,_BE);
+    insip = p+d1+d2+0x20;
+    if(File.read_int32(insip+0x12,_BE)) return false; //1st smp ofs
+    d2 = 2*File.read_int16(insip+0x16,_BE);
+    if(!d2) return false;
+    if(d2 != File.read_int32(insip+0x16+0x1E-4,_BE)) return false;
+    var mofs = 0; var msz = 0; //find max ofs instead of one just from last smp, just in case 
+    for(i=0;i < ins;i++) {
+        var sofs = File.read_int32(insip+i*0x1E+0x12,_BE);
+        var ssz = File.read_uint16(insip+i*0x1E+0x16,_BE);
+        if(sofs >= mofs) { mofs = sofs; msz = ssz } }
+    smpp = insip+ins*0x1E;
+    sz = smpp+mofs+msz*2;
+    //_log("insip:"+Hex(insip)+" smpp:"+Hex(smpp)+" sz:"+Hex(sz));
+    return true;
+}
+if(!bDetected && Binary.isDeepScan() && isJH7V()) {
+    sName = "Jochen Hippel's module (.HIP7,.S7G)"; sVersion = "7V"; bDetected = 1;
+    if(!File.compare("'TFMX'")) sVersion += "+replayer";
+    if(File.getSize() < sz) sVersion += "!short";
+    if(Binary.isVerbose()) {
+        if(txt != "") sOptionT(txt);
+        if(x>1) sOption(x,"x");
+        sOption("ptn:"+ptn+" ins:"+ins+" sz:"+sz)
+    }
+}
+function isJHSOG() {
+    //from https://zakalwe.fi/uade/uade3/uade-3.03.tar.bz2 / uade/amigasrc/players/wanted_team/Jochen_Hippel_7V/Jochen Hippel 7V_v2.asm
+    a0 = a1 = 0;
+    if(File.compare("48E7FFFE")) {
+        d5 = -1; a0 += 4; d1 = 0;
+        if(!File.compare("61",a0)) return false;
+        d1 = File.read_uint8(a0+1); if(d1 || (d1&1)) return false; a0 += d1+2;
+        if(!File.compare("2F006100",a0)) return false; a0 += 4+File.read_int16(a0+4,_BE);
+        if(!File.compare("41FA",a0)) return false;
+        if(!File.compare("41FA",a0+0x12)) return false;
+        a0 += 0x16; a0 += File.read_int16(a0,_BE);
+        if(!File.compare("'MCMD'",a0)) return false;
+    } else { // NoMCMD
+        d5 = d1 = 0;
+        if(!File.compare("60",a0)) return false; a0++;
+        d1 = File.read_uint8(a0); a0++; 
+        if(d1) { 
+            d5 = 1; d1 = File.read_int16(a0,_BE); if(d1 < 0 || (d1&1)) return false;
+            if(!File.compare("6000",a0+2)) return false;
+            a0 += d1;
+            if(!File.compare("48E7FFFE",a0)) return false; a0 += 4;
+        } else { // No3
+            if(d1&1) return false; a0 += d1;
+            if(!File.compare("48E7FFFE",a0)) return false; a0 += 4;
+            if(!File.compare("6100",a0)) return false; a0 += 2;
+            a0 += File.read_int16(a0,_BE);
+            if(!File.compare("2F006100",a0)) return false; a0 += 4;
+            a0 += File.read_int16(a0,_BE);
+            if(!File.compare("41FA",a0)) return false; a0 += 0x14;
+        } // Later:
+        if(!File.compare("41FA",a0) && !File.compare("41FA",a0+2)) return false; a0 += 4;
+        a0 += File.read_int16(a0,_BE);
+        a2 = a0;
+        if(!File.compare("'TFMX'00",a0)) return false; a0 += 4;
+        if(!File.read_int16(a0+12,_BE)) return false; // SFX file
+        d1 = (2+File.read_int16(a0,_BE)+File.read_int16(a0+2,_BE)) << 6;
+        d2 = (1+File.read_int16(a0+4,_BE))*File.read_int16(a0+8,_BE);
+        d3 = (1+File.read_int16(a0+6,_BE))*12;
+        d1 += d2+d3;
+        d2 = (1+File.read_int16(a0+12,_BE))*6;
+        d1 =+ d2+0x20;
+        a0 += d1+0x0E;
+        if(!File.read_int32(a0,_BE)) return false; a0 += 4;
+        d2 = File.read_int16(a0,_BE); if(!d2) return false;
+        d2 *= 2; if(d2 != File.read_int32(a0+0x1A,_BE)) return false;
+    }
+    a2 -= a1; t = a2; fmt = d5;
+    sz=0;x=1;
+    return true 
+}
+if(!bDetected && Binary.isDeepScan() && isJHSOG()) {
+    // This format has the best known HQ emulator of Atari ST chip on the Amiga
+    // Compatible formats from Hippel's TFMXMMTEX-Editor:
+    // - TFMX (The Final Musicsystem eXtended)
+    // - MMME (Mad Max Music Editor)
+    // - COSO (COmpressed SOng) for TFMX and MMME songfiles
+    // Not supported: MMME-MMME latest, which uses $EE (SID) command
+    sName = "Jochen Hippel's module (.SOG)"; sVersion = "ST"+fmt; bDetected = 1;
+    //if(!File.compare("'TFMX'")) sVersion = "MCMD";
+    if(File.getSize() < sz) sVersion += "!short";
+    if(Binary.isVerbose()) {
+        //if(title != "") sOptionT(title);
+        if(x>1) sOption(x,"x");
+        sOption("ptn:"+ptn+" ins:"+ins+" sz:"+sz)
+    }
+}
 
+if(Binary.compare("'COSO'") && (Binary.compare("'MMME'",0x20) ||Binary.compare("'TFMX'",0x20))) {
+    //TODO get from uade
+    bDetected = 1;
+    sName = "Jochen Hippel's COSO module (.HIPC,.SOC)";
+}
+
+function isEMS() {
+    //ref UADE's EMS player disassembly: run with -d then "f d3c2"
+    if(File.getSize() <= 0x53A) return false; // fault is @d432
+    if(File.read_uint8(0) != 1) return false;
+    if(File.read_uint8(1) > 0x25) return false;
+    t = File.read_int16(2,_BE); if(!t || t > 0x80) return false;
+    d1 = File.read_uint16(4,_BE); if(d1 > 0x3F) return false; d = d1 & 0xFF;
+    p = 6;
+    while(p < 0x86) { t = File.read_uint8(p); p++; if(d < t) return false; }
+    c = 0;
+    for(p = 0x13A; p < 0x53A; p += 4) { //@d40c
+        t = File.read_int16(p,_BE); if(t < 0) return false;
+        if(t)
+            if([
+              0x6B0, 0x650, 0x5F4, 0x5A0, 0x54C, 0x500, 0x4B8, 0x474,
+              0x434, 0x3F8, 0x3C0, 0x38A, 0x358, 0x328, 0x2FA, 0x2D0,
+              0x2A6, 0x280, 0x25C, 0x23A, 0x21A, 0x1FC, 0x1E0, 0x1C5,
+              0x1AC, 0x194, 0x17D, 0x168, 0x153, 0x140, 0x12E, 0x11D,
+              0x10D, 0xFE, 0xF0, 0xE2, 0xD6, 0xCA, 0xBE, 0xB4,
+              0xAA, 0xA0, 0x97, 0x8F, 0x97, 0x7F, 0x78, 0x71
+              ].indexOf(t) < 0)
+                return false;
+            else c++;
+    }
+    if(!c) return false;
+    return true
+}
+if(!bDetected && Binary.isDeepScan() && isEMS()) {
+    sName = "Editeur Musical Sequentiel module (.EMS)"; bDetected = 1;
+}
+ 
 
 // BELOW THIS POINT ARE THE DETECTIONS THAT ARE IFFIER THAN THE REST
 
@@ -6203,11 +6444,6 @@ if(Binary.isHeuristicScan()) { //parallel block
     }
     else if(Binary.compare("AE")) { //TODO
         _setResult("audio","Polly Tracker module (.MOD)","","")
-    }
-    else if(Binary.compare("'MMME'") || Binary.compare("'TFMX'")
-      || Binary.compare("60..60..48E7") || Binary.compare("60..60..41FA")
-      || Binary.compare("6000....6000....48E7") || Binary.compare("6000....600...6000...6000....48E7")) {
-        _setResult("audio","Jochen Hippel's ST module (.SOG)","","")
     }
 
     else if(Binary.compare("1C52")) {
