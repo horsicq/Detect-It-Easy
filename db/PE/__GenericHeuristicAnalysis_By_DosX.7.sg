@@ -54,6 +54,9 @@ function detect() {
         }
 
         scanForPackersAndCryptors_NET_and_Native();
+        // scanForMaciliousCode_NET_and_Native();
+    } else {
+        _log("[!] Heuristic scan is disabled. Use '--heuristicscan' to enable");
     }
 }
 
@@ -1928,6 +1931,48 @@ function validateSectionNames(dbCollection) {
     }
 
     return null;
+}
+
+
+
+// ALPHA v0.01
+// The module is disabled and does not work
+
+function scanForMaciliousCode_NET_and_Native() {
+
+    var _CriticalProc_ntdll = false;
+
+    if (validateSignature("'RtlSetProcessIsCritical'")) {
+        _CriticalProc_ntdll = true;
+    }
+
+    if (_CriticalProc_ntdll) heurAvSetResult("CriticalProc_ntdll", 8);
+
+
+
+
+    var _TakeScreenshot = false;
+
+    if (PE.isNET()) {
+        if (PE.isNetObjectPresent("BitBlt") || PE.isNetObjectPresent("GetDC")) {
+            _TakeScreenshot = true;
+        }
+    } else { // Global scan
+        if (validateSignature("00'BitBlt'00") || validateSignature("00'GetDC'00")) {
+            _TakeScreenshot = true;
+        }
+    }
+
+    if (_TakeScreenshot) heurAvSetResult("TakeScreenshot", 3);
+}
+
+
+function heurAvSetResult(label, scores) {
+    if (scores <= 10 && scores >= 0) {
+        _setResult("macilious", ("Win" + (PE.is64() ? "64" : "32") + ".") + label, "Heuristic AV", scores + "/10");
+    } else {
+        throw "Incorrect scores value for '" + label + "'";
+    }
 }
 
 
