@@ -54,7 +54,7 @@ which lie in the corresponding folder. Currently the program defines the followi
 - MACH executable files Mac OS
 - Binary all other files
 
-# Downlods
+# Downloads
 
 Detect-It-Easy can be downloaded from the [release](https://github.com/horsicq/DIE-engine/releases) page.
 
