@@ -4,9 +4,9 @@
 // TODO update the old scripts to use the new functions,
 // and get rid of the functions themselves
 
-const _BE = true; const _LE = false; //endianness for read_uint16+
-//little-endian = reversed notation (Intel),
-//big-endian = direct notation (TCP/IP, Motorola, Amiga, ZX Spectrum)
+const _BE = true; const _LE = false; //endianness for read_int16+
+//little-endian = reversed notation (Intel, ZX Spectrum),
+//big-endian = direct notation (TCP/IP, Motorola, Amiga)
 
 const TOEOF = -1; //use for the size parameter in findSignature
 
@@ -35,7 +35,6 @@ File.readBEDword = function(nOffset)
     return File.read_uint32(nOffset,_BE)
 }
 
-
 /**
  * Read a word, selecting endianness.
  * @param {UInt} nOffset - The offset in the file.
@@ -59,7 +58,6 @@ File.readEDword = function(nOffset,bBE)
 {
     return File.read_uint16(nOffset,bBE)
 }
-
 
 /**
  * Read a short (signed 16-bit) value.
@@ -98,13 +96,26 @@ function Hex(a,padz) {
 /**
  * Read a byte array from file.
  * @param {UInt} ofs - the offset to start from.
- * @param {ByteArray} len - the amount of bytes to read.
+ * @param {Int} len - the amount of bytes to read.
  * @returns {[uint8]} The file slice. If you go beyond EoF, read_uint8 only knows what happens.
  */
 function readBytes(ofs,len) { //for now; feels like this should be a system function
     var s=[];
-    for (i=0;i<len;i++) s.push(File.read_uint8(ofs+i));
+    for (var i=0;i<len;i++) s.push(File.read_uint8(ofs+i));
     return s;
+}
+
+/**
+ * Check a file slice for being all zeroes.
+ * @param {UInt} ofs - the offset to start from.
+ * @param {Int} len - the amount of bytes to check.
+ * @returns {bool} True if the slice is all zeroes. If you go beyond EoF, always false.
+ */
+function isAllZeroes(ofs,len) {
+    if(ofs+len>File.getSize()) return false;
+    var c = 0;
+    for(var i=0;i<len;i++) if(!File.read_uint8(ofs+i)) c++;
+    return c === s.length;
 }
 
 /**
@@ -117,7 +128,7 @@ function readBytes(ofs,len) { //for now; feels like this should be a system func
 function decEncoding(ansi,dectbl,zstop) {
     if(zstop==undefined) zstop=true;
     var s=""; var bit8=0;
-    for(i=0; i<ansi.length; i++)
+    for(var i=0; i<ansi.length; i++)
         if ((ansi[i]==0) && zstop) break; else
         if(ansi[i] < 0x80)
             switch(ansi[i]) { // 7-bit variation processing
@@ -142,8 +153,8 @@ function decEncoding(ansi,dectbl,zstop) {
 function decAnsi(ofs,len,dectbl,zstop) {
     var s="";
     if(zstop==undefined) zstop=true;
-    for (i=0;i<len;i++) {
-        b = Binary.read_uint8(ofs+i);
+    for (var i=0;i<len;i++) {
+        var b = Binary.read_uint8(ofs+i);
         if ((b==0) && zstop) break; else
         if(b < 0x80) s+=String.fromCharCode(b);
         else s+=dectbl[b-0x80];
