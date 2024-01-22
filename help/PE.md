@@ -247,6 +247,10 @@
 
 ```
 ```
+**qint32 getNumberOfExportFunctions()**
+
+```
+```
 **bool isExportPresent()**
 
 ```

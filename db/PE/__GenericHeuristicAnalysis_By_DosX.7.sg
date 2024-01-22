@@ -41,12 +41,28 @@
 
 // Please do not read the code out loud unless you have exorcism skills
 
+const logType = {
+    warning: -2,
+    about: -1,
+    nothing: 0,
+    any: 1,
+    net: 2
+};
+
 function detect() {
 
     if (stubForWrongEnvironment()) return null; // 'PE' is undefined
     if (stubForLegacyEngines()) return null; // old DIE version
 
     if (PE.isHeuristicScan()) {
+        if (!PE.isVerbose()) {
+            log(logType.warning, "To get the full heuristic scan result use '--verbose'");
+        }
+
+        log(logType.about, "Generic Heuristic Analysis by DosX")
+
+        log(logType.nothing, "Scanning has begun!");
+
         if (PE.isNET()) {
             scanForObfuscations_NET();
             scanForAntiAnalysis_NET();
@@ -55,15 +71,16 @@ function detect() {
         }
 
         scanForPackersAndCryptors_NET_and_Native();
-        scanForDamages_NET_and_Native();
+        log(logType.nothing, "Scan completed.");
+
         // scanForMaciliousCode_NET_and_Native();
     } else {
-        _log("[!] Heuristic scan is disabled. Use '--heuristicscan' to enable");
+        log(logType.warning, "Heuristic scan is disabled. Use '--heuristicscan' to enable");
     }
 }
 
 function stubForLegacyEngines() {
-    if (typeof PE.isNetObjectPresent === 'undefined') {
+    if (typeof validateNetObject === 'undefined') {
         _setResult("DIE-Message", ">>> Update DIE Engine to 3.09 and higher for using Heuristic-analyser by DosX <<<", "", "");
         return true;
     }
@@ -113,6 +130,10 @@ function scanForObfuscations_NET() {
         } else if (isAllNetReferencesMissing(defaultEntries)) {
             isEntryPointModified = true;
         }
+
+        if (isEntryPointModified) {
+            log(logType.net, "No 'Main' method found")
+        }
     }
 
     if (isEntryPointModified) options += "Modified EP";
@@ -160,7 +181,7 @@ function scanForObfuscations_NET() {
             const firstOpCode = getFirstEpAsmOpCode();
 
             if (firstOpCode !== "JMP") {
-                _log("Very strange EP pattern: " + getEpAsmPattern(onlyOpCodes = true, numberOf = 4).split("|").join(" .. "));
+                log(logType.nothing, "Very strange EP pattern: " + getEpAsmPattern(onlyOpCodes = true, numberOf = 4).split("|").join(" .. "));
 
                 isNativeEntryPointModified = true;
             }
@@ -305,7 +326,7 @@ function scanForObfuscations_NET() {
     // https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.suppressildasmattribute
     var isAntiIldasmPresent = false;
 
-    if (PE.isNetObjectPresent("SuppressIldasmAttribute")) {
+    if (validateNetObject("SuppressIldasmAttribute")) {
         isAntiIldasmPresent = true;
     }
 
@@ -319,7 +340,7 @@ function scanForObfuscations_NET() {
 
     if (
         validateSignature("'Form'******00'Form'******00'Form'******00") || // samples by: NetShield
-        PE.isNetObjectPresent("Form0") // samples by: MindLated
+        validateNetObject("Form0") // samples by: MindLated
     ) {
         isAntiDe4dotPresent = true;
     }
@@ -343,6 +364,22 @@ function scanForObfuscations_NET() {
     }
 
     if (isCalliInvokesPresent) options += (options.length != 0 ? " + " : "") + "Calli invokes";
+
+
+
+
+    var isLdftnPointersPresent = false;
+
+    if (validateNetByteCode(
+            opCodes.nop + opCodes.setStrict(opCodes.ldftn, "** 00 00 06") + opCodes.stelem_i
+        ) ||
+        validateNetByteCode(
+            opCodes.nop + opCodes.setStrict(opCodes.ldftn, "** 00 00 0A") + opCodes.stelem_i
+        )) {
+        isLdftnPointersPresent = true;
+    }
+
+    if (isLdftnPointersPresent) options += (options.length != 0 ? " + " : "") + "Ldftn pointers";
 
 
 
@@ -437,6 +474,7 @@ function scanForObfuscations_NET() {
         var secondCtorNameOffset = PE.findSignature(currentCtorOffset + 10, PE.getSize() - PE.getOverlaySize(), "'<Module>'");
 
         if (secondCtorNameOffset != -1 && PE.readByte(secondCtorNameOffset + 8) != 0x00) {
+            _log(logType.net, "Fake <Module> offset: " + secondCtorNameOffset);
             isModuleCtorMultiple = true;
         }
     }
@@ -560,7 +598,7 @@ function scanForObfuscations_NET() {
         "ZYXDNGuarder",
         "Sixxpack",
         "____KILL", // CodeVeil
-        "Reactor",
+        "Reactor", // Fake .NET Reactor
     ];
 
     var isFakeSignaturesPresent = false;
@@ -574,13 +612,14 @@ function scanForObfuscations_NET() {
     // Iterate through obfuscators attributes
     for (var t = 0; t < obfuscatorsAttributes.length; t++) {
 
-        if (PE.isNetObjectPresent(obfuscatorsAttributes[t])) {
+        if (validateNetObject(obfuscatorsAttributes[t])) {
             obfuscatorAttributeFound = obfuscatorsAttributes[t];
             signaturesCounter++;
         }
 
         // Check if the number of detected signatures exceeds 1
         if (signaturesCounter > 1) {
+
             // Set flag indicating the presence of fake signatures
             isFakeSignaturesPresent = true;
 
@@ -595,7 +634,7 @@ function scanForObfuscations_NET() {
         // "Watermark" is only possible in the absence of fake signatures
 
         if (signaturesCounter === 1) {
-            _log("Watermark (Attribute) found: '" + obfuscatorAttributeFound + "'");
+            log(logType.nothing, "Watermark (Attribute) found: '" + obfuscatorAttributeFound + "'");
             isWatermarkPresent = true;
         }
 
@@ -604,7 +643,7 @@ function scanForObfuscations_NET() {
                 validateSignature("'obfuscated'") ||
                 validateSignature("'ByAttribute'") ||
                 validateSignature("'ObfuscatorAttribute'") ||
-                PE.isNetObjectPresent("ObfuscationAttribute")
+                validateNetObject("ObfuscationAttribute")
             )) && !isFrameworkComponent()) // System.Reflection.ObfuscationAttribute
         {
             isWatermarkPresent = true;
@@ -652,7 +691,7 @@ function scanForObfuscations_NET() {
 
 
     if (isDetected) {
-        _setResult("protection", "Obfuscation", "Heuristic by DosX", PE.isVerbose() ? options : "");
+        _setResult("protection", "Obfuscation", "HEUR", PE.isVerbose() ? options : "");
     }
 }
 
@@ -670,13 +709,13 @@ function scanForAntiAnalysis_NET() {
 
     if (
         (( // .NET Functions
-                PE.isNetObjectPresent(debuggerObject) || PE.isNetUStringPresent(debuggerObject) // Check for 'Debugger'
+                validateNetObject(debuggerObject) || PE.isNetUStringPresent(debuggerObject) // Check for 'Debugger'
             ) && (
-                (PE.isNetObjectPresent(isAttached) || PE.isNetUStringPresent(isAttached)) || // Check for 'get_IsAttached' property
-                (PE.isNetObjectPresent(isLogging) || PE.isNetUStringPresent(isLogging)) // Check for 'IsLogging' function
+                (validateNetObject(isAttached) || PE.isNetUStringPresent(isAttached)) || // Check for 'get_IsAttached' property
+                (validateNetObject(isLogging) || PE.isNetUStringPresent(isLogging)) // Check for 'IsLogging' function
             ) ||
             ( // Native (WinAPI) functions
-                PE.isNetObjectPresent("CheckRemoteDebuggerPresent") || PE.isNetObjectPresent("IsDebuggerPresent")
+                validateNetObject("CheckRemoteDebuggerPresent") || validateNetObject("IsDebuggerPresent")
             )) && !isFrameworkComponent()
     ) {
         isAntiDebugPresent = true;
@@ -690,7 +729,7 @@ function scanForAntiAnalysis_NET() {
     var isAntiDumpPresent = false;
 
     if (
-        PE.isNetObjectPresent("VirtualProtect") && ( // from 'kernel32.dll', WinAPI
+        validateNetObject("VirtualProtect") && ( // from 'kernel32.dll', WinAPI
             // Need to check
             isAllNetReferencesPresent( // samples by: ConfuserEx, SkiDzEX
                 references = [
@@ -832,7 +871,7 @@ function scanForAntiAnalysis_NET() {
 
 
     if (options.length != 0) {
-        _setResult("protection", "Anti analysis", "Heuristic by DosX", PE.isVerbose() ? options : "");
+        _setResult("protection", "Anti analysis", "HEUR", PE.isVerbose() ? options : "");
     }
 }
 
@@ -892,6 +931,7 @@ function NetOpCodes() {
     this.stloc_s = "13??"; // MSIL: 'stloc.s'
     this.shr_un = "64"; // MSIL: 'shr.un'
     this.xor = "61"; // MSIL: 'xor'
+    this.stelem_i = "9B"; // MSIL: 'stelem.i'
     this.stelem_i1 = "9C"; // MSIL: 'stelem.i1'
     this.stelem_i4 = "9E"; // MSIL: 'stelem.i4'
     this.box = "8C????????"; // MSIL: 'box'
@@ -1083,6 +1123,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         for (var l = 0; l < overlayPatterns.length; l++) {
             if (PE.compareOverlay(overlayPatterns[l])) {
+                log(logType.nothing, "SFX overlay pattern: " + overlayPatterns[l]);
                 isSfx = true;
             }
         }
@@ -1123,7 +1164,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
             for (var k = 0; k < sfxEntries.length; k++) {
                 if (PE.compareEP(sfxEntries[k])) {
-                    _log("SFX entry pattern: " + sfxEntries[k]);
+                    log(logType.nothing, "SFX entry pattern: " + sfxEntries[k]);
 
                     isSfx = true;
                 }
@@ -1181,7 +1222,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
             // If the entry point matches the current entry, set the flag to true and break the loop
             if (PE.compareEP(entryToCheck)) {
-                _log("EP like a packer: '" + entryToCheck + "'");
+                log(logType.nothing, "EP like a packer: '" + entryToCheck + "'");
 
                 entryLikePacker = true;
 
@@ -1202,12 +1243,22 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (!PE.isDll()) {
         if (PE.getNumberOfSections() > 1) {
             // Get addresses of the last section and entry point
-            var lastSectionAddress = PE.OffsetToVA(PE.getSectionFileOffset(PE.getNumberOfSections() - 1)),
-                entryPointAddress = PE.getAddressOfEntryPoint();
+
+            var lastSectionAddress = -1,
+                entryPointAddress = -1
+
+
+            // Get last section with non -1 address
+            for (i = 1; lastSectionAddress == -1; i++) {
+                lastSectionAddress = PE.OffsetToVA(PE.getSectionFileOffset(PE.getNumberOfSections() - i));
+            }
+            entryPointAddress = PE.getAddressOfEntryPoint();
+
 
             // Check if the entry point is greater than or equal to the last section address
             if (entryPointAddress >= lastSectionAddress) {
                 isLastSectionEP = true;
+                log(logType.nothing, "EP address (" + entryPointAddress + ") more than last section address (" + lastSectionAddress + ")");
             }
         }
     }
@@ -1222,7 +1273,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     if (!PE.isDll()) {
         if (isLastSectionEP && getAsmOpCode(getAsmInstructionByIndex(1)) === "CALL") {
-            _log("Strange call to address: " + getAsmInstructionByIndex(1).split(" ")[1]);
+            log(logType.nothing, "Strange call to address: " + getAsmInstructionByIndex(1).split(" ")[1]);
             isStrangeCalls = true;
         }
     }
@@ -1311,6 +1362,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     const importValidatingResult = validateImportHashes(dbCollectionOfHashesDictionary);
 
     if (importValidatingResult != null) {
+        log(logType.nothing, "Imports hash like " + importValidatingResult[0] + (importValidatingResult[1].length != 0 ? " (version " + importValidatingResult[1] + ")" : "") + " (" + importValidatingResult[3] + ")")
         isImportsLikePacker = true;
     }
 
@@ -1360,6 +1412,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDictionary);
 
     if (sectionNamesValidatingResult != null) {
+        log(logType.nothing, "Sections like " + sectionNamesValidatingResult[0] + (sectionNamesValidatingResult[1].length != 0 ? " (v" + sectionNamesValidatingResult[1] + ")" : ""));
         isSectionNameLikePacker = true;
     }
 
@@ -1473,6 +1526,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (PE.isOverlayPresent() &&
         PE.getOverlaySize() >= 100 &&
         PE.compareOverlay("'MZ'")) {
+        log(logType.any, "PE signature at overlay");
         isMzSignatureDetected = true;
     }
 
@@ -1486,10 +1540,12 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Conditions to check for a strange overlay
     if (!isMzSignatureDetected && !isSfx && !PE.isSigned() && PE.isOverlayPresent()) {
+        var overlayEntropy = PE.calculateEntropy(PE.getOverlayOffset(), PE.getOverlaySize());
         if (
-            PE.getOverlaySize() > 150 && PE.calculateEntropy(PE.getOverlayOffset(), PE.getOverlaySize()) > 7 ||
+            PE.getOverlaySize() > 150 && overlayEntropy > 7 ||
             PE.getOverlaySize() > (PE.getSize() - PE.getOverlaySize())
         ) {
+            log(logType.any, "Overlay size: " + PE.getOverlaySize() + " bytes; Entropy: " + overlayEntropy);
             hasStrangeOverlay = true;
         }
     }
@@ -1536,7 +1592,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (isDetected) {
         var detectedType = isCryptor ? "cryptor" : "packer";
 
-        _setResult(detectedType, (isCryptor ? "Cryptor" : "Packer") + " detected", "Heuristic by DosX", PE.isVerbose() ? options : "");
+        _setResult(detectedType, (isCryptor ? "Cryptor" : "Packer") + " detected", "HEUR", PE.isVerbose() ? options : "");
     }
 }
 
@@ -1556,7 +1612,7 @@ function isFrameworkComponent() {
 // Validate the presence of a signature in the file
 function validateSignature(pattern) {
     const result = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), pattern) != -1
-    if (result) _log("[Heur/*] Pattern found: " + pattern);
+    if (result) log(logType.any, "Pattern found: " + pattern);
     return result;
 }
 
@@ -1567,11 +1623,18 @@ function validateNetByteCode(byteCode) {
         const sectionOffset = PE.getSectionFileOffset(s),
             sectionSize = PE.getSectionFileSize(s);
         if (PE.findSignature(sectionOffset, sectionOffset + sectionSize, byteCode) != -1) {
-            _log("[Heur/.NET] ByteCode detected: " + byteCode);
+            log(logType.net, "ByteCode detected: " + byteCode);
             return true;
         }
     }
     return false;
+}
+
+
+function validateNetObject(object) {
+    const result = PE.isNetObjectPresent(object);
+    if (result) log(logType.net, ".NET object present: " + object);
+    return result;
 }
 
 
@@ -1799,7 +1862,7 @@ function scanForObfuscations_Native() {
 
 
     if (isDetected) {
-        _setResult("protection", "Generic", "Heuristic by DosX", PE.isVerbose() ? options : "");
+        _setResult("protection", "Generic", "HEUR", PE.isVerbose() ? options : "");
     }
 }
 
@@ -1922,6 +1985,40 @@ function validateImportHashes(dbCollection) {
 }
 
 
+function log(messageTypeId, messageText) {
+    if (messageText.indexOf("\n") != -1) {
+        throw "Illegal char at log( ... )";
+    }
+
+    var prefix = ""
+
+    if (messageTypeId !== -2) {
+        prefix = "Heur";
+    }
+
+    if (messageTypeId > -2 && messageTypeId !== 0) {
+        prefix += "/";
+    }
+
+    switch (messageTypeId) {
+        case -2:
+            prefix = "!";
+            break;
+        case -1:
+            prefix += "About";
+            break;
+        case 1:
+            prefix += "Any";
+            break;
+        case 2:
+            prefix += ".NET";
+            break;
+    }
+
+    _log("[" + prefix + "] " + messageText);
+}
+
+
 function validateSectionNames(dbCollection) {
     for (var i = 0; i < dbCollection.length; i++) {
         const currentIndex = i,
@@ -1960,7 +2057,7 @@ function scanForMaciliousCode_NET_and_Native() {
     var _TakeScreenshot = false;
 
     if (PE.isNET()) {
-        if (PE.isNetObjectPresent("BitBlt") || PE.isNetObjectPresent("GetDC")) {
+        if (validateNetObject("BitBlt") || validateNetObject("GetDC")) {
             _TakeScreenshot = true;
         }
     } else { // Global scan
@@ -1981,56 +2078,5 @@ function heurAvSetResult(label, scores) {
     }
 }
 
-function scanForDamages_NET_and_Native() {
-    var options = "";
-
-    var isDetected = false;
-
-
-
-    var isIatDamaged = false;
-
-    if (!PE.isNET() && PE.getNumberOfImports() === 0x00) {
-        isIatDamaged = true;
-    }
-
-    if (isIatDamaged) options = "IAT";
-
-
-
-
-    var isEpIncorrect = false;
-
-    if (!PE.isNET() && getFirstEpAsmInstruction() === "") {
-        isEpIncorrect = true;
-    }
-
-    if (isEpIncorrect) options += (options.length != 0 ? " + " : "") + "EP";
-
-
-
-
-    var isNetDamaged = false;
-
-    if (PE.isNET()) {
-        const netVersion = PE.getNETVersion();
-
-        if (netVersion.length > 3 && (netVersion[0] !== "v" || netVersion[2] !== ".")) {
-            isNetDamaged = true;
-        }
-    }
-
-    if (isNetDamaged) options += (options.length != 0 ? " + " : "") + ".NET";
-
-
-
-
-    if (options.length != 0) isDetected = true;
-
-
-    if (isDetected) {
-        _setResult("other", "Damaged PE format", "Heuristic by DosX", PE.isVerbose() ? options : "");
-    }
-}
 
 // Every time I start writing bad code I get hit with my head on the keybofewuihdsowefjfqodgsa79dowqhdsioefurogrwhuoguethuhofrwyi
