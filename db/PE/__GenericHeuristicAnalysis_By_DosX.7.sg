@@ -22,12 +22,19 @@
 // DIE's signature file
 
 // =================== [ ABOUT ] ===================
-// This heuristic analysis will help
-// identify the presence of obfuscation
-// or wrapper tricks through advanced
-// complex checks. Static emulation,
-// signature analysis, smart checks
-// and much more!
+// This heuristic analysis will help identify
+// presence of obfuscation the or wrapper
+// tricks through advanced complex checks.
+// Static emulation, signature analysis, 
+// smart checks and much more!
+// ================================================
+
+// ================== [ DONATE ] ==================
+// Did you like my work? :D Thank you! But what
+// about donation? I'll be very grateful <3
+//
+// * Bitcoin: 1DosXdevPgbaRKJkAJpvf2Jmjip8zC57he
+// * Litecoin: LUCKY777ju5Ea2VmenRuvk75kRUzTfwrHw
 // ================================================
 
 // ================= [ CONTACTS ] =================
@@ -181,7 +188,11 @@ function scanForObfuscations_NET() {
             const firstOpCode = getFirstEpAsmOpCode();
 
             if (firstOpCode !== "JMP") {
-                log(logType.nothing, "Very strange EP pattern: " + getEpAsmPattern(onlyOpCodes = true, numberOf = 4).split("|").join(" .. "));
+                if (PE.VAToOffset(PE.getAddressOfEntryPoint()) != -1) {
+                    log(logType.net, "Very strange EP pattern: " + getEpAsmPattern(onlyOpCodes = true, numberOf = 4).split("|").join(" .. "));
+                } else {
+                    log(logType.net, "No native entry point")
+                }
 
                 isNativeEntryPointModified = true;
             }
@@ -290,8 +301,8 @@ function scanForObfuscations_NET() {
             ]
         ) &&
         (
-            validateSignature("'Ldarg_0'") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
-            validateSignature("'CreateDelegate'") // MSIL: 'System.Delegate.CreateDelegate'
+            validateNetObject("'Ldarg_0'") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
+            validateNetObject("'CreateDelegate'") // MSIL: 'System.Delegate.CreateDelegate'
         ) && !isFrameworkComponent()
     ) {
         isVirtualizationPresent = true;
@@ -439,6 +450,44 @@ function scanForObfuscations_NET() {
 
 
 
+    var isShortNamesPresent = false;
+
+    // There are two ways to detect short names - find one-letter objects or just use signature mask at Ctor offset :D
+
+    var afterCtorOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'<Module>'00**") + 8;
+
+    if (PE.compare("00**00**00", afterCtorOffset) ||
+        PE.compare("00****00****00****00", afterCtorOffset) ||
+        PE.compare("00******00******00******00", afterCtorOffset) ||
+        PE.compare("00********00********00********00", afterCtorOffset) ||
+        PE.compare("00**00****00", afterCtorOffset) ||
+        PE.compare("00****00**00", afterCtorOffset)) {
+        log(logType.net, "Short names detected! (mask)");
+        isShortNamesPresent = true;
+    }
+
+    if (!isShortNamesPresent && PE.compare("00**00", afterCtorOffset)) { // second way :D
+        var shortNamesFound = 0;
+
+        const chars = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm";
+        for (var i = 1; i < chars.length && !isShortNamesPresent; i++) {
+            if (PE.isNetObjectPresent(chars[i])) {
+                shortNamesFound++;
+                log(logType.net, "Short name found: '" + chars[i] + "' (" + shortNamesFound + "/20)");
+            }
+
+            if (shortNamesFound === 20) {
+                isShortNamesPresent = true;
+            }
+        }
+    }
+
+
+    if (isShortNamesPresent) options += (options.length != 0 ? " + " : "") + "Short names";
+
+
+
+
     var isAntiTamperPresent = false;
 
     if (
@@ -474,7 +523,7 @@ function scanForObfuscations_NET() {
         var secondCtorNameOffset = PE.findSignature(currentCtorOffset + 10, PE.getSize() - PE.getOverlaySize(), "'<Module>'");
 
         if (secondCtorNameOffset != -1 && PE.readByte(secondCtorNameOffset + 8) != 0x00) {
-            _log(logType.net, "Fake <Module> offset: " + secondCtorNameOffset);
+            log(logType.net, "Fake <Module> offset: " + secondCtorNameOffset);
             isModuleCtorMultiple = true;
         }
     }
@@ -938,6 +987,7 @@ function NetOpCodes() {
 
     this.switch__nobody = "45"; // MSIL: 'switch'
     this._unknown = "**"; // Unknown opcode
+    this._any = "??"; // Any opcode
 
 
 
@@ -1432,6 +1482,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Check if there is a collision
     if (sectionNameCollision.length != 0) {
+        log(logType.nothing, "Section names collision: '" + sectionNameCollision + "'");
         isCollisionInSectionsPresent = true;
     }
 
@@ -1441,7 +1492,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
     // Check if there are repeating section names
-    var isCollisionInSectionsPresent = false;
+    var isSectionNamesRepeatingPresent = false;
 
     // Dictionary to track encountered section names
     var sectionNamesDictionary = {};
@@ -1452,7 +1503,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         // If section name is already encountered, set collision flag and break
         if (sectionNamesDictionary[sectionName]) {
-            isCollisionInSectionsPresent = true;
+            log(logType.nothing, "Section names repeating: '" + sectionNamesDictionary[sectionName] + "'");
+            isSectionNamesRepeatingPresent = true;
 
             // Break the loop if a match is found
             break;
@@ -1464,7 +1516,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     // Clean up: release the dictionary
     sectionNamesDictionary = undefined;
 
-    if (isCollisionInSectionsPresent) options += (options.length != 0 ? " + " : "") + "Section names repeating";
+    if (isSectionNamesRepeatingPresent) options += (options.length != 0 ? " + " : "") + "Section names repeating";
 
 
 
@@ -1481,6 +1533,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         case "PUSHA":
         case "PUSHF":
         case "POPA":
+            log(logType.nothing, "'" + firstEpAsmOpCode + "' at EP");
             isStartsWithStackOperation = true;
     }
 
@@ -1508,6 +1561,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         if (
             validateSignature(generateUnicodeSignatureMask(trigger) + "00") || validateSignature("'" + trigger + "'")
         ) {
+            log(logType.nothing, "Encoded PE detected! (with Base64)");
             isCryptor = true;
             isPackedPeDetected = true;
 
@@ -1990,7 +2044,7 @@ function log(messageTypeId, messageText) {
         throw "Illegal char at log( ... )";
     }
 
-    var prefix = ""
+    var prefix = "";
 
     if (messageTypeId !== -2) {
         prefix = "Heur";
