@@ -87,7 +87,7 @@ function detect() {
 }
 
 function stubForLegacyEngines() {
-    if (typeof validateNetObject === 'undefined') {
+    if (typeof PE.isNetObjectPresent === 'undefined') {
         _setResult("DIE-Message", ">>> Update DIE Engine to 3.09 and higher for using Heuristic-analyser by DosX <<<", "", "");
         return true;
     }
@@ -301,8 +301,8 @@ function scanForObfuscations_NET() {
             ]
         ) &&
         (
-            validateNetObject("'Ldarg_0'") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
-            validateNetObject("'CreateDelegate'") // MSIL: 'System.Delegate.CreateDelegate'
+            validateNetObject("Ldarg_0") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
+            validateNetObject("CreateDelegate") // MSIL: 'System.Delegate.CreateDelegate'
         ) && !isFrameworkComponent()
     ) {
         isVirtualizationPresent = true;
@@ -491,10 +491,10 @@ function scanForObfuscations_NET() {
     var isAntiTamperPresent = false;
 
     if (
-        PE.isNetUStringPresent(" is tampered.") || // samples by: .NET Reactor
-        PE.isNetUStringPresent("ping 127.0.0.1 > nul") || // samples by: ConfuserEx (Trinity, SkiDzEx like)
-        PE.isNetUStringPresent("/C ping 1.1.1.1 -n 1 -w 3000 > Nul & Del \"") || // samples by: MindLated
-        validateNetByteCode( // samples by: ConfuserEx
+        validateNetUnicodeString(" is tampered.") || // samples by: .NET Reactor
+        validateNetUnicodeString("ping 127.0.0.1 > nul") || // samples by: ConfuserEx (Trinity, SkiDzEx like)
+        validateNetUnicodeString("/C ping 1.1.1.1 -n 1 -w 3000 > Nul & Del \"") || // samples by: MindLated
+        validateNetUnicodeString( // samples by: ConfuserEx
             opCodes.ldloc_s + opCodes.ldc_i4_0 + opCodes.ldloc_s + opCodes.ldc_i4_0 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_0 + opCodes.ldelem_u4 + opCodes._unknown + opCodes.stelem_i4 +
             opCodes.ldloc_s + opCodes.ldc_i4_1 + opCodes.ldloc_s + opCodes.ldc_i4_1 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_1 + opCodes.ldelem_u4 + opCodes._unknown + opCodes.stelem_i4 +
             opCodes.ldloc_s + opCodes.ldc_i4_2 + opCodes.ldloc_s + opCodes.ldc_i4_2 + opCodes.ldelem_u4 + opCodes.ldloc_s + opCodes.ldc_i4_2 + opCodes.ldelem_u4 + opCodes._unknown + opCodes.stelem_i4 +
@@ -547,7 +547,7 @@ function scanForObfuscations_NET() {
         opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.stloc, // samples by: .NET Reactor
         opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.ldc_i4 + opCodes.add, // samples by: ConfuserEx (Beds mod)
         opCodes.ldloc_1 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.ldc_i4 + opCodes.ldc_i4, // samples by: SkiDzEX
-        opCodes.ldloc + opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.stelem_i1 // samples by: .NET Reactor
+        opCodes.ldloc + opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.stelem_i1, // samples by: .NET Reactor
     ];
 
     for (var y = 0; y < mathTemplates.length; y++) {
@@ -758,10 +758,10 @@ function scanForAntiAnalysis_NET() {
 
     if (
         (( // .NET Functions
-                validateNetObject(debuggerObject) || PE.isNetUStringPresent(debuggerObject) // Check for 'Debugger'
+                validateNetObject(debuggerObject) || validateNetUnicodeString(debuggerObject) // Check for 'Debugger'
             ) && (
-                (validateNetObject(isAttached) || PE.isNetUStringPresent(isAttached)) || // Check for 'get_IsAttached' property
-                (validateNetObject(isLogging) || PE.isNetUStringPresent(isLogging)) // Check for 'IsLogging' function
+                (validateNetObject(isAttached) || validateNetUnicodeString(isAttached)) || // Check for 'get_IsAttached' property
+                (validateNetObject(isLogging) || validateNetUnicodeString(isLogging)) // Check for 'IsLogging' function
             ) ||
             ( // Native (WinAPI) functions
                 validateNetObject("CheckRemoteDebuggerPresent") || validateNetObject("IsDebuggerPresent")
@@ -832,7 +832,7 @@ function scanForAntiAnalysis_NET() {
 
         // Check if the signature for anti-DnSpy trigger is valid using Unicode signature mask or the original signature
         if (
-            validateSignature(generateUnicodeSignatureMask(dnSpyName)) ||
+            validateGlobalUnicodeString(dnSpyName) ||
             validateSignature("'" + dnSpyName + "'")
         ) {
             // Set flag indicating the presence of anti-DnSpy behavior
@@ -861,7 +861,7 @@ function scanForAntiAnalysis_NET() {
         const ilSpyName = antiIlSpyTriggers[l];
 
         if (
-            validateSignature(generateUnicodeSignatureMask(ilSpyName)) ||
+            validateGlobalUnicodeString(ilSpyName) ||
             validateSignature("'" + ilSpyName + "'")
         ) {
             isAntiIlSpyPresent = true;
@@ -891,7 +891,7 @@ function scanForAntiAnalysis_NET() {
 
             // Check if the signature for Sandboxie variant is valid using Unicode signature mask or the original signature
             if (
-                validateSignature(generateUnicodeSignatureMask(sbieLib)) ||
+                validateGlobalUnicodeString(sbieLib) ||
                 validateSignature("'" + sbieLib + "'")
             ) {
                 // Set flag indicating the presence of anti-Sandboxie behavior
@@ -910,7 +910,7 @@ function scanForAntiAnalysis_NET() {
 
     var isAntiVmPresent = false;
 
-    if (PE.isNetUStringPresent("vmware") || PE.isNetUStringPresent("VirtualBox")) {
+    if (validateNetUnicodeString("vmware") || validateNetUnicodeString("VirtualBox")) {
         isAntiVmPresent = true;
     }
 
@@ -1118,6 +1118,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
                 // Check if assembly invoke is found and the cryptography class is present
                 if (isAssemblyInvokeFound && result.length != 0) {
+                    log(logType.net, "Crypto class detected: " + cryptoClassSign);
+
                     isCryptor = true;
 
                     // Add the cryptography class to options
@@ -1148,6 +1150,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
                 // Check if assembly invoke is found and the compression class is present
                 if (isAssemblyInvokeFound && result.length != 0) {
+                    log(logType.net, "Compression class detected: " + compressionClassSign);
 
                     // If it's a cryptor, add the compression class to options
                     if (isCryptor) options += (options.length != 0 ? " + " : "") + compressionClassSign;
@@ -1559,7 +1562,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         // Check if the signature is valid using Unicode signature mask or the original signature
         if (
-            validateSignature(generateUnicodeSignatureMask(trigger) + "00") || validateSignature("'" + trigger + "'")
+            validateGlobalUnicodeString(trigger) || validateSignature("'" + trigger + "'")
         ) {
             log(logType.nothing, "Encoded PE detected! (with Base64)");
             isCryptor = true;
@@ -1671,7 +1674,6 @@ function validateSignature(pattern) {
 }
 
 
-// TODO: 
 function validateNetByteCode(byteCode) {
     for (var s = 0; s < PE.getNumberOfSections(); s++) {
         const sectionOffset = PE.getSectionFileOffset(s),
@@ -1688,6 +1690,20 @@ function validateNetByteCode(byteCode) {
 function validateNetObject(object) {
     const result = PE.isNetObjectPresent(object);
     if (result) log(logType.net, ".NET object present: " + object);
+    return result;
+}
+
+
+function validateNetUnicodeString(ustring) {
+    const result = PE.isNetUStringPresent(ustring);
+    if (result) log(logType.net, ".NET string present: \"" + ustring + "\"");
+    return result;
+}
+
+
+function validateGlobalUnicodeString(ustring) {
+    const result = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), generateUnicodeSignatureMask(ustring)) != -1;
+    if (result) log(logType.nothing, "Unicode string found: \"" + ustring + "\"");
     return result;
 }
 
