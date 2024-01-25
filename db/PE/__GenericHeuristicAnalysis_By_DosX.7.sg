@@ -56,6 +56,8 @@ const logType = {
     net: 2
 };
 
+var lastOffsetDetected = "0x00";
+
 function detect() {
 
     if (stubForWrongEnvironment()) return null; // 'PE' is undefined
@@ -212,6 +214,7 @@ function scanForObfuscations_NET() {
 
     // Check if the specified DOS message is not found in the DOS stub
     if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") === -1) {
+        log(logType.net, "DOS-stub modified!");
         isDosMessageModified = true;
     }
 
@@ -279,6 +282,7 @@ function scanForObfuscations_NET() {
                 (opCodes.bne_un + opCodes.ldc_i4_2 + opCodes.stloc_s + opCodes.sizeof + opCodes.add)
             )
         ) {
+            log(logType.net, "Int confusion detected! Offset: " + lastOffsetDetected);
             isIntConfusionPresent = true;
         }
     }
@@ -371,6 +375,7 @@ function scanForObfuscations_NET() {
             opCodes.idelem_i +
             opCodes.setStrict(opCodes.calli, "** 00 00 11")
         )) {
+        log(logType.net, "Calli invokes detected! Offset: " + lastOffsetDetected);
         isCalliInvokesPresent = true;
     }
 
@@ -387,6 +392,7 @@ function scanForObfuscations_NET() {
         validateNetByteCode(
             opCodes.nop + opCodes.setStrict(opCodes.ldftn, "** 00 00 0A") + opCodes.stelem_i
         )) {
+        log(logType.net, "Ldftn pointers method-obfuscation detected! Offset: " + lastOffsetDetected);
         isLdftnPointersPresent = true;
     }
 
@@ -442,6 +448,7 @@ function scanForObfuscations_NET() {
             opCodes.setStrict(opCodes.stloc_s, "05") + opCodes.nop + opCodes.ldloc_s + opCodes._unknown + opCodes.ceq + opCodes.brfalse_s
         )
     ) {
+        log(logType.net, "Control flow obfuscation detected! Offset: " + lastOffsetDetected);
         isCtrlFlowPresent = true;
     }
 
@@ -460,8 +467,9 @@ function scanForObfuscations_NET() {
         PE.compare("00****00****00****00", afterCtorOffset) ||
         PE.compare("00******00******00******00", afterCtorOffset) ||
         PE.compare("00********00********00********00", afterCtorOffset) ||
-        PE.compare("00**00****00", afterCtorOffset) ||
-        PE.compare("00****00**00", afterCtorOffset)) {
+        PE.compare("00****00****00", afterCtorOffset) ||
+        PE.compare("00****00**00", afterCtorOffset) ||
+        PE.compare("00**00****00", afterCtorOffset)) {
         log(logType.net, "Short names detected! (mask)");
         isShortNamesPresent = true;
     }
@@ -507,6 +515,7 @@ function scanForObfuscations_NET() {
             opCodes.ldloc_s + opCodes._unknown + opCodes.shr_un + opCodes.ldloc_s + opCodes.ldc_i4_s + opCodes.shl + opCodes.or + opCodes.stloc_s
         )
     ) {
+        log(logType.net, "Anti-tamper detected!");
         isAntiTamperPresent = true;
     }
 
@@ -523,7 +532,7 @@ function scanForObfuscations_NET() {
         var secondCtorNameOffset = PE.findSignature(currentCtorOffset + 10, PE.getSize() - PE.getOverlaySize(), "'<Module>'");
 
         if (secondCtorNameOffset != -1 && PE.readByte(secondCtorNameOffset + 8) != 0x00) {
-            log(logType.net, "Fake <Module> offset: " + secondCtorNameOffset);
+            log(logType.net, "Fake <Module> detected! Offset: " + Number(secondCtorNameOffset).toString(16));
             isModuleCtorMultiple = true;
         }
     }
@@ -550,18 +559,18 @@ function scanForObfuscations_NET() {
         opCodes.ldloc + opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.stelem_i1, // samples by: .NET Reactor
     ];
 
-    for (var y = 0; y < mathTemplates.length; y++) {
+    for (var y = 0; y < mathTemplates.length && !isMutationsPresent; y++) {
         const template = mathTemplates[y];
 
-        for (var e = 0; e < mathOpCodes.length; e++) {
+        for (var e = 0; e < mathOpCodes.length && !isMutationsPresent; e++) {
 
             if (e == 0 && !validateNetByteCode(template.replace("%s", opCodes._unknown))) break; // No math mutations
 
             const pattern = template.replace("%s", mathOpCodes[e]);
 
             if (validateNetByteCode(pattern)) {
+                log(logType.net, "Math mutations detected! Offset: " + lastOffsetDetected);
                 isMutationsPresent = true;
-                break;
             }
         }
     }
@@ -595,6 +604,7 @@ function scanForObfuscations_NET() {
                 opCodes.not + opCodes.not
             )
         )) {
+        log(logType.net, "Math inversions detected, offset " + lastOffsetDetected);
         isMathInversionsPresent = true;
     }
 
@@ -613,6 +623,7 @@ function scanForObfuscations_NET() {
             opCodes.setStrict(opCodes.calli, "FF FF FF FF") + opCodes.setStrict(opCodes.sizeof, "FF FF FF FF")
         )
     ) {
+        log(logType, "Invalid OpCodes detected, offset " + lastOffsetDetected);
         invalidOpCodes = true;
     }
 
@@ -659,7 +670,7 @@ function scanForObfuscations_NET() {
     var obfuscatorAttributeFound = "";
 
     // Iterate through obfuscators attributes
-    for (var t = 0; t < obfuscatorsAttributes.length; t++) {
+    for (var t = 0; t < obfuscatorsAttributes.length && !isFakeSignaturesPresent; t++) {
 
         if (validateNetObject(obfuscatorsAttributes[t])) {
             obfuscatorAttributeFound = obfuscatorsAttributes[t];
@@ -671,9 +682,6 @@ function scanForObfuscations_NET() {
 
             // Set flag indicating the presence of fake signatures
             isFakeSignaturesPresent = true;
-
-            // Break the loop if the condition is met
-            break;
         }
     }
 
@@ -827,7 +835,7 @@ function scanForAntiAnalysis_NET() {
     var isAntiDnSpyPresent = false;
 
     // Iterate through anti-DnSpy triggers
-    for (var l = 0; l < antiDnSpyTriggers.length; l++) {
+    for (var l = 0; l < antiDnSpyTriggers.length && !isAntiDnSpyPresent; l++) {
         const dnSpyName = antiDnSpyTriggers[l];
 
         // Check if the signature for anti-DnSpy trigger is valid using Unicode signature mask or the original signature
@@ -837,9 +845,6 @@ function scanForAntiAnalysis_NET() {
         ) {
             // Set flag indicating the presence of anti-DnSpy behavior
             isAntiDnSpyPresent = true;
-
-            // Break the loop if a match is found
-            break;
         }
     }
 
@@ -857,7 +862,7 @@ function scanForAntiAnalysis_NET() {
 
     var isAntiIlSpyPresent = false;
 
-    for (var l = 0; l < antiIlSpyTriggers.length; l++) {
+    for (var l = 0; l < antiIlSpyTriggers.length && !isAntiIlSpyPresent; l++) {
         const ilSpyName = antiIlSpyTriggers[l];
 
         if (
@@ -865,8 +870,6 @@ function scanForAntiAnalysis_NET() {
             validateSignature("'" + ilSpyName + "'")
         ) {
             isAntiIlSpyPresent = true;
-
-            break;
         }
     }
 
@@ -886,7 +889,7 @@ function scanForAntiAnalysis_NET() {
     // Check if the signature for 'GetModuleHandle' is present
     if (validateSignature("'GetModuleHandle'")) { // from 'kernel32.dll') {
         // Iterate through Sandboxie variants
-        for (var l = 0; l < sbieVariants.length; l++) {
+        for (var l = 0; l < sbieVariants.length && !isAntiSbiePresent; l++) {
             const sbieLib = sbieVariants[l];
 
             // Check if the signature for Sandboxie variant is valid using Unicode signature mask or the original signature
@@ -896,9 +899,6 @@ function scanForAntiAnalysis_NET() {
             ) {
                 // Set flag indicating the presence of anti-Sandboxie behavior
                 isAntiSbiePresent = true;
-
-                // Break the loop if a match is found
-                break;
             }
         }
     }
@@ -1109,7 +1109,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             ];
 
             // Iterate through cryptography classes
-            for (var i = 0; i < cryptoClasses.length; i++) {
+            for (var i = 0; i < cryptoClasses.length && !isCryptor; i++) {
                 var cryptoClassSign = cryptoClasses[i],
                     result = findAndMark(
                         sign = cryptoClassSign,
@@ -1118,15 +1118,12 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
                 // Check if assembly invoke is found and the cryptography class is present
                 if (isAssemblyInvokeFound && result.length != 0) {
-                    log(logType.net, "Crypto class detected: " + cryptoClassSign);
+                    log(logType.net, "Crypto class present: " + cryptoClassSign);
 
                     isCryptor = true;
 
                     // Add the cryptography class to options
                     options += (options.length != 0 ? " + " : "") + cryptoClassSign;
-
-                    // Break the loop if a match is found
-                    break;
                 }
             }
         }
@@ -1150,7 +1147,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
                 // Check if assembly invoke is found and the compression class is present
                 if (isAssemblyInvokeFound && result.length != 0) {
-                    log(logType.net, "Compression class detected: " + compressionClassSign);
+                    log(logType.net, "Compression class present: " + compressionClassSign);
 
                     // If it's a cryptor, add the compression class to options
                     if (isCryptor) options += (options.length != 0 ? " + " : "") + compressionClassSign;
@@ -1270,7 +1267,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ];
 
         // Iterate through the entries to check against the entry point
-        for (var e = 0; e < entries.length; e++) {
+        for (var e = 0; e < entries.length && !entryLikePacker; e++) {
             const entryToCheck = entries[e];
 
             // If the entry point matches the current entry, set the flag to true and break the loop
@@ -1278,9 +1275,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 log(logType.nothing, "EP like a packer: '" + entryToCheck + "'");
 
                 entryLikePacker = true;
-
-                // Break the loop if a match is found
-                break;
             }
         }
     }
@@ -1501,16 +1495,13 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var sectionNamesDictionary = {};
 
     // Iterate through sections to check for collisions
-    for (var i = 0; i < PE.getNumberOfSections(); i++) {
+    for (var i = 0; i < PE.getNumberOfSections() && !isSectionNamesRepeatingPresent; i++) {
         const sectionName = PE.getSectionName(i);
 
         // If section name is already encountered, set collision flag and break
         if (sectionNamesDictionary[sectionName]) {
             log(logType.nothing, "Section names repeating: '" + sectionNamesDictionary[sectionName] + "'");
             isSectionNamesRepeatingPresent = true;
-
-            // Break the loop if a match is found
-            break;
         } else {
             sectionNamesDictionary[sectionName] = true;
         }
@@ -1557,7 +1548,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var isPackedPeDetected = false;
 
     // Iterate through signature variants
-    for (var s = 0; s < signaturesVariants.length; s++) {
+    for (var s = 0; s < signaturesVariants.length && !isPackedPeDetected; s++) {
         const trigger = signaturesVariants[s];
 
         // Check if the signature is valid using Unicode signature mask or the original signature
@@ -1567,9 +1558,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             log(logType.nothing, "Encoded PE detected! (with Base64)");
             isCryptor = true;
             isPackedPeDetected = true;
-
-            // Break the loop if a match is found
-            break;
         }
     }
 
@@ -1630,11 +1618,10 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var sectionNumber = 0;
 
-    for (var t = 0; t < PE.getNumberOfSections(); t++) {
+    for (var t = 0; t < PE.getNumberOfSections() && !isCompressedSectionPresent; t++) {
         sectionNumber = t;
         if (PE.calculateEntropy(PE.getSectionFileOffset(sectionNumber), PE.getSectionFileSize(sectionNumber)) > 7.2) {
             isCompressedSectionPresent = true;
-            break;
         }
     }
 
@@ -1668,9 +1655,13 @@ function isFrameworkComponent() {
 
 // Validate the presence of a signature in the file
 function validateSignature(pattern) {
-    const result = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), pattern) != -1
-    if (result) log(logType.any, "Pattern found: " + pattern);
-    return result;
+    const offsetFound = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), pattern),
+        resultBool = offsetFound != -1;
+    if (resultBool) {
+        lastOffsetDetected = "0x" + Number(offsetFound).toString(16);
+        log(logType.any, "Pattern found: " + pattern);
+    }
+    return resultBool;
 }
 
 
@@ -1678,7 +1669,9 @@ function validateNetByteCode(byteCode) {
     for (var s = 0; s < PE.getNumberOfSections(); s++) {
         const sectionOffset = PE.getSectionFileOffset(s),
             sectionSize = PE.getSectionFileSize(s);
-        if (PE.findSignature(sectionOffset, sectionOffset + sectionSize, byteCode) != -1) {
+        var offsetFound = PE.findSignature(sectionOffset, sectionOffset + sectionSize, byteCode);
+        if (offsetFound != -1) {
+            lastOffsetDetected = "0x" + Number(offsetFound).toString(16);
             log(logType.net, "ByteCode detected: " + byteCode);
             return true;
         }
@@ -1689,14 +1682,14 @@ function validateNetByteCode(byteCode) {
 
 function validateNetObject(object) {
     const result = PE.isNetObjectPresent(object);
-    if (result) log(logType.net, ".NET object present: " + object);
+    if (result) log(logType.net, "Object present: " + object);
     return result;
 }
 
 
 function validateNetUnicodeString(ustring) {
     const result = PE.isNetUStringPresent(ustring);
-    if (result) log(logType.net, ".NET string present: \"" + ustring + "\"");
+    if (result) log(logType.net, "String present: \"" + ustring + "\"");
     return result;
 }
 
@@ -1792,13 +1785,11 @@ function scanForObfuscations_Native() {
     const badChars = '-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<> ';
 
     // Iterate through sections and characters to check for forbidden characters
-    for (var i = 0; i != PE.getNumberOfSections(); i++) {
+    for (var i = 0; i < PE.getNumberOfSections() && !strangeSections; i++) {
         var sectionName = PE.getSectionName(i);
 
         if (sectionName.length === 0 || sectionName[0] === " ") {
             strangeSections = true;
-
-            break;
         }
 
 
@@ -1825,14 +1816,11 @@ function scanForObfuscations_Native() {
 
         // If section name is too short, skip to the next iteration
         if (sectionName.length > 1) {
-            for (var x = 0; x < sectionName.length; x++) {
-                for (var d = 0; d < badChars.length; d++) {
+            for (var x = 0; x < sectionName.length && !strangeSections; x++) {
+                for (var d = 0; d < badChars.length && !strangeSections; d++) {
                     // If forbidden character is found, set flag and break
                     if (sectionName[x] === badChars[d]) {
                         strangeSections = true;
-
-                        // Break the loop if a match is found
-                        break;
                     }
                 }
             }
@@ -1865,13 +1853,9 @@ function scanForObfuscations_Native() {
         isCustomDosPresent = true;
 
         // Iterate through messages to check for custom DOS
-        for (var d = 0; d < messages.length; d++) {
-            // If signature is found in DOS stub, set flag to false and break
+        for (var d = 0; d < messages.length && isCustomDosPresent; d++) {
             if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'" + messages[d] + "'") != -1) {
                 isCustomDosPresent = false;
-
-                // Break the loop if a match is found
-                break;
             }
         }
     }
