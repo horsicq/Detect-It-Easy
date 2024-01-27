@@ -119,6 +119,31 @@ function isAllZeroes(ofs,len) {
 }
 
 /**
+ * If the string was too long and has been read incompletely, adds an ellipsis after the last
+ * complete word, to avoid cut-off words. If `space characters' are not detected,
+ * replaces the last character with an ellipsis.
+ * Mostly usable for lengthy multiline comments/messages.
+ * @param {String} a - the original incomplete string.
+ * @param {Number} trim - the buffer size; if a.length == trim, we decide it was cropped. 
+ * @param {Number} [mintrim = 78] - don't try searching for spaces below this point.
+ * @returns {String} - the resulting string.
+ */
+function addEllipsis(a,trim,mintrim) {
+    if(!mintrim) mintrim = 78; if(a.length < trim || mintrim > trim) return a;
+    const spaces = " .,:;!\\/'\"=&\x09\x10\x13\x1A\x26。、｡,，・";
+    var i = trim, c = 0, ci = -1;
+    while(i >= mintrim && c < 2) {
+        if(spaces.indexOf(a[i]) >= 0) { c++; while(spaces.indexOf(a[i]) >= 0) i--; if(ci < 0) ci = i+1 }
+        while(spaces.indexOf(a[i]) < 0) i--
+    }
+    if((i < mintrim && c < 2) //we conclude this language doesn't really have that many spaces...
+      || !c) //...or none at all in the trimmable slice...
+        return a.slice(0,trim)+'…';
+    else //this language has some spaces and we can use the last one to trim
+        return a.slice(0,Math.max(ci),mintrim)+'…';
+}
+
+/**
  * Decode a 1-byte encoding from a byte array using the 128-byte-long table given.
  * @param {[uint8]} ansi - an array returned by readBytes.
  * @param {String[0x80]} dectbl - a decoding table; just make a const here in db/read for that
