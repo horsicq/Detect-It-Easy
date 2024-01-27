@@ -94,6 +94,26 @@ function Hex(a,padz) {
 }
 
 /**
+ * Read a variable-length unsigned integer (like in MIDI files) from the file.
+ * @param {UInt} ofs - the offset to start from.
+ * @returns {List} [length,value] - if length < 0, the value had a problem.
+**/
+function readVarUInt(ofs) {
+    if(ofs < 0 || ofs >= File.getSize()) return [-1,0];
+    var t = 0, b = 0, wb = 0, a =[], av = 16, r = 1, p = ofs;
+    b = File.read_uint8(p); t <<= 7; t |= b&0x7F;
+    var b_ = b; while(b_) b_ >>= 1; wb = b_+1;
+    while(r < av && (b&0x80)) {
+        b = File.read_uint8(p+r); t <<= 7; t |= b&0x7F;
+        if(r == av) { p += r; av = 16; r = 0 }
+    }
+    p += r;
+    if(b > 64) return [-1,0xFFFFFFFFFFFFFFFF]; // sizeof(target) in bits. A 64bit value should be enough, right?
+    else if(b&0x80) return [-1,-1]; //EOF
+    else return [wb,] 
+}
+
+/**
  * Read a byte array from file.
  * @param {UInt} ofs - the offset to start from.
  * @param {Int} len - the amount of bytes to read.
