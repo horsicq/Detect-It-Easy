@@ -30,4 +30,4 @@ _log(123); // display a number
 ```
 ```
 
-**_codecs()** Show in log all codecs 
+**_encodingList()** Show in log all text codecs 
