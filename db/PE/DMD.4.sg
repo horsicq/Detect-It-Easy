@@ -1,32 +1,41 @@
 // DIE's signature file
-
+// 27.12.2023 @DosX_dev add strings
 init("compiler","DMD");
-
-function getDMDVersion()
-{
-    var sResult="";
-    var nSection=PE.getSectionNumber(".comment");
-    if(nSection!=-1)
-    {
-        var nSectionOffset=PE.getSectionFileOffset(nSection);
-        var nSectionSize=PE.getSectionFileSize(nSection);
-        var nOffset=PE.findString(nSectionOffset,nSectionSize,"DMD v");
-        if(nOffset!=-1)
-        {
-            sResult = PE.getString(nOffset+5,20);
-        }
-    }
-    
-    return sResult;
-}
 
 function detect(bShowType,bShowVersion,bShowOptions)
 {
-    var sDMDVersion=getDMDVersion();
-    if(sDMDVersion!="")
+    if(PE.isSectionNamePresent(".minfo") && PE.isSectionNamePresent("._deh"))
     {
         bDetected=1;
-        sVersion=sDMDVersion;
+    }
+
+    if (!bDetected) {
+        if((PE.section[".rdata"])&&(PE.isDeepScan()))
+        {
+            var nOffset=PE.section[".rdata"].FileOffset;
+            var nSize=PE.section[".rdata"].FileSize;
+        if (
+            PE.findSignature(nOffset, nSize, "'core.sys.windows.dll'") != -1 &&
+            PE.findSignature(nOffset, nSize, "'string.d'") != -1
+        ) {
+                bDetected = true;
+            }
+        }
+    }
+
+    if (bDetected && PE.section[".rdata"]) {
+        var nOffset=PE.section[".rdata"].FileOffset;
+        var nSize=PE.section[".rdata"].FileSize;
+
+        var strOffset = PE.findString(nOffset, nSize, "This program will continue, but will not operate when using DMD ");
+
+        if (strOffset != -1) {
+            sVersion = PE.getString(strOffset - 7, 5);
+
+            if (sVersion.indexOf(".") == -1 || sVersion.split(".")[0].length != 1) {
+                sVersion = "";
+            }
+        }
     }
 
     return result(bShowType,bShowVersion,bShowOptions);
