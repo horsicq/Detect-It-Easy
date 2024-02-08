@@ -96,6 +96,24 @@ function Hex(a,padz) {
     return minus+pads+r+"h"
 }
 
+function Bin(a,padz) {
+    if(a==undefined) return "!Bin("+a+")";
+    if(padz==undefined) padz=4;
+    var minus = ""; if(a < 0) { a=-a; minus="-" }
+    var r = a.toString(2); var pads="";
+    if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
+    return minus+pads+r+"b"
+}
+
+function Oct(a,padz) {
+    if(a==undefined) return "!Oct("+a+")";
+    if(padz==undefined) padz=4;
+    var minus = ""; if(a < 0) { a=-a; minus="-" }
+    var r = a.toString(8); var pads="";
+    if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
+    return minus+pads+r+"o"
+}
+
 /**
  * Read a variable-length unsigned integer (like in MIDI files) from the file.
  * @param {UInt} ofs - the offset to start from.
@@ -117,6 +135,46 @@ function readVarUInt(ofs) {
 }
 
 /**
+ * This object facilitates reading a file as a sequence of bits
+ * @init {UInt} [nOffset = 0] - provide the file offset
+ * @param {UInt} nBits - bits to read, autolimits to 32 (so read little by little!)
+ * @returns {UInt} read value as integer, -1 if EoF reached
+ * @example
+ * First create an instance with the file object: var bits = new BitReader(10);
+ * Then call the readBits method with the number of bits you want: var value = bits.read(5);
+ * Or put the reader towards a different place: bits.init(10)
+ * Receive the current bit-file offset: bits.ofs()
+**/
+function BitReader(nOffset, nLog) {
+    this.n = 0; // the number of bits in the buffer
+    this.buf = 0; // the bit buffer
+    this.offset = nOffset ? nOffset : 0; // the file offset
+    this.log = nLog ? nLog : 0; // how many first operations to log; for debug purposes
+
+    this.ofs = function() { return this.offset }
+
+    // use this to change the pointer, which will reinit the reader, but not the logger
+    this.init = function(nOffset) { this.ofs = nOffset ? nOffset : 0; this.n = 0; this.buf = 0 }
+
+    // the method to read b bits from the file
+    this.read = function(nBits) {
+        if(this.log) _log("  @"+Hex(this.offset)+" bt->"+nBits);
+        if(nBits > 32) nBits = 32; if(nBits < 0) return 0;
+        while(this.n < nBits) { // while the buffer is not enough
+            this.buf |= File.read_uint8(this.offset++) << this.n; // read a byte and append it to the buffer
+            this.n += 8; // increase the bit number by 8
+        }
+        var v = this.buf & ((1 << nBits) - 1); // extract the desired bits from the buffer
+        this.buf >>= nBits; // shift the buffer to the right
+        this.n -= nBits; // decrease the bit number by b
+        if(this.log) { this.log--; _log("  @"+Hex(this.offset)+": "+Hex(v)+", bitbuf:"+Hex(this.buf)
+    +", n:"+this.n) }
+        if(this.ofs <= File.getSize()) return v; // return the value if the file is not exhausted
+        else return -1; // return -1 otherwise
+    }
+}
+
+/**
  * Read a byte array from file.
  * @param {UInt} ofs - the offset to start from.
  * @param {Int} len - the amount of bytes to read.
@@ -124,7 +182,7 @@ function readVarUInt(ofs) {
  */
 function readBytes(ofs,len) { //for now; feels like this should be a system function
     var s=[];
-    for (var i=0;i<len;i++) s.push(File.read_uint8(ofs+i));
+    for (var i=0;i < len && ofs+i < File.getSize();i++) s.push(File.read_uint8(ofs+i));
     return s;
 }
 
@@ -137,7 +195,7 @@ function readBytes(ofs,len) { //for now; feels like this should be a system func
 function isAllZeroes(ofs,len) {
     if(ofs+len>File.getSize()) return false;
     var c = 0;
-    for(var i=0;i<len;i++) if(!File.read_uint8(ofs+i)) c++;
+    for(var i=0;i < len && ofs+i < File.getSize();i++) if(!File.read_uint8(ofs+i)) c++;
     return c === s.length;
 }
 
