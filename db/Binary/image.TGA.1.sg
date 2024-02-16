@@ -1,0 +1,125 @@
+// DIE's signature file
+// Author: Kae (TG@kaens)
+
+init("image","Truevision Targa (.TGA)");
+
+includeScript("read");
+
+function detect(bShowType,bShowVersion,bShowOptions) {
+    //ref https://github.com/ImageMagick/ImageMagick/blob/main/coders/tga.c
+    // & https://www.dca.fee.unicamp.br/~martino/disciplinas/ea978/tgaffs.pdf
+    if(File.getSize() < 0x12) return false;
+    var msg = "", idlen = File.read_uint8(0), cmt = File.read_uint8(1), depth = 0,
+      it = File.read_uint8(2), bpp = File.read_uint8(0x10), strcls = "", co = "none";
+    if((bpp < 1 || bpp >= 17) && bpp != 24 && bpp != 32) return;
+    switch(it) {
+        case 1: if(!cmt) return; strcls = "pseudo";
+            if(File.isVerbose()) sOption("colormap"); break;
+        case 2: if(File.isVerbose()) sOption("RGB"); col = "24bit"; break;
+        case 3: if(File.isVerbose()) sOption("monochrome"); break;
+        case 9: if(!cmt) return; co = "rle"; strcls = "pseudo";
+            if(File.isVerbose()) sOption("RLE colormap"); break;
+        case 10: co = "rle"; if(File.isVerbose()) sOption("RLE RGB"); break;
+        case 11: co = "rle"; if(File.isVerbose()) sOption("RLE monochrome"); break;
+        case 32: if(!cmt) return; co = "hdr"; strcls = "pseudo";
+            if(File.isVerbose()) sOption("H/d/RLE colormap"); break;
+        case 33: if(!cmt) return; co = "hdrq"; strcls = "pseudo";
+            if(File.isVerbose()) sOption("H/d/RLE 4-pass colormap"); break;
+        default: return;
+    }
+    var cmin = File.read_uint16(3), cmlen = File.read_uint16(5), cmsz = File.read_uint8(7),
+      x0 = File.read_uint16(8), y0 = File.read_uint16(0xA),
+      w = File.read_uint16(0xC), h = File.read_uint16(0xE), attr = File.read_uint8(0x11),
+    if(it != 1 && it != 9 && it != 32 && it != 33) depth = bpp <= 8 ? 8 : (bpp <= 16 ? 5 : 8);
+    else depth = cmsz <= 8 ? 8 : (cmsz <= 16 ? 5 : 8);
+    var col = 1 << depth;
+    if(strcls == "pseudo")
+        if(cmt) col = cmin+cmlen;
+        else { col = 1 << bpp; if(col > File.getSize()) return }
+    p = 0x12;
+    if(idlen) msg = File.read_ansiString(p += idlen, idlen);
+//_log("colormap? @"+Hex(p)+"  type:"+cmt+" index:"+cmin+" len:"+cmlen);
+    if(cmt) {
+        if(col < cmin) col = cmin;
+        switch(cmsz) {
+        case 8: default: p += col; break;
+        case 15: case 16: p += col*2; break;
+        case 24: p += col*3; break;
+        case 32: p += col*4; break;
+        }
+    }
+    var pix = base = flag = skip = index = runlen = ofs = 0, ofsss = 1;
+    if(((attr&0xC0)>>6) == 2) ofsss = 2;
+    if(co != "hdr" && co != "hdrq")
+        for(var y = 0; y < h && p < File.getSize(); y++) {
+            for(var x = 0; x < w && p < File.getSize(); x++) {
+                if(co == "rle")
+                    if(runlen) {runlen--; skip = flag != 0 }
+                    else {
+                        runlen = File.read_uint8(p++);
+                        skip = 0; flag = runlen&0x80; if(flag) runlen -= 0x80;
+                    }
+                if(!skip) switch(bpp) {
+                    case 1: if(!(x&7)) p++; break;
+                    case 8: default: p++; break;
+                    case 15: case 16: p += 2; break;
+                    case 24: p += 3; break;
+                    case 32: p += 4; break;
+                    }
+            }
+        }
+    else p = 0; //giving up on reading huffman/delta etc. (not even Imagemagick can do that)
+    ofs += ofsss; if(ofs > w) { base++; ofs = base }
+    if(p > File.getSize()) sVersion += "/malformed!short @"+Hex(p);
+
+    ea = 0;
+    if(File.isHeuristicScan()) {
+        ext = File.findSignature(p,0x1000,"'TRUEVISION-XFILE.'00");
+        if(ext > 0) {
+            function isNewTGA() {
+                //let's see if it's not us accidentally catching the next resource.
+                ea = File.read_uint32(ext-8); var dd = File.read_uint32(ext-4);
+                if(p > ext-8 || (ea && p > ea) || (dd && p > dd) || ((dd||ea) && ea == dd) ||
+                    (ea && ea+File.read_uint16(ea) > ext) ||
+                    (dd && ea && ea < dd && ea+File.read_uint16(ea) > dd))
+                    return false; //false alarm
+                if(dd) {
+                    var ddtn = File.read_uint16(dd); var dsz = ddtn*10+2;
+                    if(dd+dsz > ext || (ea && dd+dsz > ea)) return false; 
+                    for(i=0; i < ddtn; i++) {
+                        var dtp = File.read_uint32(dd+4+i*10), dtsz = File.read_uint32(dd+8+i*10);
+                        if(dtp+dtsz > ext || dtp+dtsz < p) return false;
+                    }
+                }
+                if(ea) {
+                    if(File.read_uint16(ea) == 495) sV = "v2.0"; else sV = "v2.x";
+                    auth = File.read_ansiString(ea+2,41);
+                    xmsg = File.read_ansiString(ea+43,324);
+                    timestamp = File.read_uint16(ea+371)+"-"+File.read_uint16(ea+369)+"-"+
+                      File.read_uint16(ea+367)+" "+
+                      File.read_uint16(ea+373)+":"+File.read_uint16(ea+375)+":"+File.read_uint16(ea+377);
+                    sw = File.read_ansiString(ea+426,41).trim()+" v"+
+                      Math.floor(File.read_uint16(ea+467)/100).toString()+'.'+
+                      (File.read_uint16(ea+467)%100).toString()+File.read_ansiString(ea+469,1);
+                }
+                else sV = "v2.x";
+                return true
+            }
+
+            if(isNewTGA()) {
+                sVersion = sV; p = ext+18;
+            }
+        } else sVersion = "v1.x";
+    }
+    else sVersion = "v1.x";
+    if(File.isVerbose()) {
+        sOption(w+"x"+h+" ("+x0+","+y0+")"); sOption(col,"colours:");
+        if(ea) {
+            sOptionT(auth+"by:"); sOption(timestamp,"on:"); sOption(sw,"in:"); sOption(xmsg)
+        }
+        sOption(p,"sz:")
+    }
+
+    bDetected = 1;
+    return result(bShowType,bShowVersion,bShowOptions);
+}
