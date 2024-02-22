@@ -1475,7 +1475,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         sz = p = 0x0E; txt = by = title = lyr = "";
         for(i=0; i < trk; i++) {
             var readmore = 20; //mostly enough to catch the info messages; set to 4294967295 for all of 'em
-            if(!File.compare("'MTrk'",p) || (i && File.compare("FF2F00",p-3))) { malformed += "!badtrk"; break }
+            if(!File.compare("'MTrk'",p) || (i && !File.compare("FF2F00",p-3))) { malformed += "!badtrk"; break }
             len = File.read_uint32(p+4,_BE); p += 8; sz = p;
             while(readmore && p < sz+len && p < File.getSize()) {
                 readmore--; dt = readVarUInt(p); p += dt[0];
@@ -4170,7 +4170,7 @@ function isIT() {
             var slen = File.read_uint32(smpp[i]+0x30); var smpofs = File.read_uint32(smpp[i]+0x48);
             S = { "ofs":0, "slen":0,
                 "bits":(sf & s16b)? 16 : 8, "chn":1,// 1 channel if mono, 2 if joint or split stereo
-                "en":"LE","codec":"sPCM","bps":0,"length":-1 //length is calculated from length in samples
+                "en":"LE","codec":"sPCM","bps":0,"length":0 //length is calculated from length in samples
             };
             p = smpofs; S["ofs"] = smpofs; S["slen"] = slen;
             if(cvt === cOPL) p += 12;
@@ -4199,7 +4199,8 @@ function isIT() {
                 //case "IT214": case "IT215": case "AMS": case "DMF": case "MDL": S["bps"] = 0; //and 
                 default: S["bps"] = 0 //variable length-encoded
                 }
-                if(!S["bps"]) lastsmpco = true; else {
+                if(!S["bps"]) lastsmpco = true; //...and we'll decompress it further down
+                else {
                     S["length"] = slen*S["chn"]*(S["bps"]>>3);
                     p += S["length"];
                 }
@@ -4207,8 +4208,7 @@ function isIT() {
             } //GetSampleFormat
             if(lastsmpofs < p) lastsmpofs = p; if(sz < lastsmpofs) sz = lastsmpofs;
             if(S["codec"] === "uPCM" && slen) possibleXMconv = true;
-_log(File.read_ansiString(smpp[i]+0x14,0x1A)+" @"+Hex(smpofs)+": sf:"+Hex(sf)+" ["+S["codec"]+"] slen:"+slen
-+" bps:"+S["bps"]+" bits:"+S["bits"]+", ends @"+Hex(smpofs+S["length"]));
+//_log(File.read_ansiString(smpp[i]+0x14,0x1A)+" @"+Hex(smpofs)+": sf:"+Hex(sf)+" ["+S["codec"]+"] slen:"+slen+" ch:"+S["chn"]+" bps:"+S["bps"]+" bits:"+S["bits"]+", ends @"+Hex(smpofs+S["length"]));
         }
 // Load_it.cpp:845
         if(possibleXMconv && cwtv === 0x204 && cmwt === 0x200 && !special && !nreserved
@@ -4238,11 +4238,10 @@ _log(File.read_ansiString(smpp[i]+0x14,0x1A)+" @"+Hex(smpofs)+": sf:"+Hex(sf)+" 
             }
             if(lastsmpofs < p) lastsmpofs = p; if(sz < lastsmpofs) sz = lastsmpofs
         }
-
+//find the expected length of the final compressed sample
         if(lastsmpofs) { p = lastsmpofs;
             if(lastsmpco) {
                 S = Ss[Ss.length-1];
-//if(S["ofs"] != lastsmpofs) _log("lastsmpofs mismatch: lso="+Hex(lastsmpofs)+", S[ofs]="+Hex(S["ofs"]))
                 //smp length calc
                 if(S["bps"])
                     if(S["bps"]%8) S["length"] = (S["codec"] == "ADPCM"?16:0)
@@ -4250,86 +4249,99 @@ _log(File.read_ansiString(smpp[i]+0x14,0x1A)+" @"+Hex(smpofs)+": sf:"+Hex(sf)+" 
                     else S["length"] = (S["codec"] == "ADPCM"?16:0)
                             +slen*S["bps"]/8*S["chn"];
                 else if(i+1 < smp) S["length"] = 0;
-                else { //let the crazy shit begin. ref. OpenMPT's SampleIO::ReadSample :142
+                else { //let the crazy shit begin.
+                    // ref https://github.com/nicolasgramlich/AndEngineMODPlayerExtension/blob/master/jni/loaders/itsex.c
+                    // but mainly OpenMPT's SampleIO::ReadSample :142
                     if(S["bps"] == 4 && S["chn"] == 1 && S["en"] == "LE" && S["codec"] == "ADPCM") {
                         S["length"] = 16+(slen+1)/2; p += S["length"]
                     } else if(slen > 1 && (S["codec"] === "IT214" || S["codec"] === "IT215")) { //:165
+                        // Let's try a quick-n-dirty first.
+                        var u = p, ulen = 0, quickndirty = 0;
+                        while(u < File.getSize() && ulen < slen /*packers have their limits*/) {
+                            if(File.compare("'XTPM'",u) || File.compare("'STPM'",u) || File.compare("'228'04'mptm'",u))
+                                { quickndirty = 1; p = u; break }
+                            ucsz = File.read_uint16(u,_LE); ulen += ucsz; u += 2+ucsz;
+                        } //orrrr if no MPTX block is present, we gotta do it the hard way I guess :<
                         //ITDecompression(file,sample,getencoding=it215)
-                        var bit_n = 0, bit_buf = 0; readdef = 20;
+                        var bit_n = bit_buf = cend = readdef = 0;
+
                         function readBits(b) {
-if(readdef) _log("  @"+Hex(p)+" bt->"+b);
-                            while(bit_n < b) { bit_buf |= File.read_uint8(p++) << bit_n; bit_n += 8 }
+                            while(bit_n < b) { bit_buf |= (File.read_uint8(p++) << bit_n); bit_n += 8 }
                             var v = bit_buf & ((1 << b) - 1); bit_buf >>= b; bit_n -= b;
-if(readdef) { readdef--; _log("  @"+Hex(p)+": "+Hex(v)+", bitbuf:"+Hex(bit_buf)
-    +", n:"+bit_n) }
-                            if(p <= File.getSize()) return v; else return -1
-                        }
-                        for(c = 0; c < S["chn"]; c++) {
-                            var ws = 0;
-                            if(S["chn"] == 2) { const fetchA = 4, lowerB = -8, upperB = 7, defW = 17 }
-                            else { const fetchA = 3, lowerB = -4, upperB = 3, defW = 9 }
-_log("  unp. @"+Hex(p)+" | c:"+c+" | ws:"+ws+" chn:"+S["chn"]);
-                            while(ws < slen && p < File.getSize()) {
-                                csz = File.read_uint16(p,_LE); p += 2;
-//_log("    @"+Hex(p-2)+" csz:"+csz+"="+Hex(csz))
-                                if(!csz) continue; //p += csz;
-                                var clen = Math.min(slen-ws, div(0x8000,S["chn"]));
-                                var w = defW, topbit = 0;
-                                while(clen) {
-if(readdef) _log("w is now "+w+", clen="+clen+", topbit="+Hex(topbit));
-                                    if(w > defW) break;
-                                    var v = readBits(w); var topbit = 1 << (w-1); if(v < 0) break;
-                                    if(w <= 6) { //mode A
-                                        if(w == topbit) {
-                                            var w2 = readBits(fetchA)+1; if(w2 <= 0) break; if(w2 >= w) w2++; w = w2
-                                        } else { clen--; ws++ }
+                            //if(p <= File.getSize()) return v; else return 0 }
+                            return v }
+
+                        if(S["bits"] == 16) { const fetchA=4, lowerB=-8, upperB=7, defW=17 }
+                        else { const fetchA=3, lowerB=-4, upperB=3, defW=9 }
+                        if(!quickndirty) for(c = 0; c < S["chn"]; c++) { //ITCompression.cpp:322
+                            var rs = slen, v = csz = clen = topbit = 0;
+                            cend = p;
+                            while(rs && p < File.getSize()) { //:325
+                                csz = File.read_uint16(p,_LE); p += 2; cend = p+csz;
+                                if(!csz) { readdef = 10; _log("@"+Hex(p)+" malformed sample?"); continue }
+                                if(cend > File.getSize()) { c = 0xE0F; malformed += "!short"; break }
+                                clen = Math.min(rs, 0x8000>>(S["bits"]>>4));
+                                var w = defW; bit_buf = bit_n = 0;
+//_log("@"+Hex(p)+" block ["+Hex(p)+"-"+Hex(cend-1)+"]="+Hex(csz)+" clen:"+Hex(clen)+" rs:"+(rs)+" v:"+Hex(v)+" w:"+w+" topbit:"+Hex(topbit)+" bnum:"+(~~bit_n).toString(16)+" bbuf:"+Hex(bit_buf));
+                                while(clen && p < File.getSize()) { //:357
+                                    if(w > defW) {
+                                        _log("! @"+Hex(p)+" w="+Hex(w)+" > "+defW+" rs:"+rs+" clen:"+Hex(clen)+" cend:"+Hex(cend));
+                                        rs = 0; break }
+                                    v = readBits(w); topbit = 1<<(w-1);
+                                    if(w < 7) { //mode A
+                                        if(v == topbit) {
+                                            v = readBits(fetchA)+1; if(v >= w) v++; w = v; continue
+                                        }
                                     } else if(w < defW) { //mode B
                                         if(v >= topbit+lowerB && v <= topbit+upperB) {
-                                            var w2 = v-topbit+lowerB; if(w2 >= w) w2++; w = w2
-                                        } else { clen--; ws++ }
-                                    } else { //mode C
-                                        if(v & topbit) w = (v & (~topbit))+1; else { clen--; ws++ }
-                                    }
+                                            v -= topbit-1+lowerB; if(v >= w) v++; w = v;
+                                            continue
+                                        }
+                                    } else //mode C: w = defW
+                                        if(v & topbit) { w = (v&0xFF)+1; continue }
+                                    clen--; rs--
                                 }
                             }
-if(p < File.getSize()) _log("  @"+Hex(p)+" unp.done, wrote "+ws+" samples")
-else _log("EOF!"); 
+                            if(p > File.getSize()) malformed += "!short";
                         }
-                    } else if(S["codec"] === "AMS" && S["chn"] == 1) {
-                        //
+                    } else if(S["codec"] === "AMS" && S["chn"] == 1) { //SampleIO:170
+                        //TODO test it at least
+                        sOption("\n!!! Please send this file to the detector dev!!! Poor fella hasn't any to test on")
+                        var srcsz = File.read_uint32(p+4,_LE), pc = File.read_uint8(p+8);
+                        S["length"] = srcsz+9
                     } else if(S["codec"] === "8d16" && S["chn"] == 1 && S["bps"] == 16) {
-                        //
+                        sOption("\n!!! Please send this file to the detector dev!!! Poor fella hasn't any to test on")
+                        //TODO CopyMonoSample<SC::DecodeInt16Delta8>(sample, source, fsize)
+                    } else if(S["codec"] === "MDL" && S["chn"] == 1 && S["bps"] <= 16) {
+                        var srcsz = File.read_uint32(p); S["length"] = 4+srcsz
+                    } else if(S["codec"] === "DMF" && S["chn"] == 1 && S["bps"] <= 16) {
+                        sOption("\n!!! Please send this file to the detector dev!!! Poor fella hasn't any to test on")
+                        //TODO DMFUnpack
+                    } else if((S["codec"] === "uLaw" || S["codec"] === "aLaw") /*TODO && mono or stereoInterleaved */ && S["bps"] == 16) {
+                        S["length"] = slen*S["chn"]
                     }
                 } //actual length teller
                 if(sz < p) sz = p
-// used to be Load_it.cpp:952 -- it's a BAD idea for .IT without extra settings that's within a huge file!
-                // while(p+4 < File.getSize()) {
-                //     if(File.compare("'XTPM'",p) || File.compare("'STPM'",p)) {
-                //         it = File.read_uint32(p+4,_LE);
-                //         if(!(it&0x80808080) && (it&0x60606060)) break
-                //     }
-                //     p += 2+File.read_uint16(p,_LE);
-                // }
+                //The following used to be Load_it.cpp:952 -- it's a BAD idea for .IT without extra settings
+                //that's within a huge file! We might even catch another .IT within.
+                // while(p+4 < File.getSize()) { if(File.compare("'XTPM'",p) || File.compare("'STPM'",p)) {
+                //         it = File.read_uint32(p+4,_LE); if(!(it&0x80808080) && (it&0x60606060)) break }
+                //     p += 2+File.read_uint16(p,_LE); }
             }
         }
         var bLoadXIProps = false;
-//_log("look for XTPM @"+Hex(p));
         if(File.compare("'XTPM'",p)) { // 'MPTX'
             p += 4;
             while(p+6 < File.getSize()) {
                 t = File.read_ansiString(p,4); it = File.read_uint32(p);
-                if(t === "STPM" || t === "228\x04" || (it&0x80808080) || !(it&0x60606060)) {
-                    //I haven't seen files with that to see how that goes so we'll just cut here! 
-                    break
-                }
+                if(t === "STPM" || t === "228\x04" || (it&0x80808080) || !(it&0x60606060)) break;
                 var prsz = File.read_uint16(p+4,_LE); p += 6;
                 for(i=0; i < ins; i++) p += prsz
             }
             bLoadXIProps = true;
+            if(sz < p) sz = p;
         }
-        if(sz < p) sz = p;
 // Load_it.cpp:978
-//_log("look for STPM @"+Hex(p));
         interpretModPlugMade |= bLoadXIProps;
 // Load_it.cpp:985
         if(File.compare("'STPM'",p)) {
@@ -4337,10 +4349,9 @@ else _log("EOF!");
             while(p+7 < File.getSize()) {
                 t = File.read_ansiString(p,4); it = File.read_uint32(p);
                 prsz = File.read_uint16(p+4,_LE);
-//_log("hd:"+t+":"+Hex(p));
                 if(t === "228\x04") { mptp = p; break; }
+                if((it&0x80808080) || !(it&0x60606060) || p+6+prsz > File.getSize()) break;
                 p += 6;
-                if((it&0x80808080) || !(it&0x60606060) || p+prsz > File.getSize()) break;
                 switch(t) {
                 case "...C": var chn = 0;
                     switch(prsz) {
@@ -4364,14 +4375,12 @@ else _log("EOF!");
                 }
                 p += prsz;
             }
+            if(sz < p) sz = p;
         }
-//_log("MPTS chunks end @"+Hex(p));
-
 // Load_it.cpp:1141
-        if(mVlsw === "?" && cwtv === 0x888)
-            mVlsw = "1.17.00.00";
+        if(mVlsw === "?" && cwtv === 0x888) mVlsw = "1.17.00.00";
         if(mVlsw != "?" && tracker === "") {
-            tracker = "OpenMPT "+mVlsw;
+            tracker = "OpenMPT";
             //not sure how many people care about these but...
             if(sreserved === "OMPT" && (cwtv&0xF000) === 0x5000) tracker += " (compat. export)";
             else if((mVlsw > "1.17.02.54" && mVlsw < "1.18.02.00" && mVlsw != "1.18.00.00")
@@ -4418,18 +4427,13 @@ else _log("EOF!");
                         +((mi+2)%12+1).padStart(2,'0')
                         +"-"+(ddd - div(mi*306+5,10) + 1).padStart(2,'0')
                 } break;
-            case 4:
-                tracker = "pyIT "+((cwtv&0xF00)>>8)+"."+((cwtv&0xFF).toString(16)); break;
-            case 6:
-                tracker = "BeRoTracker"; break;
+            case 4: tracker = "pyIT "+((cwtv&0xF00)>>8)+"."+((cwtv&0xFF).toString(16)); break;
+            case 6: tracker = "BeRoTracker"; break;
             case 7:
-                if(cwtv === 0x7FFF && cmwt === 0x215)
-                    tracker = "munch.py";
-                else
-                    tracker = "ITMCK "+((cwtv>>8)&0xF)+"."+((cwtv>>4)&0xF)+"."+(cwtv & 0xF);
+                if(cwtv === 0x7FFF && cmwt === 0x215) tracker = "munch.py";
+                else tracker = "ITMCK "+((cwtv>>8)&0xF)+"."+((cwtv>>4)&0xF)+"."+(cwtv&0xF);
                 break;
-            case 0xD:
-                tracker = "spc2it";
+            case 0xD: tracker = "spc2it";
             }
         }
 
@@ -4469,16 +4473,15 @@ else _log("EOF!");
                    p += t*(twochar ? 2 : 1) }
                 if(flagbyte&(1<<3)) p += 5; //:517
                 entries = readaintle(64); //if(entries > 16000) break;
-//_log("entries:"+entries);
                 if(hasmap) t = readaintle(64); if(p > File.getSize()) return false; //:533
                 //endOfHdrData = rposEndOfHdrData = p-posstart;
                 rposMapBegin = hasmap ? t : p-posstart;
                 return true
             }
 
-//_log("mptBeginRead @"+Hex(p));
             if(mptBeginRead()) {
 // serialization_utils.cpp:558
+//I've left the pieces of map code intact in case there's fun in finding out what MPT-only tweaks there are
                 if(hasmap || fes) {
                     p = posstart+rposMapBegin; if(p > File.getSize()) break;
                     //var idArray = [], mapdata = [];
@@ -4500,7 +4503,7 @@ else _log("EOF!");
             if(sz < p+4) sz = p+4; if(File.read_uint32(p,_LE) != mptp) malformed += "!mptptr";
         } //if 228.mptm
     } //if isDeepScan
-    if(mVlsw != "?") { if(mVcw != mVlsw) sV = "cw:"+mVcw+"/lsw:"+mVlsw; else sV = mVcw; charset = "CP1252" }
+    if(mVlsw != "?") { charset = "CP1252"; if(mVcw == "?") sV = mVlsw; else if(mVcw != mVlsw) sV = "cw:"+mVcw+"/lsw:"+mVlsw; else sV = mVcw }
     else { charset = "CP437"; if(mVcw != "?") sV = mVcw }
     if(malformed[0] < "3") return true
 }
