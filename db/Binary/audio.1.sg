@@ -655,6 +655,9 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         if(File.isVerbose())
             sOptionT(File.read_ansiString(0x10,20));
     }
+    else if(File.compare("48E7F1FE610000964CDF7F8F'NuH'E70010610000'$L'DF0800'NuH'E7F1FE610001844CDF7F8F'NuH'E70010610000'NL'DF0800'NuG'FAFFC651EB05',Q'EB05'PQ'EB05'tQ'EB059833FC000F00DFF09633FC00FF00DFF09E33FC000000DFF0A833FC000000DFF0B833FC000000DFF0C833FC000000DFF0D8'NuG'FAFF80177C00010524177C00010548177C0001056C177C00010590'NuG'FAFF'bJ+'00BA670E'S+'00B96608177C000600B9'Nu`'0003180006")) {
+        sName = "David Whittaker's SFX module (.DW)"; bDetected = 1
+    }
     else if(File.compare("' PWD'03") && File.compare("'Master'",0x0E)) {
         sName = "DarkWave Studio module (.DWP)"; bDetected = 1
     }
@@ -704,7 +707,20 @@ function detect(bShowType,bShowVersion,bShowOptions) {
             if(more > 0) sOption(more+1,"x ");
             sOptionT(auth);
             sOptionT(misc);
+        }aaa
+    }
+    else if(File.compare("'ENF '....'scor'")) {
+        sName = "Extended Notation Format sheet music (.ENF)"; bDetected = 1;
+        p = 6; staf = brln = 0; hkhd = "dumm";
+        while(p < File.getSize()) {
+            hkhd = File.read_ansiString(p,4);
+            if(!/[a-z\[\]\-0-9]{4}/.test(hkhd)) break;
+            hksz = File.read_uint16(p+4,_BE);
+            if(hkhd === "staf") staf++;
+            else if(hkhd === "brln") brln++;
+            p += hksz //this format includes signatures into the chunk size
         }
+        sOption("staves:"+staf+" bars:"+brln+" sz:"+p)
     }
     else if((File.getSize()>0x24 && File.compare("'ETracker (C) BY ESI.'",10)) ||
       (File.getSize()>0x4D4 && File.compare("21B384") &&
@@ -764,6 +780,13 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         sName = "Future Composer module (.BSI)"; bDetected = 1;
         sVersion = "ver.BSI";
     }
+    else if(File.compare("'SMOD'") && (File.getSize()>112)) {
+        //ref https://github.com/tonioni/WinUAE/blob/master/prowizard/rippers/FutureComposer13.c
+        sName = "Future Composer module (.SMOD)"; sVersion = "v1.0~3"; bDetected = 1;
+        if((File.getSize() < File.read_uint32(8,_BE)) || (File.getSize() < File.read_uint32(0x10,_BE))
+          || (File.getSize() < File.read_uint32(0x18,_BE)) || (File.getSize() < File.read_uint32(0x20,_BE)))
+            sVersion += "/malformed"
+    }
     else if(File.compare("'FMK!'")) {
         sName = "FM-Kingtracker module (.FMK)"; bDetected = 1;
         if(File.isVerbose()) {
@@ -785,16 +808,62 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         if(File.isVerbose())
             sOptionT(File.read_ansiString(0x10,0x20));
     }
-    else if(File.compare("'Funk'") && File.compare("FFFFFFFF",0x4D)) {
-        sName = "Funk Tracker module (.FNK)"; bDetected = 1;
-        if(File.read_uint8(0x0C)==0x46)
-            sVersion = "v"+File.read_ansiString(0x0D,1)+"."+File.read_ansiString(0x0E,2);
-        if(File.isVerbose())
+    else if(File.compare("'Funk'") && File.getSize() >= 0x8FF) {
+        //ref https://sourceforge.net/p/xmp/libxmp/ci/master/tree/docs/formats/FORMAT.FunktrackerGOLD
+        sName = "Funktracker module (.FNK,.Funk)"; bDetected = 1;
+        sV = File.read_ansiString(0x0C,4); t = File.read_uint32(4,_LE);
+        if(/F2\d\d/.test(sV))
+            sVersion = "R2 GOLD "+(1980+((t>>9)&0x7F))+"-"
+              +((t>>5)&0xF).padStart(2,'0')+"-"+(t&0x1F).padStart(2,'0')+" ";
+        else sVersion = "R1";
+        if(/F[2vk]\d\d/.test(sV)) ch = File.read_ansiString(0x0E,2);
+        else sVersion += "b";
+        switch((t>>20)&0xF) {
+        case 1: case 2: t = "IBM"; break; case 3: t = "Intel 386"; break;
+        case 4: t = "Intel 486"; break; case 5: t = "Pentium"; break; case 6: t = "Linux"; break;
+        case 7: t = "FreeBSD"; break; case 8: t = "N/A"; break; default: t = "unk.system" }
+        sVersion += "#"+t;
+        switch((t>>16)&0xF) {
+        case 0: t = "SB 2.0"; break; case 1: t = "SB Pro"; break;
+        case 2: t = "GUS+ch.pan"; break; case 3: t = "SB compatible"; break;
+        case 4: t = "SB 16"; break; case 5: t = "GUS"; break; case 6: t = "conversion"; break;
+        case 7: t = "Pro Audio Spectrum"; break; case 8: t = "Voxware /dev/dsp 8 bit"; break;
+        case 9: t = "Voxware /dev/dsp 16 bit"; break; case 15: t = "unk.soundcard"; break;
+        default: t = "soundcard N/A" }
+        sVersion += ":"+t;
+        sz = File.read_uint32(8,_LE); malformed = "";
+        if(File.getSize() < sz) malformed += "!short";
+        ord = 0; ptn = -1; for(i = 0; i < 256; i++) {
+            t = File.read_uint8(0x11+i); if(t == 0xFF) break; ord++;
+            if(t > 0x79)
+                if(File.isHeuristicScan()) { if(malformed.indexOf("!badord") < 0) malformed += "!badord" }
+                else { bDetected = 0; break }
+            else if(t > ptn) ptn = t;
+        } ptn++;
+        t = File.read_uint8(0x10);
+        if(t == 0xFF) looped = " non-looped";
+        else looped = " looped@"+t;
+        if(t > ord) if(File.isHeuristicScan()) malformed += "!badloop"; else bDetected = 0;
+        if(bDetected && File.isVerbose()) {
+            bpm = t>>24; bits = bpm&1 ? 16 : 8; bpm >>= 1; var sine = bpm >> 6;
+            bpm &= (1<<6)-1; if(sine) bpm = 125-bpm; else bpm = 125+bpm;
+            smp = 0; for(i = 0x1A8; i < 0x8BF; i += 0x20) if(File.read_uint32(i,_LE)) smp++; //length
             sOptionT(File.read_ansiString(0x191,0x13));
+            sOption("ch:"+ch+" "+bits+"bit ord:"+ord+" ptn:"+ptn+" smp:"+smp+" bpm:"+bpm+looped+" sz:"+sz);
+        }
+        if(malformed != "") sVersion += "malformed"+malformed
     }
     else if(File.compare("000003F3") && File.read_uint8(0x14)
       && File.compare("70FF4E75'F.PLAYER'",0x20) && File.read_int32(0x40,_BE)) {
         sName = "Future Player module (.FP)"; bDetected = 1;
+        if(File.isVerbose()) {
+            sOptionT(File.read_ansiString(File.read_int32(0x2C,_BE)+0x20,0x100));
+            x = 1; p = 0x48;
+            do { t = File.read_uint32(p,_BE); if(t) x++; p += 8 } while(t);
+            if(x > 1) sOption(x,"x");
+            sOptionT(File.read_ansiString(File.read_int32(0x30,_BE)+0x20,0x100),"by:");
+            sOptionT(Hex(File.read_int32(0x38,_BE)+0x20),"sz:");
+        }
     }
     else if(File.compare("'Module: '") && File.compare("';Fast Tracker v1.00'", 0x32)) {
         sName = "Fast Tracker module (.FTС)"; bDetected = 1;
@@ -907,7 +976,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
                 if(File.isVerbose()) {
                     wvt = File.read_uint16(p+0x18,_LE);
                     smp = File.read_uint16(p+0x1A,_LE);
-                    sOptionT(File.read_utf8String(p+0x0C,0x200));
+                    sOptionT(File.read_codePageString(p+0x0C,0x200,"UTF8"));
                     sOption(" wvt:"+wvt+" smp:"+smp);
                 }
             } //verbose inst
@@ -915,9 +984,9 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         if(cV === 'm' && File.isVerbose()) {
             p = File.read_uint32(0x14,_LE);
             if(p>0 && File.compare("'INFO'",p)) {
-                t = File.read_utf8String(p+0x100,0x200);
+                t = File.read_codePageString(p+0x100,0x200,"UTF8");
                 p1 = File.findSignature(p+0x100,0x200,"00")+1;
-                a = File.read_utf8String(p1,0x200);
+                a = File.read_codePageString(p1,0x200,"UTF8");
                 p1 = File.findSignature(p1,0x200,"00")+1;
                 ins = File.read_uint16(p+0x16,_LE);
                 wvt = File.read_uint16(p+0x18,_LE);
@@ -1691,45 +1760,45 @@ function detect(bShowType,bShowVersion,bShowOptions) {
             if(sVersion == "v6") sOption(File.read_ansiString(9,20))
     }
     else if(File.compare("'NESM'1A") || File.compare("'NSFE'")) {
-        //ref https://web.archive.org/web/20180817053626/http://wiki.nesdev.com/w/index.php/NSF
-        sName = "Nintendo Sound Format module (.NSF,.NSFe)"; bDetected = 1;
+        //ref http://www.nesdev.org/wiiki/NSF
+        sName = "Nintendo Sound Format audio (."; bDetected = 1;
         sig = File.read_ansiString(0,4);
-        if(sig === "NSFE") filever="NSFE"
-        else if(File.read_uint8(5) == 2) filever="NSF2"
+        if(sig === "NSFE") filever = "NSFe";
+        else if(File.read_uint8(5) == 2) filever = "NSF2";
         else filever = "NSF";
-        sVersion = filever; 
-        INFOready = false; NEND=false; hkhd=""; pn=4;
-        nsf2jump = -1; palntsc=-1; spd=""; vrc7repl=0;
+        sName += filever+")";
+        INFOready = false; NEND = false; hkhd = ""; pn = 4;
+        nsf2jump = palntsc = sz = -1; spd = ""; vrc7repl = 0;
         playtime = Number(0); g=""; t=""; a=""; c=""; taut=[]; tlbl=[]; xc="";
-        if(filever === "NSFE") {
+        if(filever === "NSFe") {
             if(File.isVerbose()) //no base header, find INFO first
               while(pn < File.getSize()){
                 hksz = File.read_uint32(pn,_BE); hkhd = File.read_ansiString(pn+4,4);
-                if(hkhd==="INFO") break;
-                else pn+=hksz+8;
+                if(hkhd === "INFO") break;
+                else pn += hksz+8;
             }
-            nsf2jump=0;
+            nsf2jump = 0;
         }
         else { //NSF v1/2 have a hardplaced header, let's read that
             bDetected = 1;
-            sVersion = filever;
+            sVersion = "";
             if(File.isVerbose()) {
                 palntsc = File.read_uint8(0x7A); 
-                chip=File.read_uint8(0x7B);
-                tc=File.read_uint8(6); t=File.read_ansiString(0x0E,0x20);
-                a=File.read_ansiString(0x2E,0x20); c=File.read_ansiString(0x4E,0x20);
+                chip = File.read_uint8(0x7B);
+                tc = File.read_uint8(6); t = File.read_ansiString(0x0E,0x20);
+                a = File.read_ansiString(0x2E,0x20); c = File.read_ansiString(0x4E,0x20);
             }
             INFOready = true;
-            nsf2jump=File.read_uint8(0x7D)<<16+File.read_uint8(0x7E)<<8+File.read_uint8(0x7F);
-            pn+=nsf2jump; //NSF v1 files ALSO can have this jump... orz
+            nsf2jump = File.read_uint24(0x7D,_LE);
+            pn += nsf2jump; //NSF v1 files ALSO can have this jump... orz
         }
         // at this point we're standing at the first hunk unless it's a pure NSF, and at "INFO" for NSFe
-        if(nsf2jump >= 0 && File.isVerbose())
-            while(pn<File.getSize() && !NEND) {
+        if(nsf2jump >= 0 && filever === "NSFe" && File.isVerbose())
+            while(pn < File.getSize() && !NEND) {
                 hksz = File.read_uint32(pn,_LE); hkhd = File.read_ansiString(pn+4,4); pn+=8;
                 switch (hkhd) {
                     case "NEND": //end of hunks
-                        NEND=true; break;
+                        NEND = true; break;
                     case "INFO": //really shouldn't happen with nsf1/2
                         if(INFOready) break;
                         palntsc = File.read_uint8(pn+6);
@@ -1754,16 +1823,16 @@ function detect(bShowType,bShowVersion,bShowOptions) {
                         } break;
                     case "auth":
                         apn = 0;
-                        g = File.read_ansiString(pn,0x100); apn+=g.length+1;
-                        a = File.read_ansiString(pn+apn,0x100); apn+=a.length+1;
-                        c = File.read_ansiString(pn+apn,0x100); apn+=c.length+1;
-                        c += ", rip: "+File.read_ansiString(pn+apn,0x100);
+                        g = File.read_codePageString(pn,0x100,"UTF8"); apn+=g.length+1;
+                        a = File.read_codePageString(pn+apn,0x100,"UTF8"); apn+=a.length+1;
+                        c = File.read_codePageString(pn+apn,0x100,"UTF8"); apn+=c.length+1;
+                        c += ", rip: "+File.read_codePageString(pn+apn,0x100,"UTF8");
                         break;
                     case "taut":
                         if(File.isDeepScan()) {
                             apn = 0;
                             while(apn < hksz) {
-                                trkauth = File.read_ansiString(pn+apn,hksz-apn); apn += trkauth.length+1;
+                                trkauth = File.read_codePageString(pn+apn,hksz-apn,"UTF8"); apn += trkauth.length+1;
                                 taut.push(trkauth)
                             }
                         } break;
@@ -1771,15 +1840,15 @@ function detect(bShowType,bShowVersion,bShowOptions) {
                         if(File.isDeepScan()) {
                             apn = 0;
                             while(apn < hksz) {
-                                trklbl = File.read_ansiString(pn+apn,hksz-apn); apn += trklbl.length+1;
+                                trklbl = File.read_codePageString(pn+apn,hksz-apn,"UTF8"); apn += trklbl.length+1;
                                 tlbl.push(trklbl)
                             }
                         } break;
                     case "text":
                         if(File.isDeepScan())
-                            xc = File.read_ansiString(pn,hksz);
+                            xc = File.read_codePageString(pn,hksz,"UTF8");
                 }
-                pn += hksz;
+                pn += hksz; sz = pn;
             }
         if(File.isVerbose() && INFOready) {
             switch(palntsc) {
@@ -1796,7 +1865,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
             if(chip&0x10) sVersion += "#Namco163";
             if(chip&0x20) sVersion += "#Sunsoft5B";
             sOptionT(t);
-            if(tc > 1) sOption("x "+tc);
+            if(tc > 1) sOption(tc,"x");
             sOptionT(a,"by: ");
             sOptionT(c);
         }
@@ -1807,11 +1876,12 @@ function detect(bShowType,bShowVersion,bShowOptions) {
             for (i=0; i < Math.max(tlbl.length,taut.length); i++) {
                 if(i < tlbl.length) ttlbl = tlbl[i];
                 else ttlbl = "#"+(i+1);
-                if(i < taut.length) ttaut = " by: "+taut[i]
+                if(i < taut.length) ttaut = " by: "+taut[i];
                 else ttaut = "";
                 sOption(ttlbl+ttaut)
             }
-            if(xc != "") sOption(xc,"[Commentary]: ")
+            if(xc != "") sOption(xc,"[Commentary]: ");
+            if(sz > -1) sOption(sz,"sz:")
         }
     }
     else if(File.compare("'OKTASONG'")) {
@@ -1949,26 +2019,27 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         nV = File.read_uint8(3);
         if(nV>=0) {
             bDetected = 1;
-            sName = "Playstation Sound Format module (.";
+            sName = "Portable Sound Format module (.";
             switch(nV) {
                 case 0x01: sName += "PSF,.MINIPSF)"; sVersion = "Playstation"; break;
                 case 0x03: sName += "PSF2,.MINIPSF2)"; sVersion = "Playstation 2"; break;
                 case 0x11: sName += "SSF,.MINISSF)"; sVersion = "Saturn"; break;
                 case 0x12: sName += "DSF,.MINIDSF)"; sVersion = "Dreamcast"; break;
-                case 0x21: sName += "USF,.MINIUSF)"; sVersion='Ultra64'; break;
-                case 0x22: sName += "GSF,.MINIGSF)"; sVersion='Gameboy'; break;
-                case 0x23: sName += "SNSF,.MINISNSF)"; sVersion='Super Nintendo'; break;
-                case 0x24: sName += "2SF,.MINI2SF)"; sVersion='Nintendo DS'; break;
-                case 0x41: sName += "QSF,.MINIQSF)"; sVersion='Capcom Q-Sound'
+                case 0x21: sName += "USF,.MINIUSF)"; sVersion = 'Ultra64'; break;
+                case 0x22: sName += "GSF,.MINIGSF)"; sVersion = 'Gameboy'; break;
+                case 0x23: sName += "SNSF,.MINISNSF)"; sVersion = 'Super Nintendo'; break;
+                case 0x24: sName += "2SF,.MINI2SF)"; sVersion = 'Nintendo DS'; break;
+                case 0x41: sName += "QSF,.MINIQSF)"; sVersion = 'Capcom Q-Sound'; break;
+                default: sName += "*SF,MINI*SF"; sVersion = "unk.console";
             }
             if(File.isVerbose()) {
                 //fs1 = Math.max(File.getSize()-0x200,0); fs2 = Math.min(File.getSize(),0x200);
                 //ptags = File.findSignature(fs1,fs2,"'[TAG]'")+5;
                 ptags = File.read_uint32(8,_LE)+0x15; sig2 = false;
-                if(0x15<ptags<File.getSize()) sig2 = File.read_ansiString(ptags-5,5) === "[TAG]";
+                if(0x15 < ptags && ptags < File.getSize()) sig2 = File.read_ansiString(ptags-5,5) === "[TAG]";
                 if(!sig2) { //coincides with pv==2
                     ptags = File.read_uint32(4,_LE)+0x15;
-                    if(0x15<ptags<File.getSize()) sig2 = File.read_ansiString(ptags-5,5) === "[TAG]";
+                    if(0x15 < ptags && ptags < File.getSize()) sig2 = File.read_ansiString(ptags-5,5) === "[TAG]";
                 }
                 if(sig2) {
                     tags = File.read_codePageString(ptags,File.getSize()-ptags,"UTF8").trim();
@@ -2573,23 +2644,23 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
             gvol = File.read_uint8(0x30); spd = File.read_uint8(0x31);
             tmp = File.read_uint8(0x32); mvol = File.read_uint8(0x33);
             p = 0x60+ord+smp*2;
-            var max = 0; sz = 0;
-            for (var i=0; i < ptn; i++) {
-                var p1 = File.read_uint16(p+i*2,_LE) << 4;
+            max = sz = 0;
+            for (i=0; i < ptn; i++) {
+                var p1 = File.read_uint16(p+i*2) << 4;
                 if(!p1) continue;
-                if (p1 > max) { max = p1; sz = max + File.read_uint16(p1+1,_LE) }
+                if (p1 > max) { max = p1; sz = max + File.read_uint16(p1+1) }
             }
             if(sz%16) sz += 16-(sz%16);
             p = 0x60+ord;
-            var p1 = 0; var p2 = 0;
-            for(var i=0; i < smp; i++) {
-                p1 = File.read_uint16(p+i*2,_LE) << 4; if(!p1) continue;
-                if(File.read_uint8(p1) === 1) {
-                    p2 = File.read_uint16(p1+14,_LE) << 4;
-                    if (p2 > max) {
-                        t = File.read_uint24(p1+16)
-                        if ((File.read_uint8(p1+31)&4) === 0x04) t *= 2;
-                        max = p2; sz = max + t;
+            for(i=0; i < smp; i++) {
+                si = File.read_uint16(p+i*2) << 4; if(!si) continue;
+                if(File.read_uint8(si) === 1) {
+                    sofs = File.read_uint16(si+14) << 4;
+                    if (sofs > max) {
+                        ssz = File.read_uint32(si+16);
+                        if (File.read_uint8(si+31)&4) ssz *= 2;
+                        if(ssz%16) ssz += 16-ssz%16; //the padding might be important
+                        max = sofs; if(sz < max+ssz) sz = max+ssz;
                     }
                 }
             }
@@ -2622,7 +2693,7 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
                     if(ptags > 6 && File.read_ansiString(ptags,5)=="[S98]") {
                         ptags+=5;
                         bUTF8 = File.compare("EFBBBF",ptags); //if BOM's there
-                        if(bUTF8) tags = File.read_utf8String(ptags+3,0x200); //test whether this parses BOM too
+                        if(bUTF8) tags = File.read_codePageString(ptags+3,0x200,"UTF8"); //test whether this parses BOM too
                         else tags = File.read_codePageString(ptags,0x200,"Shift_JIS");
                         tagl = tags.split('\x0A');
                         for (i=0; i < tagl.length; i++) {
@@ -2813,20 +2884,13 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
         sName = "Skale Tracker module (.SKM)"; bDetected = 1;
         if(File.isVerbose()) sOptionT(File.read_ansiString(0x19));
     }
-    else if(File.compare("'SMOD'") && (File.getSize()>112)) {
-        //ref https://github.com/tonioni/WinUAE/blob/master/prowizard/rippers/FutureComposer13.c
-        sName = "Future Composer module (.SMOD)"; sVersion = "v1.0~3"; bDetected = 1;
-        if((File.getSize() < File.read_uint32(8,_BE)) || (File.getSize() < File.read_uint32(0x10,_BE))
-          || (File.getSize() < File.read_uint32(0x18,_BE)) || (File.getSize() < File.read_uint32(0x20,_BE)))
-            sVersion += "/malformed"
-    }
     else if(File.compare("6000000A60000090600000'xM'F900DFF00047FA07FC'=|'000F0096'=|'00FF009E700641EBFFF810FC000051C8FFFA41EB0006'p-'117C00000034117C00000068117C0000009C10FC000051C8FFE87600162B00DF1743FFFB610001E241EBFFFA1082176B00DD00DB08B9000100BFE001'J+'00E1660808F9000100BFE001'NuG'FA078C1740FFFD1740FFFC177C0001FFFE'NuM'F900DFF0007E0347FA07'pK'FA07'l3'EB00D200DFF096'7|'000000D0177C000000DA'Jm'001A661041EB00E6'-H'00A0'=|'000100A4600C'=m'001A00A4'-m'001C00A0'J+'FFF8660E'J+'FFF96604610000B2610001E4DDFC00000010DBFC000000'4Q'CFFFBC33EB00D000DFF096'7|'820000D0'7|'000000D44DF900DFF0007E0347FA06F24BFA06EE'J+'FFF8660461000200610003D8DDFC00000010DBFC000000'4Q'CFFFE46100008C'0+'00D0806B00D233C000DFF096'7k'00D400D2'J+'FFFD6706'S+'FFFD'`4'102BFFFC12000201007F'g('1741FFFD4A006B0C'J+'00D9671A'S+'00D960140C2B004000D96608177C0000FFFC6004'R+'00D9'Nur'007000122BFFFA41EB02E8D1ED000010301800D1FC000004001B70180000'0r'00122B00DEC2C041EB1068D288'+A'0016'Nuv'00162BFFFB142BFFFA122BFFF9102BFFF8'J+'00DA6706122B00DE55015200B02B00DB'f6p'005401B22B00DE'f,r'00B42B00D767045202'` R'03B62B00E06616162B00DF177C0000FFFC176B00DD00DB177C000000D961121743FFFB1742FFFA1741FFF91740FFF8'NuA'EB00E843EB00D6780212F03800D1FC000000'@Q'CCFFF41A'08'0043EB00'1x'03D1FC0000004012B03800D3FC000000'4Q'CCFFEE'J+'FFFE'fRJ'056B08177C0000FFFC")) {
         sName = "Sound Master II module (.SMPRO)"; sVersion = "v1"; bDetected = 1
     }
     else if(File.compare("'<track'") && (File.findString(6,0x100,"rowhighliohtingminor=")>0)) {
         sName = "Picatune module v1 (.SMUFI) or v2 (.PT2)"; bDetected = 1;
         if(File.isVerbose()) {
-            s = File.read_utf8String(0,0x100);
+            s = File.read_codePageString(0,0x100,"UTF8");
             t = /.*name="([^"]*)".*/.exec(s);
             if(t != null) sOptionT(t[1]);
             a = /.*author="([^"]*)".*/.exec(s);
@@ -3028,7 +3092,7 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
     else if(File.compare("'STP3'")) {
         sName = "Soundtracker Pro II module (.STP)"; bDetected = 1;
     }
-    else if(File.compare("48E7FFFE 4DFA.... 4A2E001.")) {
+    else if(File.compare("48E7FFFE 4DFA.... 4A2E....")) {
         sName = "SUNtronic module (.SUN)"; bDetected = 1
     }
     else if(File.compare("'SVOX'00000000")) {
@@ -3081,7 +3145,7 @@ _log("after-for "+Hex(p)+", tagdata? "+tagdata);
                       if(pklen>=10 && File.compare(p+o,"'PACK'FFFF")) { o+=6;
                         _log("yes we're FUCKING doing this. The algo's 100% from openMPT");
                         unplen = File.read_uint32(p+o,_BE); o+=4;
-                        maxlen = pklen-10; if(4294967295/170 >= maxlen) maxlen += 170; else maxlen = 4294967295;
+                        maxlen = pklen-10; if(4294967295/170 >= maxlen) maxlen *= 170; else maxlen = 4294967295;
                         if(unplen > maxlen) unplen = maxlen;
                         done = false; ofs = 0; left = unplen;
                         while(!done && o<hksz) {
@@ -3964,59 +4028,102 @@ if(!bDetected && isAHX()) {
 
 function isSTM() {
     //ref https://github.com/OpenMPT/openmpt/blob/master/soundlib/Load_stm.cpp
-    t = readBytes(0x14,8); for(i=0; i < 8;i++) { if(t[i]<0x20 || t[i] >= 0x7F) return false }
-    if([0x1A,2].indexOf(File.read_uint8(0x1C)) < 0) return false;
-    if([1,2].indexOf(File.read_uint8(0x1D)) < 0) return false;
-    if(!File.compare("02",0x1E)) return false;
-    if([0,10,20,21].indexOf(File.read_uint8(0x1F)) < 0) return false;
-    if(File.read_uint8(0x21) > 0x40) return false;
-    if(File.read_uint8(0x22) > 0x40 && File.read_uint8(0x22) != 0x58) return false;
-    nVm = File.read_uint8(0x1F); ptn = File.read_uint8(0x21);
-    if(nVm) maxord = 128; else maxord = 64;
-    minsz = 0x30+31*0x20+maxord+ptn*256; if(File.getSize() < minsz) return false;
-    sz = sz1 = minsz; smp = 0; smp0 = "";
-    for(i=0; i < 31; i++) {
-        zero = File.read_uint8(0x30+i*0x20+12);
-        if(zero && zero != 46) return false;
-            t = File.read_codePageString(0x30+i*0x20,12,"CP1250"/*CP437*/).trim();
-        if(i < 3 && File.isVerbose()) {
-            if(t.length) smp0 = smp0.append(t)
-        }
-        var sofs = File.read_uint16(0x30+i*0x20+0x0E,_LE) << 4;
-        var ssz = File.read_uint16(0x30+i*0x20+0x10,_LE);
-        var slps = File.read_uint16(0x30+i*0x20+0x12,_LE);
-        var slpe = File.read_uint16(0x30+i*0x20+0x14,_LE);
-        var svol = File.read_uint8(0x30+i*20+0x16);
-        if(ssz && sofs > 0x30 && sofs < File.getSize()) {
-            if(ssz) sz1 = sofs+ssz;
-            //Actually it seems that if ssz is 1 it still must be 0, but then it'll just ignore
-            //  the potentially interesting byte, so let's rip it too, just in case.
-            if(sz1 > sz) sz = sz1;
-            //We won't count it towards the smp counter though, that one's for the meaningful stuff.
-            if(ssz > 1) smp++
-        }
+    t = readBytes(0x14,8); for(i = 0; i < 8; i++) { if(t[i] < 0x20 || t[i] >= 0x7F) return false }
+    function _isstm() {
+        if([0x1A,2].indexOf(File.read_uint8(0x1C)) < 0) return false;
+        if([1,2].indexOf(File.read_uint8(0x1D)) < 0) return false;
+        if(!File.compare("02",0x1E)) return false;
+        if([0,10,20,21].indexOf(File.read_uint8(0x1F)) < 0) return false;
+        if(File.read_uint8(0x21) > 0x40) return false;
+        gvol = File.read_uint8(0x22);
+        if(gvol > 0x40 && gvol != 0x58) return false;
+        nVm = File.read_uint8(0x1F); ptn = File.read_uint8(0x21);
+        if(nVm) maxord = 128; else maxord = 64;
+        minsz = 0x30+31*0x20+maxord+ptn*256; if(File.getSize() < minsz) return false;
+        smp = 0; ord = -1; tracker = "Scream Tracker 2 module"; ext = "STM"; return true
     }
-    ord = -1;
-    for(i=0; i < maxord; i++) {
-        t = File.read_uint8(0x410+i);
-        if(t === 99 || t === 255) t = 255;
-        else if(t > 63) return false
-        else ord++;
-    } ord++;
-    n = 0;
-    tracker = "Scream Tracker"; ext = "STM";
-    //TODO add STX stuff from Load_stm, and test on a real STX :)
-    return true;
+    function _isstx() {
+        if(!File.compare("'SCRM'",0x3C)) return false;
+        ptnsz = File.read_uint16(0x1C);
+        if((ptnsz < 64 && ptnsz != 0x1A) || ptnsz > 0x840) return false;
+        t = File.read_uint8(0x2A); if(t > 0x40 && t != 0x58) return false;
+        ptn = File.read_uint16(0x30); if(ptn > 64) return false;
+        smp = File.read_uint16(0x32); if(smp > 96) return false;
+        ord = File.read_uint16(0x34); if(ord > 0x81 && ord != 0x101) return false;
+        if(File.read_uint16(0x1E) || File.read_uint32(0x26) || File.read_uint32(0x2C) != 1) return false;
+        ptntp = File.read_uint16(0x20)<<4; smptp = File.read_uint16(0x22)<<4;
+        chtp = File.read_uint16(0x24)<<4;
+        minsz = 0x40 + Math.max(ptntp+ptn*2, smptp+smp*2, chtp+32+ord*5);
+        if(File.getSize() < minsz) return false;
+        p = chtp+32; for(i=0; i < ord; i++) {
+            t = File.read_uint8(p+i*5); if(t > 63 && t != 99 && t != 255) return false;
+        }
+        tracker = "Scream Tracker Music Interface Kit module"; ext = "STX"; return true;
+    }
+    isstm = _isstm(); if(!isstm) isstx = _isstx(); if(!isstx) return false;
+    sz = sz1 = minsz; smp0 = ""; max = 0;
+
+    if(isstm) { //STM things
+        for(i = 0; i < 31; i++) {
+            zero = File.read_uint8(0x30+i*0x20+12);
+            if(zero && zero != 46) return false;
+            t = File.read_codePageString(0x30+i*0x20,12,"CP437").trim();
+            if(i < 3 && File.isVerbose()) if(t.length) smp0 = smp0.append(t);
+            var sofs = File.read_uint16(0x30+i*0x20+0x0E,_LE) << 4;
+            var ssz = File.read_uint16(0x30+i*0x20+0x10,_LE);
+            if(ssz && sofs > 0x30 && sofs < File.getSize()) {
+                if(ssz) sz1 = sofs+ssz;
+                //Actually it seems that if ssz is 1 it still must be 0, but then it'll just ignore
+                //  the potentially interesting byte, so let's rip it too, just in case.
+                if(sz1 > sz) sz = sz1;
+                //We won't count it towards the smp counter though, that one's for the meaningful stuff.
+                if(ssz > 1) smp++
+            }
+        }
+        for(i=0; i < maxord; i++) {
+            t = File.read_uint8(0x410+i);
+            if(t === 99 || t === 255) t = 255;
+            else if(t > 63) return false;
+            else ord++;
+        } ord++;
+    }
+    else if(isstx) { //STX things
+        p = smptp; for(i = 0; i < smp; i++) {
+            si = File.read_uint16(p+i*2) << 4;
+            t = File.read_codePageString(si+0x30,28,"CP437").trim();
+            if(i < 3 && File.isVerbose()) if(t.length) smp0 = smp0.append(t);
+            if(!si) continue;
+            if(File.read_uint8(si) === 1) {
+                sofs = File.read_uint16(si+14)<<4;
+                if(sofs > max) {
+                    ssz = File.read_uint32(si+16); if(File.read_uint8(si+31)&4) ssz *= 2; //16bit
+                    //if(ssz%16) ssz += 16-ssz%16; //the padding. Although STM2STX.EXE v1.0 doesn't pad
+                    max = sofs; if(sz < max+ssz) sz = max+ssz
+                }
+            }
+        }
+        fmt = 1;
+        if(ptn && ptnsz != 0x1A) {
+            p = File.read_uint16(ptntp) << 4;
+            if(p > File.getSize())
+                if(File.isHeuristicScan())
+                    if(malformed.indexOf("!badptnp")) { malformed += "!badptnp"; return true }
+                else return false;
+            if(File.read_uint16(p) === ptnsz) fmt = 0;
+        }
+        // I'll skip parsing the patterns, too much trouble when the samples always come later in the file
+    }
+    else return false; return true
 }
 if(!bDetected && isSTM()) {
-    sName = "ScreamTracker 2 module (."+ext+")"; bDetected = 1;
+    sName = tracker+" (."+ext+")"; bDetected = 1;
     if(File.isVerbose()) {
-        sOptionT(File.read_codePageString(0,0x14,"CP1252"/*CP437*/));
+        sOptionT(File.read_codePageString(0,0x14,"CP437"));
         if(smp0.length) sOption(smp0,"by/smp: ");
-        sVersion = tracker + " v"+File.read_uint8(0x1E)+"."+nVm;
+        if(ext === "STM") sVersion = "v"+File.read_uint8(0x1E)+"."+nVm;
+        else sVersion = "v1."+fmt;
         tmp0 = File.read_uint8(0x20); gvol = File.read_uint8(0x22);
-        sOption("ord:"+ord+" ptn:"+ptn+" smp:"+smp
-            +" bpm0:"+tmp0+" gvol:"+gvol+" notes:"+n+" sz:"+sz)
+        sOption("ord:"+ord+" ptn:"+ptn+" smp:"+smp+" gvol:"+gvol+" sz:"+sz)
     }
 }
 
@@ -4177,6 +4284,8 @@ function isIT() {
             else if(cvt === cExt) {
                 t = readVarUInt(p); extsmp.push(File.read_ansiString(p+1,t[1]));
                 p += t[0]+t[1]; }
+            else if(File.compare("'fLaC'",smpofs)) { S["codec"] = "FLAC" }
+            else if(File.compare("'OggS'",smpofs)) { S["codec"] = "Ogg" }
             else { //GetSampleFormat
                 S["codec"] = (cvt & cSS) ? "sPCM" : "uPCM";
                 if((sf & sSt) && cwtv >= 0x214) S["chn"] = 2;
@@ -4247,24 +4356,24 @@ function isIT() {
                     if(S["bps"]%8) S["length"] = (S["codec"] == "ADPCM"?16:0)
                             +Math.ceil((slen+1)/2*S["ch"]);
                     else S["length"] = (S["codec"] == "ADPCM"?16:0)
-                            +slen*S["bps"]/8*S["chn"];
-                else if(i+1 < smp) S["length"] = 0;
+                            +S["slen"]*S["bps"]/8*S["chn"];
                 else { //let the crazy shit begin.
                     // ref https://github.com/nicolasgramlich/AndEngineMODPlayerExtension/blob/master/jni/loaders/itsex.c
                     // but mainly OpenMPT's SampleIO::ReadSample :142
                     if(S["bps"] == 4 && S["chn"] == 1 && S["en"] == "LE" && S["codec"] == "ADPCM") {
-                        S["length"] = 16+(slen+1)/2; p += S["length"]
-                    } else if(slen > 1 && (S["codec"] === "IT214" || S["codec"] === "IT215")) { //:165
+                        S["length"] = 16+(S["slen"]+1)/2; p += S["length"]
+                    } else if(S["slen"] > 1 && (S["codec"] === "IT214" || S["codec"] === "IT215")) { //:165
                         // Let's try a quick-n-dirty first.
                         var u = p, ulen = 0, quickndirty = 0;
-                        while(u < File.getSize() && ulen < slen /*packers have their limits*/) {
+                        while(u < File.getSize() && ulen < S["slen"] /*packers have their limits*/) {
                             if(File.compare("'XTPM'",u) || File.compare("'STPM'",u) || File.compare("'228'04'mptm'",u))
                                 { quickndirty = 1; p = u; break }
                             ucsz = File.read_uint16(u,_LE); ulen += ucsz; u += 2+ucsz;
-                        } //orrrr if no MPTX block is present, we gotta do it the hard way I guess :<
+                        }
+                        if(quickndirty) { p = u } else {
+                        //orrrr if no MPTX block is present, we gotta do it the hard way I guess :<
                         //ITDecompression(file,sample,getencoding=it215)
                         var bit_n = bit_buf = cend = readdef = 0;
-
                         function readBits(b) {
                             while(bit_n < b) { bit_buf |= (File.read_uint8(p++) << bit_n); bit_n += 8 }
                             var v = bit_buf & ((1 << b) - 1); bit_buf >>= b; bit_n -= b;
@@ -4273,8 +4382,8 @@ function isIT() {
 
                         if(S["bits"] == 16) { const fetchA=4, lowerB=-8, upperB=7, defW=17 }
                         else { const fetchA=3, lowerB=-4, upperB=3, defW=9 }
-                        if(!quickndirty) for(c = 0; c < S["chn"]; c++) { //ITCompression.cpp:322
-                            var rs = slen, v = csz = clen = topbit = 0;
+                        for(c = 0; c < S["chn"]; c++) { //ITCompression.cpp:322
+                            var rs = S["slen"], v = csz = clen = topbit = 0;
                             cend = p;
                             while(rs && p < File.getSize()) { //:325
                                 csz = File.read_uint16(p,_LE); p += 2; cend = p+csz;
@@ -4303,7 +4412,12 @@ function isIT() {
                                 }
                             }
                             if(p > File.getSize()) malformed += "!short";
-                        }
+                        } } //if quickndirty else
+                    } //if IT215||IT214
+                    else if(S["codec"] === "FLAC") {
+                        //TODO, or maybe not
+                    } else if(S["codec"] === "Ogg") {
+                        //TODO, or maybe not
                     } else if(S["codec"] === "AMS" && S["chn"] == 1) { //SampleIO:170
                         //TODO test it at least
                         sOption("\n!!! Please send this file to the detector dev!!! Poor fella hasn't any to test on")
@@ -4318,7 +4432,7 @@ function isIT() {
                         sOption("\n!!! Please send this file to the detector dev!!! Poor fella hasn't any to test on")
                         //TODO DMFUnpack
                     } else if((S["codec"] === "uLaw" || S["codec"] === "aLaw") /*TODO && mono or stereoInterleaved */ && S["bps"] == 16) {
-                        S["length"] = slen*S["chn"]
+                        S["length"] = S["slen"]*S["chn"]
                     }
                 } //actual length teller
                 if(sz < p) sz = p
@@ -4371,7 +4485,7 @@ function isIT() {
                     default: v = File.read_uint32(p,_LE) }
                     if(v) mVcw = itV(Hex(v)); break;
                 case "AUTH":
-                    auth = File.read_utf8String(p,prsz); break;
+                    auth = File.read_codePageString(p,prsz,"UTF8"); break;
                 }
                 p += prsz;
             }
@@ -4469,7 +4583,7 @@ function isIT() {
                 hasstartpos=hd&(1<<2); hassz=hd&(1<<3); hasid=idbytes; hasdesc=hd&(1<<7);
                 hasmap = hasid || hasstartpos || hassz || hasdesc;
                 if(flagbyte&(1<<2)) { t = readaintle(16); //:512
-//_log("  @"+Hex(p)+" desc["+t+"]:"+(twochar ? File.read_utf8String(p,t) : File.read_ansiString(p,t)));
+//_log("  @"+Hex(p)+" desc["+t+"]:"+(twochar ? File.read_codePageString(p,t,"UTF8") : File.read_ansiString(p,t)));
                    p += t*(twochar ? 2 : 1) }
                 if(flagbyte&(1<<3)) p += 5; //:517
                 entries = readaintle(64); //if(entries > 16000) break;
@@ -6049,55 +6163,152 @@ if(!bDetected && File.isDeepScan() && isDesire()) {
 
 function isDavidWhittaker() {
     //from uade players/DavidWhittaker
-    // sfx-only not detected; feud fake.dw not detected
-    // TODO reverse more to add calcsize and other variables, if it has those
+    // & https://github.com/neumatho/NostalgicPlayer/blob/main/Source/Agents/Players/DavidWhittaker/DavidWhittakerWorker.cs
+    // <space>sfx.dw not detected, -sfx.dw may be fucked up but they are detected 
+    if(File.getSize() < 2500) return false;
+    const sl = Math.min(File.getSize(), 0x4000); //search buffer length
+    malformed = ""; fmt = 0xFF;
+    function _uadetect() {
+        function _dw() {
+            d1 = a1+0x80; do { t = File.compare("6100",a1); a1 += 2 } while(!t && a1 < d1);
+            if(!t) return false;
+            a1 += File.read_int16(a1,_BE); //@e43c
+            if(File.compare("48E7F1FE",0)) { //@e440
+                a1 += 4; t = File.compare("6100",a1); a1 += 2; if(!t) return false;
+                a1 += File.read_int16(a1,_BE)
+            }
+            d1 = a1+0x80;
+            do { //@e452
+                if(File.compare("4E75",a1)) return false;
+                if(File.compare("2F0B",a1) || File.compare("00DFF0C8",a1)) return true;
+                a1 += 2;
+            } while(a1 < d1);
+            return false }
 
-    function _dw() {
-        d1 = 0x80; do { t = File.compare("6100",a1); a1 += 2; d1--
-        } while(d1 && !t && a1 < File.getSize());
-        if(!t) return false;
-        a1 += File.read_int16(a1,_BE); d1 = 0x80; //@e43c
-        if(File.compare("48E7F1FE",0)) { //@e440
-            a1 += 4; t = File.compare("6100",a1); a1 += 2; if(!t) return false;
-            a1 += File.read_int16(a1,_BE)
+        if(File.compare("48E7F1FE",0)) {
+            if(!File.compare("6100",4)) return false;
+            a1 = 6+File.read_int16(6,_BE); d1 = a1+20; //@ec3a
+            do { t = File.compare("47FA",a1); a1 += 2 } while(!t && a1 < d1);
+            if(!t) return false;
+            if(!_dw()) return false; // @e3d8
+            fmt = 0; return true;
         }
-        do { //@e452
-            if(File.compare("4E75",a1)) return false;
-            if(File.compare("2F0B",a1) || File.compare("00DFF0C8",a1)) return true
-            a1 += 2
-        } while(d1 && a1 < File.getSize());
+        else if(!File.compare("08F90001",0)) {
+            if(File.compare("4E714E71",0)) return false;
+            t = File.compare("47FA",0); a1 = 2;
+            if(t) if(!_dw()) return false; else { fmt = 1; return true }
+            d1 = 10; //@e3fa..e402
+            do { t = File.compare("47FA",a1); a1 += 2 } while(!t && a1 < d1);
+            if(!t) return false;
+            a1 += File.read_int16(a1,_BE); //@e408
+            if(a1) return false;
+            if(!_dw()) return false; else { fmt = 1; return true }
+        }
+        else { a1 += 4;
+            if(File.compare("00BFE001",a1)) if(_dw()) { fmt = 1; return true }
+        }
         return false
     }
+    //if(!_uadetect()) return false;
+    //and now for the NP routine ExtractInfoFromInitFunction
+    sz = x = ch = smp = 0;
+    function _npdetect() {
+        for(i = 0; i < sl; i += 2) if(File.compare("47FA",i) && (File.read_uint8(i+2)&0xF0) == 0xF0) break;
+        if(i >= sl-6) return false;
+        sofs = i+2+File.read_int16(i+2,_BE);
+        for(; i < sl; i += 2) if(File.compare("6100",i)) break; if(i >= sl-6) return false;
+        sinit = i; ssmpsinit = i;
+//_log("ssmpsinit:"+Hex(ssmpsinit))
+        if(File.compare("6100",i+4)) ssmpsinit = i+6+File.read_int16(i+6,_BE);
+        for(i = ssmpsinit; i < sl; i += 2) if(File.compare("4A2B",i)) break;
+        if(i >= sl-36) return false;
+        if(!File.compare("66",i+4)) return false; //TODO this breaks on qball.dw...
+//_log("4A2B??66 -> i:"+Hex(i))
+        if(!File.read_uint8(i+5)) i += 2;
+        if(!File.compare("41FA",i+6)) return false;
+        smpdp = i+8+File.read_int16(i+8,_BE);
+        i += 10;
+        if(File.compare("2748....D0FC",i)) {
+            smpdp += File.read_int16(i+6,_BE); i += 12;
+            if(!File.compare("D0FC",i)) return false;
+            smpdp += File.read_int16(i+2,_BE); i += 4;
+        }
+//_log("@"+Hex(i)+" smpdatap:"+Hex(smpdp))
+        if(!File.compare("4BFA....72",i)) return false;
+        smp = 1+File.read_uint8(i+5);
+        //load sample info:
+        p = smpdp;
+        for(i = 0; i < smp; i++) {
+            ssz = File.read_uint32(p,_BE); p += 6;
+//_log("smpd["+i+"] @"+Hex(p-6)+" sz:"+ssz);
+            if(p+ssz > File.getSize()) { malformed += "!short"; return true }
+            p += ssz; sz = p;
+        }
+        for(i=0; i < sl; i += 2) if(File.compare("41FA",i) && !File.compare("4B",i+4)) break;
+        if(i >= sl-4) return false;
+        if(!File.compare("1230",i+4) && !File.compare("3770",i+4)) return false;
+        sstp = i+2+File.read_int16(i+2,_BE); i += 4;
+//_log("sstp:"+Hex(sstp))
+        for(; i < sl-8; i += 2) if(File.compare("41FA",i) && !File.compare("23",i+4)) break;
+        if(i >= sl-8) return false;
+        if(File.compare("2070",i+4)) is32bp = true;
+        else if(File.compare("3070",i+4)) is32bp = false;
+        else return false;
+        for(i = 0; i < sl; i += 2) if(File.compare("47FA",i)) {
+            if(i >= sl-10) return false;
+            if (File.compare("4A2B....67",i+4)) {
+                if(File.compare("33FC",i+10) || File.compare("177C",i+10) || File.compare("08B9",i+10))
+                    continue;
+                break
+            }
+        }
+        splay = i;
+//_log("splay:"+Hex(i))
+        ch = 0;
+        for(i = splay; i < splay + 200; i += 2) if(File.read_uint8(i) == 0x7E) {
+            ch = File.read_uint8(i+1);
+            if(!ch) {
+                for(; i < splay + 500; i += 2)
+                    if(File.read_uint8(i) == 0xBE && [0x7C,0x3C].indexOf(File.read_uint8(i+1)) >= 0) {
+                        ch = File.read_uint8(i+3); break }
+            } else ch++;
+            break
+        }
+        if(!ch) return false;
+//_log("ch:"+ch)
+        endlyc = endlym = false; //:667
+        for(i = splay; i < splay + 100; i += 2) if(File.compare("103A",i)) {
+            endlyc = true; if(File.compare("C0FC",i+6)) endlym = true; break }
+//_log("@"+Hex(i)+" dlyc?"+endlyc+" dlym?"+endlym)
+        x = 0; p = sstp; minpp = 0xFFFFFFFF; //:966
+        sngspd = 0; dlyspd = 0;
+        while(p+8 < minpp) {
+            if(endlyc) { sngspd = File.read_uint8(p++); dlyspd = File.read_uint8(p++) }
+            else { sngspd = File.read_uint16(p,_BE); p += 2; dlyspd = 0 }
+            if(sngspd > 0xFF) break;
+            for(i = 0; i < ch; i++) {
+                if(is32bp) { t = File.read_uint32(p,_BE); p += 4 }
+                else { t = File.read_uint16(p,_BE); p += 2 }
+                if(minpp > sofs+t) minpp = sofs+t;
+//_log(x+" ordp:"+Hex(t))
+            }
+            if(p > File.getSize()) { malformed += "!short"; break }
+            x++
+        }
+        return x;
+    }
 
-    if(File.compare("48E7F1FE",0)) {
-        if(!File.compare("6100",4)) return false;
-        a1 = 6+File.read_int16(6,_BE);
-        d1 = 10; //@ec3a
-        do { t = File.compare("47FA",a1); a1 += 2; d1--;
-        } while(d1 && !t && a1 < File.getSize());
-        if(!t) return false;
-        if(!_dw()) return false; // @e3d8
-        fmt = 0; return true;
-    }
-    else if(!File.compare("08F90001",0)) {
-        if(File.compare("4E714E71",0)) return false;
-        t = File.compare("47FA",0); a1 = 2;
-        if(t) if(!_dw()) return false; else { fmt = 1; return true }
-        d1 = 4; //@e3fa..e402
-        do { t = File.compare("47FA",a1); a1 += 2; d1--
-        } while(d1 && !t && a1 < File.getSize());
-        if(!t) return false;
-        a1 += File.read_int16(a1,_BE); //@e408
-        if(a1) return false;
-        if(!_dw()) return false; else { fmt = 1; return true }
-    }
-    else { a1 += 4; if(File.compare("00BFE001",a1))
-        if(_dw()) { fmt = 1; return true }
-    }
-    return false
+    if(!_npdetect()) malformed += "!unknownformat";
+    return true
 }
 if(!bDetected && File.isDeepScan() && isDavidWhittaker()) {
-    sName = "David Whittaker's module (.DW)"; sVersion = "f."+fmt; bDetected = 1
+    sName = "David Whittaker's module (.DW)"; if(fmt != 0xFF) sVersion = "f."+fmt;
+    bDetected = 1;
+    if(malformed != "") sVersion += "/malformed"+malformed;
+    if(File.isVerbose()) {
+        if(x > 1) sOption(x,"x");
+        sOption("ch:"+ch+" smp:"+smp+" sz:"+sz)
+    }
 }
 
 function isFashionTracker() {
@@ -6265,7 +6476,8 @@ if(!bDetected && File.isDeepScan() && isSMUS()) {
 function isAMBK() {
     //from https://zakalwe.fi/uade/uade3/uade-3.03.tar.bz2 / uade/amigasrc/players/ambk/AMOS.s
     if(File.compare("'AmBk'")) a0 = p = 4; else if(File.compare("C0")) a0 = p = 0; else return false;
-    if(!File.compare("80",p+4)) return false;
+    //if(!File.compare("80",p+4)) return false;
+    _log(Hex(File.read_uint32(p+4,_BE)&((1<<28)-1)));
     if(!File.compare("'Music   '",p+8)) return false;
     p += 0x14; p += File.read_int32(p,_BE);
     if(File.read_int16(p,_BE) != 6) return false; p += 2; r = p;
@@ -6303,7 +6515,7 @@ if(!bDetected && File.isDeepScan() && isAMBK()) {
     if(malformed) sVersion = "malformed";
     if(File.isVerbose()) {
         sOption(title);
-        sOption("ord:"+ord+" ptn:"+ptn+" smp:"+smp+" sz:"+sz+" smpsz:"+Hex(smpsz)+" songsz:"+Hex(songsz))
+        sOption("ord:"+ord+" ptn:"+ptn+" smp:"+smp+/*" smpsz:"+Hex(smpsz)+" songsz:"+Hex(songsz)+*/" sz:"+sz)
     }
 }
 
@@ -6348,7 +6560,7 @@ function isJH() {
         } else { // No3
             if(d1&1) return false; a0 += d1;
             if(!File.compare("48E7FFFE",a0)) return false; a0 += 4;
-            if(!File.compare("6100",a0)) return false; a0 += 2; //astaroth.hip fails this one and has more jumps, iono
+            if(!File.compare("6100",a0)) return false; a0 += 2; //astaroth.hip, prince.hip fail this one and have more jumps, iono
             a0 += File.read_int16(a0,_BE);
             if(!File.compare("2F006100",a0)) return false; a0 += 4;
             a0 += File.read_int16(a0,_BE);
@@ -6461,7 +6673,7 @@ function isJHCoSo() {
     d0--} while(d0 >= 0);
     if(d7 >= d6) return false;
     ptn = File.read_int16(0x28,_BE)+1; smp = File.read_int16(0x32,_BE);
-    a0 = File.read_int32(0x18,_BE)+smp*10; _log("a0:"+Hex(a0));
+    a0 = File.read_int32(0x18,_BE)+smp*10; //_log("a0:"+Hex(a0));
     smpsz = File.read_int32(a0-10,_BE) + File.read_int16(a0-6,_BE)*2;
     sz = songsz+smpsz;
     x = File.read_int16(0x30,_BE);
@@ -6537,9 +6749,9 @@ function isJHST() {
     }
     if(d0 != 2) return false;
     if(File.compare("'LSMP'",a0+0x1C)) d1 = 1; else d1 = 0;
-    if(d1) _log("pc+@e16c (lsmp): "+d1); //it stores 'em'
+//    if(d1) _log("pc+@e16c (lsmp): "+d1); //it stores 'em'
     a0 -= a4;
-    if(a0) _log("pc+@e170 (mod ofs?): "+a0); //stores this too
+//    if(a0) _log("pc+@e170 (mod ofs?): "+a0); //stores this too
 
     //size calc
     Special = songsz = smpsz = 0; sz = -1; d0 = File.getSize();
@@ -6570,15 +6782,15 @@ function isJHST() {
         }
         //NoDigi2:
         d0 = d1; smpsz = d3;
-        /* d1 += d4; //d4 is Size(PC), apparently unused */
+        // d1 += d4; //d4 is Size(PC), apparently unused
         songsz = d1; sz = songsz+smpsz;
     } else {
         sV = "packed";
         a1 = a0; d3 = 0;
         d3 = (1+File.read_int16(a0+0x32,_BE))*6; d2 = d3+File.read_int32(a0+0x18,_BE);
-        _log("d2:"+Hex(d2)+"/"+d2+" d3:"+Hex(d3)+"/"+d3+" Special:"+Hex(a1))
+    // _log("d2:"+Hex(d2)+"/"+d2+" d3:"+Hex(d3)+"/"+d3+" Special:"+Hex(a1))
         d3 = 0; d0 -= d2;
-        //_log(Hex(File.getSize())+" - "+Hex(d2)+" = "+Hex(File.getSize()-d2))
+    // _log(Hex(File.getSize())+" - "+Hex(d2)+" = "+Hex(File.getSize()-d2))
         if(d0 < 0)
             if(File.isHeuristicScan()) { malformed = "!short"+d0; return true }
             else return false;
@@ -6680,8 +6892,9 @@ if(!bDetected && File.isHeuristicScan() && isHSC()) {
 
 function isJamCracker() {
     //ref https://github.com/tonioni/WinUAE/blob/master/prowizard/rippers/JamCracker.c
+    if(!File.isHeuristicScan() && !File.compare("'BeEp'")) return false;
     smp = File.read_uint8(5);
-    if(!smp || (smp>0x1F)) return false;
+    if(!smp || (smp > 0x1F)) return false;
     if(File.read_uint8(6+smp*40) > 0) return false;
     allsmpsz = 0;
     for(k=0; k<smp; k++) {
@@ -6702,9 +6915,7 @@ function isJamCracker() {
     sz = ptns + 2 + ptn*2 + allsmpsz + trkdtsz + addlns; //doesn't include the Xag tags
     return true
 }
-if(!bDetected &&
-  (((!File.isHeuristicScan()) && File.compare("'BeEp'"))
-  || (File.isHeuristicScan() && isJamCracker()))) {
+if(!bDetected && isJamCracker()) {
     sName = "JamCracker/Pro module (.JAM,.JC)"; bDetected = 1;
     if(File.isVerbose() && File.isHeuristicScan()) {
         if(sz+19 == File.getSize()) {
@@ -6712,7 +6923,7 @@ if(!bDetected &&
             sOptionT(File.read_ansiString(sz,19)); //this version adds these
             sz += 19
         }
-        sOption("sz:"+sz+" ord:"+ord+" ptn:"+ptn+" smp:"+smp);
+        sOption("ord:"+ord+" ptn:"+ptn+" smp:"+smp+" sz:"+sz);
         if(sz != File.getSize()) sVersion += "/malformed"
     }
 }

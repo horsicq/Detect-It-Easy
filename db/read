@@ -143,11 +143,11 @@ function readVarUInt(ofs) {
  * Or put the reader towards a different place: bits.init(10)
  * Receive the current bit-file offset: bits.ofs()
 **/
-function BitReader(nOffset, nLog) {
+function BitReader(nOffset, nEndian) {
     this.n = 0; // the number of bits in the buffer
     this.buf = 0; // the bit buffer
     this.offset = nOffset ? nOffset : 0; // the file offset
-    this.log = nLog ? nLog : 0; // how many first operations to log; for debug purposes
+    this.endian = nEndian ? nEndian : _LE; // for different mechanics of bitstreaming; ogg/flac use _BE
 
     this.ofs = function() { return this.offset }
 
@@ -156,19 +156,24 @@ function BitReader(nOffset, nLog) {
 
     // the method to read b bits from the file
     this.read = function(nBits) {
-        if(this.log) _log("  @"+Hex(this.offset)+" bt->"+nBits);
-        if(nBits > 32) nBits = 32; if(nBits < 0) return 0;
-        while(this.n < nBits) { // while the buffer is not enough
-            this.buf |= File.read_uint8(this.offset++) << this.n; // read a byte and append it to the buffer
-            this.n += 8; // increase the bit number by 8
+        if(nBits > 64) nBits = 64; if(nBits < 0) return 0;
+        if(this.endian === _LE) {
+            while(this.n < nBits) { // while the buffer is not enough
+                this.buf |= File.read_uint8(this.offset++) << this.n; // read a byte and append it to the buffer
+                this.n += 8; // increase the bit number by 8
+            }
+            var v = this.buf & ((1 << nBits) - 1); // extract the desired bits from the buffer
+            this.buf >>= nBits; // shift the buffer to the right
+        } else {
+            while(this.n < nBits) {
+                this.buf = (this.buf << 8) | File.read_uint8(this.offset++); // shift the buffer to the left and append a byte
+                this.n += 8;
+            }
+            var v = this.buf >> (this.n - nBits); // extract the desired bits from the most significant part of the buffer
+            this.buf &= ((1<<this.n)-1) >> nBits; // clear the extracted bits from the buffer
         }
-        var v = this.buf & ((1 << nBits) - 1); // extract the desired bits from the buffer
-        this.buf >>= nBits; // shift the buffer to the right
         this.n -= nBits; // decrease the bit number by b
-        if(this.log) { this.log--; _log("  @"+Hex(this.offset)+": "+Hex(v)+", bitbuf:"+Hex(this.buf)
-    +", n:"+this.n) }
-        if(this.ofs <= File.getSize()) return v; // return the value if the file is not exhausted
-        else return -1; // return -1 otherwise
+        return v; // return the value even if the file is exhausted
     }
 }
 
@@ -272,7 +277,7 @@ function decAnsi(ofs,len,dectbl,zstop) {
  * @param {String} prefix (optional) - what to put in front of the output string
  */
 function sOptionT(a,prefix) { if ((""+a).trim() != "")
-  if(prefix != undefined) sOptions = sOptions.append(prefix+a.trim())
+  if(prefix != undefined) sOptions = sOptions.append(prefix+(""+a).trim())
   else sOptions = sOptions.append((""+a).trim()) }
 
 /**
@@ -281,7 +286,7 @@ function sOptionT(a,prefix) { if ((""+a).trim() != "")
  * @param {String} prefix (optional) - what to put in front of the output string
  */
 function sOption(a,prefix) { if ((""+a) != "")
-  if(prefix != undefined) sOptions = sOptions.append(prefix+a)
+  if(prefix != undefined) sOptions = sOptions.append(prefix+(""+a))
   else sOptions = sOptions.append(""+a) }
 
 /**
