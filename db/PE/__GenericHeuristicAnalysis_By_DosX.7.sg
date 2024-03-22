@@ -682,6 +682,7 @@ function scanForObfuscations_NET() {
         "YanoAttribute",
         "EMyPID_8234_",
         "ZYXDNGuarder",
+        "SkiDzEX", // ConfuserEx based
         "Sixxpack",
         "____KILL", // CodeVeil
         "Reactor", // Fake .NET Reactor
@@ -1918,6 +1919,54 @@ function scanForObfuscations_Native() {
 
 
 
+    var isContainsNoExtensionLibrary = false;
+
+    for (var i = 0; i < PE.getNumberOfImports() && !isContainsNoExtensionLibrary; i++) {
+        const libraryName = PE.getImportLibraryName(i).toLowerCase();
+
+        if (libraryName.length > 4) {
+            if (libraryName[libraryName.length - 4] !== ".") {
+                isContainsNoExtensionLibrary = true;
+            }
+        } else { /* if (libraryName.indexOf(".") === -1) */
+            isContainsNoExtensionLibrary = true;
+        }
+    }
+
+    if (isContainsNoExtensionLibrary) options += (options.length != 0 ? " + " : "") + "No extension import";
+
+
+
+
+    var exeInImports = false;
+
+    for (var i = 0; i < PE.getNumberOfImports() && !exeInImports; i++) {
+        const libraryName = PE.getImportLibraryName(i).toLowerCase();
+
+        if (libraryName.length > 4) {
+            if (libraryName.substr(libraryName.length - 4, 4) === ".exe") {
+                exeInImports = true;
+            }
+        }
+    }
+
+    if (exeInImports) options += (options.length != 0 ? " + " : "") + "EXE in imports";
+
+
+
+
+    var isEmptyImportPresent = false;
+
+    for (var i = 0; i < PE.getNumberOfImports() && !isEmptyImportPresent; i++) {
+        if (PE.getImportLibraryName(i) === "")
+            isEmptyImportPresent = true;
+    }
+
+    if (isEmptyImportPresent) options += (options.length != 0 ? " + " : "") + "Empty import";
+
+
+
+
     // Check if the first instruction at the entry point is "INT 3" (CC or CD 03)
     var isStartsWithBreakPoint = false;
 
@@ -1934,9 +1983,8 @@ function scanForObfuscations_Native() {
     var isStartsWithNop = false;
 
     // Condition to check if the first instruction is NOP
-    if (getFirstEpAsmInstruction() === "NOP") { // nop (90)
+    if (getFirstEpAsmInstruction() === "NOP") // nop (90)
         isStartsWithNop = true;
-    }
 
     if (isStartsWithNop) options += (options.length != 0 ? " + " : "") + "Nop at EP";
 
