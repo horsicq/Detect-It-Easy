@@ -204,6 +204,11 @@ if(signature=="AA5411DD")
 
 ```
 ```
+
+**quint16 crc16(qint64 nOffset, qint64 nSize, quint16 nInit = 0)**
+
+```
+```
 **bool isSignatureInSectionPresent(quint32 nNumber,QString sSignature)**
 
 ```

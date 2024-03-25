@@ -29,5 +29,23 @@ _log(123); // display a number
 
 ```
 ```
+**bool _isResultPresent(const QString &sType, const QString &sName)**
 
+```
+```
+**qint32 _getNumberOfResults(const QString &sType)**
+
+```
+```
+**void _removeResult(const QString &sType, const QString &sName)**
+
+```
+```
+**bool _isStop** Is scan stopped
+
+```
+```
 **_encodingList()** Show in log all text codecs 
+
+```
+```
