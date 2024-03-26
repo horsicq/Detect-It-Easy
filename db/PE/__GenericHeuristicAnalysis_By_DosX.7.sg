@@ -128,7 +128,8 @@ function scanForObfuscations_NET() {
         ],
         defaultEntries = [ // like MSIL, C#, C++ NET etc
             "Main",
-            "<Main>$" // For programs with top-level operators (C#)
+            "<Main>$", // For programs with top-level operators (C#)
+            "mainCRTStartup" // C++ .NET
         ]
 
     if (!PE.isDll()) {
@@ -163,8 +164,8 @@ function scanForObfuscations_NET() {
     // Specify the default .NET section index
     const defaultNetSection = 0;
 
-    // Check conditions for a strange entry point position
-    if (PE.getNumberOfSections() > 1) {
+    // Check conditions for a strange entry point position (not for CLR apps)
+    if (PE.getNumberOfSections() > 1 && !isClrNET()) {
         // Iterate through .NET metadata headers
         for (var s = 0; s < netMetaHeaders.length; s++) {
             const headerName = netMetaHeaders[s];
@@ -184,7 +185,7 @@ function scanForObfuscations_NET() {
 
     var isNativeEntryPointModified = false;
 
-    if (!PE.isDll()) {
+    if (!PE.isDll() && !isClrNET()) { // not for CLR apps
         if (!PE.is64()) {
             // FF2500????00: jmp dword ptr [ ... ]
             const firstOpCode = getFirstEpAsmOpCode();
@@ -228,27 +229,22 @@ function scanForObfuscations_NET() {
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
 
     // Check conditions for strange sections
-    if (PE.getNumberOfSections() > 6 || !PE.isSectionNamePresent(".text")) {
-        strangeSections = true;
-    } else {
+    if (PE.getNumberOfSections() > (!isClrNET() ? 6 : 10) || !PE.isSectionNamePresent(".text")) { strangeSections = true; } else {
         // Iterate through each section
-        for (var i = 0; i != PE.getNumberOfSections(); i++) {
-            var sectionName = PE.getSectionName(i);
+        for (var i = 0; i < PE.getNumberOfSections() && !strangeSections; i++) {
+            const sectionName = PE.getSectionName(i);
 
             // Check if the first character is not "." and the length of name is less than 3
-            if (sectionName[0] != "." && sectionName.length < 3) {
+            if (sectionName[0] !== "." && sectionName.length < 3) {
                 strangeSections = true;
                 break;
             }
 
             // Iterate through characters after "."
-            for (var x = 1; x < sectionName.length; x++) {
-                // Check if the character is in the badChars list
-                for (var d = 0; d < badChars.length; d++) {
-                    if (sectionName[x] === badChars[d]) {
-                        strangeSections = true;
-                        break;
-                    }
+            // Check if the character is in the badChars list
+            for (var d = 0; d < badChars.length && !strangeSections; d++) {
+                if (sectionName.substr(1, sectionName.length).indexOf(badChars[d]) !== -1) {
+                    strangeSections = true;
                 }
             }
         }
@@ -264,6 +260,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // A popular way to obfuscate numbers/booleans
     var isIntConfusionPresent = false;
 
     const intConfusionXorPattern = opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.ldc_i4;
@@ -292,6 +289,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // Virtualization is a method of protection in which some code segments are rewritten into instructions inherent in the built-in virtual machine and executed by it
     var isVirtualizationPresent = false;
 
     if (
@@ -305,8 +303,8 @@ function scanForObfuscations_NET() {
             ]
         ) &&
         (
-            validateNetObject("Ldarg_0") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
-            validateNetObject("CreateDelegate") // MSIL: 'System.Delegate.CreateDelegate'
+            PE.isNetObjectPresent("Ldarg_0") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
+            PE.isNetObjectPresent("CreateDelegate") // MSIL: 'System.Delegate.CreateDelegate'
         ) && !isFrameworkComponent()
     ) {
         isVirtualizationPresent = true;
@@ -317,6 +315,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // Hiding calls using delegate tricks
     var callsEncrypt = false;
 
     if (
@@ -405,6 +404,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // Turns the code into spaghetti by splitting it into blocks that it executes depending on the situation
     var isCtrlFlowPresent = false;
 
     if (validateNetByteCode( // samples by: ConfuserEx
@@ -426,7 +426,7 @@ function scanForObfuscations_NET() {
         ) ||
         validateNetByteCode( // samples by: .NET Reactor (legacy~~)
             opCodes.stloc + opCodes.ldloc +
-            opCodes.setStrict(opCodes.switch__nobody, "?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00") +
+            opCodes.setStrict(opCodes.switch__nobody, "** ** ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00") +
             opCodes.ldc_i4 + opCodes.br
         ) ||
         validateNetByteCode( // samples by: MindLated, NetShield
@@ -461,6 +461,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // Indicates that the file uses short object names. Typically this indicates the presence of an obfuscation
     var isShortNamesPresent = false;
 
     // There are two ways to detect short names - find one-letter objects or just use signature mask at Ctor offset :D
@@ -500,6 +501,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // AntiTamper protects the file from modification
     var isAntiTamperPresent = false;
 
     if (
@@ -528,6 +530,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // If in the assembly you can find a second object starting with “<Module>”, then this is a fakeee!
     var isModuleCtorMultiple = false;
 
     var currentCtorOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "00'<Module>'00");
@@ -546,6 +549,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // Detects the use of unusual mathematical expressions that would be simplified by the compiler. For example, an expression like "912874 + 39188124^834"
     var isMutationsPresent = false;
 
     const mathOpCodes = [
@@ -561,6 +565,7 @@ function scanForObfuscations_NET() {
         opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.ldc_i4 + opCodes.add, // samples by: ConfuserEx (Beds mod)
         opCodes.ldloc_1 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.ldc_i4 + opCodes.ldc_i4, // samples by: SkiDzEX
         opCodes.ldloc + opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.stelem_i1, // samples by: .NET Reactor
+        opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.br_s // samples by: [Unknown protector, only samples]
     ];
 
     for (var y = 0; y < mathTemplates.length && !isMutationsPresent; y++) {
@@ -599,6 +604,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // A type of obfuscation of numbers in which they are inverted several times from positive to negative and vice versa...
     var isMathInversionsPresent = false;
 
     if (validateNetByteCode(opCodes.ldc_i4 + opCodes.not) && (
@@ -637,6 +643,7 @@ function scanForObfuscations_NET() {
 
 
 
+    // A technique that allows you to avoid code decompilation. dnSpy gives a parsing error when trying to open such a file
     var invalidOpCodes = false;
 
     if (
@@ -805,6 +812,7 @@ function scanForAntiAnalysis_NET() {
     var options = "";
 
 
+    // Assumes the file can detect debugging protection
     var isAntiDebugPresent = false;
 
     const debuggerObject = "Debugger", // MSIL: 'System.Diagnostics.Debugger' from System.Diagnostics.dll
@@ -830,6 +838,7 @@ function scanForAntiAnalysis_NET() {
 
 
 
+    // A type of protection in which, after launching an application, it erases the headers and/or PE signature behind itself
     var isAntiDumpPresent = false;
 
     if (
@@ -973,6 +982,14 @@ function scanForAntiAnalysis_NET() {
 
 
 
+// Determines whether the application is a C++ CLR
+
+function isClrNET() {
+    return PE.isNET() && PE.isLibraryPresent("MSVCP140.dll") && PE.isLibraryPresent("KERNEL32.DLL");
+}
+
+
+
 // .NET OpCodes for static emulations
 function NetOpCodes() {
     this.add = "58"; // MSIL: 'add'
@@ -1093,6 +1110,7 @@ function replaceAllInString(inputString, search, replacement) {
 
 // This feature was originally intended only for .NET, but
 // now partially works with Native files.
+
 function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native apps
     var options = "";
 
@@ -1834,7 +1852,7 @@ function scanForObfuscations_Native() {
     var strangeSections = false;
 
     // Define forbidden characters
-    const badChars = '-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<> ';
+    const badSectionChars = '-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<> ';
 
     // Iterate through sections and characters to check for forbidden characters
     for (var i = 0; i < PE.getNumberOfSections() && !strangeSections; i++) {
@@ -1851,10 +1869,9 @@ function scanForObfuscations_Native() {
             if (PE.isSectionNamePresent(".build-id")) {
                 isIdioticMinGwSectionsPresent = true;
             } else {
-                for (var d = 1; d < 10; d++) { // sections like "/5", "/2" etc
+                for (var d = 1; d < 10 && !isIdioticMinGwSectionsPresent; d++) { // sections like "/5", "/2" etc
                     if (sectionName.indexOf("/" + d) != -1) {
                         isIdioticMinGwSectionsPresent = true;
-                        break;
                     }
                 }
             }
@@ -1866,15 +1883,10 @@ function scanForObfuscations_Native() {
         }
 
 
-        // If section name is too short, skip to the next iteration
-        if (sectionName.length > 1) {
-            for (var x = 0; x < sectionName.length && !strangeSections; x++) {
-                for (var d = 0; d < badChars.length && !strangeSections; d++) {
-                    // If forbidden character is found, set flag and break
-                    if (sectionName[x] === badChars[d]) {
-                        strangeSections = true;
-                    }
-                }
+        for (var d = 0; d < badSectionChars.length && !strangeSections; d++) {
+            // If forbidden character is found, set flag and break
+            if (sectionName.indexOf(badSectionChars[d]) !== -1) {
+                strangeSections = true;
             }
         }
 
@@ -1919,6 +1931,7 @@ function scanForObfuscations_Native() {
 
 
 
+    // It works if the file contains an import without an extension (for example, instead of "kernel32.dll" it is written "kernel32"). Compilers don't do that
     var isContainsNoExtensionLibrary = false;
 
     for (var i = 0; i < PE.getNumberOfImports() && !isContainsNoExtensionLibrary; i++) {
@@ -1938,6 +1951,7 @@ function scanForObfuscations_Native() {
 
 
 
+    // .exe files in imports are a separate type of sophistication. But this happens.
     var exeInImports = false;
 
     for (var i = 0; i < PE.getNumberOfImports() && !exeInImports; i++) {
@@ -1955,14 +1969,35 @@ function scanForObfuscations_Native() {
 
 
 
-    var isEmptyImportPresent = false;
+    // Looks for sections whose names contain strange (or invalid) characters
+    var isInvalidImportsPresent = false;
 
-    for (var i = 0; i < PE.getNumberOfImports() && !isEmptyImportPresent; i++) {
-        if (PE.getImportLibraryName(i) === "")
-            isEmptyImportPresent = true;
+    const badImportChars = '=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<> ';
+
+    for (var i = 0; i < PE.getNumberOfImports() && !isInvalidImportsPresent; i++) {
+        const libraryName = PE.getImportLibraryName(i).toLowerCase();
+
+        for (var l = 0; l < badImportChars.length && !isInvalidImportsPresent; l++) {
+            if (libraryName.indexOf(badImportChars[l]) !== -1) {
+                isInvalidImportsPresent = true;
+            }
+        }
     }
 
-    if (isEmptyImportPresent) options += (options.length != 0 ? " + " : "") + "Empty import";
+    if (isInvalidImportsPresent) options += (options.length != 0 ? " + " : "") + "Invalid imports";
+
+
+
+
+    // Checks if application resources can be read or if they are compressed/encrypted
+    var isUnreadableResourcesPresent = false;
+
+    for (var i = 0; i < PE.getNumberOfResources() && !isUnreadableResourcesPresent; i++) {
+        if (PE.getResourceOffsetByNumber(i) === -1)
+            isUnreadableResourcesPresent = true;
+    }
+
+    if (isUnreadableResourcesPresent) options += (options.length != 0 ? " + " : "") + "Unreadable resources";
 
 
 
@@ -2107,6 +2142,8 @@ function getFirstEpAsmInstruction() {
 }
 
 
+// Gets an opcode from an instruction
+
 function getAsmOpCode(instruction) {
     return instruction.indexOf(" ") !== -1 ? instruction.split(" ")[0] : instruction;
 }
@@ -2193,6 +2230,7 @@ function validateSectionNames(dbCollection) {
 
 // ALPHA v0.01
 // The module is disabled and does not work
+// You can write this yourself if you want.
 
 function scanForMaciliousCode_NET_and_Native() {
 
