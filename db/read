@@ -141,7 +141,10 @@ function readVarUInt(ofs) {
  * First create an instance with the file object: var bits = new BitReader(10);
  * Then call the readBits method with the number of bits you want: var value = bits.read(5);
  * Or put the reader towards a different place: bits.init(10)
- * Receive the current bit-file offset: bits.ofs()
+ * Receive the current bit-file offset: bits.offset
+ * Set the bit-file's offset, in bytes, without changing state: bits.seek(10)
+ * Set the bit-file's offset in bits: bits.bseek(14)
+ * Skip some bytes without changing state: bits.consume(2)
 **/
 function BitReader(nOffset, nEndian) {
     this.n = 0; // the number of bits in the buffer
@@ -149,10 +152,8 @@ function BitReader(nOffset, nEndian) {
     this.offset = nOffset ? nOffset : 0; // the file offset
     this.endian = nEndian ? nEndian : _LE; // for different mechanics of bitstreaming; ogg/flac use _BE
 
-    this.ofs = function() { return this.offset }
-
     // use this to change the pointer, which will reinit the reader, but not the logger
-    this.init = function(nOffset) { this.ofs = nOffset ? nOffset : 0; this.n = 0; this.buf = 0 }
+    this.init = function(nOffset) { this.ofs = nOffset ? nOffset : 0; this.n = this.buf = 0 }
 
     // the method to read b bits from the file
     this.read = function(nBits) {
@@ -175,6 +176,15 @@ function BitReader(nOffset, nEndian) {
         this.n -= nBits; // decrease the bit number by b
         return v; // return the value even if the file is exhausted
     }
+
+    // Skip some bytes without changing state: bits.consume(2)
+    this.consume = function(nBytes) { this.offset += nBytes; }
+
+    // Set the bit-file's offset, in bytes, without changing state:
+    this.seek = function(nOfs) { this.offset = nOfs; }
+
+    // Set the bit-file's offset in bits:
+    this.bseek = function(nOfs) { this.offset = nOfs - (nOfs%8); this.buf = this.n = 0; this.read(nOfs%8); }
 }
 
 /**
@@ -311,4 +321,37 @@ function slashTag(a,b) {
     else if(a != "" && b != "")
         return a+"/"+b;
     else return ""
+}
+
+/**
+ * createOrderlyHuffmanTable is just for detections but it does return the table for further checks. Or it returns false.
+ * @param {Array} lent - the lengths table
+ * @param {String} btl - bit table length
+ * @param {BitReader} br - a BitReader object pointing somewhere at the right position for this. The provided BitReader WILL change state.
+ * @returns {Array or false} 
+*/
+// createOrderlyHuffmanTable is just for detections but it does return the table for further checks. Or it returns false. 
+function createOrderlyHuffmanTable(lent,btl,br) {
+    var md = 32, Md = reall = code = 0; var _t = [], fi = [], li = [], ni = [];
+    for(i = 0; i < 33; i++) fi[i] = 0xFFFF;
+    for(i = 0; i < btl; i++) { len = lent[i]; if(len) {
+        if(len < md) md = len; if(len > Md) Md = len;
+        if(fi[len] == 0xFFFF) { fi[len] = li[len] = i } else { ni[li[len]] = i; li[len] = i } reall++ } }
+    if(!Md) return false;
+    for(d = md; d <= Md; d++) {
+        if(fi[d] != 0xFFFF) ni[li[d]] = btl;
+        for(i = fi[d]; i < btl; i = ni[i]) {
+            //insert HuffmanCode:
+            var j = 0, le = _t.length;
+            for(var cb = d; cb >= 0; cb--) {
+                var cob = (cb && ( ( (code>>(Md-d)) >> (cb-1) ) & 1 ) ) ? 1 : 0;
+                if(j != le) {
+                    if(!cb || (!_t[j][0] && !_t[j][1])) return false; //[0] is left, [1] is right, [2] is value
+                    if(!_t[j][cob]) _t[j][cob] = j = le; else j = _t[j][cob];
+                } else {
+                    _t.push([ (cb&&!cob)?le+1:0, (cb&&cob)?le+1:0, cb?0:i ]);
+                    j++; le++
+                } }
+            code += 1 << (Md-d) } }
+    return _t
 }
