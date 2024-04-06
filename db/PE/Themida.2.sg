@@ -4,31 +4,23 @@
 // 21:54 17.01.2013 add 1.x and 2.x
 //       20.09.2013 add 2.x for x64
 
-init("protector","Themida/Winlicense");
+init("protector", "Themida/Winlicense");
 
-function detectThemida()
-{
-    var sResult="";
+function detectThemida() {
+    var sResult = "";
 
-    if(PE.section.length>=4)
-    {
-        var nResourceSection=PE.getResourceSection();
-        var nImportSection=PE.getImportSection();
-        var nEntryPointSection=PE.getEntryPointSection();
+    if (PE.section.length >= 4) {
+        var nResourceSection = PE.getResourceSection();
+        var nImportSection = PE.getImportSection();
+        var nEntryPointSection = PE.getEntryPointSection();
 
-        if((nResourceSection==1)&&(nImportSection==2))
-        {
-            if(PE.getAddressOfEntryPoint()==PE.section[nEntryPointSection].VirtualAddress)
-            {
-                if(PE.calculateEntropy(PE.section[0].FileOffset,PE.section[0].FileSize)>=7.5)
-                {
-                    if(nEntryPointSection==3)
-                    {
-                        sResult="1.X";
-                    }
-                    else if(nEntryPointSection>3)
-                    {
-                        sResult="2.X";
+        if ((nResourceSection == 1) && (nImportSection == 2)) {
+            if (PE.getAddressOfEntryPoint() == PE.section[nEntryPointSection].VirtualAddress) {
+                if (PE.calculateEntropy(PE.section[0].FileOffset, PE.section[0].FileSize) >= 7.5) {
+                    if (nEntryPointSection == 3) {
+                        sResult = "1.X";
+                    } else if (nEntryPointSection > 3) {
+                        sResult = "2.X";
                     }
                 }
             }
@@ -38,92 +30,65 @@ function detectThemida()
     return sResult;
 }
 
-function detect(bShowType,bShowVersion,bShowOptions)
-{
-    if(PE.isPEPlus()&&PE.compareEP("4883EC085053E801000000CC584889C348FFC0482D........482D........4805........803BCC75..C60300"))
-    {
-        sVersion="2.X";
-        bDetected=1;
-    }
-    else if(PE.isNET())
-    {
-        if(PE.isSignatureInSectionPresent(0,"b8000000006011c0"))
-        {
-            sVersion="1.9";
-            bDetected=1;
+function detect(bShowType, bShowVersion, bShowOptions) {
+    if (PE.isPEPlus() && PE.compareEP("4883EC085053E801000000CC584889C348FFC0482D........482D........4805........803BCC75..C60300")) {
+        sVersion = "2.X";
+        bDetected = 1;
+    } else if (PE.isNET()) {
+        if (PE.isSignatureInSectionPresent(0, "b8000000006011c0")) {
+            sVersion = "1.9";
+            bDetected = 1;
+        } else if (PE.isSignatureInSectionPresent(0, "83ec048053e80100")) {
+            sVersion = "2.X";
+            bDetected = 1;
         }
-        else if(PE.isSignatureInSectionPresent(0,"83ec048053e80100"))
-        {
-            sVersion="2.X";
-            bDetected=1;
+    } else if (PE.compareEP("B8........600BC074..E8000000005805..0000008038E975")) {
+        switch (PE.readByte(PE.nEP + 9)) {
+            case 0x58:
+                sVersion = "1.0.x.x-1.8.0.0";
+                break;
+            case 0x68:
+                sVersion = "1.8.X-1.9.X";
+                break;
         }
-    }
-    else if(PE.compareEP("B8........600BC074..E8000000005805..0000008038E975"))
-    {
-        switch(PE.readByte(PE.nEP+9))
-        {
-        case 0x58: sVersion="1.0.x.x-1.8.0.0"; break;
-        case 0x68: sVersion="1.8.X-1.9.X";     break;
-        }
-        sOptions="compressed engine";
-        bDetected=1;
-    }
-    else if(PE.compareEP("558BEC83C4D860E8000000005A81EA........8BDAC745D8000000008B45D8408945D8817DD880000000"))
-    {
-        sVersion="1.0.x.x-1.8.x.x";
-        sOptions="no compression";
-        bDetected=1;
-    }
-    else if(PE.compareEP("8BC58BD460E8000000005D81ED........8995........89B5........8985........83BD"))
-    {
-        sVersion="1.X";
-        sOptions="NoCompression SecureEngine";
-        bDetected=1;
-    }
-    else if(PE.compareEP("83EC045053E801000000CC588BD840"))
-    {
-        sVersion="2.0.1.0-2.1.8.0";
-        bDetected=1;
-    }
-    else if(PE.compareEP("83EC045053E801000000CC5889C3402D........2D........05........803BCC75..C60300"))
-    {
-        sVersion="2.X";
-        bDetected=1;
-    }
-    else if(PE.compareEP("E9$$$$$$$$8bc58bd460e8"))
-    {
-        sVersion="1.1.X-1.2.X";
-        bDetected=1;
-    }
-    else if(PE.compareEP("eb$$e9$$$$$$$$e9$$$$$$$$565053e8$$$$$$$$5889c3402d"))
-    {
-        bDetected=1;
-    }
-    else if(PE.isImportPositionHashPresent(0,0x3ffccc8a)&&PE.isImportPositionHashPresent(1,0x4b2fc056))
-    {
-        sVersion="1.XX-2.XX";
-        bDetected=1;
-    }
-    else if(PE.isSectionNamePresent(".themida"))
-    {
-        sVersion="3.XX";
-        bDetected=1;
-    }
-    else if(PE.isSectionNamePresent(".winlice"))
-    {
-        sVersion="3.XX";
-        sOptions="Winlicense";
-        bDetected=1;
-    }
-    else
-    {
-        var sThemidaVersion=detectThemida();
-        if(sThemidaVersion!="")
-        {
-            sVersion=sThemidaVersion;
-            bDetected=1;
+        sOptions = "compressed engine";
+        bDetected = 1;
+    } else if (PE.compareEP("558BEC83C4D860E8000000005A81EA........8BDAC745D8000000008B45D8408945D8817DD880000000")) {
+        sVersion = "1.0.x.x-1.8.x.x";
+        sOptions = "no compression";
+        bDetected = 1;
+    } else if (PE.compareEP("8BC58BD460E8000000005D81ED........8995........89B5........8985........83BD")) {
+        sVersion = "1.X";
+        sOptions = "NoCompression SecureEngine";
+        bDetected = 1;
+    } else if (PE.compareEP("83EC045053E801000000CC588BD840")) {
+        sVersion = "2.0.1.0-2.1.8.0";
+        bDetected = 1;
+    } else if (PE.compareEP("83EC045053E801000000CC5889C3402D........2D........05........803BCC75..C60300")) {
+        sVersion = "2.X";
+        bDetected = 1;
+    } else if (PE.compareEP("E9$$$$$$$$8bc58bd460e8")) {
+        sVersion = "1.1.X-1.2.X";
+        bDetected = 1;
+    } else if (PE.compareEP("eb$$e9$$$$$$$$e9$$$$$$$$565053e8$$$$$$$$5889c3402d")) {
+        bDetected = 1;
+    } else if (PE.isImportPositionHashPresent(0, 0x3ffccc8a) && PE.isImportPositionHashPresent(1, 0x4b2fc056)) {
+        sVersion = "1.XX-2.XX";
+        bDetected = 1;
+    } else if (PE.isSectionNamePresent(".themida")) {
+        sVersion = "3.XX";
+        bDetected = 1;
+    } else if (PE.isSectionNamePresent(".winlice")) {
+        sVersion = "3.XX";
+        sOptions = "Winlicense";
+        bDetected = 1;
+    } else {
+        var sThemidaVersion = detectThemida();
+        if (sThemidaVersion != "") {
+            sVersion = sThemidaVersion;
+            bDetected = 1;
         }
     }
 
-    return result(bShowType,bShowVersion,bShowOptions);
+    return result(bShowType, bShowVersion, bShowOptions);
 }

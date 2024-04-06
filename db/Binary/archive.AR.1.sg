@@ -3,64 +3,82 @@
 // Status: WIP
 // doc-ref: https://en.wikipedia.org/wiki/Ar_(Unix)
 includeScript("archive");
-init("archive","The archiver (.AR)");
+init("archive", "The archiver (.AR)");
 
-function detect(bShowType,bShowVersion,bShowOptions)
-{
+function detect(bShowType, bShowVersion, bShowOptions) {
 
     function ParseLibInfo() {
-        sType="format"; 
+        sType = "format";
         sName = "COFF Library (.LIB)"
-        var nMachineOffset=Binary.read_uint32(0x48,_BE)+0x3C;
-        if (Binary.compare("0000FFFF",nMachineOffset)) {
-            var nMachine = Binary.read_uint16(nMachineOffset+6)} // long format
+        var nMachineOffset = Binary.read_uint32(0x48, _BE) + 0x3C;
+        if (Binary.compare("0000FFFF", nMachineOffset)) {
+            var nMachine = Binary.read_uint16(nMachineOffset + 6)
+        } // long format
         else {
-            var nMachine = Binary.read_uint16(nMachineOffset)}   // short format
-        switch(nMachine)
-        {
-            case  0x014c: sVersion = "I386";   break; // Intel 386 or later processors and compatible processors
-            case  0x0162: sVersion = "R3000";  break; // MIPS little-endian, 0x160 big-endian
-            case  0x01c0: sVersion = "ARM";    break; // ARM little-endian
-            case  0x8664: sVersion = "AMD64";  break; // x64
-            case  0xAA64: sVersion = "ARM64";  break; // ARM64 little-endian
-            case  0x01c4: sVersion = "ARMNT";  break; // Arm Thumb-2 little-endian
-            default: sVersion = "Unknown";
+            var nMachine = Binary.read_uint16(nMachineOffset)
+        } // short format
+        switch (nMachine) {
+            case 0x014c:
+                sVersion = "I386";
+                break; // Intel 386 or later processors and compatible processors
+            case 0x0162:
+                sVersion = "R3000";
+                break; // MIPS little-endian, 0x160 big-endian
+            case 0x01c0:
+                sVersion = "ARM";
+                break; // ARM little-endian
+            case 0x8664:
+                sVersion = "AMD64";
+                break; // x64
+            case 0xAA64:
+                sVersion = "ARM64";
+                break; // ARM64 little-endian
+            case 0x01c4:
+                sVersion = "ARMNT";
+                break; // Arm Thumb-2 little-endian
+            default:
+                sVersion = "Unknown";
         }
     }
 
-    function ParseDebInfo()
-    {
+    function ParseDebInfo() {
         sName = "Debian Software package (.DEB)";
-        sVersion = Binary.getString(nOffset, nFileSize-1);
+        sVersion = Binary.getString(nOffset, nFileSize - 1);
     }
 
-    if(Binary.compare("'!<arch>'0A"))
-    {
-            bDetected=true;
-            var nOffset = 8
-            var nItemCount = 0
-            while(nOffset<Binary.getSize()){
-                sFileName  = Binary.getString(nOffset,0x10).trim() ; nOffset +=0x10;
-                    nOffset +=0x0C; //modification_timestamp
-                    nOffset +=0x06; //ownerID
-                    nOffset +=0x06; //groupID
-                    nOffset +=0x08; //fileMode
-                nFileSize = parseInt(Binary.getString(nOffset,0x0A)); nOffset +=0x0A;
-                    nOffset +=0x02; //endMarker
-                switch(sFileName)
-                {
-                    case  "/":             ParseLibInfo(); break;
-                    case  "debian-binary": ParseDebInfo(); break;
-                    case  "/\/":                           break;
-                    default: Archive.add(nFileSize,nFileSize);
-                }
-                    nOffset +=nFileSize;
-                if( nFileSize & 1) nOffset +=1;  // padding
-                nItemCount+=1
+    if (Binary.compare("'!<arch>'0A")) {
+        bDetected = true;
+        var nOffset = 8
+        var nItemCount = 0
+        while (nOffset < Binary.getSize()) {
+            sFileName = Binary.getString(nOffset, 0x10).trim();
+            nOffset += 0x10;
+            nOffset += 0x0C; //modification_timestamp
+            nOffset += 0x06; //ownerID
+            nOffset += 0x06; //groupID
+            nOffset += 0x08; //fileMode
+            nFileSize = parseInt(Binary.getString(nOffset, 0x0A));
+            nOffset += 0x0A;
+            nOffset += 0x02; //endMarker
+            switch (sFileName) {
+                case "/":
+                    ParseLibInfo();
+                    break;
+                case "debian-binary":
+                    ParseDebInfo();
+                    break;
+                case "/\/":
+                    break;
+                default:
+                    Archive.add(nFileSize, nFileSize);
             }
+            nOffset += nFileSize;
+            if (nFileSize & 1) nOffset += 1; // padding
+            nItemCount += 1
+        }
 
-            //sOption("Items:" + nItemCount);
-            if (Binary.isVerbose()) sOption(Archive.contents()); // TODO: parse DIR\FILES
+        //sOption("Items:" + nItemCount);
+        if (Binary.isVerbose()) sOption(Archive.contents()); // TODO: parse DIR\FILES
     }
-    return result(bShowType,bShowVersion,bShowOptions);
+    return result(bShowType, bShowVersion, bShowOptions);
 }

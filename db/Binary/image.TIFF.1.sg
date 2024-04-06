@@ -3,50 +3,42 @@
 // Status: WIP
 // doc-ref: 
 
-init("image","Tagged Image File Format (.TIFF)");
+init("image", "Tagged Image File Format (.TIFF)");
 
-function detect(bShowType,bShowVersion,bShowOptions)
-{
-    function ReadTagValue(nType)
-    {
-        var nTempValue=0, nTempOffset=0;
-        switch(nType)
-        {
+function detect(bShowType, bShowVersion, bShowOptions) {
+    function ReadTagValue(nType) {
+        var nTempValue = 0,
+            nTempOffset = 0;
+        switch (nType) {
             case 1: // eBYTE 
                 break;
             case 2: // eASCII
-                nTempOffset = Binary.read_uint32(nOffset+8,bEndian);
-                nTempValue =  Binary.getString(nTempOffset, nCount);
+                nTempOffset = Binary.read_uint32(nOffset + 8, bEndian);
+                nTempValue = Binary.getString(nTempOffset, nCount);
                 return nTempValue;
                 break;
             case 3: // eSHORT
-                if (nCount == 1)
-                {
-                    nTempValue = Binary.read_uint16(nOffset+8,bEndian);
+                if (nCount == 1) {
+                    nTempValue = Binary.read_uint16(nOffset + 8, bEndian);
                     return nTempValue;
-                }
-                else
-                {
-                    nTempOffset = Binary.read_uint32(nOffset+8,bEndian);
-                    while(nCount--)
-                    {
-                        nTempValue = Binary.read_uint16(nTempOffset,bEndian); nTempOffset+=2;                        
+                } else {
+                    nTempOffset = Binary.read_uint32(nOffset + 8, bEndian);
+                    while (nCount--) {
+                        nTempValue = Binary.read_uint16(nTempOffset, bEndian);
+                        nTempOffset += 2;
                     }
                     return nTempValue;
                 }
                 break;
             case 4: // eLONG
-                if (nCount == 1)
-                {
-                    nTempValue = Binary.read_uint32(nOffset+8,bEndian);
+                if (nCount == 1) {
+                    nTempValue = Binary.read_uint32(nOffset + 8, bEndian);
                     return nTempValue;
-                }
-                else
-                {
-                    nTempOffset = Binary.read_uint32(nOffset+8,bEndian);
-                    while(nCount--)
-                    {
-                        nTempValue = Binary.read_uint32(nTempOffset,bEndian); nTempOffset+=4;                        
+                } else {
+                    nTempOffset = Binary.read_uint32(nOffset + 8, bEndian);
+                    while (nCount--) {
+                        nTempValue = Binary.read_uint32(nTempOffset, bEndian);
+                        nTempOffset += 4;
                     }
                     return nTempValue;
                 }
@@ -67,97 +59,129 @@ function detect(bShowType,bShowVersion,bShowOptions)
                 break;
             case 12: // eDOUBLE 
                 break;
-            }
+        }
 
     }
 
-    if(Binary.getSize()>=0x0E)
-    {
-        bDetected=true;
-        switch(Binary.read_uint32(0x00,_BE))
-        {
-            case 0x4D4D002A:  var bEndian=_BE; sOption("BE"); break;
-            case 0x49492A00:  var bEndian=_LE; sOption("LE"); break;
-            default: bDetected=false;
+    if (Binary.getSize() >= 0x0E) {
+        bDetected = true;
+        switch (Binary.read_uint32(0x00, _BE)) {
+            case 0x4D4D002A:
+                var bEndian = _BE;
+                sOption("BE");
+                break;
+            case 0x49492A00:
+                var bEndian = _LE;
+                sOption("LE");
+                break;
+            default:
+                bDetected = false;
         }
 
-        if(bDetected) 
-        {
-            var nOffset = Binary.read_uint32(0x04,bEndian);
-            var nTagCount  = Binary.read_uint16(nOffset,bEndian); nOffset+=2;
-            var nWidth, nHeight, nBPS, nCol,nComp;
-            while(nTagCount--)
-            {
-                var nTag   = Binary.read_uint16(nOffset,  bEndian);
-                var nType  = Binary.read_uint16(nOffset+2,bEndian);
-                var nCount = Binary.read_uint32(nOffset+4,bEndian);
-                switch(nTag)
-                {
-                case 0x100: // ImageWidth (256)
-                    nWidth  = ReadTagValue(nType);
-                    break;
+        if (bDetected) {
+            var nOffset = Binary.read_uint32(0x04, bEndian);
+            var nTagCount = Binary.read_uint16(nOffset, bEndian);
+            nOffset += 2;
+            var nWidth, nHeight, nBPS, nCol, nComp;
+            while (nTagCount--) {
+                var nTag = Binary.read_uint16(nOffset, bEndian);
+                var nType = Binary.read_uint16(nOffset + 2, bEndian);
+                var nCount = Binary.read_uint32(nOffset + 4, bEndian);
+                switch (nTag) {
+                    case 0x100: // ImageWidth (256)
+                        nWidth = ReadTagValue(nType);
+                        break;
 
-                case 0x101: // ImageLength (257)
-                    nHeight = ReadTagValue(nType);
-                    break;
+                    case 0x101: // ImageLength (257)
+                        nHeight = ReadTagValue(nType);
+                        break;
 
-                case 0x102: // BitsPerSample (258)
-                    nBPS = nCount * ReadTagValue(nType);
-                    break;
+                    case 0x102: // BitsPerSample (258)
+                        nBPS = nCount * ReadTagValue(nType);
+                        break;
 
-                case 0x103: // Compression (259)
-                    nComp = ReadTagValue(nType);
-                    break;
+                    case 0x103: // Compression (259)
+                        nComp = ReadTagValue(nType);
+                        break;
 
-                case 0x106: // PhotometricInterpretation (262)
-                    nCol = ReadTagValue(nType);
-                    break;
+                    case 0x106: // PhotometricInterpretation (262)
+                        nCol = ReadTagValue(nType);
+                        break;
 
-                case 271: // Make (271)
-                    sOption("Make:"+ReadTagValue(nType));
-                    break;
+                    case 271: // Make (271)
+                        sOption("Make:" + ReadTagValue(nType));
+                        break;
 
-                case 50706: // DNGVersion (50706)
-                    sName = "Digital Negative (.DNG)"
-                    break;
-                default: 
+                    case 50706: // DNGVersion (50706)
+                        sName = "Digital Negative (.DNG)"
+                        break;
+                    default:
 
                 }
-                nOffset+= 0x0C;
+                nOffset += 0x0C;
 
             }
 
 
-            switch(nComp)
-            {
-            case     1: sOption("Uncompressed"); break;
-            case     2: sOption("Huffman");      break;
-            case     3: sOption("Group 3");      break;
-            case     4: sOption("Group 4");      break;
-            case     5: sOption("LZW");          break;
-            case     6: sOption("embedded JPEG (602Photo software)"); break;
-            case     7: sOption("JPEG");         break;
-            case 32771: sOption("Alchemy software type 6 unknown compression"); break;
-            case 32773: sOption("PackBits");     break;
-            case 32946: sOption("Deflate");      break;
-            case 34690: sOption("LDF bitonal");  break;
-            case 65000: sOption("Kodak DCR");
-                        sName = "Kodak DCS Pro SLR (.DCR)";       break;
+            switch (nComp) {
+                case 1:
+                    sOption("Uncompressed");
+                    break;
+                case 2:
+                    sOption("Huffman");
+                    break;
+                case 3:
+                    sOption("Group 3");
+                    break;
+                case 4:
+                    sOption("Group 4");
+                    break;
+                case 5:
+                    sOption("LZW");
+                    break;
+                case 6:
+                    sOption("embedded JPEG (602Photo software)");
+                    break;
+                case 7:
+                    sOption("JPEG");
+                    break;
+                case 32771:
+                    sOption("Alchemy software type 6 unknown compression");
+                    break;
+                case 32773:
+                    sOption("PackBits");
+                    break;
+                case 32946:
+                    sOption("Deflate");
+                    break;
+                case 34690:
+                    sOption("LDF bitonal");
+                    break;
+                case 65000:
+                    sOption("Kodak DCR");
+                    sName = "Kodak DCS Pro SLR (.DCR)";
+                    break;
             }
-            if(nWidth!=0&&nHeight!=0)
-            {
-                sOption(nWidth+"x"+nHeight);
+            if (nWidth != 0 && nHeight != 0) {
+                sOption(nWidth + "x" + nHeight);
             }
-            sOption(nBPS+"-bit ");
-            switch(nCol)
-            {
-                case 0: sOption("W/B");   break;
-                case 1: sOption("B/W");   break;
-                case 2: sOption("RGB");   break;
-                case 3: sOption("index"); break;
+            sOption(nBPS + "-bit ");
+            switch (nCol) {
+                case 0:
+                    sOption("W/B");
+                    break;
+                case 1:
+                    sOption("B/W");
+                    break;
+                case 2:
+                    sOption("RGB");
+                    break;
+                case 3:
+                    sOption("index");
+                    break;
             }
         }
     }
 
-    return result(bShowType,bShowVersion,bShowOptions);
+    return result(bShowType, bShowVersion, bShowOptions);
 }

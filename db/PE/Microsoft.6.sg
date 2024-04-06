@@ -69,7 +69,7 @@ function detect(bShowType, bShowVersion, bShowOptions) {
     function getNetConfigStringByOffset(configOffset) {
         var result = PE.getString(configOffset).split("=")[1];
 
-        if (result.length > 5)
+        if (result.length > 7)
             result = String();
 
 
@@ -80,7 +80,7 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 
         const netFrameworkConfigPattern = findNetFrameworkConfigOffset();
 
-        if (netFrameworkConfigPattern !== -1 && PE.compare("1a", netFrameworkConfigPattern - 1)) {
+        if (netFrameworkConfigPattern !== -1) {
 
             sLibraryDot_Name = ".NET Framework"; // .NET Framework better than .NET Core
             sLibraryDot_Version = getNetConfigStringByOffset(netFrameworkConfigPattern);
@@ -110,11 +110,12 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 
         }
 
-        if (sLibraryDot_Name) {
-            sLibraryDot_Version += (sLibraryDot_Version.length != 0 ? ", " : String()) + "CLR " + PE.getNETVersion();
-        } else {
-            sLibraryDot_Version = "Corrupted";
+        if (!sLibraryDot_Name) {
+            sLibraryDot_Name = ".NET Framework";
+            sLibraryDot_Version = "Legacy";
         }
+
+        sLibraryDot_Version += (sLibraryDot_Version.length != 0 ? ", " : String()) + "CLR " + PE.getNETVersion();
 
         // sLibraryDot_Version = PE.getNETVersion();
 
@@ -125,7 +126,9 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 
     } else {
 
-        if (PE.isFunctionPresent("LoadLibraryExW") && PE.isFunctionPresent("ShellExecuteW") && PE.findString(0, PE.getSize(), "__clrcall") !== -1) {
+        if (PE.isFunctionPresent("LoadLibraryExW") &&
+            PE.isFunctionPresent("ShellExecuteW") &&
+            PE.findString(0, PE.getSize(), "__clrcall") !== -1) {
             sLibraryDot_Version = "Loader";
         }
 
