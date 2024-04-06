@@ -1,5 +1,5 @@
-// DIE's signature file
-// Author: Kae (TG@kaens)
+// https://github.com/horsicq/Detect-It-Easy signature file
+// Author: Kaens (TG@kaens)
 
 init("image","Truevision Targa (.TGA)");
 
@@ -9,7 +9,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
     //ref https://github.com/ImageMagick/ImageMagick/blob/main/coders/tga.c
     // & https://www.dca.fee.unicamp.br/~martino/disciplinas/ea978/tgaffs.pdf
     if(File.getSize() < 0x12) return false;
-    var msg = "", idlen = File.read_uint8(0), cmt = File.read_uint8(1), depth = 0,
+    var msg = bad = "", idlen = File.read_uint8(0), cmt = File.read_uint8(1), depth = 0,
       it = File.read_uint8(2), bpp = File.read_uint8(0x10), strcls = "", co = "none";
     if((bpp < 1 || bpp >= 17) && bpp != 24 && bpp != 32) return;
     switch(it) {
@@ -70,7 +70,10 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         }
     else p = 0; //giving up on reading huffman/delta etc. (not even Imagemagick can do that)
     ofs += ofsss; if(ofs > w) { base++; ofs = base }
-    if(p > File.getSize()) sVersion += "/malformed!short @"+Hex(p);
+    if(p > File.getSize())
+        if(File.isHeuristicScan())
+            bad = bad.addIfNone("!short");
+        else return; //because the format is shaky and FPs are more than possible
 
     ea = 0;
     if(File.isHeuristicScan()) {
@@ -119,6 +122,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
         }
         sOption(p,"sz:")
     }
+    if(bad != "") sVersion += "/malformed"+bad;
 
     bDetected = 1;
     return result(bShowType,bShowVersion,bShowOptions);
