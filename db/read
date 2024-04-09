@@ -19,10 +19,8 @@ const TOEOF = -1; //use for the size parameter in findSignature
  * @returns {UShort} The word value.
  * @alias Binary.readBEWord
  */
-File.readBEWord = function(nOffset)
-{
+File.readBEWord = function(nOffset) {
     return File.read_uint16(nOffset,_BE)
-//    return  (File.readByte(nOffset) << 8) + File.readByte(nOffset+1);
 }
 
 /**
@@ -31,8 +29,7 @@ File.readBEWord = function(nOffset)
  * @returns {UInt} The dword value.
  * @alias Binary.readBEDword
  */
-File.readBEDword = function(nOffset)
-{
+File.readBEDword = function(nOffset) {
     return File.read_uint32(nOffset,_BE)
 }
 
@@ -43,8 +40,7 @@ File.readBEDword = function(nOffset)
  * @returns {UShort} The word value.
  * @alias Binary.readEWord
  */
-File.readEWord = function(nOffset,bBE)
-{
+File.readEWord = function(nOffset,bBE) {
     return File.read_uint16(nOffset,bBE)
 }
 
@@ -55,8 +51,7 @@ File.readEWord = function(nOffset,bBE)
  * @returns {UInt} The dword value.
  * @alias Binary.readEDWord
  */
-File.readEDword = function(nOffset,bBE)
-{
+File.readEDword = function(nOffset,bBE) {
     return File.read_uint16(nOffset,bBE)
 }
 
@@ -66,21 +61,97 @@ File.readEDword = function(nOffset,bBE)
  * @returns {Short} The short value.
  * @alias Binary.readShort
  */
-File.readShort = function(nOffset)
-{
+File.readShort = function(nOffset) {
     return File.read_int16(nOffset,_LE)
 }
 
 
 // -------- END OF PRE-v3.06 CODE
 
-const CP437="ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛"+
-    "┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
-const CP1252="€?‚ƒ„…†‡ˆ‰Š‹Œ?Ž??‘’“”•–—˜™š›œ?žŸ?¡¢£¤¥¦§¨©ª«¬?®¯°±²³´µ¶·¸¹º»¼½¾¿"+
-    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
-const JISX0201="→-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—˜™š›œ¢žŸ"+//decided to mix it with cp1252
-    "→｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ"+
-    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ"
+//the encoding tables start with 0x7F, not 0x80!
+const CP437 = "⌂"+
+    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ"+
+    "áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐"+
+    "└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀"+
+    "αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
+const CP1252 = "⌂"+
+    "€?‚ƒ„…†‡ˆ‰Š‹Œ?Ž??‘’“”•–—˜™š›œ?žŸ"+
+    " ¡¢£¤¥¦§¨©ª«¬?®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
+    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+const CPAmiga = "⫽"+ // alternatively, "▒""
+    "абвгдежзийклмнопрстуфхцчшщъыьэюя"+ //0x80~0xA0 display Cyrillics, just to fill the void
+    " ¡¢£¤¥¦§¨©ª«¬–®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
+    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+const CPRISCOS = "⌂"+
+    "€Ŵŵ◰﯀Ŷŷ�⇦⇨⇩⇧…™‰•‘’‹›“”„–—−Œœ†‡ﬁﬂ"+
+    " ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
+    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+const CPAtariST = "⌂"+
+    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥ßƒ"+
+    "áíóúñÑªº¿⌐¬½¼¡«»ãõØøœŒÀÃÕ¨´†¶©®™"+
+    "ĳĲאבגדהוזחטיכלמנסעפצקרשתןךםףץ§∧∞"+
+    "αβΓπΣσµτΦΘΩδ∮φ∈∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²³¯";
+const JISX0201 = "⌂"+
+    "→-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—˜™š›œ¢žŸ"+ //decided to mix it with cp1252
+    "→｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｶｷｸｹｺｻｼｽｾｿﾀ"+
+    "ﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ"+
+    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+const Chars0to32 = "・☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼"; //#0 is a small dot from Japanese
+
+/**
+ * Decode a 1-byte encoding from a byte array using the 128-byte-long table given.
+ * @param {[uint8]} ansi - an array returned by readBytes.
+ * @param {String[0x81]} dectbl - a decoding table; just make a const here in db/read for that
+ * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
+ * @returns {String} a string value usable with js.
+ */
+function decEncoding(ansi, dectbl, zstop) {
+    if(zstop == undefined) zstop = true;
+    var s = "", bit8 = 0;
+    for(var i=0; i < ansi.length; i++)
+        if (!ansi[i] && zstop) break;
+        else if(ansi[i] < 0x80)
+            switch(ansi[i]) { // 7-bit variation processing
+                case 0x0E: if(dectbl == "JISX0201" || dectbl == "KOI7-R") bit8 = 0x80; else s += Chars0to32[0xE]; break;
+                case 0x0F: if(dectbl == "JISX0201" || dectbl == "KOI7-R") bit8 = 0; else s += Chars0to32[0xF]; break;
+                case 0x5C: if(dectbl == "JISX0201") s += "¥"; else s += "\\"; break;
+                case 0x7E: if(dectbl == "JISX0201") s += "‾"; else s += "~"; break;
+                case 0x7F: if(dectbl != "JISX0201") s += dectbl[0];
+                    else s += String.fromCharCode(bit8+ansi[i]); break;
+                default:
+                    if(!bit8 && ansi[i] >= 0 && ansi[i] < 0x20) s += Chars0to32[ansi[i]];
+                    else s += String.fromCharCode(bit8+ansi[i]);
+            }
+        else s += dectbl[ansi[i]-0x7F];
+    return s;
+}
+
+/**
+ * Read a byte array from file.
+ * @param {UInt} ofs - the offset to start from.
+ * @param {Int} len - the amount of bytes to read.
+ * @returns {[uint8]} The file slice. If you go beyond EoF, read_uint8 only knows what happens.
+ */
+function readBytes(ofs, len) { //for now; feels like this should be a system function
+    var s=[];
+    for (var i=0;i < len && ofs+i < File.getSize();i++) s.push(File.read_uint8(ofs+i));
+    return s;
+}
+
+/**
+ * Decode a 1-byte encoding from file using the 128-byte-long table given.
+ * @param {UInt} ofs - the offset to start from.
+ * @param {UInt} len - the amount of bytes to read.
+ * @param {String[0x81]} dectbl - a decoding table; just make a const here in db/read for that
+ * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
+ * @returns {String} a string value usable with js.
+ */
+function decAnsi(ofs, len, dectbl, zstop) {
+    return(decEncoding(readBytes(ofs,len), dectbl, zstop))
+}
 
 /**
  * Derive a string hexadecimal value, zero-padded.
@@ -88,7 +159,7 @@ const JISX0201="→-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—
  * @param {UInt} padz (optional,default=2) - how many characters to zero-pad.
  * @returns {String} The hex value, capital letters A~F, ending with "h".
  */
-function Hex(a,padz) {
+function Hex(a, padz) {
     if(a==undefined) return "!Hex("+a+")";
     if(padz==undefined) padz=2;
     var minus=""; if(a<0) { a=-a; minus="-" }
@@ -97,7 +168,7 @@ function Hex(a,padz) {
     return minus+pads+r+"h"
 }
 
-function Bin(a,padz) {
+function Bin(a, padz) {
     if(a==undefined) return "!Bin("+a+")";
     if(padz==undefined) padz=4;
     var minus = ""; if(a < 0) { a=-a; minus="-" }
@@ -106,7 +177,7 @@ function Bin(a,padz) {
     return minus+pads+r+"b"
 }
 
-function Oct(a,padz) {
+function Oct(a, padz) {
     if(a==undefined) return "!Oct("+a+")";
     if(padz==undefined) padz=4;
     var minus = ""; if(a < 0) { a=-a; minus="-" }
@@ -189,24 +260,12 @@ function BitReader(nOffset, nEndian) {
 }
 
 /**
- * Read a byte array from file.
- * @param {UInt} ofs - the offset to start from.
- * @param {Int} len - the amount of bytes to read.
- * @returns {[uint8]} The file slice. If you go beyond EoF, read_uint8 only knows what happens.
- */
-function readBytes(ofs,len) { //for now; feels like this should be a system function
-    var s=[];
-    for (var i=0;i < len && ofs+i < File.getSize();i++) s.push(File.read_uint8(ofs+i));
-    return s;
-}
-
-/**
  * Check a file slice for being all zeroes.
  * @param {UInt} ofs - the offset to start from.
  * @param {Int} len - the amount of bytes to check.
  * @returns {bool} True if the slice is all zeroes. If you go beyond EoF, always false.
  */
-function isAllZeroes(ofs,len) {
+function isAllZeroes(ofs, len) {
     if(ofs+len>File.getSize()) return false;
     var c = 0;
     for(var i=0;i < len && ofs+i < File.getSize();i++) if(!File.read_uint8(ofs+i)) c++;
@@ -223,7 +282,7 @@ function isAllZeroes(ofs,len) {
  * @param {Number} [mintrim = 78] - don't try searching for spaces below this point.
  * @returns {String} - the resulting string.
  */
-function addEllipsis(a,trim,mintrim) {
+function addEllipsis(a, trim, mintrim) {
     if(!mintrim) mintrim = 78; if(a.length < trim || mintrim > trim) return a;
     const spaces = " .,:;!\\/'\"=&\x09\x10\x13\x1A\x26。、｡,，・";
     var i = trim, c = 0, ci = -1;
@@ -239,66 +298,26 @@ function addEllipsis(a,trim,mintrim) {
 }
 
 /**
- * Decode a 1-byte encoding from a byte array using the 128-byte-long table given.
- * @param {[uint8]} ansi - an array returned by readBytes.
- * @param {String[0x80]} dectbl - a decoding table; just make a const here in db/read for that
- * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
- * @returns {String} a string value usable with js.
- */
-function decEncoding(ansi,dectbl,zstop) {
-    if(zstop==undefined) zstop=true;
-    var s=""; var bit8=0;
-    for(var i=0; i<ansi.length; i++)
-        if ((ansi[i]==0) && zstop) break; else
-        if(ansi[i] < 0x80)
-            switch(ansi[i]) { // 7-bit variation processing
-                case 0x0E: if(dectbl == "JISX0201") bit8=0x80; break;
-                case 0x0F: if(dectbl == "JISX0201") bit8=0; break;
-                case 0x5C: if(dectbl == "JISX0201") s+="¥"; break;
-                case 0x7E: if(dectbl == "JISX0201") s+="‾"; break;
-                default: s += String.fromCharCode(bit8+ansi[i]);
-            }
-        else s+=dectbl[ansi[i]-0x80];
-    return s;
-}
-
-/**
- * Decode a 1-byte encoding from file using the 128-byte-long table given.
- * @param {UInt} ofs - the offset to start from.
- * @param {ByteArray} len - the amount of bytes to read.
- * @param {String[0x80]} dectbl - a decoding table; just make a const here in db/read for that
- * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
- * @returns {String} a string value usable with js.
- */
-function decAnsi(ofs,len,dectbl,zstop) {
-    var s="";
-    if(zstop==undefined) zstop=true;
-    for (var i=0;i<len;i++) {
-        var b = Binary.read_uint8(ofs+i);
-        if ((b==0) && zstop) break; else
-        if(b < 0x80) s+=String.fromCharCode(b);
-        else s+=dectbl[b-0x80];
-    }
-    return s;
-}
-
-/**
  * sOptions.append a string (optionally prefixed) if the space-trimmed string is not empty.
  * @param {variant} a - the string to output (safe to accidentally drop a non-string in)
  * @param {String} prefix (optional) - what to put in front of the output string
+ * @param {String} suffix (optional) - what to put after the output string
  */
-function sOptionT(a,prefix) { if ((""+a).trim() != "")
-  if(prefix != undefined) sOptions = sOptions.append(prefix+(""+a).trim())
-  else sOptions = sOptions.append((""+a).trim()) }
+function sOptionT(a, prefix, suffix) {
+  if (prefix === undefined) prefix = ""; if (suffix === undefined) suffix = "";
+  if ((""+a).trim() != "") sOptions = sOptions.append(prefix+(""+a).trim()+suffix)
+}
 
 /**
  * sOptions.append a string (optionally prefixed) if the string is not empty.
  * @param {variant} a - the string to output (safe to accidentally drop a non-string in)
  * @param {String} prefix (optional) - what to put in front of the output string
+ * @param {String} suffix (optional) - what to put after the output string
  */
-function sOption(a,prefix) { if ((""+a) != "")
-  if(prefix != undefined) sOptions = sOptions.append(prefix+(""+a))
-  else sOptions = sOptions.append(""+a) }
+function sOption(a, prefix, suffix) {
+  if (prefix === undefined) prefix = ""; if (suffix === undefined) suffix = "";
+  if ((""+a).trim() != "") sOptions = sOptions.append(prefix+(""+a).trim()+suffix)
+}
 
 /**
  * A more verbose (but still concise) way of outputting the calculated size(s, derived using different algorithms),
@@ -335,7 +354,7 @@ function extIs(a) { return Binary.getFileSuffix().toLowerCase() == a.toLowerCase
  * @param {String} b - the second of the two
  * @returns {String}
 */
-function slashTag(a,b) {
+function slashTag(a, b) {
     if(a == b) return a;
     else if(a != "" && b == "")
         return a;
@@ -354,7 +373,7 @@ function slashTag(a,b) {
  * @returns {Array or false} 
 */
 // createOrderlyHuffmanTable is just for detections but it does return the table for further checks. Or it returns false. 
-function createOrderlyHuffmanTable(lent,btl,br) {
+function createOrderlyHuffmanTable(lent, btl, br) {
     var md = 32, Md = reall = code = 0; var _t = [], fi = [], li = [], ni = [];
     for(i = 0; i < 33; i++) fi[i] = 0xFFFF;
     for(i = 0; i < btl; i++) { len = lent[i]; if(len) {
