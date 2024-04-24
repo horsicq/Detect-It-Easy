@@ -1,0 +1,54 @@
+// Author: DosX
+// E-Mail: collab@kay-software.ru
+// GitHub: https://github.com/DosX-dev
+// Telegram: @DosX_dev
+
+init("protector", "VMProtect");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+
+    if (PE.isNET() && PE.getNumberOfSections() >= 3 && PE.isNetObjectPresent("SuppressIldasmAttribute")) {
+
+        const chunk = "** ** ** ** ** ** ** ** 00", // chunk size is 8 bytes
+            scanBytes = PE.getSize() - PE.getOverlaySize();
+
+        var patternFromCctor = "'<Module>'00",
+            globalBigPattern = "00";
+
+        for (var t = 0; t < 4; t++) {
+            patternFromCctor += chunk;
+
+            for (var i = 0; i < 2; i++) {
+                globalBigPattern += chunk;
+            }
+        }
+
+        if (PE.findSignature(0x00, scanBytes, patternFromCctor) != -1) {
+            if (PE.findSignature(0x00, scanBytes, globalBigPattern) != -1) {
+                sVersion = "3.X";
+                bDetected = true;
+            }
+        }
+
+
+        if (bDetected) {
+            if (PE.findSignature(0x00, scanBytes, generateUnicodeSignatureMask("Program will be terminated."))) { // Unicode [global] string
+                sOptions = "Resources protection";
+            }
+
+            if (PE.getSectionNameCollision("0", "1")) {
+                sOptions += (sOptions.length != 0 ? " + " : "") + "Custom sections";
+            }
+        }
+    }
+
+    return result(bShowType, bShowVersion, bShowOptions);
+}
+
+function generateUnicodeSignatureMask(inputString) {
+    var output = "";
+    for (var c = 0; c < inputString.length; c++) { output += (c != 0 ? "00" : "") + "'" + inputString[c] + "'"; }
+    return output;
+}
+
+// Hello Ivan Permyakov and thanks for your contribution to Open Source!

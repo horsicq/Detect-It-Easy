@@ -1,0 +1,136 @@
+// DIE's signature file
+// Author: DosX
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+
+    if (!PE.isNET()) return null;
+
+    if (!PE.isNetObjectPresent("Microsoft.VisualBasic")) return null;
+
+    const malwareType = "NjRAT";
+
+    if (checkForNative(
+            type = malwareType, edition = "0.7D Green Edition", stubReferences = [
+                "w",
+                "System.Drawing",
+                "System.Windows.Forms",
+                "avicap32.dll", "capGetDriverDescriptionA",
+                "kernel32",
+                "KERNEL32.DLL",
+                "ntdll",
+                "user32", "GetWindowText", "EnumChildWindows", "SendMessage", "GetWindowTextLength",
+                "user32.dll",
+                "winmm.dll"
+            ], objectsToValidate = ["A", "kl", "mgr", "OK"])) {
+        return null;
+    }
+
+    if (checkForNative(
+            type = malwareType, edition = "0.7D Lime Edition", stubReferences = [
+                "Stub",
+                "System.Drawing",
+                "System.Windows.Forms",
+                "avicap32.dll", "capGetDriverDescriptionA",
+                "kernel32",
+                "ntdll", "NtSetInformationProcess",
+                "user32", "MapVirtualKey", "ToUnicodeEx", "GetKeyboardState",
+                "user32.dll",
+                "wintrust.dll"
+            ], objectsToValidate = ["Lime", "kl", "StartNow"])) {
+        return null;
+    }
+
+    if (checkForNative(
+            type = malwareType, edition = "0.7D", stubReferences = [
+                "Stub",
+                "System.Drawing",
+                "System.Windows.Forms",
+                "avicap32.dll", "capGetDriverDescriptionA",
+                "kernel32",
+                "ntdll", "NtSetInformationProcess",
+                "user32", "MapVirtualKey", "ToUnicodeEx", "GetKeyboardState",
+                "user32.dll"
+            ], objectsToValidate = ["A", "kl", "OK"])) {
+        return null;
+    }
+
+    if (checkForNative(
+            type = malwareType, edition = "0.7D Danger Edition", stubReferences = [
+                "Stub",
+                "System.Drawing",
+                "System.Windows.Forms",
+                "avicap32.dll", "capGetDriverDescriptionA",
+                "Kernel32.dll",
+                "KERNEL32.DLL",
+                "user32", "GetWindowText", "EnumChildWindows", "SendMessage", "GetWindowTextLength", "SetWindowPos",
+                "user32.dll",
+                "winmm.dll",
+            ], objectsToValidate = ["e", "A", "CompDir", "connect"])) {
+        return null;
+    }
+
+    if (checkForNative(
+            type = malwareType, edition = "0.7D Golden Edition", stubReferences = [
+                "Stub",
+                "System.Drawing",
+                "System.Windows.Forms",
+                "avicap32.dll",
+                "kernel32",
+                "Kernel32.dll",
+                "ntdll",
+                "user32", "GetWindowText",
+                "user32.dll",
+                "winmm.dll",
+            ], objectsToValidate = ["A", "OK", "connect"])) {
+        return null;
+    }
+
+    if (checkForNative(
+            type = "XWorm", edition = "5.0", stubReferences = [
+                "System.Core",
+                "System.Drawing",
+                "System.Management",
+                "System.Windows.Forms",
+                "avicap32.dll", "capCreateCaptureWindowA",
+                "kernel32.dll", "SetThreadExecutionState", "",
+                "user32.dll", "GetForegroundWindow", "GetWindowText",
+            ], objectsToValidate = ["Main", "ClientSocket", "Uninstaller"])) {
+        return null;
+    }
+}
+
+function checkForNative(type, edition, stubReferences, objectsToValidate) {
+    if (validateReferences(
+            isPositive = true,
+            references = stubReferences
+        )) {
+        return false;
+    }
+
+    var isObfuscated = false;
+    if (validateReferences(
+            isPositive = true,
+            references = objectsToValidate
+        )) {
+        isObfuscated = true;
+    }
+
+    _setResult("virus", type, edition, (isObfuscated ? "Obfuscated" : ""));
+    return true;
+}
+
+function validateReferences(isPositive, references) {
+    for (var i = 0; i < references.length; i++) {
+        var sign = "00'" + references[i] + "'00";
+        if (isPositive) {
+            if (!PE.isSignatureInSectionPresent(0, sign)) {
+                return true;
+            }
+        } else { // negative
+            if (PE.isSignatureInSectionPresent(0, sign)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}

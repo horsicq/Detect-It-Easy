@@ -1,0 +1,165 @@
+// DIE's signature file
+// Authors: LinXP, Kae (TG@kaens)
+// doc-ref: http://www.libpng.org/pub/png/spec/1.2/PNG-Contents.html
+
+init("image", "");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    if (File.compare("89'PNG'0D0A1A0A........'IHDR'")) {
+        bDetected = true;
+        sName = "Portable Network Graphics (.PNG)";
+        ct = File.read_uint8(0x19);
+        switch (ct) {
+            case 0:
+                sOption("grey");
+                break;
+            case 2:
+                sOption("RGB");
+                break;
+            case 3:
+                sOption("indexed");
+                break;
+            case 4:
+                sOption("grey+alpha");
+                break;
+            case 6:
+                sOption("RGBA");
+                break;
+            default:
+                sOption("unk.colour type");
+        }
+        if (File.read_uint8(0x1C)) sOption("interlaced");
+        if (File.compare("00000008'acTL'", 0x21)) {}
+        if (File.isVerbose()) {
+            var p = 8,
+                col = 0,
+                end = simplea = musthaveplte = false,
+                w = h = "?",
+                af = icc = title = auth = desc = timestamp = sw = warn = cmt = sd = "";
+            mainloop: while (!end && p < File.getSize()) {
+                hksz = File.read_uint32(p, _BE);
+                hkhd = File.read_ansiString(p + 4, 4);
+                if (p + 12 + hksz > File.getSize()) { sVersion += "!short"; break }
+                // the CRC algo in DiE seems to be different for this:
+                // crc = File.calculateCRC32(p,8+hksz); ccrc = File.read_uint32(p+8+hksz,_BE);
+                // if(crc != ccrc) sVersion += "!badchunk "//+hkhd+"@"+Hex(p);
+                p += 8;
+                switch (hkhd) {
+                    case "IEND":
+                        end = true;
+                        break;
+                    case "IHDR":
+                        w = File.read_uint32(p, _BE);
+                        h = File.read_uint32(p + 4, _BE);
+                        col = 1 << File.read_uint8(p + 8);
+                        musthaveplte = File.read_uint8(p + 9) == 3;
+                        break;
+                    case "PLTE":
+                        musthaveplte = false;
+                        break;
+                    case "tRNS":
+                        simplea = true;
+                        break;
+                    case "iCCP":
+                        icc = File.read_codePageString(p, 79, "CP850");
+                        break;
+                    case "iTXt":
+                    case "tEXt":
+                        var i = p;
+                        if (hkhd === "iTXt") {
+                            t1 = File.read_codePageString(i, 79, "CP850").toLowerCase();
+                            i += t1.length + 1;
+                            if (!File.read_uint8(i += 2)) break; //not messing with compressed tags
+                            t = File.read_codePageString(i, 0x100, "CP850");
+                            i += t.length + 1; //language tag
+                            t = File.read_codePageString(i, 0x100, "CP850");
+                            i += t.length + 1; //translated keyword
+                            t2 = File.read_utf8String(i, hksz - i);
+                        } else {
+                            t1 = File.read_codePageString(p, 79, "CP850").toLowerCase();
+                            i += t1.length + 1;
+                            t2 = File.read_codePageString(i, hksz - i, "CP850")
+                        }
+                        _log("t1:" + t1.slice(0, 4));
+                        switch (t1) {
+                            case "title":
+                                title = t2;
+                                break;
+                            case "author":
+                                auth = t2;
+                                break;
+                            case "description":
+                                desc = t2;
+                                break;
+                            case "creation time":
+                                timestamp = t2;
+                                break;
+                            case "software":
+                                sw = t2;
+                                break;
+                            case "warning":
+                                warn = t2;
+                                break;
+                            case "comment":
+                                cmt = t2;
+                                break;
+                            default:
+                                if (t1.slice(0, 4) == "xml:") desc = desc.append("XML info found")
+                        }
+                        break;
+                    case "sBIT":
+                        switch (ct) {
+                            case 0:
+                                sd = File.read_uint8(p);
+                                break;
+                            case 2:
+                            case 3:
+                                sd = "R" + File.read_uint8(p) + "G" + File.read_uint8(p + 1) +
+                                    "B" + File.read_uint8(p + 2);
+                                break;
+                            case 4:
+                                sd = "g" + File.read_uint8(p) + "a" + File.read_uint8(p + 1);
+                                break;
+                            case 6:
+                                sd = "R" + File.read_uint8(p) + "G" + File.read_uint8(p + 1) +
+                                    "B" + File.read_uint8(p + 2) + "a" + File.read_uint8(p + 3);
+                                break;
+                        }
+                    case "tIME":
+                        timestamp = "UTC" + File.read_uint16(p, _BE) + "-" +
+                            File.read_uint8(p + 2) + "-" + File.read_uint8(p + 3) + "T" +
+                            File.read_uint8(p + 4) + ":" + File.read_uint8(p + 5) + ":" + File.read_uint8(p + 6);
+                        break;
+                    case "acTL":
+                        sName = "Animated Portable Network Graphics (.PNG)";
+                        af = Binary.read_uint32(p, _BE);
+                        break;
+                    default:
+                        for (i = 0; i < 4; i++) {
+                            var c = hkhd[i];
+                            if (c < 'A' || (c > 'Z' && c < 'a') || c > 'z') { sVersion += "!badchunkheader"; break }
+                        }
+                }
+                p += 4 + hksz;
+            }
+            if (musthaveplte) sVersion += "!badpalette";
+            if (!end) sVersion += "!noIEND";
+            sOption(w + "x" + h);
+            sOption(col, "colours:");
+            sOption(af, "frames:");
+            sOption(sd, "src.depth:");
+            if (simplea) sOption("simple alpha");
+            sOptionT(icc);
+            sOption(title);
+            sOption(auth, "by:");
+            sOption(timestamp, "on:");
+            sOption(sw, "in:");
+            sOption(warn, "/!\\:");
+            sOption(addEllipsis(desc, 70, 0x200));
+            sOption(cmt);
+            sOption(p, "sz:")
+        }
+    }
+
+    return result(bShowType, bShowVersion, bShowOptions);
+}

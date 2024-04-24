@@ -1,0 +1,97 @@
+// DIE's signature file
+//Authors: unknown person, Kae (TG@kaens)
+
+init("image", "Graphics Interchange Format file (.GIF)");
+
+includeScript("read");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    //ref https://www.w3.org/Graphics/GIF/spec-gif89a.txt
+    if (!File.compare("'GIF87'") && !File.compare("'GIF89'") || File.getSize() < 11) return;
+    sVersion = Binary.getString(4, 2);
+    if (/\d[a-z]/.test(sVersion) < 0) return;
+    sVersion = "v198" + sVersion;
+    bDetected = true;
+    if (!File.isDeepScan() && !File.compare("3B", File.getSize() - 1)) sVersion += "/malformed";
+    if (!File.isVerbose()) return result(bShowType, bShowVersion, bShowOptions);
+
+    var fl = File.read_uint8(0x0A),
+        ar = File.read_uint8(0x0C),
+        malformed = "";
+    sOption(File.read_uint16(6) + "x" + File.read_uint16(8));
+    var col = 1 << ((fl & 7) + 1);
+    sOption(col, "col:");
+    var bgc = File.read_uint8(0x0B);
+    if (bgc) sOption(bgc, "bgc:");
+    if (ar) sOption((ar + 15) / 64, "a/r:");
+    if (File.isDeepScan()) {
+        p = 0x0D;
+        imgs = 0;
+        cmt = "";
+        if (fl & 0x80) {
+            p += 3 * col;
+        }
+        blocksp = p; //skip global palette
+        mainloop: for (;;) {
+            var ch = File.read_uint8(p++);
+            if (ch === 0x3B) break;
+            else if (ch === 0x21) {
+                var c = File.read_uint8(p++);
+                switch (c) {
+                    case 0xF9:
+                        p += File.read_uint8(p++);
+                        break; //graphics control extension
+                    case 0xFE: //comments
+                        c = File.read_uint8(p++);
+                        if (c) {
+                            cmt += File.read_ansiString(p, c);
+                            p += c
+                        }
+                    case 0xFF: //application data extension
+                        c = File.read_uint8(p++);
+                        if (c === 11) {
+                            t = File.read_ansiString(p, c);
+                            sOption(t, "appdata:");
+                            p += c;
+                            c = File.read_uint8(p++);
+                            while (c && p < File.getSize()) {
+                                p += c;
+                                c = File.read_uint8(p++)
+                            }
+                        } else { malformed += "!badappext"; break mainloop }
+                        break;
+                    default:
+                        c = File.read_uint8(p++);
+                        while (c) {
+                            p += c;
+                            c = File.read_uint8(p++)
+                        }
+                }
+            }
+            if (p >= File.getSize()) { malformed += "!short"; break }
+            if (ch != 0x2C) continue;
+            imgs++;
+            if (!File.read_uint16(p + 4) || !File.read_uint16(p + 6)) { malformed += "!badimg"; break }
+            p += 8 /*skip coords,w,h*/ ;
+            fl = File.read_uint8(p++);
+            p++ /*skip the min.lzw code size*/
+            if (fl & 0x80) {
+                col = 1 << ((fl & 7) + 1);
+                p += 3 * col;
+                _log("  local palettes skipped @" + Hex(p))
+            }
+            c = File.read_uint8(p++);
+            while (c && p < File.getSize()) {
+                p += c;
+                c = File.read_uint8(p++)
+            }
+            if (p >= File.getSize()) { malformed += "!short"; break }
+        }
+        if (ch != 0x3B) malformed += "!badEoS";
+        if (!imgs) { bDetected = false; return } else if (imgs > 1) sOption(imgs, "frames:");
+        if (malformed != "") sVersion += "/malformed" + malformed;
+        else sOption(p, "sz:");
+    }
+
+    return result(bShowType, bShowVersion, bShowOptions);
+}

@@ -1,0 +1,87 @@
+// DIE's signature file
+// Author: hbasrc <rob.cheung+git@gmail.com>
+
+init("library", "Perl5 xs");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    if (!PE.isDll()) return;
+
+    var sLib = PE.isLibraryPresentExp(/perl(5)_?(\d\d*)/i);
+    if (sLib) {
+        bDetected = true;
+        sVersion = sLib[1] + "." + sLib[2];
+        return result(bShowType, bShowVersion, bShowOptions);
+    }
+
+    var sInterp = PE.isExportFunctionPresentExp("Perl_sv_bless|perl_parse");
+    if (sInterp) {
+        bDetected = true;
+        sVersion = getPerlVersion();
+
+        return _setResult("library", "Perl5 runtime", sVersion, "");
+    }
+
+    _setLang("Perl", bDetected);
+
+}
+
+function getPerlVersion() {
+    const verSig = [
+        "'erl5'..'.dll'", // v5.x
+        "'erl5'....'.dll'", // v5.xx
+        "'erl5_'..'.dll'", // cygwin or msys
+        "'erl5_'....'.dll'"
+    ];
+
+    var nExp = PE.getExportSection();
+    var sPLVersion = String();
+    var nMinorVer = 0;
+    var nGot = -1;
+
+    for (var i = 0; i < verSig.length; ++i) {
+        nGot = PE.findSignature(PE.section[nExp].FileOffset, PE.getSize(), verSig[i]);
+        if (nGot > -1) break;
+    }
+
+    if (nGot > 0) {
+        var sRes = PE.getString(nGot, 12);
+        //_log(" >>debug: Got DLL-ver = " + sRes);
+
+        sRes = sRes.match(/(5)_?(\d\d*)/);
+
+        if (sRes) {
+            sPLVersion = sRes[1] + "." + sRes[2];
+            nMinorVer = Number(sRes[2]);
+        } else {
+            return sPLVersion;
+        }
+
+        // find 5.x.x or 5.xx.x
+        var sSign = nMinorVer > 9 ? "'5.'....'.'.." : "'5.'..'.'..";
+        var patchVer = findPatchVersion(sSign);
+
+        if (patchVer > 0) sPLVersion += "." + patchVer;
+    }
+
+    return sPLVersion;
+}
+
+function findPatchVersion(sSign) {
+    var nOffset = 0;
+    var nSize = PE.getSize();
+    var nPatchVer = 0;
+    var nGot = -1;
+
+    // Traverse and find the max number
+    while ((nGot = PE.findSignature(nOffset, nSize, sSign)) != -1) {
+        var sRes = PE.getString(nGot, 12);
+        nOffset = nGot + sRes.length;
+
+        //_log("  >>debug: Got patchVer = " + sRes);
+
+        sRes = sRes.match(/5\.\d\d*\.(\d\d*)/);
+        if (sRes && sRes[1] > nPatchVer) nPatchVer = sRes[1];
+    }
+
+    return nPatchVer;
+}

@@ -1,115 +1,88 @@
 // DIE's signature file
 
-init("installer","InstallShield");
+init("installer", "InstallShield");
 
-function detect(bShowType,bShowVersion,bShowOptions)
-{
-    if(PE.compareEP("64a1........558bec6a..68........68........50648925........83ec..5356578965..ff15"))
-    {
-        if(PE.isOverlayPresent())
-        {
-            nOffset=PE.readByte(PE.getOverlayOffset())+PE.getOverlayOffset()+12;
-            if(PE.compare("135d658c", nOffset))
-            {
-                sVersion="3.x";
-                bDetected=1;
+function detect(bShowType, bShowVersion, bShowOptions) {
+    if (PE.compareEP("64a1........558bec6a..68........68........50648925........83ec..5356578965..ff15")) {
+        if (PE.isOverlayPresent()) {
+            nOffset = PE.readByte(PE.getOverlayOffset()) + PE.getOverlayOffset() + 12;
+            if (PE.compare("135d658c", nOffset)) {
+                sVersion = "3.x";
+                bDetected = true;
+            } else if (PE.compare("'PK'0304", nOffset)) {
+                sVersion = "3.x";
+                sOptions = "zip";
+                bDetected = true;
             }
-            else if(PE.compare("'PK'0304", nOffset))
-            {
-                sVersion="3.x";
-                sOptions="zip";
-                bDetected=1;
-            }
-        }
-        else
-        {
-            for(var i=0;i<PE.resource.length;i++)
-            {
-                if(PE.resource[i].Type==3000) //IS2
+        } else {
+            for (var i = 0; i < PE.resource.length; i++) {
+                if (PE.resource[i].Type == 3000) //IS2
                 {
-                    if(PE.compare("'SZDD'",PE.resource[i].Offset))
-                    {
-                        sVersion="2.x"
-                        bDetected=1;
+                    if (PE.compare("'SZDD'", PE.resource[i].Offset)) {
+                        sVersion = "2.x"
+                        bDetected = true;
                         break;
                     }
                 }
             }
         }
-        if(PE.isSectionNamePresent("_cabinet"))
-        {
-            bDetected=1;
+        if (PE.isSectionNamePresent("_cabinet")) {
+            bDetected = true;
+        }
+    } else if (PE.compareEP("558bec6a..68........68........64a1........50648925........83ec..5356578965..ff15")) {
+        if (PE.findSignature(PE.getOverlayOffset(), 0x100, "'InstallShield Native Installer'") != -1) {
+            sName += " Java Edition";
+            bDetected = true;
+        } else if (PE.findSignature(PE.getOverlayOffset(), 0x100, "'setup.class'") != -1) {
+            sName += " Java Edition";
+            sVersion = "3.x";
+            bDetected = true;
+        }
+    } else if (PE.compareEP("558BEC83EC4456FF15........8BF085F675086AFFFF15........8A06578B3D")) {
+        bDetected = true;
+    } else if (PE.compareEP("558bec6a..68........68........64a1........50648925........83ec..5356578965..ff15........33d2")) {
+        if (PE.findSignature(PE.getOverlayOffset(), Math.min(0x2000, PE.getOverlaySize()), "'ISc('") != -1) {
+            sVersion = "19.x";
+            bDetected = true;
+        }
+    } else if (PE.compareEP("e8$$$$$$$$8bff558bec83ec..a1........8365....8365....5357bf........bb........3bc774..85c374..f7")) {
+        if (PE.findSignature(PE.getOverlayOffset(), Math.min(0x2000, PE.getOverlaySize()), "'ISSetupStream'") != -1) {
+            sVersion = "18.x";
+            bDetected = true;
+        }
+    } else if (PE.compareEP("e8$$$$$$$$558bec83ec..a1........8365....8365....5657bf........be........3bc774..85c674..f7")) {
+        if (PE.compareOverlay("'ISSetupStream'")) {
+            sVersion = "19.x";
+            bDetected = true;
         }
     }
-    else if(PE.compareEP("558bec6a..68........68........64a1........50648925........83ec..5356578965..ff15"))
-    {
-        if(PE.findSignature(PE.getOverlayOffset(), 0x100, "'InstallShield Native Installer'")!=-1)
-        {
-            sName+=" Java Edition";
-            bDetected=1;
-        }
-        else if(PE.findSignature(PE.getOverlayOffset(), 0x100, "'setup.class'")!=-1)
-        {
-            sName+=" Java Edition";
-            sVersion="3.x";
-            bDetected=1;
-        }
 
+    if ((PE.getVersionStringInfo("ProductName").substr(0, 13) == "InstallShield") || (PE.getVersionStringInfo("CompanyName") == "InstallShield Software Corporation")) {
+        sVersion = PE.getVersionStringInfo("FileVersion").replace(/, /g, ".").trim();
+        bDetected = true;
     }
-    else if((PE.getVersionStringInfo("ProductName").substr(0,13)=="InstallShield")||(PE.getVersionStringInfo("CompanyName")=="InstallShield Software Corporation"))
-    {
-        sVersion=PE.getVersionStringInfo("FileVersion").replace(/, /g,".").trim();
-        bDetected=1;
+
+    if (!bDetected) {
+        if (/InstallShield/.test(PE.getManifest())) {
+            bDetected = true;
+        }
     }
-    else if(PE.compareEP("558BEC83EC4456FF15........8BF085F675086AFFFF15........8A06578B3D"))
-    {
-        bDetected=1;
-    }
-    else if(/InstallShield/.test(PE.getManifest()))
-    {
-        bDetected=1;
-    }
+
     /*else if(PE.isOverlayPresent()&&
             (searchSection(".rsrc",0x10000)||searchSection(".data",0x1000))) // Too slow on some files :(
     {
         bDetected=1;
     } */
-    else if(PE.compareEP("558bec6a..68........68........64a1........50648925........83ec..5356578965..ff15........33d2"))
-    {
-        if(PE.findSignature(PE.getOverlayOffset(),Math.min(0x2000,PE.getOverlaySize()),"'ISc('")!=-1)
-        {
-            sVersion="19.x";
-            bDetected=1;
-        }
-    }
-    else if(PE.compareEP("e8$$$$$$$$8bff558bec83ec..a1........8365....8365....5357bf........bb........3bc774..85c374..f7"))
-    {
-        if(PE.findSignature(PE.getOverlayOffset(),Math.min(0x2000,PE.getOverlaySize()),"'ISSetupStream'")!=-1)
-        {
-            sVersion="18.x";
-            bDetected=1;
-        }
-    }
-    else if(PE.compareEP("e8$$$$$$$$558bec83ec..a1........8365....8365....5657bf........be........3bc774..85c674..f7"))
-    {
-        if(PE.compareOverlay("'ISSetupStream'"))
-        {
-            sVersion="19.x";
-            bDetected=1;
-        }
-    }
 
-    return result(bShowType,bShowVersion,bShowOptions);
+
+    return result(bShowType, bShowVersion, bShowOptions);
 }
 
-function searchSection(sSection,nLimit)
-{
-    if(PE.section[sSection])
-    {
-        var nOffset=PE.section[sSection].FileOffset;
-        var nSize=PE.section[sSection].FileSize;
-        if(PE.findString(nOffset,Math.min(nLimit,nSize),"InstallShield")!=-1)
-        {
+function searchSection(sSection, nLimit) {
+    if (PE.section[sSection]) {
+        var nOffset = PE.section[sSection].FileOffset;
+        var nSize = PE.section[sSection].FileSize;
+        if (PE.findString(nOffset, Math.min(nLimit, nSize), "InstallShield") != -1) {
             return 1;
         }
     }

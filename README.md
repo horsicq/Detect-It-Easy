@@ -1,10 +1,23 @@
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=NF3FBD3KHMXDN)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/horsicq/DIE-engine.svg)](http://ntinfo.biz)
 [![GitHub All Releases](https://img.shields.io/github/downloads/horsicq/DIE-engine/total.svg)](http://ntinfo.biz)
+[![gitlocalized ](https://gitlocalize.com/repo/4736/whole_project/badge.svg)](https://github.com/horsicq/XTranslation)
 
-Detect-It-Easy
-==============
-![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/2.05.jpg "Version")
-![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/screenshot.jpg "Screenshot")
+[![OS Linux](https://img.shields.io/badge/os-linux-brightgreen)](https://github.com/horsicq/DIE-engine/releases)
+[![OS Windows](https://img.shields.io/badge/os-windows-brightgreen)](https://github.com/horsicq/DIE-engine/releases)
+[![OS MacOS](https://img.shields.io/badge/os-macos-brightgreen)](https://github.com/horsicq/DIE-engine/releases)
+
+# Detect It Easy
+
+- Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
+
+You can help with translation: https://github.com/horsicq/XTranslation
+
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/1.png "1")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/2.png "2")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/3.png "3")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/4.png "4")
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/5.png "5")
 
 Detect It Easy, or abbreviated "DIE" is a program for determining types of files.
 
@@ -28,21 +41,78 @@ Indeed, scripts run slower than compiled code, but, thanks to the good optimizat
 of Script Engine, this doesn't cause any special inconvenience. The possibilities
 of open architecture compensate these limitations.
 
-DIE exists in three versions. Basic version ("DIE"), Lite version ("DIEL") and
-console version ("DIEC"). All the three use the same signatures, which are located
+DIE exists in three versions. Basic version ("die"), Lite version ("diel") and
+console version ("diec"). All the three use the same signatures, which are located
 in the folder "db". If you open this folder, nested sub-folders will be found
 ("Binary", "PE" and others). The names of sub-folders correspond to the types of files.
 First, DIE determines the type of file, and then sequentially loads all the signatures,
 which lie in the corresponding folder. Currently the program defines the following types:
 
-* MSDOS executable files MS-DOS
+- MSDOS executable files MS-DOS
+- PE executable files Windows
+- ELF executable files Linux
+- MACH executable files Mac OS
+- Binary all other files
 
-* PE executable files Windows
+# Downloads
 
-* ELF executable files Linux
+Detect-It-Easy can be downloaded from the [release](https://github.com/horsicq/DIE-engine/releases) page.
 
-* MACH executable files Mac OS
+DIE library: https://github.com/horsicq/die_library
 
-* Binary all other files
+### Portable version (Linux)
 
-You could download binaries for Windows, Linux and Mac here: http://ntinfo.biz/
+```bash
+wget https://github.com/horsicq/DIE-engine/releases/download/3.08/Detect_It_Easy-3.08-x86_64.AppImage
+chmod +x Detect_It_Easy-3.08-x86_64.AppImage
+```
+
+# Installing
+
+### Using installation packages
+
+- Windows: [die](https://community.chocolatey.org/packages/die) on Chocolatey (Thanks [**chtof**](https://github.com/chtof) and [**Rob Reynolds**](https://github.com/ferventcoder))
+- Parrot OS: Package name **detect-it-easy** (Thanks [**Nong Hoang Tu**](https://github.com/dmknght))
+- Arch Linux: Aur package [detect-it-easy-git](https://aur.archlinux.org/packages/detect-it-easy-git/) (Thanks [**Arnaud Dovi**](https://github.com/class101))
+- [REMnux](https://remnux.org): (Thanks [**REMnux team**](https://twitter.com/REMnux/status/1401935989266919426))
+- openSUSE: [detect-it-easy](https://build.opensuse.org/package/show/home:mnhauke/detect-it-easy) (Thanks Martin Hauke)
+
+### Build from source
+
+Build instructions can be found in [BUILD.md](docs/BUILD.md).
+
+### Docker install
+
+You can also run DIE with [Docker](https://www.docker.com/community-edition)! Of course, this requires that you have git and Docker installed.
+
+```bash
+git clone --recursive https://github.com/horsicq/Detect-It-Easy
+cd Detect-It-Easy/
+docker build . -t horsicq:diec
+```
+
+# Usage
+
+### detect-it-easy has 3 variants
+
+- `die` GUI version
+- `diec` console version
+- `diel` GUI lite version
+
+Detailed usage instructions can be found in [RUN.md](docs/RUN.md).
+
+# Telegram Bot
+
+You could find the Bot in Telegram @detectiteasy_bot or simply enter in the search for Telegram "Detect It Easy"
+
+# Thanks to all the people who already contributed!
+
+<a href="https://github.com/horsicq/Detect-It-Easy/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=horsicq/Detect-It-Easy" />
+</a>
+
+## Special Thanks
+
+- [PELock Software Protection & Reverse Engineering](https://www.pelock.com)
+
+![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/mascots/logo.png "Mascot")

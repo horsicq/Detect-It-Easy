@@ -1,4 +1,17 @@
 // Supplemental read functions.
+// Authors: unknown guy, Kaens (TG @kaens)
+// Lots of legacy,
+// TODO update the old scripts to use the new functions,
+// and get rid of the functions themselves
+
+const _BE = true; const _LE = false; //endianness for read_int16+
+//little-endian = reversed notation (Intel, ZX Spectrum),
+//big-endian = direct notation (TCP/IP, Motorola, Amiga)
+//For the BitReader Object, BE is MSB and LE is LSB (intuitively)
+
+const TOEOF = -1; //use for the size parameter in findSignature
+
+// ---------- START OF PRE-v3.06 CODE --------------------
 
 /**
  * Read a big-endian word.
@@ -6,9 +19,8 @@
  * @returns {UShort} The word value.
  * @alias Binary.readBEWord
  */
-File.readBEWord = function(nOffset)
-{
-    return (File.readByte(nOffset) << 8) + File.readByte(nOffset+1);
+File.readBEWord = function(nOffset) {
+    return File.read_uint16(nOffset,_BE)
 }
 
 /**
@@ -17,11 +29,9 @@ File.readBEWord = function(nOffset)
  * @returns {UInt} The dword value.
  * @alias Binary.readBEDword
  */
-File.readBEDword = function(nOffset)
-{
-    return File.swapBytes(File.readDword(nOffset));
+File.readBEDword = function(nOffset) {
+    return File.read_uint32(nOffset,_BE)
 }
-
 
 /**
  * Read a word, selecting endianness.
@@ -30,9 +40,8 @@ File.readBEDword = function(nOffset)
  * @returns {UShort} The word value.
  * @alias Binary.readEWord
  */
-File.readEWord = function(nOffset,bBE)
-{
-    return bBE?File.readBEWord(nOffset):File.readWord(nOffset);
+File.readEWord = function(nOffset,bBE) {
+    return File.read_uint16(nOffset,bBE)
 }
 
 /**
@@ -42,11 +51,9 @@ File.readEWord = function(nOffset,bBE)
  * @returns {UInt} The dword value.
  * @alias Binary.readEDWord
  */
-File.readEDword = function(nOffset,bBE)
-{
-    return bBE?File.readBEDword(nOffset):File.readDword(nOffset);
+File.readEDword = function(nOffset,bBE) {
+    return File.read_uint16(nOffset,bBE)
 }
-
 
 /**
  * Read a short (signed 16-bit) value.
@@ -54,7 +61,339 @@ File.readEDword = function(nOffset,bBE)
  * @returns {Short} The short value.
  * @alias Binary.readShort
  */
-File.readShort = function(nOffset)
-{
-    return (File.readWord(nOffset)<<16)>>16;
+File.readShort = function(nOffset) {
+    return File.read_int16(nOffset,_LE)
+}
+
+
+// -------- END OF PRE-v3.06 CODE
+
+//the encoding tables start with 0x7F, not 0x80!
+const CP437 = "⌂"+
+    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ"+
+    "áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐"+
+    "└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀"+
+    "αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
+const CP1252 = "⌂"+
+    "€?‚ƒ„…†‡ˆ‰Š‹Œ?Ž??‘’“”•–—˜™š›œ?žŸ"+
+    " ¡¢£¤¥¦§¨©ª«¬?®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
+    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+const CPAmiga = "⫽"+ // alternatively, "▒""
+    "абвгдежзийклмнопрстуфхцчшщъыьэюя"+ //0x80~0xA0 display Cyrillics, just to fill the void
+    " ¡¢£¤¥¦§¨©ª«¬–®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
+    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+const CPRISCOS = "⌂"+
+    "€Ŵŵ◰﯀Ŷŷ�⇦⇨⇩⇧…™‰•‘’‹›“”„–—−Œœ†‡ﬁﬂ"+
+    " ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
+    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+const CPAtariST = "⌂"+
+    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥ßƒ"+
+    "áíóúñÑªº¿⌐¬½¼¡«»ãõØøœŒÀÃÕ¨´†¶©®™"+
+    "ĳĲאבגדהוזחטיכלמנסעפצקרשתןךםףץ§∧∞"+
+    "αβΓπΣσµτΦΘΩδ∮φ∈∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²³¯";
+const JISX0201 = "⌂"+
+    "→-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—˜™š›œ¢žŸ"+ //decided to mix it with cp1252
+    "→｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｶｷｸｹｺｻｼｽｾｿﾀ"+
+    "ﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ"+
+    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+const Chars0to32 = "・☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼"; //#0 is a small dot from Japanese
+
+/**
+ * Decode a 1-byte encoding from a byte array using the 128-byte-long table given.
+ * @param {[uint8]} ansi - an array returned by readBytes.
+ * @param {String[0x81]} dectbl - a decoding table; just make a const here in db/read for that
+ * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
+ * @returns {String} a string value usable with js.
+ */
+function decEncoding(ansi, dectbl, zstop) {
+    if(zstop == undefined) zstop = true;
+    var s = "", bit8 = 0;
+    for(var i=0; i < ansi.length; i++)
+        if (!ansi[i] && zstop) break;
+        else if(ansi[i] < 0x80)
+            switch(ansi[i]) { // 7-bit variation processing
+                case 0x0E: if(dectbl == "JISX0201" || dectbl == "KOI7-R") bit8 = 0x80; else s += Chars0to32[0xE]; break;
+                case 0x0F: if(dectbl == "JISX0201" || dectbl == "KOI7-R") bit8 = 0; else s += Chars0to32[0xF]; break;
+                case 0x5C: if(dectbl == "JISX0201") s += "¥"; else s += "\\"; break;
+                case 0x7E: if(dectbl == "JISX0201") s += "‾"; else s += "~"; break;
+                case 0x7F: if(dectbl != "JISX0201") s += dectbl[0];
+                    else s += String.fromCharCode(bit8+ansi[i]); break;
+                default:
+                    if(!bit8 && ansi[i] >= 0 && ansi[i] < 0x20) s += Chars0to32[ansi[i]];
+                    else s += String.fromCharCode(bit8+ansi[i]);
+            }
+        else s += dectbl[ansi[i]-0x7F];
+    return s;
+}
+
+/**
+ * Read a byte array from file.
+ * @param {UInt} ofs - the offset to start from.
+ * @param {Int} len - the amount of bytes to read.
+ * @returns {[uint8]} The file slice. If you go beyond EoF, read_uint8 only knows what happens.
+ */
+function readBytes(ofs, len) { //for now; feels like this should be a system function
+    var s=[];
+    for (var i=0;i < len && ofs+i < File.getSize();i++) s.push(File.read_uint8(ofs+i));
+    return s;
+}
+
+/**
+ * Decode a 1-byte encoding from file using the 128-byte-long table given.
+ * @param {UInt} ofs - the offset to start from.
+ * @param {UInt} len - the amount of bytes to read.
+ * @param {String[0x81]} dectbl - a decoding table; just make a const here in db/read for that
+ * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
+ * @returns {String} a string value usable with js.
+ */
+function decAnsi(ofs, len, dectbl, zstop) {
+    return(decEncoding(readBytes(ofs,len), dectbl, zstop))
+}
+
+/**
+ * Derive a string hexadecimal value, zero-padded.
+ * @param {Int} a - the numerical value.
+ * @param {UInt} padz (optional,default=2) - how many characters to zero-pad.
+ * @returns {String} The hex value, capital letters A~F, ending with "h".
+ */
+function Hex(a, padz) {
+    if(a==undefined) return "!Hex("+a+")";
+    if(padz==undefined) padz=2;
+    var minus=""; if(a<0) { a=-a; minus="-" }
+    var r = a.toString(16).toUpperCase(); var pads="";
+    if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
+    return minus+pads+r+"h"
+}
+
+function Bin(a, padz) {
+    if(a==undefined) return "!Bin("+a+")";
+    if(padz==undefined) padz=4;
+    var minus = ""; if(a < 0) { a=-a; minus="-" }
+    var r = a.toString(2); var pads="";
+    if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
+    return minus+pads+r+"b"
+}
+
+function Oct(a, padz) {
+    if(a==undefined) return "!Oct("+a+")";
+    if(padz==undefined) padz=4;
+    var minus = ""; if(a < 0) { a=-a; minus="-" }
+    var r = a.toString(8); var pads="";
+    if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
+    return minus+pads+r+"o"
+}
+
+/**
+ * Read a variable-length quantity, an unsigned integer like in MIDI files, from the file.
+ * @param {UInt} ofs - the offset to start from.
+ * @returns {List} [length,value] - if length (in physical bytes) = 0, the value had a problem.
+**/
+function readVarUInt(ofs) {
+    if(ofs < 0 || ofs >= File.getSize()) return [0,0];
+    var t = 0, wb = 1, r = 1, o = ofs;
+    var b = File.read_uint8(o++); t = (t << 7) | (b&0x7F);
+    var b_ = b; while(b_) { b_ >>= 1; wb++ }
+    while(r < 16 && (b&0x80)) {
+        b = File.read_uint8(o++); t = (t << 7) | (b&0x7F); r++
+    }
+    if(wb > 64) return [0,0xFFFFFFFFFFFFFFFF]; // sizeof(target) in bits. A 64bit value should be enough, right?
+    else if(b&0x80) return [0,-1]; //EOF
+    else return [r,t]
+}
+
+/**
+ * This object facilitates reading a file as a sequence of bits
+ * @init {UInt} [nOffset = 0] - provide the file offset
+ * @param {UInt} nBits - bits to read, autolimits to 32 (so read little by little!)
+ * @returns {UInt} read value as integer, -1 if EoF reached
+ * @example
+ * First create an instance with the file object: var bits = new BitReader(10);
+ * Then call the readBits method with the number of bits you want: var value = bits.read(5);
+ * Or put the reader towards a different place: bits.init(10)
+ * Receive the current bit-file offset: bits.offset
+ * Set the bit-file's offset, in bytes, without changing state: bits.seek(10)
+ * Set the bit-file's offset in bits: bits.bseek(14)
+ * Skip some bytes without changing state: bits.consume(2)
+**/
+function BitReader(nOffset, nEndian) {
+    this.n = 0; // the number of bits in the buffer
+    this.buf = 0; // the bit buffer
+    this.offset = nOffset ? nOffset : 0; // the file offset
+    this.endian = nEndian ? nEndian : _LE; // for different mechanics of bitstreaming; ogg/flac use _BE
+
+    // use this to change the pointer, which will reinit the reader, but not the logger
+    this.init = function(nOffset) { this.ofs = nOffset ? nOffset : 0; this.n = this.buf = 0 }
+
+    // the method to read b bits from the file
+    this.read = function(nBits) {
+        if(nBits > 64) nBits = 64; if(nBits < 0) return 0;
+        if(this.endian === _LE) {
+            while(this.n < nBits) { // while the buffer is not enough
+                this.buf |= File.read_uint8(this.offset++) << this.n; // read a byte and append it to the buffer
+                this.n += 8; // increase the bit number by 8
+            }
+            var v = this.buf & ((1 << nBits) - 1); // extract the desired bits from the buffer
+            this.buf >>= nBits; // shift the buffer to the right
+        } else {
+            while(this.n < nBits) {
+                this.buf = (this.buf << 8) | File.read_uint8(this.offset++); // shift the buffer to the left and append a byte
+                this.n += 8;
+            }
+            var v = this.buf >> (this.n - nBits); // extract the desired bits from the most significant part of the buffer
+            this.buf &= ((1<<this.n)-1) >> nBits; // clear the extracted bits from the buffer
+        }
+        this.n -= nBits; // decrease the bit number by b
+        return v; // return the value even if the file is exhausted
+    }
+
+    // Skip some bytes without changing state: bits.consume(2)
+    this.consume = function(nBytes) { this.offset += nBytes; }
+
+    // Set the bit-file's offset, in bytes, without changing state:
+    this.seek = function(nOfs) { this.offset = nOfs; }
+
+    // Set the bit-file's offset in bits:
+    this.bseek = function(nOfs) { this.offset = nOfs - (nOfs%8); this.buf = this.n = 0; this.read(nOfs%8); }
+}
+
+/**
+ * Check a file slice for being all zeroes.
+ * @param {UInt} ofs - the offset to start from.
+ * @param {Int} len - the amount of bytes to check.
+ * @returns {bool} True if the slice is all zeroes. If you go beyond EoF, always false.
+ */
+function isAllZeroes(ofs, len) {
+    if(ofs+len>File.getSize()) return false;
+    var c = 0;
+    for(var i=0;i < len && ofs+i < File.getSize();i++) if(!File.read_uint8(ofs+i)) c++;
+    return c === len;
+}
+
+/**
+ * If the string was too long and has been read incompletely, adds an ellipsis after the last
+ * complete word, to avoid cut-off words. If `space characters' are not detected,
+ * replaces the last character with an ellipsis.
+ * Mostly usable for lengthy multiline comments/messages.
+ * @param {String} a - the original incomplete string.
+ * @param {Number} trim - the buffer size; if a.length == trim, we decide it was cropped. 
+ * @param {Number} [mintrim = 78] - don't try searching for spaces below this point.
+ * @returns {String} - the resulting string.
+ */
+function addEllipsis(a, trim, mintrim) {
+    if(!mintrim) mintrim = 78; if(a.length < trim || mintrim > trim) return a;
+    const spaces = " .,:;!\\/'\"=&\x09\x10\x13\x1A\x26。、｡,，・";
+    var i = trim, c = 0, ci = -1;
+    while(i >= mintrim && c < 2) {
+        if(spaces.indexOf(a[i]) >= 0) { c++; while(spaces.indexOf(a[i]) >= 0) i--; if(ci < 0) ci = i+1 }
+        while(spaces.indexOf(a[i]) < 0) i--
+    }
+    if((i < mintrim && c < 2) //we conclude this language doesn't really have that many spaces...
+      || !c) //...or none at all in the trimmable slice...
+        return a.slice(0,trim)+'…';
+    else //this language has some spaces and we can use the last one to trim
+        return a.slice(0,Math.max(ci),mintrim)+'…';
+}
+
+/**
+ * sOptions.append a string (optionally prefixed) if the space-trimmed string is not empty.
+ * @param {variant} a - the string to output (safe to accidentally drop a non-string in)
+ * @param {String} prefix (optional) - what to put in front of the output string
+ * @param {String} suffix (optional) - what to put after the output string
+ */
+function sOptionT(a, prefix, suffix) {
+  if (prefix === undefined) prefix = ""; if (suffix === undefined) suffix = "";
+  if ((""+a).trim() != "") sOptions = sOptions.append(prefix+(""+a).trim()+suffix)
+}
+
+/**
+ * sOptions.append a string (optionally prefixed) if the string is not empty.
+ * @param {variant} a - the string to output (safe to accidentally drop a non-string in)
+ * @param {String} prefix (optional) - what to put in front of the output string
+ * @param {String} suffix (optional) - what to put after the output string
+ */
+function sOption(a, prefix, suffix) {
+  if (prefix === undefined) prefix = ""; if (suffix === undefined) suffix = "";
+  if ((""+a).trim() != "") sOptions = sOptions.append(prefix+(""+a).trim()+suffix)
+}
+
+/**
+ * A more verbose (but still concise) way of outputting the calculated size(s, derived using different algorithms),
+ * taking into account and visualising the difference from the actual file size.
+ * @param {...Number} sizes - numerical values
+ * For example, if a file is 100 bytes long, outSz(90,100,105) will yield "90(+10)/100/105(-5!)"
+ * The "!)" thus indicates the file is too short compared to the algorithmic estimation.
+ * If some of the reported sizes match, the value will only be displayed once.
+ * It's still a good idea to add "/malformed!short" to the version string — it's visible without isVerbose.
+ */
+function outSz() { if(!arguments.length || arguments[0] == undefined) return "?";
+    var sizes = [], origs = [];
+    for(i = 0; i < arguments.length; i++) if(!origs.length || origs.indexOf(arguments[i]) < 0) {
+        origs.push(arguments[i]);
+        sizes.push(
+            arguments[i] < File.getSize() ? arguments[i]+"(+"+(File.getSize()-arguments[i])+")"
+          : arguments[i] > File.getSize() ? arguments[i]+"(-"+(arguments[i]-File.getSize())+"!)"
+          : arguments[i]
+        )
+    }
+    return sizes.join("/")
+}
+
+/**
+ * A shorthand for the situation where you compare the file suffix to what you'd expect. Use as the option to isHeuristicScan being true.
+ * @param {String} a - the expected file suffix, case-insensitive, no heading period unlike Python
+ * @returns {bool} if a match is reached
+ */
+function extIs(a) { return Binary.getFileSuffix().toLowerCase() == a.toLowerCase() }
+
+/**
+ * slashTag formats a string in a way that's useful when a tag has two versions (for ex. in different languages). It will either show both with "/" in between, or one of them if the other one's an empty string, or an empty string if both are empty.
+ * @param {String} a - the first of the two
+ * @param {String} b - the second of the two
+ * @returns {String}
+*/
+function slashTag(a, b) {
+    if(a == b) return a;
+    else if(a != "" && b == "")
+        return a;
+    else if(a == "" && b != "")
+        return b;
+    else if(a != "" && b != "")
+        return a+"/"+b;
+    else return ""
+}
+
+/**
+ * createOrderlyHuffmanTable is just for detections but it does return the table for further checks. Or it returns false.
+ * @param {Array} lent - the lengths table
+ * @param {String} btl - bit table length
+ * @param {BitReader} br - a BitReader object pointing somewhere at the right position for this. The provided BitReader WILL change state.
+ * @returns {Array or false} 
+*/
+// createOrderlyHuffmanTable is just for detections but it does return the table for further checks. Or it returns false. 
+function createOrderlyHuffmanTable(lent, btl, br) {
+    var md = 32, Md = reall = code = 0; var _t = [], fi = [], li = [], ni = [];
+    for(i = 0; i < 33; i++) fi[i] = 0xFFFF;
+    for(i = 0; i < btl; i++) { len = lent[i]; if(len) {
+        if(len < md) md = len; if(len > Md) Md = len;
+        if(fi[len] == 0xFFFF) { fi[len] = li[len] = i } else { ni[li[len]] = i; li[len] = i } reall++ } }
+    if(!Md) return false;
+    for(d = md; d <= Md; d++) {
+        if(fi[d] != 0xFFFF) ni[li[d]] = btl;
+        for(i = fi[d]; i < btl; i = ni[i]) {
+            //insert HuffmanCode:
+            var j = 0, le = _t.length;
+            for(var cb = d; cb >= 0; cb--) {
+                var cob = (cb && ( ( (code>>(Md-d)) >> (cb-1) ) & 1 ) ) ? 1 : 0;
+                if(j != le) {
+                    if(!cb || (!_t[j][0] && !_t[j][1])) return false; //[0] is left, [1] is right, [2] is value
+                    if(!_t[j][cob]) _t[j][cob] = j = le; else j = _t[j][cob];
+                } else {
+                    _t.push([ (cb&&!cob)?le+1:0, (cb&&cob)?le+1:0, cb?0:i ]);
+                    j++; le++
+                } }
+            code += 1 << (Md-d) } }
+    return _t
 }

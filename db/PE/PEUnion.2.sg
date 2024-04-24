@@ -1,0 +1,122 @@
+// DIE's signature file
+// Author: KDSS-Research
+// Edited: DosX
+
+init("cryptor", "PEUnion");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    //32bit RUNPE stub
+    if (!PE.isNET()) {
+        bDetected = true;
+
+        if (PE.isPEPlus()) {
+            bDetected = false;
+        }
+
+        const kLib = "kernel32.dll";
+
+        if (validateNativeImports(
+                isPositive = true,
+                references = [
+                    [kLib, "GetProcAddress"],
+                    [kLib, "ExitProcess"],
+                    [kLib, "GetModuleFileNameA"],
+                    [kLib, "GetComputerNameA"],
+                    [kLib, "VirtualAllocExNuma"],
+                    ["shlwapi.dll", "PathFindFileNameA"]
+                ]
+            )) {
+            bDetected = false;
+        }
+
+        // ====== ENTRY POINT ======
+        //      E8:  call ...
+        //      6A:  push 0
+        //  FF15A4:  call dword ptr [...]
+        //      C3:  ret
+        // =========================
+        const entryPoint = "E8??????006A00FF15A4????00C3";
+
+        if (PE.getNumberOfSections() != 3 ||
+            !PE.compareEP(entryPoint) ||
+            !PE.isSectionNamePresent(".rsrc") || !PE.isSectionNamePresent(".idata") || !PE.isSectionNamePresent(".text") ||
+            PE.findString(PE.section[".rsrc"].FileOffset, PE.section[".rsrc"].FileSize, "</assembly>") == -1 ||
+            !(PE.getSectionVirtualSize(1) + PE.getSectionVirtualSize(2) < PE.getSectionVirtualSize(0)) ||
+            !PE.isSignatureInSectionPresent(1, "00'Shlwapi.dll'00")) { // validate imports with signature <[S]hlwapi.dll>
+            bDetected = false;
+        }
+
+
+        sOptions += "RunPE"
+    }
+
+    if (PE.isNET()) {
+        bDetected = true;
+        if (validateReferences(
+                isPositive = true,
+                references = [
+                    "kernel32.dll", "LoadLibraryA", "GetProcAddress",
+                    "System.Runtime.InteropServices",
+                    "System.Runtime.CompilerServices",
+                    "System.IO",
+                    "System.Reflection",
+                    "System.Resources",
+                    "System.Collections.Generic",
+                    "System.Core",
+                    "System.Linq",
+                    "IEnumerable`1", "<>c__DisplayClass1", "Func`2"
+                ],
+                section = 0
+            )) {
+            bDetected = false;
+        }
+
+        if (PE.isNetObjectPresent("BeginInvoke") ||
+            PE.isNetObjectPresent("EndInvoke")) {
+            sOptions += "Invoke"
+        }
+
+    }
+
+    sVersion = "v4.0";
+    return result(bShowType, bShowVersion, bShowOptions);
+}
+
+
+// validateReferences by DosX
+function validateReferences(isPositive, references, section) {
+    for (var i = 0; i < references.length; i++) {
+        var sign = "00'" + references[i] + "'00";
+        if (isPositive == true) {
+            if (!PE.isSignatureInSectionPresent(section, sign)) {
+                return true;
+            }
+        } else { // negative
+            if (PE.isSignatureInSectionPresent(section, sign)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// and validateNativeImports by DosX also
+function validateNativeImports(isPositive, references) { // references[2]
+    for (var i = 0; i < references.length; i++) {
+        var importSign = references[i],
+            library = importSign[0],
+            entry = importSign[1];
+        if (isPositive == true) {
+            if (!PE.isLibraryFunctionPresent(library, entry)) {
+                return true;
+            }
+        } else { // negative
+            if (PE.isLibraryFunctionPresent(library, entry)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// I like coffee. Preferably with milk

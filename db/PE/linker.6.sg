@@ -1,219 +1,108 @@
 // DIE's signature file
 
-init("linker","unknown",PE.getCompilerVersion(),PE.getGeneralOptionsEx());
+init("linker", "unknown", PE.getCompilerVersion(), PE.getGeneralOptionsEx());
 
 includeScript("FASM");
 includeScript("RosASM");
 includeScript("SpASM");
 includeScript("FPC");
 
-function getMSLinkerVersionFromRichSignature()
-{
-    var sResult="";
-    if(PE.getNumberOfRichIDs())
-    {
-        var nDosStubOffset=PE.getDosStubOffset();
-        var nDosStubSize=PE.getDosStubSize();
-
-        var nRichOffset=PE.findString(nDosStubOffset,nDosStubSize,"Rich");
-        if(nRichOffset!=-1)
+function detect(bShowType, bShowVersion, bShowOptions) {
+    if (PE.compare("'MZ'78000100000004000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000780000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.$'0000'PE'0000")) {
+        var nMajor = PE.getMajorLinkerVersion();
+        var nMinor = PE.getMinorLinkerVersion();
+        if (nMajor >= 14) // TODO Check
         {
-            var nXorKey=PE.readDword(nRichOffset+4);
-            var nDword=PE.readDword(nRichOffset-8)^nXorKey;
-            switch(nDword&0xFFFF)
-            {
-            case 8078: sResult="5.12"; break; //link.exe  5.12.8078
-            case 8168: sResult="6.0"; break; //link.exe 6.00.8168
-            case 8447: sResult="6.0"; break; //link.exe 6.00.8447
-            case 8905: sResult="7.0"; break; //link.exe 7.00.8905
-            case 9466: sResult="7.0"; break; //link.exe 7.00.9466
-            case 9955: sResult="7.0"; break; //link.exe 7.00.9955
-            case 2240: sResult="7.10"; break; //link.exe  7.10.2240
-            case 3077: sResult="7.10"; break; //link.exe  7.10.3077
-            case 6030: sResult="7.10"; break; //link.exe  7.10.6030
-            case 40310: sResult="8.0"; break; //link.exe  8.00.40310
-            case 50727: sResult="8.0 or 11.0"; break; //link.exe  8.00.50727 or 11.00.50727
-            case 21022: sResult="9.0"; break; //link.exe 9.00.21022
-            case 30729: sResult="9.0"; break; //link.exe 9.00.30729
-            case 30319: sResult="10.0"; break; //link.exe 10.00.30319
-            case 40219: sResult="10.0"; break; //link.exe 10.00.40219
-            case 60315: sResult="11.0"; break; //link.exe  11.00.60315
-            case 60610: sResult="11.0"; break; //link.exe  11.00.60610
-            case 61030: sResult="11.0"; break; //link.exe  11.00.61030
-            case 21005: sResult="12.0"; break; //link.exe  12.00.21005
-            case 30501: sResult="12.0"; break; //link.exe  12.00.30501
-            case 30626: sResult="12.0"; break; //link.exe  12.00.30626
-            case 30723: sResult="12.0"; break; //link.exe  12.00.30723
-            case 22215: sResult="14.0"; break; //link.exe  14.00.22215
-            }
+            sName = "Microsoft Linker";
+            bDetected = true;
         }
-    }
-
-    return sResult;
-}
-
-
-function detect(bShowType,bShowVersion,bShowOptions)
-{
-    if(PE.isRichSignaturePresent())
-    {
-        sName="Microsoft Linker";
-        bDetected=1;
-    }
-    else if(PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000000000'PE'0000"))
-    {
-        var nMajor=PE.getMajorLinkerVersion();
-        var nMinor=PE.getMinorLinkerVersion();
-        if(nMajor>=3) // There are MS linker "3.0" and MS linker "3.10"
-        {
-            sName="Microsoft Linker";
-            bDetected=1;
-        }
-        else if(nMajor==2)
-        {
-            if(nMinor==55)
-            {
-                sName="LCC Linker";
-                sVersion+="*";
-                bDetected=1;
-            }
-            else if(nMinor<=30||nMinor==56)
-            {
-                sName="GNU linker ld (GNU Binutils)";
-                if(nMinor==56)
-                {
-                    sVersion+="*";
+    } else if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000000000'PE'0000")) {
+        var nMajor = PE.getMajorLinkerVersion();
+        var nMinor = PE.getMinorLinkerVersion();
+        if (nMajor == 2) {
+            if (nMinor == 55) {
+                sName = "LCC Linker";
+                sVersion += "*";
+                bDetected = true;
+            } else if (nMinor <= 40 || nMinor == 56) {
+                sName = "GNU linker ld (GNU Binutils)";
+                if (nMinor == 56) {
+                    sVersion += "*";
                 }
-                bDetected=1;
+                bDetected = true;
+            } else if (nMinor == 50) {
+                sName = "Polink";
+                sVersion += "*";
+                bDetected = true;
             }
-            else if(nMinor==50)
-            {
-                sName="Polink";
-                sVersion+="*";
-                bDetected=1;
-            }
-        }
-        else if(nMajor==1)
-        {
-            if(nMinor==3)
-            {
-                sName="LCC Linker";
-                bDetected=1;
+        } else if (nMajor == 1) {
+            if (nMinor == 3) {
+                sName = "LCC Linker";
+                bDetected = true;
             }
         }
-    }
-    else if(PE.compare("'This program must be run under Win'....0D0A24..00",0x50))
-    {
-        sName="Turbo Linker";
-        if(sVersion=="2.25")
-        {
-            sVersion+="*,Delphi";
+    } else if (PE.compare("'This program must be run under Win'....0D0A24..00", 0x50)) {
+        sName = "Turbo Linker";
+        if (sVersion == "2.25") {
+            sVersion += "*,Delphi";
         }
-        bDetected=1;
-    }
-    else if(PE.compare("FB..'jr'",0x1e))
-    {
-        sName="Turbo Linker";
-        sVersion=(PE.readByte(0x1f)/16).toFixed(1);
-        if(PE.compare("'32STUB'",0x200))
-        {
-            sOptions=sOptions.append("RTM32");
+        bDetected = true;
+    } else if (PE.compare("FB..'jr'", 0x1e)) {
+        sName = "Turbo Linker";
+        sVersion = (PE.readByte(0x1f) / 16).toFixed(1);
+        if (PE.compare("'32STUB'", 0x200)) {
+            sOptions = sOptions.append("RTM32");
         }
-        bDetected=1;
+        bDetected = true;
+    } else if (PE.compare( /*[Tt]*/ "'his is a Windows '" /*(?:95|NT)*/ , 0x4f)) {
+        sName = "Watcom Linker";
+        sVersion += "*";
+        bDetected = true;
+    } else if (PE.compare("'MZ'6c000100000002000000ffff000000000000110000004000000000000000'Win'....' Program!\r\n$'b409ba0001cd21b44ccd2160000000'GoLink, GoAsm www.GoDevTool.com'00")) {
+        sName = "GoLink";
+        bDetected = true;
     }
-    else if(PE.compare(/*[Tt]*/"'his is a Windows '"/*(?:95|NT)*/,0x4f))
-    {
-        sName="Watcom Linker";
-        sVersion+="*";
-        bDetected=1;
-    }
-    else if(PE.compare("'MZ'6c000100000002000000ffff000000000000110000004000000000000000'Win32 Program!\r\n$'b409ba0001cd21b44ccd2160000000'GoLink, GoAsm www.GoDevTool.com'00"))
-    {
-        sName="Go Link";
-        bDetected=1;
-    }
-    var nMajor=PE.getMajorLinkerVersion();
-    var nMinor=PE.getMinorLinkerVersion();
-    if((nMajor==2)&&(nMinor==18))
-    {
-        sName="Watcom Linker";
-        bDetected=1;
-    }
-    else if((nMajor==2)&&(nMinor==52))
-    {
-        sName="PowerBASIC Linker";
-        bDetected=1;
+    var nMajor = PE.getMajorLinkerVersion();
+    var nMinor = PE.getMinorLinkerVersion();
+    if ((nMajor == 2) && (nMinor == 18)) {
+        sName = "Watcom Linker";
+        bDetected = true;
+    } else if ((nMajor == 2) && (nMinor == 52)) {
+        sName = "PowerBASIC Linker";
+        bDetected = true;
     }
     // Correct version
-    if(sName=="Microsoft Linker")
-    {
-        if(PE.isRichSignaturePresent())
-        {
-            var sMSLinkerVersion=getMSLinkerVersionFromRichSignature();
-            if(sMSLinkerVersion!="")
-            {
-                sVersion=sMSLinkerVersion;
-            }
-            else
-            {
-                // Heuristic based on: https://en.wikipedia.org/wiki/Microsoft_Visual_C%2B%2B
-                if(nMajor == 14)
-                {
-                    switch(nMinor)
-                    {
-                        case 0: sVersion+=", Visual Studio 2015 14.0"; break;
-                        case 10: sVersion+=", Visual Studio 2017 15.0"; break;
-                        case 11: sVersion+=", Visual Studio 2017 15.3"; break;
-                        case 12: sVersion+=", Visual Studio 2017 15.5"; break;
-                        case 13: sVersion+=", Visual Studio 2017 15.6"; break;
-                        case 14: sVersion+=", Visual Studio 2017 15.7"; break;
-                        case 15: sVersion+=", Visual Studio 2017 15.8"; break;
-                        case 16: sVersion+=", Visual Studio 2017 15.9"; break;
-                        case 20: sVersion+=", Visual Studio 2019 16.0"; break;
-                        default: sVersion+="*"; break;
-                    }
-                }
-                sVersion+="*";
-            }
-        }
-    }
-    else if(sName=="Borland Linker")
-    {
-        if(PE.getMajorLinkerVersion()>15)
-        {
-            sVersion+="*";
+    if (sName == "Borland Linker") {
+        if (PE.getMajorLinkerVersion() > 15) {
+            sVersion += "*";
         }
     }
 
-    if(!bDetected&&(bShowVersion||bShowOptions))
+    /* if(!bDetected&&(bShowVersion||bShowOptions))
     {
         if(!bShowType)
         {
             sName+=" "+sType;
         }
         bDetected=1;
-    }
+    } */
 
-    if(bFASM)
-    {
+    if (bFASM) {
         // FASM doesn't have a linker.
-        bDetected=0;
+        bDetected = false;
     }
-    if(bRosASM)
-    {
+    if (bRosASM) {
         // RosASM doesn't have a linker.
-        bDetected=0;
+        bDetected = false;
     }
-    if(bSpASM)
-    {
+    if (bSpASM) {
         // SpASM doesn't have a linker.
-        bDetected=0;
+        bDetected = false;
     }
-    if(bFPC)
-    {
+    if (bFPC) {
         // Free Pascal doesn't have a linker.
-        bDetected=0;
+        bDetected = false;
     }
 
-    return result(bShowType,bShowVersion,bShowOptions);
+    return result(bShowType, bShowVersion, bShowOptions);
 }

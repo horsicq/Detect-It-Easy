@@ -383,7 +383,7 @@ PE.getSize=function(){}
  */
 PE.getSizeOfCode=function(){}
 /**
- * Get the size of unitialized data.
+ * Get the size of uninitialized data.
  * @returns {Int}
  */
 PE.getSizeOfUninitializedData=function(){}
@@ -423,6 +423,16 @@ PE.isOverlayPresent=function(){}
  */
 PE.isPEPlus=function(){}
 /**
+ * Check if the file is 64 bit (PE+).
+ * @returns {Bool}
+ * @example
+ * if(PE.is64())
+ * {
+ *     sOptions="PE+";
+ * }
+ */
+PE.is64=function(){}
+/**
  * Check if the “Rich” signature is in the file. For more information see {@link http://www.ntcore.com/files/richsign.htm}. It is typical for the files made by the MS Linker.
  * @returns {Bool}
  * @example
@@ -444,6 +454,18 @@ PE.isRichSignaturePresent=function(){}
  * }
  */
 PE.isResourceNamePresent=function(sName){}
+/**
+ * Check if there is a resource group with a specific name in the file.
+ * @param {String} sName - The name of the resource group.
+ * @returns {Bool}
+ */
+PE.isResourceGroupNamePresent=function(sName){}
+/**
+ * Check if there is a resource group with a specific ID in the file.
+ * @param {int} nID - The ID of the resource group.
+ * @returns {Bool}
+ */
+PE.isResourceGroupIdPresent=function(sName){}
 /**
  * Check if there is a specific .NET string.
  * @param {String} sString
@@ -530,6 +552,22 @@ ELF.readQword=function(nOffset){}
  * @see Binary.readWord
  */
 PE.readWord=function(nOffset){}
+/**
+ * @see Binary.readSByte
+ */
+PE.readSByte=function(nOffset){}
+/**
+ * @see Binary.readSDword
+ */
+PE.readSDword=function(nOffset){}
+/**
+ * @see Binary.readSQword
+ */
+PE.readSQword=function(nOffset){}
+/**
+ * @see Binary.readSWord
+ */
+PE.readSWord=function(nOffset){}
 /**
  * @see Binary.swapBytes
  */
@@ -680,10 +718,10 @@ PE.isTLSPresent=function(){}
  */
 PE.isImportPresent=function(){}
 /**
- * Check if Resource presents.
+ * Check if Resources presents.
  * @returns {Bool}
  */
-PE.isResourcePresent=function(){}
+PE.isResourcesPresent=function(){}
 /**
  * Check if Export function exists with a specific name.
  * @param {String} sFunctionName - Function name

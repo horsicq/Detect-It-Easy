@@ -62,11 +62,27 @@ MACH.readDword=function(nOffset){}
 /**
  * @see Binary.readQword
  */
-ELF.readQword=function(nOffset){}
+MACH.readQword=function(nOffset){}
 /**
  * @see Binary.readWord
  */
 MACH.readWord=function(nOffset){}
+/**
+ * @see Binary.readSByte
+ */
+MACH.readSByte=function(nOffset){}
+/**
+ * @see Binary.readSDword
+ */
+MACH.readSDword=function(nOffset){}
+/**
+ * @see Binary.readSQword
+ */
+MACH.readSQword=function(nOffset){}
+/**
+ * @see Binary.readSWord
+ */
+MACH.readSWord=function(nOffset){}
 /**
  * @see Binary.swapBytes
  */
@@ -154,6 +170,16 @@ MACH.getSegmentFileSize=function(nSection){}
  * @returns {UInt}
  */
 MACH.getSegmentName=function(nSection){}
+/**
+ * Check if the file is 64 bit (MachO64).
+ * @returns {Bool}
+ * @example
+ * if(MACH.is64())
+ * {
+ *     sOptions="MachO64";
+ * }
+ */
+MACH.is64=function(){}
 /**
  * Convert a relative virtual address (RVA) to a file offset.
  * @param {UInt64} nRVA

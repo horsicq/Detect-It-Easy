@@ -3,16 +3,156 @@
 // 16:27 26.01.2013 detect improved //ajax
 //  2:30 27.01.2013 bugfixes
 // 14:14 27.01.2013 bugfixes
+// 2022/10 new detect hypn0 <hypn0@mail.ru>
 
-init("protector","VMProtect");
+init("protector", "VMProtect");
 
-function detectVMP(sSectionName)
-{
-    if(PE.section[sSectionName])
-    {
-        nCharacteristics=PE.section[sSectionName].Characteristics;
-        if((nCharacteristics==0x60000060)||(nCharacteristics==0xE0000060)||(nCharacteristics==0xE0000040))
-        {
+function detect(bShowType, bShowVersion, bShowOptions) {
+    if (PE.isNET()) return null; // Native files only
+
+    var nNumberOfSections = PE.getNumberOfSections();
+
+    var sVMPSectionName;
+
+    for (var i = nNumberOfSections - 1; i >= 0; i--) {
+        if (i == PE.getRelocsSection()) {
+            continue;
+        }
+        if (i == PE.getResourceSection()) {
+            continue;
+        }
+
+        if (PE.getSectionName(i) != "") {
+            sVMPSectionName = PE.getSectionName(i);
+
+            if ((i > 0) &&
+                (sVMPSectionName == ".vmp0")) {
+                bDetected = true;
+
+                break;
+            } else if ((i > 1) &&
+                (sVMPSectionName.substr(sVMPSectionName.length - 1) == "1")) {
+                var sCollision = PE.getSectionNameCollision("0", "1");
+
+                if (PE.isSectionNamePresent(sCollision + "1")) {
+                    bDetected = true;
+
+                    break;
+                }
+            } else if ((i > 2) &&
+                (sVMPSectionName.substr(sVMPSectionName.length - 1) == "2")) {
+                var sCollision = PE.getSectionNameCollision("1", "2");
+
+                if (PE.isSectionNamePresent(sCollision + "1") &&
+                    PE.isSectionNamePresent(sCollision + "0")) {
+                    bDetected = true;
+
+                    break;
+                }
+            } else if ((i > 3) &&
+                (sVMPSectionName.substr(sVMPSectionName.length - 1) == "3")) {
+                var sCollision = PE.getSectionNameCollision("2", "3");
+
+                if (PE.isSectionNamePresent(sCollision + "2") &&
+                    PE.isSectionNamePresent(sCollision + "1") &&
+                    PE.isSectionNamePresent(sCollision + "0")) {
+                    bDetected = true;
+
+                    break;
+                }
+            }
+        }
+
+        break;
+    }
+
+    if (bDetected) {
+        if (PE.is64()) {
+            sVersion = "2.XX-3.XX";
+        }
+
+        if (sVMPSectionName != "") {
+            if ((sVMPSectionName.substr(sVMPSectionName.length - 1) == "0")) {
+                sOptions = "Min protection";
+            }
+        }
+
+        if (PE.isImportPositionHashPresent(-1, 0x1ff3103f)) {
+            sVersion = "1.70";
+        } else if (PE.isImportPositionHashPresent(-1, 0x0c16df2d)) {
+            sVersion = "1.70";
+            sOptions = "Max protection";
+        } else if (PE.isImportPositionHashPresent(-1, 0x9d12b153)) {
+            sVersion = "2.0.3-2.13";
+        } else if (PE.isImportPositionHashPresent(-1, 0x1e5500c1)) {
+            sVersion = "3.0.0";
+        } else if (PE.isImportPositionHashPresent(-1, 0xc5fb6a4b)) {
+            sVersion = "3.0.9";
+        } else if (PE.isImportPositionHashPresent(-1, 0x5caa99c7)) {
+            sVersion = "3.2.0-3.5.0";
+        }
+    }
+
+    if ((!bDetected) && (PE.isDeepScan()) && (PE.isVerbose())) {
+        var da = "";
+        var das = "";
+        var res = 0;
+        var jmp = 0;
+        var ep = PE.OffsetToVA(PE.getEntryPointOffset());
+        var count = 0;
+
+        while ((das.substr(0, das.indexOf('+')) != "MOV EDX, DWORD PTR [EAX*4 ") &&
+            (das.substr(0, das.indexOf('+')) != "MOV EBX, DWORD PTR [EAX*4 ") &&
+            (das.substr(0, das.indexOf('+')) != "MOV ECX, DWORD PTR [EAX*4 ") && count < 1000) {
+            count++;
+            var byte = PE.readByte(PE.VAToOffset(ep));
+            var da = PE.getDisasmString(ep);
+            var das = da;
+
+            if (da.indexOf(' ') != -1) {
+                da = da.substr(0, da.indexOf(' '));
+            }
+
+            if ((byte == 0xFF && da == "JMP") || ((byte == 0xC3 || byte == 0xC2) && da == "RET")) {
+                var fresh = 1;
+                break;
+            }
+
+            if (byte == 0xFF && da == "CALL") { break; }
+
+            if (da.indexOf(' ') != -1) {
+                da = da.substr(0, da.indexOf(' '));
+            }
+
+            if (da == "CLC" || da == "CMC") { res++; }
+            if (da == "PUSHFD") { res++; }
+            if (da == "PUSHAL") { res++; }
+            if (da == "XOR") { res++; }
+            if (da == "NEG" || da == "NOT") { res++; }
+            if (da == "SAR" || da == "SAL") { res++; }
+            if (da == "JMP" || da == "CALL") { jmp++; }
+            if (da == "BT" || da == "BTR" || da == "BTS" || da == "BTC") { res++; }
+            if (da == "BSF" || da == "BSR" || da == "BSWAP") { res++; }
+            if (da == "ROL" || da == "ROR" || da == "RCL" || da == "RCR") { res++; }
+
+            ep = PE.getDisasmNextAddress(ep);
+        }
+
+        if (res > 10 && count < 200) {
+            sOptions = "count " + count;
+            if (fresh == 1) { sVersion = "new " + res + " jmp " + jmp; } else { sVersion = "old " + res + " jmp " + jmp; }
+            bDetected = true;
+            sOptions = "DS";
+        }
+    }
+
+    return result(bShowType, bShowVersion, bShowOptions);
+}
+
+function detectVMP(sSectionName) {
+    if (PE.section[sSectionName]) {
+        nCharacteristics = PE.section[sSectionName].Characteristics;
+        if ((nCharacteristics == 0x60000060) || (nCharacteristics == 0xE0000060) || (nCharacteristics == 0xE0000040) || (nCharacteristics == 0x68000060) || (nCharacteristics == 0xe2000060)) {
             return 1;
         }
     }
@@ -20,72 +160,57 @@ function detectVMP(sSectionName)
     return 0;
 }
 
-function detectVMP2()
-{
-    if(PE.section.length>7)
-    {
-        var nCount=5;
-        var nResource=PE.getResourceSection();
-        var nRelocs=PE.getRelocsSection();
+function detectVMP2() {
+    if (PE.section.length > 7) {
+        var nCount = 5;
+        var nResource = PE.getResourceSection();
+        var nRelocs = PE.getRelocsSection();
 
-        if(nResource>PE.section.length-nCount)
-        {
+        if (nResource > PE.section.length - nCount) {
             nCount++;
         }
-        if(nRelocs>PE.section.length-nCount)
-        {
+        if (nRelocs > PE.section.length - nCount) {
             nCount++;
         }
 
-        var nDetectCount=0;
-        var nLastVMPSection=0;
+        var nDetectCount = 0;
+        var nLastVMPSection = 0;
 
-        for(var nSection=PE.section.length-nCount;nSection<PE.section.length;nSection++)
-        {
-            if((nSection==nResource)||(nSection==nRelocs))
-            {
+        for (var nSection = PE.section.length - nCount; nSection < PE.section.length; nSection++) {
+            if ((nSection == nResource) || (nSection == nRelocs)) {
                 continue;
             }
-            if((PE.section[nSection].FileSize==0)&&(PE.section[nSection].FileOffset==0))
-            {
+            if ((PE.section[nSection].FileSize == 0) && (PE.section[nSection].FileOffset == 0)) {
                 nDetectCount++;
             }
 
-            if((PE.section[nSection].FileSize!=0)&&(PE.section[nSection].FileOffset!=0))
-            {
-                nLastVMPSection=nSection;
+            if ((PE.section[nSection].FileSize != 0) && (PE.section[nSection].FileOffset != 0)) {
+                nLastVMPSection = nSection;
             }
         }
 
-        if(nDetectCount>=3)
-        {
-            if(PE.getEntryPointSection()==nLastVMPSection)
-            {
-                if(PE.section[nLastVMPSection].Characteristics==0xE0000060)
-                {
-                    if(PE.calculateEntropy(PE.section[nLastVMPSection].FileOffset,PE.section[nLastVMPSection].FileSize)>7.6)
-                    {
+        if (nDetectCount >= 3) {
+            if (PE.getEntryPointSection() == nLastVMPSection) {
+                if (PE.section[nLastVMPSection].Characteristics == 0xE0000060) {
+                    if (PE.calculateEntropy(PE.section[nLastVMPSection].FileOffset, PE.section[nLastVMPSection].FileSize) > 7.6) {
                         return 1;
                     }
-                }
-                else if(PE.section[nLastVMPSection].Characteristics&0x20000000) // Fix sent Deniskore
+                } else if (PE.section[nLastVMPSection].Characteristics & 0x20000000) // Fix sent Deniskore
                 {
-                    var nSectionOffset=PE.section[nLastVMPSection].FileOffset;
-                    var nSectionSize=PE.section[nLastVMPSection].FileSize;
-                    var nOffset=nSectionOffset;
-                    var nSize=nSectionSize;
-                    var nCount=0;
+                    var nSectionOffset = PE.section[nLastVMPSection].FileOffset;
+                    var nSectionSize = PE.section[nLastVMPSection].FileSize;
+                    var nOffset = nSectionOffset;
+                    var nSize = nSectionSize;
+                    var nCount = 0;
                     var nSignatureOffset;
-                    while(nSize>0)
-                    {
-                        nSignatureOffset=PE.findSignature(nOffset,nSize,"9c8d64");
-                        if(nSignatureOffset==-1)
+                    while (nSize > 0) {
+                        nSignatureOffset = PE.findSignature(nOffset, nSize, "9c8d64");
+                        if (nSignatureOffset == -1)
                             break;
                         nCount++;
-                        nOffset=nSignatureOffset+3;
-                        nSize=nSectionSize-(nSignatureOffset-nSectionOffset);
-                        if(nCount>=2)
-                        {
+                        nOffset = nSignatureOffset + 3;
+                        nSize = nSectionSize - (nSignatureOffset - nSectionOffset);
+                        if (nCount >= 2) {
                             return 1;
                         }
                     }
@@ -97,99 +222,66 @@ function detectVMP2()
     return 0;
 }
 
-function detect(bShowType,bShowVersion,bShowOptions)
-{
-    var nSectionNumber=0;
-    var nCharacteristics=0;
-    var collision="";
+function detect_old(bShowType, bShowVersion, bShowOptions) {
+    var nSectionNumber = 0;
+    var nCharacteristics = 0;
+    var collision = "";
 
-    if(PE.section[".vmp0"]&&(PE.compareEP("68........E9")||PE.compareEP("68........E8")))
-    {
-        sVersion="1.60-2.05";
-        bDetected=1;
-    }
-    else if(detectVMP(".vmp0"))
-    {
-        bDetected=1;
-    }
-    else if(detectVMP(".vmp1"))
-    {
-        bDetected=1;
-    }
-    else if(detectVMP(".vmp2"))
-    {
-        bDetected=1;
-    }
-    else if(PE.compareEP("54c70424........9c60c74424..........c64424....887424..60"))
-    {
-        sVersion="2.06";
-        bDetected=1;
-    }
-    else if(PE.compareEP("e8$$$$$$$$e9$$$$$$$$880424881c24c70424........9ce8"))
-    {
-        sVersion="2.07";
-        bDetected=1;
-    }
-    else if(PE.compareEP("9ce8$$$$$$$$e8$$$$$$$$c74424..........e9$$$$$$$$e8$$$$$$$$c74424..........526068"))
-    {
-        sVersion="2.12-13";
-        bDetected=1;
-    }
-    else if(PE.compareEP("9c9cc74424..........9cc74424..........9c528d6424..e9"))
-    {
-        sVersion="2.12-13";
-        bDetected=1;
-    }
-    else if(PE.compareEP("68........e8$$$$$$$$41574150448ac350410f96c057415148c7c7"))
-    {
-        sVersion="3.0x";
-        bDetected=1;
-    }
-    else
-    {
-        collision=PE.getSectionNameCollision("0","1");
+    if (PE.section[".vmp0"] && (PE.compareEP("68........E9") || PE.compareEP("68........E8"))) {
+        sVersion = "1.60-2.05";
+        bDetected = true;
+    } else if (detectVMP(".vmp0")) {
+        bDetected = true;
+    } else if (detectVMP(".vmp1")) {
+        bDetected = true;
+    } else if (detectVMP(".vmp2")) {
+        bDetected = true;
+    } else if (PE.compareEP("54c70424........9c60c74424..........c64424....887424..60")) {
+        sVersion = "2.06";
+        bDetected = true;
+    } else if (PE.compareEP("e8$$$$$$$$e9$$$$$$$$880424881c24c70424........9ce8")) {
+        sVersion = "2.07";
+        bDetected = true;
+    } else if (PE.compareEP("9ce8$$$$$$$$e8$$$$$$$$c74424..........e9$$$$$$$$e8$$$$$$$$c74424..........526068")) {
+        sVersion = "2.12-13";
+        bDetected = true;
+    } else if (PE.compareEP("9c9cc74424..........9cc74424..........9c528d6424..e9")) {
+        sVersion = "2.12-13";
+        bDetected = true;
+    } else if (PE.compareEP("68........e8$$$$$$$$41574150448ac350410f96c057415148c7c7")) {
+        sVersion = "3.0x";
+        bDetected = true;
+    } else {
+        collision = PE.getSectionNameCollision("0", "1");
 
-        if(collision!="")
-        {
-            if((PE.compareEP("68........E9")||PE.compareEP("68........E8")))
-            {
-                sVersion="1.X";
-                bDetected=1;
-            }
-            else if((PE.compareEP("9cE9")||PE.compareEP("9cFF")))
-            {
-                sVersion="2.X";
-                bDetected=1;
-            }
-            else if(detectVMP(collision+"0")&&detectVMP(collision+"1"))
-            {
-                bDetected=1;
+        if (collision != "") {
+            if ((PE.compareEP("68........E9") || PE.compareEP("68........E8"))) {
+                sVersion = "1.X";
+                bDetected = true;
+            } else if ((PE.compareEP("9cE9") || PE.compareEP("9cFF"))) {
+                sVersion = "2.X";
+                bDetected = true;
+            } else if (detectVMP(collision + "0") && detectVMP(collision + "1")) {
+                bDetected = true;
             }
         }
-        if(!bDetected)
-        {
-            if(detectVMP2())
-            {
-                sVersion="2.X";
-                bDetected=1;
+        if (!bDetected) {
+            if (detectVMP2()) {
+                sVersion = "2.X";
+                bDetected = true;
             }
         }
     }
 
-    if(bDetected)
-    {
-        if(PE.section.length<3)
-        {
-            bDetected=0;
-        }
-        else if(PE.section.length==3)
-        {
-            if(PE.section[0].FileSize==0)
-            {
-                bDetected=0;
+    if (bDetected) {
+        if (PE.section.length < 3) {
+            bDetected = false;
+        } else if (PE.section.length == 3) {
+            if (PE.section[0].FileSize == 0) {
+                bDetected = false;
             }
         }
     }
 
-    return result(bShowType,bShowVersion,bShowOptions);
+    return result(bShowType, bShowVersion, bShowOptions);
 }

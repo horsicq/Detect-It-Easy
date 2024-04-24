@@ -166,6 +166,22 @@ ELF.readQword=function(nOffset){}
  */
 ELF.readWord=function(nOffset){}
 /**
+ * @see Binary.readSByte
+ */
+ELF.readSByte=function(nOffset){}
+/**
+ * @see Binary.readSDword
+ */
+ELF.readSDword=function(nOffset){}
+/**
+ * @see Binary.readSQword
+ */
+ELF.readSQword=function(nOffset){}
+/**
+ * @see Binary.readSWord
+ */
+ELF.readSWord=function(nOffset){}
+/**
  * @see Binary.swapBytes
  */
 ELF.swapBytes=function(nValue){}
@@ -191,6 +207,16 @@ ELF.getSectionFileSize=function(nSection){}
  * @returns {Int} 0-based section number, or <code>-1</code> if there is no section with that name.
  */
 ELF.getSectionNumber=function(sSectionName){}
+/**
+ * Check if the file is 64 bit (ELF64).
+ * @returns {Bool}
+ * @example
+ * if(ELF.is64())
+ * {
+ *     sOptions="ELF64";
+ * }
+ */
+ELF.is64=function(){}
 /**
  * Convert a relative virtual address (RVA) to a file offset.
  * @param {UInt64} nRVA

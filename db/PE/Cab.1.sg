@@ -1,82 +1,60 @@
 // DIE's signature file
 // Author: Jason Hood <jadoxa@yahoo.com.au>
 
-init("sfx","Microsoft Cabinet");
+init("sfx", "Microsoft Cabinet");
 
-function detect(bShowType,bShowVersion,bShowOptions)
-{
-    if(PE.compareOverlay("'wextract'",16))
-    {
+function detect(bShowType, bShowVersion, bShowOptions) {
+    if (PE.compareOverlay("'wextract'", 16)) {
         // The version is probably for what's being installed, not what's doing
         // the installing; it does seem, though, the raw product version is for
         // the installer itself.  Take a punt, anyway.
-        var nOffset=PE.getOverlayOffset();
-        nOffset=PE.findSignature(nOffset-0xE00,0xE00,"BD04EFFE00000100");
-        if(nOffset!=-1)
-        {
-            nOffset+=16;
-            sVersion=PE.readWord(nOffset+2)+"."+PE.readWord(nOffset)+"."
-                    +PE.readWord(nOffset+6)+"."+PE.readWord(nOffset+4);
+        var nOffset = PE.getOverlayOffset();
+        nOffset = PE.findSignature(nOffset - 0xE00, 0xE00, "BD04EFFE00000100");
+        if (nOffset != -1) {
+            nOffset += 16;
+            sVersion = PE.readWord(nOffset + 2) + "." + PE.readWord(nOffset) + "." +
+                PE.readWord(nOffset + 6) + "." + PE.readWord(nOffset + 4);
         }
-        bDetected=1;
-    }
-    else if(/sfxcab/.test(PE.getManifest()))
-    {
+        bDetected = true;
+    } else if (/sfxcab/.test(PE.getManifest())) {
         // There's two version resources, locate the second.
-        if(PE.section[".rsrc"])
-        {
-            var nVirtSize=PE.section[".rsrc"].VirtualSize;
-            var nOffset=PE.section[".rsrc"].FileOffset+nVirtSize;
-            nOffset=PE.findSignature(nOffset-0x600,0x600,"BD04EFFE00000100");
-            if(nOffset!=-1)
-            {
-                nOffset+=8;
-                sVersion=PE.readWord(nOffset+2)+"."+PE.readWord(nOffset)+"."
-                        +PE.readWord(nOffset+6)+"."+PE.readWord(nOffset+4);
+        if (PE.section[".rsrc"]) {
+            var nVirtSize = PE.section[".rsrc"].VirtualSize;
+            var nOffset = PE.section[".rsrc"].FileOffset + nVirtSize;
+            nOffset = PE.findSignature(nOffset - 0x600, 0x600, "BD04EFFE00000100");
+            if (nOffset != -1) {
+                nOffset += 8;
+                sVersion = PE.readWord(nOffset + 2) + "." + PE.readWord(nOffset) + "." +
+                    PE.readWord(nOffset + 6) + "." + PE.readWord(nOffset + 4);
             }
         }
-        bDetected=1;
-    }
-    else if(/wextract/i.test(PE.getVersionStringInfo("InternalName")))
-    {
-        sVersion=PE.getFileVersion();
-        bDetected=1;
-    }
-    else if(PE.compareEP("558bec81ec........535657ff15........a3........ff15........a1........6625....3d"))
-    {
-        if(PE.compare("'MSCF'00000000", 0x5000))
-        {
-            bDetected=1;
+        bDetected = true;
+    } else if (/wextract/i.test(PE.getVersionStringInfo("InternalName"))) {
+        sVersion = PE.getFileVersion();
+        bDetected = true;
+    } else if (PE.compareEP("558bec81ec........535657ff15........a3........ff15........a1........6625....3d")) {
+        if (PE.compare("'MSCF'00000000", 0x5000)) {
+            bDetected = true;
         }
-    }
-    else if(PE.compareEP("6a..68........e8........66813d............75..a1........81b8................75.."))
-    {
-        if(PE.compareOverlay("'MSCF'00000000"))
-        {
-            bDetected=1;
+    } else if (PE.compareEP("6a..68........e8........66813d............75..a1........81b8................75..")) {
+        if (PE.compareOverlay("'MSCF'00000000")) {
+            bDetected = true;
         }
+    } else if (PE.compareEP("e9$$$$$$$$558bec81ec........830d..........5356576a..33dbbf........68........895d..881d")) {
+        bDetected = true;
     }
-    else if(PE.compareEP("e9$$$$$$$$558bec81ec........830d..........5356576a..33dbbf........68........895d..881d"))
-    {
-        bDetected=1;
-    }
-    if (PE.getNumberOfResources()>0)
-    {
-        nOffset=PE.getResourceNameOffset("CABINET");
-        {
-            if(PE.compare("'MSCF'00000000", nOffset))
-            {
-                bDetected=1;
+    if (PE.getNumberOfResources() > 0) {
+        nOffset = PE.getResourceNameOffset("CABINET"); {
+            if (PE.compare("'MSCF'00000000", nOffset)) {
+                bDetected = true;
             }
         }
-        nOffset=PE.getResourceNameOffset("IDR_CABFILE");
-        {
-            if(PE.compare("'MSCF'00000000", nOffset))
-            {
-                bDetected=1;
+        nOffset = PE.getResourceNameOffset("IDR_CABFILE"); {
+            if (PE.compare("'MSCF'00000000", nOffset)) {
+                bDetected = true;
             }
         }
     }
 
-    return result(bShowType,bShowVersion,bShowOptions);
+    return result(bShowType, bShowVersion, bShowOptions);
 }

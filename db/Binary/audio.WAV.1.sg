@@ -1,0 +1,806 @@
+// https://github.com/horsicq/Detect-It-Easy signature file
+// Authors: Levis <levintaeyeon@live.com>
+//         Jason Hood <jadoxa@yahoo.com.au>
+//         Kaens (TG @kaens)
+
+init("audio", "WAV Audio File");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    // redoing to include the other formats, make it chunk-aware,
+    // and, most importantly, include OGG-in-WAV
+
+    const _BE = true;
+    const _LE = false; //endianness for read_uint16+
+    //chunks!
+    pn = 0;
+    pc = 0;
+    hkhd = "";
+    hksz = 4; //12 skips the static header bit
+    nRate = 0;
+    nChannels = 0;
+    nBPS = 0,
+
+        function Hex(a) { return a.toString(16).toUpperCase() + "h" }
+
+    function nextChunk() {
+        if (pn + hksz + 8 < Binary.getSize()) {
+            pn += hksz + 8;
+            hkhd = Binary.read_ansiString(pn, 4);
+            hksz = Binary.read_uint32(pn + 4, _BE);
+            if (hksz % 2 == 1) hksz++;
+            pc = pn + 8; //chunk's internal pointer (pn points at hkhd)
+            return true;
+        } else return false;
+    }
+
+    if (Binary.getSize() >= 36 && Binary.compare("'RIFF'........'WAVE'")) {
+        sName = "RIFF container/WAVE";
+        dcsamples = 0;
+        chunks = "";
+        while (nextChunk()) {
+            chunks += " *" + hkhd + " [" + Hex(hksz) + "] @" + Hex(pc);
+            switch (hkhd) {
+                case "fmt ":
+                    bDetected = true;
+                    nFormat = Binary.read_uint16(pc, _LE);
+                    nChannels = Binary.read_uint16(pc + 2, _LE);
+                    nRate = Binary.read_uint32(pc + 4, _LE);
+                    nBPS = Binary.read_uint16(pc + 0x0E, _LE);
+                    switch (nFormat) {
+                        case 0x0001:
+                            sVersion = "Microsoft PCM (uncompressed)";
+                            break;
+                        case 0x0002:
+                            sVersion = "Microsoft ADPCM";
+                            break;
+                        case 0x0003:
+                            sVersion = "Microsoft IEEE float";
+                            break;
+                        case 0x0004:
+                            sVersion = "Compaq VSELP";
+                            break;
+                        case 0x0005:
+                            sVersion = "IBM CVSD";
+                            break;
+                        case 0x0006:
+                            sVersion = "ITU G.711 a-law";
+                            break;
+                        case 0x0007:
+                            sVersion = "ITU G.711 u-law";
+                            break;
+                        case 0x0008:
+                            sVersion = "Microsoft DTS";
+                            break;
+                        case 0x0009:
+                            sVersion = "DRM";
+                            break;
+                        case 0x000A:
+                            sVersion = "WMA 9 Speech";
+                            break;
+                        case 0x000B:
+                            sVersion = "Microsoft Windows Media RT Voice";
+                            break;
+                        case 0x0010:
+                            sVersion = "OKI-ADPCM";
+                            break;
+                        case 0x0011:
+                            sVersion = "Intel IMA/DVI-ADPCM";
+                            break;
+                        case 0x0012:
+                            sVersion = "Videologic Mediaspace ADPCM";
+                            break;
+                        case 0x0013:
+                            sVersion = "Sierra ADPCM";
+                            break;
+                        case 0x0014:
+                            sVersion = "Antex G.723 ADPCM";
+                            break;
+                        case 0x0015:
+                            sVersion = "DSP Solutions DIGISTD";
+                            break;
+                        case 0x0016:
+                            sVersion = "DSP Solutions DIGIFIX";
+                            break;
+                        case 0x0017:
+                            sVersion = "Dialogic OKI ADPCM";
+                            break;
+                        case 0x0018:
+                            sVersion = "Media Vision ADPCM";
+                            break;
+                        case 0x0019:
+                            sVersion = "HP CU";
+                            break;
+                        case 0x001A:
+                            sVersion = "HP Dynamic Voice";
+                            break;
+                        case 0x0020:
+                            sVersion = "Yamaha ADPCM";
+                            break;
+                        case 0x0021:
+                            sVersion = "SONARC Speech Compression";
+                            break;
+                        case 0x0022:
+                            sVersion = "DSP Group True Speech";
+                            break;
+                        case 0x0023:
+                            sVersion = "Echo Speech Corp.";
+                            break;
+                        case 0x0024:
+                            sVersion = "Virtual Music Audiofile AF36";
+                            break;
+                        case 0x0025:
+                            sVersion = "Audio Processing Tech.";
+                            break;
+                        case 0x0026:
+                            sVersion = "Virtual Music Audiofile AF10";
+                            break;
+                        case 0x0027:
+                            sVersion = "Aculab Prosody 1612";
+                            break;
+                        case 0x0028:
+                            sVersion = "Merging Tech. LRC";
+                            break;
+                        case 0x0030:
+                            sVersion = "Dolby AC2";
+                            break;
+                        case 0x0031:
+                            sVersion = "Microsoft GSM610";
+                            break;
+                        case 0x0032:
+                            sVersion = "MSN Audio";
+                            break;
+                        case 0x0033:
+                            sVersion = "Antex ADPCM";
+                            break;
+                        case 0x0034:
+                            sVersion = "Control Resources VQLPC";
+                            break;
+                        case 0x0035:
+                            sVersion = "DSP Solutions DIGIREAL";
+                            break;
+                        case 0x0036:
+                            sVersion = "DSP Solutions DIGIADPCM";
+                            break;
+                        case 0x0037:
+                            sVersion = "Control Resources CR10";
+                            break;
+                        case 0x0038:
+                            sVersion = "Natural MicroSystems VBX ADPCM";
+                            break;
+                        case 0x0039:
+                            sVersion = "Crystal Semiconductors IMA ADPCM";
+                            break;
+                        case 0x003A:
+                            sVersion = "Echo Speech ECHOSC3";
+                            break;
+                        case 0x003B:
+                            sVersion = "Rockwell ADPCM";
+                            break;
+                        case 0x003C:
+                            sVersion = "Rockwell DIGITALK";
+                            break;
+                        case 0x003D:
+                            sVersion = "Xebec Multimedia";
+                            break;
+                        case 0x0040:
+                            sVersion = "Antex G.721 ADPCM";
+                            break;
+                        case 0x0041:
+                            sVersion = "Antex G.728 CELP";
+                            break;
+                        case 0x0042:
+                            sVersion = "Microsoft MSG723";
+                            break;
+                        case 0x0043:
+                            sVersion = "IBM AVC ADPCM";
+                            break;
+                        case 0x0045:
+                            sVersion = "ITU-T G.726";
+                            break;
+                        case 0x0050:
+                            sVersion = "Microsoft MPEG";
+                            break;
+                        case 0x0051:
+                            sVersion = "RT23 or PAC";
+                            break;
+                        case 0x0052:
+                            sVersion = "InSoft RT24";
+                            break;
+                        case 0x0053:
+                            sVersion = "InSoft PAC";
+                            break;
+                        case 0x0055:
+                            sVersion = "MP3";
+                            break;
+                        case 0x0059:
+                            sVersion = "Cirrus";
+                            break;
+                        case 0x0060:
+                            sVersion = "Cirrus Logic";
+                            break;
+                        case 0x0061:
+                            sVersion = "ESS Tech. PCM";
+                            break;
+                        case 0x0062:
+                            sVersion = "Voxware Inc.";
+                            break;
+                        case 0x0063:
+                            sVersion = "Canopus ATRAC";
+                            break;
+                        case 0x0064:
+                            sVersion = "APICOM G.726 ADPCM";
+                            break;
+                        case 0x0065:
+                            sVersion = "APICOM G.722 ADPCM";
+                            break;
+                        case 0x0066:
+                            sVersion = "Microsoft DSAT";
+                            break;
+                        case 0x0067:
+                            sVersion = "Microsoft DSAT-DISPLAY";
+                            break;
+                        case 0x0069:
+                            sVersion = "Voxware Byte Aligned";
+                            break;
+                        case 0x0070:
+                            sVersion = "Voxware ACB";
+                            break;
+                        case 0x0071:
+                            sVersion = "Voxware AC10";
+                            break;
+                        case 0x0072:
+                            sVersion = "Voxware AC16";
+                            break;
+                        case 0x0073:
+                            sVersion = "Voxware AC20";
+                            break;
+                        case 0x0074:
+                            sVersion = "Voxware MetaVoice";
+                            break;
+                        case 0x0075:
+                            sVersion = "Voxware MetaSound";
+                            break;
+                        case 0x0076:
+                            sVersion = "Voxware RT29HW";
+                            break;
+                        case 0x0077:
+                            sVersion = "Voxware VR12";
+                            break;
+                        case 0x0078:
+                            sVersion = "Voxware VR18";
+                            break;
+                        case 0x0079:
+                            sVersion = "Voxware TQ40";
+                            break;
+                        case 0x007A:
+                            sVersion = "Voxware SC3";
+                            break;
+                        case 0x007B:
+                            sVersion = "Voxware SC3";
+                            break;
+                        case 0x0080:
+                            sVersion = "Soundsoft";
+                            break;
+                        case 0x0081:
+                            sVersion = "Voxware TQ60";
+                            break;
+                        case 0x0082:
+                            sVersion = "Microsoft MSRT24";
+                            break;
+                        case 0x0083:
+                            sVersion = "AT&T G.729A";
+                            break;
+                        case 0x0084:
+                            sVersion = "Motion Pixels MVI-MV12";
+                            break;
+                        case 0x0085:
+                            sVersion = "DataFusion G.726";
+                            break;
+                        case 0x0086:
+                            sVersion = "DataFusion GSM610";
+                            break;
+                        case 0x0088:
+                            sVersion = "Iterated Systems Audio";
+                            break;
+                        case 0x0089:
+                            sVersion = "Onlive";
+                            break;
+                        case 0x008A:
+                            sVersion = "Multitude, Inc. FT SX20";
+                            break;
+                        case 0x008B:
+                            sVersion = "Infocom IT’S A/S G.721 ADPCM";
+                            break;
+                        case 0x008C:
+                            sVersion = "Convedia G729";
+                            break;
+                        case 0x008D:
+                            sVersion = "Congruency, Inc. (not specified)";
+                            break;
+                        case 0x0091:
+                            sVersion = "Siemens SBC24";
+                            break;
+                        case 0x0092:
+                            sVersion = "Sonic Foundry Dolby AC3 APDIF";
+                            break;
+                        case 0x0093:
+                            sVersion = "MediaSonic G.723";
+                            break;
+                        case 0x0094:
+                            sVersion = "Aculab Prosody 8kbps";
+                            break;
+                        case 0x0097:
+                            sVersion = "ZyXEL ADPCM";
+                            break;
+                        case 0x0098:
+                            sVersion = "Philips LPCBB";
+                            break;
+                        case 0x0099:
+                            sVersion = "Studer Professional Audio Packed";
+                            break;
+                        case 0x00A0:
+                            sVersion = "Maiden PhonyTalk";
+                            break;
+                        case 0x00A1:
+                            sVersion = "Racal Recorder GSM";
+                            break;
+                        case 0x00A2:
+                            sVersion = "Racal Recorder G720.a";
+                            break;
+                        case 0x00A3:
+                            sVersion = "Racal G723.1";
+                            break;
+                        case 0x00A4:
+                            sVersion = "Racal Tetra ACELP";
+                            break;
+                        case 0x00B0:
+                            sVersion = "NEC AAC NEC Corporation";
+                            break;
+                        case 0x00FF:
+                            sVersion = "AAC";
+                            break;
+                        case 0x0100:
+                            sVersion = "Rhetorex ADPCM";
+                            break;
+                        case 0x0101:
+                            sVersion = "IBM u-Law";
+                            break;
+                        case 0x0102:
+                            sVersion = "IBM a-Law";
+                            break;
+                        case 0x0103:
+                            sVersion = "IBM ADPCM";
+                            break;
+                        case 0x0111:
+                            sVersion = "Vivo G.723";
+                            break;
+                        case 0x0112:
+                            sVersion = "Vivo Siren";
+                            break;
+                        case 0x0120:
+                            sVersion = "Philips Speech Processing CELP";
+                            break;
+                        case 0x0121:
+                            sVersion = "Philips Speech Processing GRUNDIG";
+                            break;
+                        case 0x0123:
+                            sVersion = "Digital G.723";
+                            break;
+                        case 0x0125:
+                            sVersion = "Sanyo LD ADPCM";
+                            break;
+                        case 0x0130:
+                            sVersion = "Sipro Lab ACEPLNET";
+                            break;
+                        case 0x0131:
+                            sVersion = "Sipro Lab ACELP4800";
+                            break;
+                        case 0x0132:
+                            sVersion = "Sipro Lab ACELP8V3";
+                            break;
+                        case 0x0133:
+                            sVersion = "Sipro Lab G.729";
+                            break;
+                        case 0x0134:
+                            sVersion = "Sipro Lab G.729A";
+                            break;
+                        case 0x0135:
+                            sVersion = "Sipro Lab Kelvin";
+                            break;
+                        case 0x0136:
+                            sVersion = "VoiceAge AMR";
+                            break;
+                        case 0x0140:
+                            sVersion = "Dictaphone G.726 ADPCM";
+                            break;
+                        case 0x0150:
+                            sVersion = "Qualcomm PureVoice";
+                            break;
+                        case 0x0151:
+                            sVersion = "Qualcomm HalfRate";
+                            break;
+                        case 0x0155:
+                            sVersion = "Ring Zero Systems TUBGSM";
+                            break;
+                        case 0x0160:
+                            sVersion = "Microsoft Audio1";
+                            break;
+                        case 0x0161:
+                            sVersion = "Windows Media Audio V2 V7 V8 V9 / DivX audio (WMA) / Alex AC3 Audio";
+                            break;
+                        case 0x0162:
+                            sVersion = "Windows Media Audio Professional V9";
+                            break;
+                        case 0x0163:
+                            sVersion = "Windows Media Audio Lossless V9";
+                            break;
+                        case 0x0164:
+                            sVersion = "WMA Pro over S/PDIF";
+                            break;
+                        case 0x0170:
+                            sVersion = "UNISYS NAP ADPCM";
+                            break;
+                        case 0x0171:
+                            sVersion = "UNISYS NAP ULAW";
+                            break;
+                        case 0x0172:
+                            sVersion = "UNISYS NAP ALAW";
+                            break;
+                        case 0x0173:
+                            sVersion = "UNISYS NAP 16K";
+                            break;
+                        case 0x0174:
+                            sVersion = "MM SYCOM ACM SYC008 SyCom Technologies";
+                            break;
+                        case 0x0175:
+                            sVersion = "MM SYCOM ACM SYC701 G726L SyCom Technologies";
+                            break;
+                        case 0x0176:
+                            sVersion = "MM SYCOM ACM SYC701 CELP54 SyCom Technologies";
+                            break;
+                        case 0x0177:
+                            sVersion = "MM SYCOM ACM SYC701 CELP68 SyCom Technologies";
+                            break;
+                        case 0x0178:
+                            sVersion = "Knowledge Adventure ADPCM";
+                            break;
+                        case 0x0180:
+                            sVersion = "Fraunhofer IIS MPEG2AAC";
+                            break;
+                        case 0x0190:
+                            sVersion = "Digital Theater Systems DTS DS";
+                            break;
+                        case 0x0200:
+                            sVersion = "Creative Labs ADPCM";
+                            break;
+                        case 0x0202:
+                            sVersion = "Creative Labs FASTSPEECH8";
+                            break;
+                        case 0x0203:
+                            sVersion = "Creative Labs FASTSPEECH10";
+                            break;
+                        case 0x0210:
+                            sVersion = "UHER ADPCM";
+                            break;
+                        case 0x0215:
+                            sVersion = "Ulead DV ACM";
+                            break;
+                        case 0x0216:
+                            sVersion = "Ulead DV ACM";
+                            break;
+                        case 0x0220:
+                            sVersion = "Quarterdeck Corp.";
+                            break;
+                        case 0x0230:
+                            sVersion = "I-Link VC";
+                            break;
+                        case 0x0240:
+                            sVersion = "Aureal Semiconductor Raw Sport";
+                            break;
+                        case 0x0241:
+                            sVersion = "ESST AC3";
+                            break;
+                        case 0x0250:
+                            sVersion = "Interactive Products HSX";
+                            break;
+                        case 0x0251:
+                            sVersion = "Interactive Products RPELP";
+                            break;
+                        case 0x0260:
+                            sVersion = "Consistent CS2";
+                            break;
+                        case 0x0270:
+                            sVersion = "Sony SCX";
+                            break;
+                        case 0x0271:
+                            sVersion = "Sony SCY";
+                            break;
+                        case 0x0272:
+                            sVersion = "Sony ATRAC3";
+                            break;
+                        case 0x0273:
+                            sVersion = "Sony SPC";
+                            break;
+                        case 0x0280:
+                            sVersion = "TELUM Telum Inc.";
+                            break;
+                        case 0x0281:
+                            sVersion = "TELUMIA Telum Inc.";
+                            break;
+                        case 0x0285:
+                            sVersion = "Norcom Voice Systems ADPCM";
+                            break;
+                        case 0x0300:
+                            sVersion = "Fujitsu FM TOWNS SND";
+                            break;
+                        case 0x0301:
+                            sVersion = "Fujitsu (not specified)";
+                            break;
+                        case 0x0302:
+                            sVersion = "Fujitsu (not specified)";
+                            break;
+                        case 0x0303:
+                            sVersion = "Fujitsu (not specified)";
+                            break;
+                        case 0x0304:
+                            sVersion = "Fujitsu (not specified)";
+                            break;
+                        case 0x0305:
+                            sVersion = "Fujitsu (not specified)";
+                            break;
+                        case 0x0306:
+                            sVersion = "Fujitsu (not specified)";
+                            break;
+                        case 0x0307:
+                            sVersion = "Fujitsu (not specified)";
+                            break;
+                        case 0x0308:
+                            sVersion = "Fujitsu (not specified)";
+                            break;
+                        case 0x0350:
+                            sVersion = "Micronas Semiconductors, Inc. Development";
+                            break;
+                        case 0x0351:
+                            sVersion = "Micronas Semiconductors, Inc. CELP833";
+                            break;
+                        case 0x0400:
+                            sVersion = "Brooktree Digital";
+                            break;
+                        case 0x0401:
+                            sVersion = "Intel Music Coder (IMC)";
+                            break;
+                        case 0x0402:
+                            sVersion = "Ligos Indeo Audio";
+                            break;
+                        case 0x0450:
+                            sVersion = "QDesign Music";
+                            break;
+                        case 0x0500:
+                            sVersion = "On2 VP7 On2 Technologies";
+                            break;
+                        case 0x0501:
+                            sVersion = "On2 VP6 On2 Technologies";
+                            break;
+                        case 0x0680:
+                            sVersion = "AT&T VME VMPCM";
+                            break;
+                        case 0x0681:
+                            sVersion = "AT&T TCP";
+                            break;
+                        case 0x0700:
+                            sVersion = "YMPEG Alpha (dummy for MPEG-2 compressor)";
+                            break;
+                        case 0x08AE:
+                            sVersion = "ClearJump LiteWave (lossless)";
+                            break;
+                        case 0x1000:
+                            sVersion = "Olivetti GSM";
+                            break;
+                        case 0x1001:
+                            sVersion = "Olivetti ADPCM";
+                            break;
+                        case 0x1002:
+                            sVersion = "Olivetti CELP";
+                            break;
+                        case 0x1003:
+                            sVersion = "Olivetti SBC";
+                            break;
+                        case 0x1004:
+                            sVersion = "Olivetti OPR";
+                            break;
+                        case 0x1100:
+                            sVersion = "Lernout & Hauspie";
+                            break;
+                        case 0x1101:
+                            sVersion = "Lernout & Hauspie CELP";
+                            break;
+                        case 0x1102:
+                            sVersion = "Lernout & Hauspie SBC";
+                            break;
+                        case 0x1103:
+                            sVersion = "Lernout & Hauspie SBC";
+                            break;
+                        case 0x1104:
+                            sVersion = "Lernout & Hauspie SBC";
+                            break;
+                        case 0x1400:
+                            sVersion = "Norris Comm. Inc.";
+                            break;
+                        case 0x1401:
+                            sVersion = "ISIAudio";
+                            break;
+                        case 0x1500:
+                            sVersion = "AT&T Soundspace Music Compression";
+                            break;
+                        case 0x181C:
+                            sVersion = "VoxWare RT24 speech";
+                            break;
+                        case 0x181E:
+                            sVersion = "Lucent elemedia AX24000P Music";
+                            break;
+                        case 0x1971:
+                            sVersion = "Sonic Foundry LOSSLESS";
+                            break;
+                        case 0x1979:
+                            sVersion = "Innings Telecom Inc. ADPCM";
+                            break;
+                        case 0x1C07:
+                            sVersion = "Lucent SX8300P speech";
+                            break;
+                        case 0x1C0C:
+                            sVersion = "Lucent SX5363S G.723 compliant";
+                            break;
+                        case 0x1F03:
+                            sVersion = "CUseeMe DigiTalk (ex-Rocwell)";
+                            break;
+                        case 0x1FC4:
+                            sVersion = "NCT Soft ALF2CD ACM";
+                            break;
+                        case 0x2000:
+                            sVersion = "FAST Multimedia DVM";
+                            break;
+                        case 0x2001:
+                            sVersion = "Dolby DTS";
+                            break;
+                        case 0x2002:
+                            sVersion = "RealAudio 1 / 2 14.4";
+                            break;
+                        case 0x2003:
+                            sVersion = "RealAudio 1 / 2 28.8";
+                            break;
+                        case 0x2004:
+                            sVersion = "RealAudio G2 / 8 Cook (low bitrate)";
+                            break;
+                        case 0x2005:
+                            sVersion = "RealAudio 3 / 4 / 5 Music (DNET)";
+                            break;
+                        case 0x2006:
+                            sVersion = "RealAudio 10 AAC (RAAC)";
+                            break;
+                        case 0x2007:
+                            sVersion = "RealAudio 10 AAC+ (RACP)";
+                            break;
+                        case 0x2500:
+                            sVersion = "Reserved range to 0x2600 Microsoft";
+                            break;
+                        case 0x3313:
+                            sVersion = "makeAVIS (ffvfw fake AVI sound from AviSynth scripts)";
+                            break;
+                        case 0x4143:
+                            sVersion = "Divio MPEG-4 AAC audio";
+                            break;
+                        case 0x4201:
+                            sVersion = "Nokia adaptive multirate";
+                            break;
+                        case 0x4243:
+                            sVersion = "Divio G726 Divio, Inc.";
+                            break;
+                        case 0x434C:
+                            sVersion = "LEAD Speech";
+                            break;
+                        case 0x564C:
+                            sVersion = "LEAD Vorbis";
+                            break;
+                        case 0x5756:
+                            sVersion = "WavPack Audio";
+                            break;
+                        case 0x674F:
+                            sVersion = "Ogg Vorbis (mode 1)";
+                            break;
+                        case 0x6750:
+                            sVersion = "Ogg Vorbis (mode 2)";
+                            break;
+                        case 0x6751:
+                            sVersion = "Ogg Vorbis (mode 3)";
+                            break;
+                        case 0x676F:
+                            sVersion = "Ogg Vorbis (mode 1+)";
+                            break;
+                        case 0x6770:
+                            sVersion = "Ogg Vorbis (mode 2+)";
+                            break;
+                        case 0x6771:
+                            sVersion = "Ogg Vorbis (mode 3+)";
+                            break;
+                        case 0x7000:
+                            sVersion = "3COM NBX 3Com Corporation";
+                            break;
+                        case 0x706D:
+                            sVersion = "FAAD AAC";
+                            break;
+                        case 0x7A21:
+                            sVersion = "GSM-AMR (CBR, no SID)";
+                            break;
+                        case 0x7A22:
+                            sVersion = "GSM-AMR (VBR, including SID)";
+                            break;
+                        case 0xA100:
+                            sVersion = "Comverse Infosys Ltd. G723 1";
+                            break;
+                        case 0xA101:
+                            sVersion = "Comverse Infosys Ltd. AVQSBC";
+                            break;
+                        case 0xA102:
+                            sVersion = "Comverse Infosys Ltd. OLDSBC";
+                            break;
+                        case 0xA103:
+                            sVersion = "Symbol Technologies G729A";
+                            break;
+                        case 0xA104:
+                            sVersion = "VoiceAge AMR WB VoiceAge Corporation";
+                            break;
+                        case 0xA105:
+                            sVersion = "Ingenient Technologies Inc. G726";
+                            break;
+                        case 0xA106:
+                            sVersion = "ISO/MPEG-4 advanced audio Coding";
+                            break;
+                        case 0xA107:
+                            sVersion = "Encore Software Ltd G726";
+                            break;
+                        case 0xA109:
+                            sVersion = "Speex ACM Codec xiph.org";
+                            break;
+                        case 0xDFAC:
+                            sVersion = "DebugMode SonicFoundry Vegas FrameServer ACM";
+                            break;
+                        case 0xF1AC:
+                            sVersion = "Free Lossless Audio Codec FLAC";
+                            break;
+                        case 0xFFFE:
+                            sVersion = "Extensible";
+                            break;
+                        case 0xFFFF:
+                            sVersion = "Development";
+                            break;
+                        default:
+                            sVersion = "Unknown"
+                    }
+                    break;
+                case "fact":
+                    dcsamples = Binary.read_uint32(pc, _LE); //the uncompressed (factual?) file size?
+                case "data":
+                    if (nBPS && nFormat == 1 && (nBPS == 8 || nBPS == 16)) {
+                        var nmSeconds = Math.round(Binary.readDword(pc - 4) / (nBPS / 8) / nRate / nChannels * 1000);
+                        sOption(new Date(nmSeconds).toISOString().substr(11, 8));
+                    }
+                    break;
+                case "INFO":
+                    c = Binary.getString(pc).trim();
+                    if (c != "") sOptions = sOptions.append(c);
+                    break;
+            }
+        } // end of chunks
+
+        sOptions = sOptions.append(nRate + "Hz");
+        sOptions = sOptions.append("ch: " + nChannels);
+        if (nBPS) {
+            sOptions = sOptions.append(nBPS + "-bit");
+        }
+        if (dcsamples > 0) //for compressed things only
+            sOptions = sOptions.append("fact:" + Math.round(dcsamples / 1024 / 1024) + "M")
+        if (chunks != "") sOptions = sOptions.append(chunks);
+    }
+
+    return result(bShowType, bShowVersion, bShowOptions);
+}

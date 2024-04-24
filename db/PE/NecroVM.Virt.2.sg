@@ -1,0 +1,44 @@
+// DIE's signature file
+// NecroVM by DosX
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    if (PE.isNET()) {
+        if (PE.isSignatureInSectionPresent(0, "5F00'VmLoad'00'mscorlib'") &&
+            PE.getString(0x2e, 13) == "It's NecroVM!") {
+
+            var nOffset = PE.findString(0x1f0, 16, "v"),
+                version = "";
+
+            if (nOffset != -1) {
+                version = PE.getString(nOffset + 1, 0x1ff - nOffset);
+            }
+            _setResult("packer", "NecroVM Compressor", version, "LZMAT");
+            return ""; // There is no point in analyzing anything further
+        }
+
+        const references = ["System.Reflection", "System.Security.Cryptography", "System.Runtime.InteropServices"];
+        for (var i = 0; i < references.length; i++)
+            if (!PE.isSignatureInSectionPresent(0, "00'" + references[i] + "'00")) // 00'keyValue'00
+                return "";
+
+        const vmCore = "NecroVM.Runtime"; // Virtual machine namespace
+
+        if (PE.isSignatureInSectionPresent(0, "50??'" + vmCore + "'") && PE.isNetObjectPresent(vmCore) && // check for core
+            PE.isSignatureInSectionPresent(0, "'info'00'flags'00'nativeEntry'00'nativeSizeOfCode'")) {
+
+            if (PE.isSignatureInSectionPresent(0, "0005'_'00'_'00")) // code isolation
+                _setResult("protection", "NecroVM Code Container", "", "");
+
+            if (PE.isSignatureInSectionPresent(0, "2000690073002000740061006d00700065007200650064002e00")) // check for anti-tamper
+                _setResult("protection", "NecroVM Anti-Tamper", "", "");
+
+            var options = "Virtualization"
+
+            if (PE.isSignatureInSectionPresent(0, "00'm_1'")) {
+                options += " + Obfuscation"
+            }
+
+            _setResult("protector", "NecroVM", "2.X", options);
+        }
+    }
+}

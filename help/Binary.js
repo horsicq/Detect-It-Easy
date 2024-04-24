@@ -163,6 +163,30 @@ Binary.readQword=function(nOffset){}
  */
 Binary.readWord=function(nOffset){}
 /**
+ * Read a signed byte value from the file.
+ * @param {UInt} nOffset - The offset in the file.
+ * @returns {UChar} The byte value.
+ */
+Binary.readSByte=function(nOffset){}
+/**
+ * Read a signed dword value from the file.
+ * @param {UInt} nOffset - The offset in the file.
+ * @returns {UInt} The dword value.
+ */
+Binary.readSDword=function(nOffset){}
+/**
+ * Read a signed qword value from the file.
+ * @param {UInt} nOffset - The offset in the file.
+ * @returns {UInt64} The qword value.
+ */
+Binary.readSQword=function(nOffset){}
+/**
+ * Read a signed word from the file.
+ * @param {UInt} nOffset - The offset in the file.
+ * @returns {UShort} The word value.
+ */
+Binary.readSWord=function(nOffset){}
+/**
  * Swap the four bytes of a dword. For example <samp>0x11223344</samp> becomes <samp>0x44332211</samp>.
  * @param nValue {UInt} - The value.
  * @returns {Uint} The value with its bytes swapped.

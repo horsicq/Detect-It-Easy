@@ -1,0 +1,57 @@
+// DIE's signature file
+// Authors: LinXP, Kae (TG@kaens)
+
+init("image", "ZSoft Paintbrush (.PCX)");
+
+includeScript("read");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    //ref https://www.fileformat.info/format/pcx/spec/a10e75307b3a4cc49c3bbe6db4c41fa2/view.htm
+    if (File.getSize() >= 0x0E) {
+        if (File.compare("0a") && !File.read_uint8(0x40)) {
+            switch (File.read_uint8(0x01)) {
+                case 0:
+                    sVersion = "v2.5 using a fixed EGA palette";
+                    break;
+                case 2:
+                    sVersion = "v2.8 using a modifiable EGA palette";
+                    break;
+                case 3:
+                    sVersion = "v2.8 using no palette";
+                    break;
+                case 4:
+                    sVersion = "Windows";
+                    break;
+                case 5:
+                    sVersion = "v3.0/+, including 24-bit images";
+                    break;
+                default:
+                    return;
+            }
+            var rle = File.read_uint8(0x02);
+            if (rle > 1) return;
+            var w = File.read_uint16(0x08) - File.read_uint16(0x04) + 1,
+                h = File.read_uint16(0x0A) - File.read_uint16(0x06) + 1;
+            if (w <= 0 || h <= 0) return;
+            if (File.isVerbose()) sOption(w + "x" + h);
+            if (rle && File.isVerbose()) sOption("RLE");
+            var bpplane = File.read_uint8(0x03),
+                nplanes = File.read_uint8(0x41);
+            if ([1, 2, 4, 8].indexOf(bpplane) < 0 || !isAllZeroes(0x4A, 0x36)) return;
+            var bpline = File.read_uint16(0x42);
+            if (bpline % 2 || bpline < h) return;
+            if (File.isVerbose()) {
+                sOption(bpplane * nplanes, "bpx:");
+                sOption(bpplane, "bpl:");
+                sOption(File.read_uint16(0x0C) + "x" + File.read_uint16(0x0E), "dpi:");
+                var scrw = File.read_uint16(0x46),
+                    scrh = File.read_uint16(0x48);
+                if (scrw * scrh) sOption(scrw + "x" + scrh, "screen:");
+                if (!rle) sOption(0x80 + (w * h * bpplane * nplanes >> 3), "sz:")
+            }
+            bDetected = true;
+            return result(bShowType, bShowVersion, bShowOptions);
+        }
+    }
+    return
+}

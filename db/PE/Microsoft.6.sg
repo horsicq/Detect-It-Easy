@@ -1,0 +1,1711 @@
+// This file has a lot of results
+// Microsoft linker
+// Microsoft Visual C/C++
+// Visual Basic
+// MASM
+// MFC
+function getVBOptions() {
+    var sResult = String();
+
+    var nOffset = PE.findDword(PE.section[0].FileOffset, PE.section[0].FileSize, 0x21354256);
+    if (nOffset == -1) {
+        nOffset = PE.findDword(PE.section[0].FileOffset, PE.section[0].FileSize, 0x21364256);
+    }
+    if (nOffset != -1) {
+        var nDword = PE.readDword(nOffset + 0x30);
+        nOffset = PE.VAToOffset(nDword);
+        nDword = PE.readDword(nOffset + 0x20);
+        sResult = (nDword == 0) ? "P-Code" : "Native";
+    }
+
+    return sResult;
+}
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    var sLinker_Name = String(),
+        sLinker_Version = String(),
+        sLinker_Options = String(),
+        sCompilerCPP_Name = String(),
+        sCompilerCPP_Version = String(),
+        sCompilerCPP_Options = String(),
+        sCompilerMASM_Name = String(),
+        sCompilerMASM_Version = String(),
+        sCompilerMASM_Options = String(),
+        sCompilerVB_Name = String(),
+        sCompilerVB_Version = String(),
+        sCompilerVB_Options = String(),
+        sLibraryDot_Name = String(),
+        sLibraryDot_Version = String(),
+        sLibraryDot_Options = String(),
+        sLibraryMFC_Name = String(),
+        sLibraryMFC_Version = String(),
+        sLibraryMFC_Options = String(),
+        sTool_Name = String(),
+        sTool_Version = String(),
+        sTool_Options = String();
+
+
+
+
+    //
+    // ==================================================
+    //     Advanced detection of .NET applications
+    // ==================================================
+    //        Author: DosX
+    //        E-Mail: collab@kay-software.ru
+    //        GitHub: https://github.com/DosX-dev
+    //        Telegram: @DosX_dev
+    // ==================================================
+    //
+
+    function findNetCoreConfigOffset() {
+        return PE.findString(0, PE.getSize(), ".NETCoreApp,Version=v");
+    }
+
+    function findNetFrameworkConfigOffset() {
+        return PE.findString(0, PE.getSize() - PE.getOverlaySize(), ".NETFramework,Version=v");
+    }
+
+    function getNetConfigStringByOffset(configOffset) {
+        var result = PE.getString(configOffset).split("=")[1];
+
+        if (result && result.length > 7)
+            result = String();
+
+
+        return result;
+    }
+
+    if (PE.isNET()) {
+
+        const netFrameworkConfigPattern = findNetFrameworkConfigOffset();
+
+        if (netFrameworkConfigPattern) {
+
+            sLibraryDot_Name = ".NET Framework"; // .NET Framework better than .NET Core
+            sLibraryDot_Version = String(getNetConfigStringByOffset(netFrameworkConfigPattern));
+
+            if (sLibraryDot_Version) {
+                // antifake
+                if (sLibraryDot_Version[1] !== "4" &&
+                    sLibraryDot_Version[1] !== "3" &&
+                    sLibraryDot_Version[1] !== "2" &&
+                    sLibraryDot_Version[2] !== "." &&
+                    Number(sLibraryDot_Version[3]) !== NaN) {
+                    sLibraryDot_Version = String();
+                }
+            }
+
+
+
+        } else {
+
+            const netCoreConfigPattern = findNetCoreConfigOffset();
+
+            if (netCoreConfigPattern && PE.compare("18", netCoreConfigPattern - 1) && PE.getNETVersion().substr(0, 4) === "v4.0") { // Is .NET Core DLL
+                sLibraryDot_Name = ".NET Core";
+                sLibraryDot_Version = getNetConfigStringByOffset(netCoreConfigPattern);
+
+                // antifake
+                if (Number(sLibraryDot_Version[1]) === NaN) {
+                    sLibraryDot_Version = String();
+                }
+            }
+
+        }
+
+        if (!sLibraryDot_Name) {
+            sLibraryDot_Name = ".NET Framework";
+            sLibraryDot_Version = "Legacy";
+        }
+
+        sLibraryDot_Version += (sLibraryDot_Version.length != 0 ? ", " : String()) + "CLR " + PE.getNETVersion();
+
+        // sLibraryDot_Version = PE.getNETVersion();
+
+
+        if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000")) {
+            sLinker_Name = "Microsoft Linker";
+        }
+
+    } else {
+
+        if (PE.isFunctionPresent("LoadLibraryExW") &&
+            PE.isFunctionPresent("ShellExecuteW") &&
+            PE.findString(0, PE.getSize(), "__clrcall") !== -1 &&
+            PE.isSignaturePresent(0, PE.getSize(), "002E004E0045005400200043006F00720065")) {
+            sLibraryDot_Version = "Loader";
+        }
+
+        if (PE.isExportFunctionPresent("DotNetRuntimeDebugHeader")) {
+            sLibraryDot_Options = "AOT";
+
+            const netCoreConfigPattern = findNetCoreConfigOffset();
+
+            if (netCoreConfigPattern) sLibraryDot_Version = getNetConfigStringByOffset(netCoreConfigPattern);
+        }
+
+        if (sLibraryDot_Version !== String() || sLibraryDot_Options !== String()) sLibraryDot_Name = ".NET Core";
+    }
+
+    //
+    // ==================================================
+    //
+
+
+
+
+    var bCCP = 0;
+    var bWmain = 0;
+    var aMSVCRT = PE.isLibraryPresentExp(/^MSVCR/i);
+    if (aMSVCRT) {
+        bWmain = PE.isLibraryFunctionPresent(aMSVCRT[0], "__wgetmainargs");
+    }
+
+    if (!PE.isPEPlus()) {
+        if (PE.compareEP("558BEC51C745FC01000000837D0C007510833D")) {
+            if (PE.compareEP("00", -4)) {
+                sOptions = sOptions.append("libcd");
+            } else if (PE.compareEP("00", -8)) {
+                sOptions = sOptions.append("libcmtd");
+            } else {
+                sOptions = sOptions.append("msvcrtd");
+            }
+            sCompilerCPP_Version = "12.00";
+            bCCP = 1;
+        } else if (PE.compareEP("558BEC538B5D08568B750C578B7D1085F67509833D")) {
+            if (PE.compareEP("CA", -1)) {
+                sCompilerCPP_Options = sCompilerCPP_Options.append("libc");
+            } else if (PE.compareEP("59", -7)) {
+                sCompilerCPP_Options = sCompilerCPP_Options.append("libcmt");
+            } else {
+                sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrt");
+            }
+            sCompilerCPP_Version = "12.00";
+            bCCP = 1;
+        } else if (PE.compareEP("558BEC6AFF68........68........64A100000000506489250000000083")) {
+            var nOfs;
+            switch (PE.readByte(PE.nEP + 31)) {
+                case 0x10:
+                    if (PE.compareEP("83", 107)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("libc");
+                        nOfs = 116;
+                    } else {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("libcmt");
+                        nOfs = 133;
+                    }
+                    if (PE.compareEP("E8", nOfs)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                        --nOfs;
+                    }
+                    if (PE.compareEP("FF", nOfs + 25)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                    }
+                    break;
+                case 0x20:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrt");
+                    if (bWmain) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                    }
+                    if (PE.compareEP("FF", 109)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                    }
+                    break;
+                case 0x58:
+                    if (PE.compareEP("33", 87)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("libc");
+                        nOfs = 116;
+                    } else {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("libcmt");
+                        nOfs = 134;
+                    }
+                    if (PE.compareEP("E8", nOfs)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                    }
+                    break;
+                case 0x68:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrt");
+                    if (PE.compareEP("5F", 45)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                    }
+                    break;
+                case 0x90:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("libcd");
+                    if (PE.compareEP("E8", 241)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                    }
+                    break;
+                case 0x94:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrtd");
+                    if (PE.compareEP("83", 233)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                    }
+                    break;
+                case 0xA4:
+                    if (PE.compareEP("00", 125)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("libcd");
+                        nOfs = 160;
+                    } else {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("libcmtd");
+                        nOfs = 179;
+                    }
+                    if (PE.compareEP("E8", nOfs)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                    }
+                    break;
+                case 0xE0:
+                    switch (PE.readByte(PE.nEP + 38)) {
+                        case 0xB8:
+                            sCompilerCPP_Options = sCompilerCPP_Options.append("libcd");
+                            if (PE.compareEP("E8", 241)) {
+                                sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                            }
+                            break;
+                        case 0xC7:
+                            sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrtd");
+                            if (bWmain) {
+                                sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                            }
+                            if (PE.compareEP("FF", 121)) {
+                                sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                            }
+                            break;
+                    }
+                    break;
+                case 0xE8:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("libcd");
+                    break;
+                case 0xF0:
+                    if (PE.compareEP("00", 125)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("libcd");
+                        nOfs = 160;
+                    } else {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("libcmtd");
+                        nOfs = 179;
+                    }
+                    if (PE.compareEP("E8", nOfs)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                        --nOfs;
+                    }
+                    if (PE.compareEP("FF", nOfs + 25)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                    }
+                    break;
+            }
+            sCompilerCPP_Version = "11.00-13.10";
+            bCCP = 1;
+        } else if (PE.compareEP("6A0C68........E8........33C0408945E48B750C33FF3BF7750C393D")) {
+            switch (PE.readByte(PE.nEP - 1)) {
+                case 0xC0:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("libc");
+                    break;
+                case 0x00:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("libcmt");
+                    break;
+            }
+            sCompilerCPP_Version = "13.10";
+            bCCP = 1;
+        } else if (PE.compareEP("6A..68........E8........66813D")) {
+            sCompilerCPP_Version = "13.10";
+            bCCP = 1;
+        } else if (PE.compareEP("6A..68........E8........BF940000008BC7E8")) {
+            nOfs = 0;
+            var sMain;
+            switch (PE.readByte(PE.nEP + 1)) {
+                case 0x18:
+                    sMain = "wmain";
+                    nOfs = 197;
+                    break;
+                case 0x60:
+                    sMain = "wWinMain";
+                    nOfs = 199;
+                    break;
+            }
+            if (nOfs) {
+                if (PE.compareEP("6A", nOfs)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("libcmt");
+                    nOfs += 62;
+                } else {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("libc");
+                    nOfs += 69;
+                }
+                if (PE.compareEP("E8", nOfs)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append(sMain);
+                }
+            }
+            sCompilerCPP_Version = "13.10";
+            bCCP = 1;
+        } else if (PE.compareEP("8BFF558BEC837D0C017505E8")) {
+            if (PE.compareEP("8B", 16)) {
+                sCompilerCPP_Options = sCompilerCPP_Options.append(PE.compareEP("E8", 74) ? "libcmtd" : "msvcrtd");
+            } else {
+                sCompilerCPP_Options = sCompilerCPP_Options.append(PE.compareEP("8B", 35) ? "libcmt" : "msvcrt");
+            }
+            sCompilerCPP_Version = "15.00-16.00";
+            bCCP = 1;
+        } else if (PE.compareEP("8BFF558BECE8......00E8......005DC3")) {
+            switch (PE.readByte(PE.nEP + 58)) {
+                case 0x88:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrtd", "wWinMain");
+                    sCompilerCPP_Version = "15.00";
+                    break;
+                case 0x8C:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrtd");
+                    sCompilerCPP_Version = "15.00";
+                    break;
+                case 0x90:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrtd");
+                    if (bWmain) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                    }
+                    sCompilerCPP_Version = "16.00";
+                    break;
+                case 0x94:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("libcmtd");
+                    if (PE.compareEP("52", 145)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                    }
+                    sCompilerCPP_Version = "15.00";
+                    break;
+                case 0x98:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("libcmtd");
+                    if (PE.compareEP("6A", 645)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                    }
+                    sCompilerCPP_Version = "16.00";
+                    break;
+                case 0xE4:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrtd");
+                    if (bWmain) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                    }
+                    if (PE.compareEP("FF", -0x9B)) {
+                        sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                    }
+                    sCompilerCPP_Version = "15.00-16.00";
+                    break;
+                case 0xE8:
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("libcmtd");
+                    if (PE.compareEP("E8", 92)) {
+                        if (PE.compareEP("E8", 184)) {
+                            sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                            bWmain = 1;
+                        }
+                        sCompilerCPP_Version = "15.00";
+                    } else {
+                        if (PE.compareEP("E8$$$$$$$$8BFF558BEC83EC10", 213)) {
+                            sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                            bWmain = 1;
+                        }
+                        sCompilerCPP_Version = "16.00";
+                    }
+                    if (bWmain) {
+                        if (PE.compareEP("10", -6)) {
+                            sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                        }
+                    } else {
+                        if (PE.compareEP("CC", -2)) {
+                            sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                        }
+                    }
+                    break;
+            }
+            bCCP = 1;
+        } else if (PE.compareEP("E8......00E9$$$$$$$$6A..68........E8")) {
+            var nEP = PE.nEP;
+            nEP += 10 + ~~PE.readDword(nEP + 6);
+            if (PE.compare("10", nEP + 1)) {
+                sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrt");
+                if (bWmain) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                }
+                if (PE.compareEP("FF", -48)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                }
+            } else if (PE.compare("33DB", nEP + 12)) {
+                sCompilerCPP_Options = sCompilerCPP_Options.append("msvcrt");
+                if (PE.compare("89", nEP + 53) || PE.compare("E0", nEP + 60)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                }
+            } else if (PE.compare("3935", nEP + 14)) {
+                sCompilerCPP_Options = sCompilerCPP_Options.append("libcmt");
+                if (PE.compareEP("E8$$$$$$$$8B", -150)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                }
+                if (PE.compareEP("FF", -0xA3)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                }
+            } else if (PE.compare("8D4598", nEP + 12)) {
+                sCompilerCPP_Options = sCompilerCPP_Options.append("libcmt");
+                if (PE.compareEP("51", 15)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                }
+            } else if (PE.compare("33F68975FC", nEP + 12)) {
+                sCompilerCPP_Options = sCompilerCPP_Options.append("libcmt");
+                if (PE.compare("E8", nEP + 170)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("wWinMain");
+                }
+            } else if (PE.compare("B8'MZ'", nEP + 12)) {
+                sCompilerCPP_Options = sCompilerCPP_Options.append("libcmt");
+                if (PE.compare("E8", nEP + 149)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("wmain");
+                    --nEP;
+                }
+                if (PE.compare("FF", nEP + 174)) {
+                    sCompilerCPP_Options = sCompilerCPP_Options.append("glob");
+                }
+            }
+            sCompilerCPP_Version = "15.00-16.00";
+            bCCP = 1;
+        } else if (PE.compareEP("64A100000000558BEC6AFF68")) {
+            bCCP = 1;
+        } else if (PE.compareEP("64A100000000506489250000000083C4A8535657")) {
+            sCompilerCPP_Version = "11.00";
+            bCCP = 1;
+        } else if (PE.compareEP("535657BB........8B......553BFB75")) {
+            sCompilerCPP_Version = "8.00";
+            bCCP = 1;
+        } else if (PE.compareEP("56E8........8BF0E8........68........68........E8........6A..68........56E8")) {
+            sCompilerCPP_Version = "8.00";
+            bCCP = 1;
+        } else if (PE.compareEP("53B8........8B......565785DB5575")) {
+            sCompilerCPP_Version = "10.20";
+            bCCP = 1;
+        } else if (PE.compareEP("558BEC83EC4456FF15........6A018BF0FF15")) {
+            sCompilerCPP_Version = "12.00";
+            bCCP = 1;
+        } else if (PE.compareEP("558BEC83EC4456FF15........8BF08A063C22")) {
+            sCompilerCPP_Version = "12.00";
+            bCCP = 1;
+        } else if (PE.compareEP("558D6C....81EC........8B45..83F801560F84........85C00F84")) {
+            sCompilerCPP_Version = "12.00";
+            bCCP = 1;
+        }
+        //else if(PE.compareEP("837C24080175098B442404A3....0010E88BFFFFFF")) // Pure Basic 4.0
+        //{
+        //    sCompilerCPP_Version="12.00";
+        //    bCCP=1;
+        //}
+        else if (PE.compareEP("558BEC538B5D08568B750C85F6578B7D10")) {
+            sCompilerCPP_Version = "13.00";
+            bCCP = 1;
+        } else if (PE.compareEP("833D........00741A68........E8........85C059740BFF742404FF15........59E8........68........68........E8........85C059597554565768........E8........BE........8BC6BF")) {
+            sCompilerCPP_Version = "14.00";
+            bCCP = 1;
+        } else if (PE.compareEP("6A1468........E8........BB94000000536A008B..........FFD750FF..........8BF085F6750A6A12E8........59EB18891E56FF..........5685C0751450FFD750FF..........B8")) {
+            sCompilerCPP_Version = "14.00";
+            bCCP = 1;
+        } else if (PE.compareEP("8BFF558BEC538B5D08568B750C85F6578B7D100F84....000083FE01")) {
+            sCompilerCPP_Version = "14.00";
+            bCCP = 1;
+        } else if (PE.compareEP("8BFF558BEC538B5D08568B750C85F6578B7D107509833D........00EB2683FE01740583FE027522A1........85C07409575653FFD085C0740C575653E8......FF85C0750433C0EB4E575653E8......FF83FE0189450C750C85C07537575053E8......FF85F6740583FE037526575653E8......FF85C0750321450C837D0C007411A1........85C07408575653FFD089450C8B450C5F5E5B5DC20C00")) {
+            sCompilerCPP_Version = "14.00";
+            bCCP = 1;
+        } else if (PE.compareEP("558BEC83EC10A1........8365F8008365FC005357BF4EE640BB3BC7BB0000FFFF740D85C37409F7D0A3........EB60568D45F850FF15........8B75FC3375F8FF15........33F0FF15........33F0FF15........33F08D45F050FF15........8B45F43345F033F03BF77507BE4FE640BBEB0B85F375078BC6C1E0100BF08935........F7D68935........5E5F5BC9C3")) {
+            sCompilerCPP_Version = "14.00";
+            bCCP = 1;
+        } else if (PE.compareEP("558BEC83EC245356578965F8")) {
+            bCCP = 1;
+        }
+    } else {
+        if (PE.compareEP("4883EC2885D248895C243048896C243848897424408BDA488BE9498BF0751E3915")) {
+            sCompilerCPP_Version = "14.00"; // DLL
+            bCCP = 1;
+        } else if (PE.compareEP("4883EC5848895C247048897C247866813D")) {
+            sCompilerCPP_Version = "14.00"; // console, msvcrt
+            bCCP = 1;
+        } else if (PE.compareEP("4883EC3848895C245048897C2458FF15")) {
+            sCompilerCPP_Version = "14.00"; // console, static
+            bCCP = 1;
+        } else if (PE.compareEP("488BC44881EC........4889581848897820488D4888FF15")) {
+            sCompilerCPP_Version = "14.00"; // GUI
+            bCCP = 1;
+        } else if (PE.compareEP("4883EC28E8........4883C428E9$$$$$$$$48895C24")) {
+            sCompilerCPP_Version = "16.00";
+            bCCP = 1;
+        } else if (PE.compareEP("4883EC28E8........E8........4883C428C3")) {
+            sCompilerCPP_Version = "16.00"; // debug
+            bCCP = 1;
+        } else if (PE.compareEP("48895C24084889742410574883EC20498BF88BDA488BF183FA017505E8")) {
+            sCompilerCPP_Version = "16.00"; // DLL
+            bCCP = 1;
+        } else if (PE.compareEP("4C894424188954241048894C24084883EC28837C2438017505E8")) {
+            sCompilerCPP_Version = "16.00"; // DLL debug
+            bCCP = 1;
+        }
+    }
+
+    if (bCCP) {
+        sCompilerCPP_Name = "Microsoft Visual C/C++";
+    }
+
+    if (PE.isRichSignaturePresent()) {
+        sLinker_Name = "Microsoft Linker";
+    }
+
+    var aMFC = PE.isLibraryPresentExp(/^MFC(\d+?)(u?)(d?)\.dll/i);
+
+    if (aMFC) {
+        sLibraryMFC_Version = (aMFC[1] / 10).toFixed(1);
+        if (aMFC[2]) {
+            sLibraryMFC_Options = "Unicode";
+        }
+        if (aMFC[3]) {
+            sLibraryMFC_Options = sOptions.append("debug");
+        }
+        sLibraryMFC_Name = "MFC";
+    }
+
+    if (PE.isDeepScan() && (sLibraryMFC_Name == String())) {
+        if (PE.section[".data"] && PE.isSignatureInSectionPresent(PE.section[".data"].Number, "'CMFCComObject'")) {
+            sLibraryMFC_Name = "MFC";
+            sLibraryMFC_Options = "static";
+        }
+    }
+
+    if (PE.isNET()) {
+        if (PE.isNetObjectPresent("Microsoft.VisualBasic")) {
+            sCompilerVB_Name = "VB.NET";
+            bDetected = true;
+        }
+    } else if (PE.isLibraryPresent("MSVBVM60.DLL")) {
+        sCompilerVB_Name = "Microsoft Visual Basic";
+        sCompilerVB_Version = "6.0";
+        sCompilerVB_Options = getVBOptions();
+    } else if (PE.isLibraryPresent("MSVBVM50.DLL")) {
+        sCompilerVB_Name = "Microsoft Visual Basic";
+        sCompilerVB_Version = "5.0";
+        sCompilerVB_Options = getVBOptions();
+    } else if (PE.isLibraryPresent("VB40032.DLL")) {
+        sCompilerVB_Name = "Microsoft Visual Basic";
+        sCompilerVB_Version = "4.0";
+    }
+
+    // Rich
+    var _sLinker_Name = String(),
+        _sLinker_Version = String(),
+        _sLinker_Options = String(),
+        _sCompilerCPP_Name = String(),
+        _sCompilerCPP_Version = String(),
+        _sCompilerCPP_Options = String(),
+        _sCompilerMASM_Name = String(),
+        _sCompilerMASM_Version = String(),
+        _sCompilerMASM_Options = String(),
+        _sCompilerVB_Name = String(),
+        _sCompilerVB_Version = String(),
+        _sCompilerVB_Options = String();
+
+    var nNumberOfIDs = PE.getNumberOfRichIDs();
+
+    for (var i = nNumberOfIDs - 1; i >= 0; i--) {
+        var nRichID = PE.getRichID(i);
+
+        if (nRichID > 1) {
+            var _sV = String();
+            var _sO = String();
+            var bL = 0;
+            var bC = 0;
+            var bM = 0;
+            var bB = 0;
+
+            switch (nRichID) {
+                case 0x0002:
+                    bL = 1;
+                    _sV = "5.10";
+                    break;
+                case 0x0004:
+                    bL = 1;
+                    _sV = "6.00";
+                    break;
+                case 0x0007:
+                    bB = 1;
+                    _sV = "5.00";
+                    _sO = "Native";
+                    break;
+                case 0x0008:
+                    bC = 1;
+                    _sV = "11.00";
+                    _sO = "C/C++";
+                    break;
+                case 0x0009:
+                    bB = 1;
+                    _sV = "6.00";
+                    _sO = "Native";
+                    break;
+                case 0x000a:
+                    bC = 1;
+                    _sV = "12.00";
+                    _sO = "C";
+                    break;
+                case 0x000b:
+                    bC = 1;
+                    _sV = "12.00";
+                    _sO = "C++";
+                    break;
+                case 0x000e:
+                    bM = 1;
+                    _sV = "6.13";
+                    break;
+                case 0x000f:
+                    bM = 1;
+                    _sV = "7.01";
+                    break;
+                case 0x0010:
+                    bL = 1;
+                    _sV = "5.11";
+                    break;
+                case 0x0012:
+                    bM = 1;
+                    _sV = "6.14";
+                    _sO = "MMX2 support";
+                    break;
+                case 0x0013:
+                    bL = 1;
+                    _sV = "5.12";
+                    break;
+                case 0x0015:
+                    bC = 1;
+                    _sV = "12.00";
+                    _sO = "C/std";
+                    break;
+                case 0x0016:
+                    bC = 1;
+                    _sV = "12.00";
+                    _sO = "C++/std";
+                    break;
+                case 0x0017:
+                    bC = 1;
+                    _sV = "12.00";
+                    _sO = "C/book";
+                    break;
+                case 0x0018:
+                    bC = 1;
+                    _sV = "12.00";
+                    _sO = "C++/book";
+                    break;
+                case 0x001b:
+                    bB = 1;
+                    _sV = "7.00";
+                    _sO = "Native";
+                    break;
+                case 0x001c:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "C";
+                    break;
+                case 0x001d:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "C++";
+                    break;
+                case 0x001e:
+                    bL = 1;
+                    _sV = "6.10";
+                    break;
+                case 0x0020:
+                    bL = 1;
+                    _sV = "6.01";
+                    break;
+                case 0x0022:
+                    bB = 1;
+                    _sV = "6.10";
+                    _sO = "Native";
+                    break;
+                case 0x0023:
+                    bC = 1;
+                    _sV = "12.10";
+                    _sO = "C";
+                    break;
+                case 0x0024:
+                    bC = 1;
+                    _sV = "12.10";
+                    _sO = "C++";
+                    break;
+                case 0x0025:
+                    bL = 1;
+                    _sV = "6.20";
+                    break;
+                case 0x0028:
+                    bL = 1;
+                    _sV = "6.21";
+                    break;
+                case 0x002a:
+                    bM = 1;
+                    _sV = "6.15";
+                    break;
+                case 0x002b:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x002c:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x002d:
+                    bM = 1;
+                    _sV = "6.20";
+                    break;
+                case 0x002f:
+                    bB = 1;
+                    _sV = "6.20";
+                    _sO = "Native";
+                    break;
+                case 0x0030:
+                    bC = 1;
+                    _sV = "12.20";
+                    _sO = "C";
+                    break;
+                case 0x0031:
+                    bC = 1;
+                    _sV = "12.20";
+                    _sO = "C++";
+                    break;
+                case 0x0032:
+                    bC = 1;
+                    _sV = "12.20";
+                    _sO = "C/std";
+                    break;
+                case 0x0033:
+                    bC = 1;
+                    _sV = "12.20";
+                    _sO = "C++/std";
+                    break;
+                case 0x0034:
+                    bC = 1;
+                    _sV = "12.20";
+                    _sO = "C/book";
+                    break;
+                case 0x0035:
+                    bC = 1;
+                    _sV = "12.20";
+                    _sO = "C++/book";
+                    break;
+                case 0x0039:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "C/std";
+                    break;
+                case 0x003a:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "C++/std";
+                    break;
+                case 0x003c:
+                    bL = 1;
+                    _sV = "6.22";
+                    break;
+                case 0x003d:
+                    bL = 1;
+                    _sV = "7.00";
+                    break;
+                case 0x0040:
+                    bM = 1;
+                    _sV = "7.00";
+                    break;
+                case 0x0041:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x0042:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "POGO_I_CPP";
+                    break;
+                case 0x0043:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x0044:
+                    bC = 1;
+                    _sV = "13.00";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x0047:
+                    bL = 1;
+                    _sV = "7.10p";
+                    break;
+                case 0x004b:
+                    bM = 1;
+                    _sV = "7.10p";
+                    break;
+                case 0x004c:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "C";
+                    break;
+                case 0x004d:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "C++/book";
+                    break;
+                case 0x004e:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "C/std";
+                    break;
+                case 0x004f:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "C++/std";
+                    break;
+                case 0x0050:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x0051:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x0052:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x0053:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x0054:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x0055:
+                    bC = 1;
+                    _sV = "13.10p";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x0056:
+                    bL = 1;
+                    _sV = "6.24";
+                    break;
+                case 0x005a:
+                    bL = 1;
+                    _sV = "7.10";
+                    break;
+                case 0x005f:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "C";
+                    break;
+                case 0x0060:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "C++/book";
+                    break;
+                case 0x0061:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "C/std";
+                    break;
+                case 0x0062:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "C++/std";
+                    break;
+                case 0x0063:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x0064:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x0065:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x0066:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x0067:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x0068:
+                    bC = 1;
+                    _sV = "13.10";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x006d:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "C";
+                    break;
+                case 0x006e:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "C++/book";
+                    break;
+                case 0x006f:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "C/std";
+                    break;
+                case 0x0070:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "C++/std";
+                    break;
+                case 0x0071:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x0072:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x0073:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x0074:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x0075:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x0076:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x0078:
+                    bL = 1;
+                    _sV = "8.00";
+                    break;
+                case 0x007d:
+                    bM = 1;
+                    _sV = "8.00";
+                    break;
+                case 0x0080:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "CVTCIL/C";
+                    break;
+                case 0x0081:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "CVTCIL/C++";
+                    break;
+                case 0x0082:
+                    bC = 1;
+                    _sV = "14.00";
+                    _sO = "LTCG/MSIL";
+                    break;
+                case 0x0083:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "C";
+                    break;
+                case 0x0084:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "C++";
+                    break;
+                case 0x0085:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "C/std";
+                    break;
+                case 0x0086:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "C++/std";
+                    break;
+                case 0x0087:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "CVTCIL/C";
+                    break;
+                case 0x0088:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "CVTCIL/C++";
+                    break;
+                case 0x0089:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x008a:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x008b:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "LTCG/MSIL";
+                    break;
+                case 0x008c:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x008d:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x008e:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x008f:
+                    bC = 1;
+                    _sV = "15.00";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x0091:
+                    bL = 1;
+                    _sV = "9.00";
+                    break;
+                case 0x0095:
+                    bM = 1;
+                    _sV = "9.00";
+                    break;
+                case 0x009d:
+                    bL = 1;
+                    _sV = "10.00";
+                    break;
+                case 0x009e:
+                    bM = 1;
+                    _sV = "10.00";
+                    break;
+                case 0x00aa:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "C";
+                    break;
+                case 0x00ab:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "C++";
+                    break;
+                case 0x00ac:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "CVTCIL/C";
+                    break;
+                case 0x00ad:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "CVTCIL/C++";
+                    break;
+                case 0x00ae:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x00af:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x00b0:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "LTCG/MSIL";
+                    break;
+                case 0x00b1:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00b2:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00b3:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x00b4:
+                    bC = 1;
+                    _sV = "16.00";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x00ba:
+                    bL = 1;
+                    _sV = "10.10";
+                    break;
+                case 0x00bb:
+                    bM = 1;
+                    _sV = "10.10";
+                    break;
+                case 0x00bc:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "C";
+                    break;
+                case 0x00bd:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "C++";
+                    break;
+                case 0x00be:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "CVTCIL/C";
+                    break;
+                case 0x00bf:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "CVTCIL/C++";
+                    break;
+                case 0x00c0:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x00c1:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x00c2:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "LTCG/MSIL";
+                    break;
+                case 0x00c3:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00c4:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00c5:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x00c6:
+                    bC = 1;
+                    _sV = "16.10";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x00cc:
+                    bL = 1;
+                    _sV = "11.00";
+                    break;
+                case 0x00cd:
+                    bM = 1;
+                    _sV = "11.00";
+                    break;
+                case 0x00ce:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "C";
+                    break;
+                case 0x00cf:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "C++";
+                    break;
+                case 0x00d0:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "CVTCIL/C";
+                    break;
+                case 0x00d1:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "CVTCIL/C++";
+                    break;
+                case 0x00d2:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x00d3:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x00d4:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "LTCG/MSIL";
+                    break;
+                case 0x00d5:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00d6:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00d7:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x00d8:
+                    bC = 1;
+                    _sV = "17.00";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x00de:
+                    bL = 1;
+                    _sV = "12.00";
+                    break;
+                case 0x00df:
+                    bM = 1;
+                    _sV = "12.00";
+                    break;
+                case 0x00e0:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "C";
+                    break;
+                case 0x00e1:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "C++";
+                    break;
+                case 0x00e2:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "CVTCIL/C";
+                    break;
+                case 0x00e3:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "CVTCIL/C++";
+                    break;
+                case 0x00e4:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x00e5:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x00e6:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "LTCG/MSIL";
+                    break;
+                case 0x00e7:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00e8:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00e9:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x00ea:
+                    bC = 1;
+                    _sV = "18.00";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x00f0:
+                    bL = 1;
+                    _sV = "12.10";
+                    break;
+                case 0x00f1:
+                    bM = 1;
+                    _sV = "12.10";
+                    break;
+                case 0x00f2:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "C";
+                    break;
+                case 0x00f3:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "C++";
+                    break;
+                case 0x00f4:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "CVTCIL/C";
+                    break;
+                case 0x00f5:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "CVTCIL/C++";
+                    break;
+                case 0x00f6:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x00f7:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x00f8:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "LTCG/MSIL";
+                    break;
+                case 0x00f9:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00fa:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x00fb:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x00fc:
+                    bC = 1;
+                    _sV = "18.10";
+                    _sO = "POGO_O_CPP";
+                    break;
+                case 0x0102:
+                    bL = 1;
+                    _sV = "14.00";
+                    break;
+                case 0x0103:
+                    bM = 1;
+                    _sV = "14.00";
+                    break;
+                case 0x0104:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "C";
+                    break;
+                case 0x0105:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "C++";
+                    break;
+                case 0x0106:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "CVTCIL/C";
+                    break;
+                case 0x0107:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "CVTCIL/C++";
+                    break;
+                case 0x0108:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "LTCG/C";
+                    break;
+                case 0x0109:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "LTCG/C++";
+                    break;
+                case 0x010a:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "LTCG/MSIL";
+                    break;
+                case 0x010b:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x010c:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "POGO_I_C";
+                    break;
+                case 0x010d:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "POGO_O_C";
+                    break;
+                case 0x010e:
+                    bC = 1;
+                    _sV = "19.00";
+                    _sO = "POGO_O_CPP";
+                    break;
+            }
+
+            var __sVersion = _sV + "." + PE.getRichVersion(i);
+
+            if ((bL && (_sV == "14.00")) || (bM && (_sV == "14.00")) || (bC && (_sV == "19.00"))) {
+                var __nBuild = PE.getRichVersion(i);
+                var __nMinorVersion = 0;
+                if (__nBuild > 25000) {
+                    if (__nBuild < 25506) __nMinorVersion = 10;
+                    else if (__nBuild < 25830) __nMinorVersion = 11;
+                    else if (__nBuild < 26128) __nMinorVersion = 12;
+                    else if (__nBuild < 26428) __nMinorVersion = 13;
+                    else if (__nBuild < 26726) __nMinorVersion = 14;
+                    else if (__nBuild < 26926) __nMinorVersion = 15;
+                    else if (__nBuild < 27508) __nMinorVersion = 16;
+                    else if (__nBuild < 27702) __nMinorVersion = 20;
+                    else if (__nBuild < 27905) __nMinorVersion = 21;
+                    else if (__nBuild < 28105) __nMinorVersion = 22;
+                    else if (__nBuild < 28314) __nMinorVersion = 23;
+                    else if (__nBuild < 28610) __nMinorVersion = 24;
+                    else if (__nBuild < 28805) __nMinorVersion = 25;
+                    else if (__nBuild < 29110) __nMinorVersion = 26;
+                    else if (__nBuild < 29333) __nMinorVersion = 27;
+                    else if (__nBuild < 30133) __nMinorVersion = 28;
+                    else if (__nBuild < 30401) __nMinorVersion = 29;
+                    else if (__nBuild < 30818) __nMinorVersion = 30;
+                    else if (__nBuild < 31114) __nMinorVersion = 31;
+                    else if (__nBuild < 31424) __nMinorVersion = 32;
+                    else if (__nBuild < 31721) __nMinorVersion = 33;
+                    else if (__nBuild < 32019) __nMinorVersion = 34;
+                    else if (__nBuild < 32323) __nMinorVersion = 35;
+                    else if (__nBuild >= 32323) __nMinorVersion = 36;
+                }
+
+                if (__nMinorVersion) {
+                    if (bL || bM) {
+                        __sVersion = "14." + __nMinorVersion + "." + __nBuild;
+                    } else if (bC) {
+                        __sVersion = "19." + __nMinorVersion + "." + __nBuild;
+                    }
+                }
+            }
+
+            if (bL) {
+                if (__sVersion > _sLinker_Version) {
+                    _sLinker_Name = "Microsoft Linker";
+                    _sLinker_Version = __sVersion;
+                    _sLinker_Options = _sO;
+                }
+            } else if (bC) {
+                if (__sVersion > _sCompilerCPP_Version) {
+                    _sCompilerCPP_Name = "Microsoft Visual C/C++";
+                    _sCompilerCPP_Version = __sVersion;
+                    _sCompilerCPP_Options = _sO;
+                }
+            } else if (bM) {
+                if (__sVersion > _sCompilerMASM_Version) {
+                    _sCompilerMASM_Name = "MASM";
+                    _sCompilerMASM_Version = __sVersion;
+                    _sCompilerMASM_Options = _sO;
+                }
+            } else if (bB) {
+                if (__sVersion > _sCompilerVB_Version) {
+                    _sCompilerVB_Name = "Visual Basic";
+                    _sCompilerVB_Version = __sVersion;
+                    _sCompilerVB_Options = _sO;
+                }
+            }
+        }
+    }
+
+    if (_sLinker_Name) {
+        sLinker_Name = _sLinker_Name;
+        sLinker_Version = _sLinker_Version;
+        sLinker_Options = _sLinker_Options;
+    }
+
+    if (_sCompilerVB_Name) {
+        sCompilerVB_Name = _sCompilerVB_Name;
+        sCompilerVB_Version = _sCompilerVB_Version;
+        sCompilerVB_Options = _sCompilerVB_Options;
+    } else if (_sCompilerCPP_Name) {
+        sCompilerCPP_Name = _sCompilerCPP_Name;
+        sCompilerCPP_Version = _sCompilerCPP_Version;
+        sCompilerCPP_Options = _sCompilerCPP_Options;
+    } else if (_sCompilerMASM_Name) {
+        sCompilerMASM_Name = _sCompilerMASM_Name;
+        sCompilerMASM_Version = _sCompilerMASM_Version;
+        sCompilerMASM_Options = _sCompilerMASM_Options;
+    }
+
+    if (PE.isDeepScan()) {
+        if (_sCompilerCPP_Name == String()) {
+            if (PE.section.length >= 3) {
+                var msVisualCrtPattern = "'Microsoft Visual C++ Runtime Library'"
+                if (PE.isSignatureInSectionPresent(0, msVisualCrtPattern) ||
+                    PE.isSignatureInSectionPresent(1, msVisualCrtPattern) ||
+                    PE.isSignatureInSectionPresent(2, msVisualCrtPattern)) {
+                    sCompilerCPP_Name = "Microsoft Visual C/C++";
+                }
+            }
+        }
+    }
+
+    if (PE.isVerbose()) {
+        if (_sCompilerCPP_Name == String()) {
+            if (PE.isLibraryPresent("msvcrt.dll")) {
+                var nMajorLinkerVersion = PE.getMajorLinkerVersion();
+                var nMinorLinkerVersion = PE.getMinorLinkerVersion();
+
+                if ((nMajorLinkerVersion >= 3) && (nMajorLinkerVersion <= 14) && (nMinorLinkerVersion < 40)) {
+                    sCompilerCPP_Name = "Microsoft Visual C/C++";
+                }
+            }
+        }
+    }
+
+    if (PE.isVerbose()) {
+        if (sLibraryMFC_Name) {
+            if (sCompilerCPP_Name == String()) {
+                sCompilerCPP_Name = "Microsoft Visual C/C++";
+                // TODO Version
+            }
+            if (sLinker_Name == String()) {
+                sLinker_Name = "Microsoft Linker";
+                // TODO Version
+            }
+        }
+
+        if ((sCompilerCPP_Name) || (_sCompilerVB_Name) || (sCompilerMASM_Name)) {
+            if (sLinker_Name == String()) {
+                var nMajorLinkerVersion = PE.getMajorLinkerVersion();
+                var nMinorLinkerVersion = PE.getMinorLinkerVersion();
+
+                if ((nMajorLinkerVersion >= 3) && (nMajorLinkerVersion <= 14) && (nMinorLinkerVersion < 40)) {
+                    sLinker_Name = "Microsoft Linker";
+                }
+            }
+        }
+    }
+
+    if (sLinker_Name) {
+        if (sLinker_Version == String()) {
+            var nMajorLinkerVersion = PE.getMajorLinkerVersion();
+            var nMinorLinkerVersion = PE.getMinorLinkerVersion();
+
+            if ((nMajorLinkerVersion >= 3) && (nMajorLinkerVersion <= 14) && (nMinorLinkerVersion < 40)) {
+                sLinker_Version = PE.getCompilerVersion();
+            }
+        }
+    }
+
+    if ((sCompilerCPP_Name) && (sLinker_Name)) {
+        var sLinkerMajorVersion = sLinker_Version.match(/\d+\.\d+/gm);
+
+        if (sLinkerMajorVersion) {
+            sTool_Name = "Visual Studio";
+
+            if (sLinkerMajorVersion == "6.00") sTool_Version = "6.0";
+            else if (sLinkerMajorVersion == "7.00") sTool_Version = "2002";
+            else if (sLinkerMajorVersion == "7.10") sTool_Version = "2003";
+            else if (sLinkerMajorVersion == "8.00") sTool_Version = "2005";
+            else if (sLinkerMajorVersion == "9.00") sTool_Version = "2008";
+            else if (sLinkerMajorVersion == "10.00") sTool_Version = "2010";
+            else if (sLinkerMajorVersion == "11.00") sTool_Version = "2012";
+            else if (sLinkerMajorVersion == "12.00") sTool_Version = "2013";
+            else if (sLinkerMajorVersion == "14.00") sTool_Version = "2015";
+            else if (sLinkerMajorVersion == "14.10") sTool_Version = "2017, v15.0-15.2";
+            else if (sLinkerMajorVersion == "14.11") sTool_Version = "2017, v15.3";
+            else if (sLinkerMajorVersion == "14.12") sTool_Version = "2017, v15.5";
+            else if (sLinkerMajorVersion == "14.13") sTool_Version = "2017, v15.6";
+            else if (sLinkerMajorVersion == "14.14") sTool_Version = "2017, v15.7";
+            else if (sLinkerMajorVersion == "14.15") sTool_Version = "2017, v15.8";
+            else if (sLinkerMajorVersion == "14.16") sTool_Version = "2017, v15.9";
+            else if (sLinkerMajorVersion == "14.20") sTool_Version = "2019, v16.0";
+            else if (sLinkerMajorVersion == "14.21") sTool_Version = "2019, v16.1";
+            else if (sLinkerMajorVersion == "14.22") sTool_Version = "2019, v16.2";
+            else if (sLinkerMajorVersion == "14.23") sTool_Version = "2019, v16.3";
+            else if (sLinkerMajorVersion == "14.24") sTool_Version = "2019, v16.4";
+            else if (sLinkerMajorVersion == "14.25") sTool_Version = "2019, v16.5";
+            else if (sLinkerMajorVersion == "14.26") sTool_Version = "2019, v16.6";
+            else if (sLinkerMajorVersion == "14.27") sTool_Version = "2019, v16.7-16.8";
+            else if (sLinkerMajorVersion == "14.28") sTool_Version = "2019, v16.9-16.10";
+            else if (sLinkerMajorVersion == "14.29") sTool_Version = "2019, v16.11";
+            else if (sLinkerMajorVersion == "14.30") sTool_Version = "2022, v17.0";
+            else if (sLinkerMajorVersion == "14.31") sTool_Version = "2022, v17.1";
+            else if (sLinkerMajorVersion == "14.32") sTool_Version = "2022, v17.2";
+            else if (sLinkerMajorVersion == "14.33") sTool_Version = "2022, v17.3";
+            else if (sLinkerMajorVersion == "14.34") sTool_Version = "2022, v17.4";
+            else if (sLinkerMajorVersion == "14.35") sTool_Version = "2022, v17.5";
+            else if (sLinkerMajorVersion == "14.36") sTool_Version = "2022, v17.6";
+            else if (sLinkerMajorVersion == "14.37") sTool_Version = "2022, v17.7";
+            else if (sLinkerMajorVersion == "14.38") sTool_Version = "2022, v17.8";
+            else if (sLinkerMajorVersion == "14.39") sTool_Version = "2022, v17.9.1";
+        }
+    }
+
+    if ((sCompilerMASM_Version == "6.14.8444") && (sLinker_Version == "5.12.8078")) {
+        sTool_Name = "masm32";
+        sTool_Version = "8-11";
+    }
+
+    if (sCompilerVB_Name) {
+        _setLang("VB" + (sCompilerVB_Name.indexOf(".NET") !== -1 ? ".NET" : ""));
+        _setResult("compiler", sCompilerVB_Name, sCompilerVB_Version, sCompilerVB_Options);
+    } else if (sCompilerCPP_Name) {
+
+        if (sCompilerCPP_Options !== "C++" && !_isResultPresent("compiler", "Rust")) { // check is Rust detected
+
+            if (sCompilerCPP_Options.indexOf("C++") !== -1 || sCompilerCPP_Options.indexOf("CPP") !== -1) {
+                _setLang("C++");
+            } else if (sCompilerCPP_Options == "C" || sCompilerCPP_Options.indexOf("/C") !== -1 || sCompilerCPP_Options.indexOf("_C") !== -1) {
+                _setLang("C");
+            } else {
+                _setLang("C/C++");
+            }
+
+        }
+
+
+        _setResult("compiler", sCompilerCPP_Name, sCompilerCPP_Version, sCompilerCPP_Options);
+    } else if (sCompilerMASM_Name) {
+        _setLang("ASMx" + (PE.is64() ? "64" : "86"));
+        _setResult("compiler", sCompilerMASM_Name, sCompilerMASM_Version, sCompilerMASM_Options);
+    }
+
+    if (sLibraryDot_Name) {
+        if (_getNumberOfResults("language") == -1) _setLang("MSIL/C#");
+        _setResult("library", sLibraryDot_Name, sLibraryDot_Version, sLibraryDot_Options);
+    }
+
+    if (sLibraryMFC_Name) {
+        _setResult("library", sLibraryMFC_Name, sLibraryMFC_Version, sLibraryMFC_Options);
+    }
+
+    if (sLinker_Name) {
+        _setResult("linker", sLinker_Name, sLinker_Version, sLinker_Options);
+    }
+
+    if (sTool_Name && sTool_Version) {
+        _setResult("tool", sTool_Name, sTool_Version, sTool_Options);
+    }
+
+    return String(); // No need
+}
