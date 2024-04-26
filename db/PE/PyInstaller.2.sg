@@ -3,8 +3,10 @@
 init("packer", "PyInstaller"); // python = 💩
 
 function detect(bShowType, bShowVersion, bShowOptions) {
+    const overlaySignatureDetected = PE.compareOverlay("78da");
 
-    if (PE.compareOverlay("78da")) {
+
+    if (overlaySignatureDetected) {
         const rdata = PE.section[".rdata"];
 
         if (rdata &&
@@ -22,12 +24,18 @@ function detect(bShowType, bShowVersion, bShowOptions) {
         const resSize = PE.getResourceSizeByNumber(i);
         if (resSize == 0x909b &&
             PE.calculateMD5(PE.getResourceOffsetByNumber(i), resSize) == "20d36c0a435caad0ae75d3e5f474650c") {
-            sOptions = PE.section[".rdata"] ? "modified" : "packed";
+
+            if (!overlaySignatureDetected) {
+                sOptions = "custom";
+            } else {
+                sOptions = PE.section[".rdata"] ? "modified" : "packed";
+            }
+
             bDetected = true;
         }
     }
 
-    if (!bDetected && PE.findSignature(
+    if (!bDetected && overlaySignatureDetected && PE.findSignature(
             PE.getOverlayOffset(),
             PE.getOverlaySize(),
             "4d45490c0b0a0b0e"
