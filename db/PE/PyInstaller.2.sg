@@ -1,15 +1,40 @@
 // DIE's signature file
 
-init("packer", "PyInstaller");
+init("packer", "PyInstaller"); // python = 💩
 
 function detect(bShowType, bShowVersion, bShowOptions) {
 
-    if (PE.findSignature(
+    if (PE.compareOverlay("78da")) {
+        const rdata = PE.section[".rdata"];
+
+        if (rdata &&
+            PE.findString(
+                rdata.FileOffset,
+                rdata.FileSize,
+                "PyInstaller: FormatMessageW failed."
+            ) != -1) {
+            bDetected = true;
+        }
+    }
+
+    // Author: DosX
+    for (var i = 0; i < PE.getNumberOfResources() && !bDetected; i++) {
+        const resSize = PE.getResourceSizeByNumber(i);
+        if (resSize == 0x909b &&
+            PE.calculateMD5(PE.getResourceOffsetByNumber(i), resSize) == "20d36c0a435caad0ae75d3e5f474650c") {
+            sOptions = PE.section[".rdata"] ? "modified" : "packed";
+            bDetected = true;
+        }
+    }
+
+    if (!bDetected && PE.findSignature(
             PE.getOverlayOffset(),
             PE.getOverlaySize(),
             "4d45490c0b0a0b0e"
-        ) != -1)
+        ) != -1) {
+        sOptions = "overlay; modified";
         bDetected = true;
+    }
 
     _setLang("Python", bDetected);
     return result(bShowType, bShowVersion, bShowOptions);
