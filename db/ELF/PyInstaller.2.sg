@@ -6,9 +6,19 @@
 init("packer", "PyInstaller"); // python = 💩
 
 function detect(bShowType, bShowVersion, bShowOptions) {
-    if (ELF.compareEP("31ED") &&
-        ELF.isSignaturePresent(0, ELF.getSize(), "00'PYINSTALLER_STRICT_UNPACK_MODE'00"))
+
+    // they insert pkgs into the section named "pydata"
+    const pydata = ELF.getSectionNumber("pydata")  
+
+    // we can find the magic number in the section
+    if (pydata != -1 && ELF.findSignature(
+            ELF.getSectionFileOffset(pydata),
+            ELF.getSectionFileSize(pydata),
+            "4d45490c0b0a0b0e"
+        ) != -1)
         bDetected = true;
+
+    _setLang("Python", bDetected);
 
     return result(bShowType, bShowVersion, bShowOptions);
 }
