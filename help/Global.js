@@ -4,7 +4,7 @@
  * @example
  * includeScript("Cab"); // include script $APP/db/Cab
  */
-function includeScript(sScriptName){}
+function includeScript(sScriptName) {}
 /**
  * Display a message in the log window or as a console error. It is used to debug signatures.
  * @param {String} sString - The message.
@@ -12,7 +12,7 @@ function includeScript(sScriptName){}
  * _log("Hello world!"); // display a string
  * _log(123); // display a number
  */
-function _log(sString){}
+function _log(sString) {}
 
 /**
  * Get a result string appropriate to the class.
@@ -21,4 +21,4 @@ function _log(sString){}
  * @param {Bool} bShowOptions - True to include the options.
  * @returns {String}
  */
-function result(bShowType,bShowVersion,bShowOptions){}
+function result(bShowType, bShowVersion, bShowOptions) {}
