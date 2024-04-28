@@ -86,6 +86,8 @@ function main() {
         }
 
         scanForPackersAndCryptors_NET_and_Native();
+        scanForLanguages_NET_and_Native();
+
         log(logType.nothing, "Scan completed.");
 
         // scanForMaciliousCode_NET_and_Native();
@@ -2268,6 +2270,37 @@ function validateSectionNames(dbCollection) {
     }
 
     return null;
+}
+
+
+
+function scanForLanguages_NET_and_Native() {
+    const extdb = [
+        ["C++", "cpp"],
+        ["Rust", "rs"],
+        ["PHP", "php"],
+        ["Java", "jar"],
+        ["JavaScript", "js"],
+        ["Python", "pyd"]
+    ];
+
+    for (var i = 0; i < extdb.length; i++) {
+        const langName = extdb[i][0],
+            langExtName = extdb[i][1];
+
+        // todo: REWRITE AFTER DIE OPTIMIZATION UPDATE!!!!!!!!!
+        // PE.findSignature(0x00, PE.getSize(), "** ** ** ** ** ** ** ** '." + langExtName + "' 00 00")
+
+        var found = PE.findSignature(0x00, PE.getSize(), "'." + langExtName + "' 00 00");
+        if (found !== -1 && PE.compare("** ** ** ** **", found - 5)) {
+            _setLang(langName, true, "HEUR");
+            debug("detected " + langName);
+        }
+    }
+
+    if (!_isLangDetected() && !_getNumberOfResults("compiler")) {
+        _setLang("ASMx" + (PE.is64() ? "64" : "86"), true, "HEUR");
+    }
 }
 
 
