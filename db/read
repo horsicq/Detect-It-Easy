@@ -99,36 +99,37 @@ const JISX0201 = "⌂"+
     "→｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｶｷｸｹｺｻｼｽｾｿﾀ"+
     "ﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ"+
     "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
-const Chars0to32 = "・☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼"; //#0 is a small dot from Japanese
-const Chars0to32LF = "・☺☻♥♦♣♠•◘○\x0A♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼";
-const Chars0to32CRLF = "・☺☻♥♦♣♠•◘○\x0A♂♀\x0D♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼";
+const Chars0to1F = "・☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼"; //#0 is a small dot from Japanese
+const Chars0to1FLF = "・☺☻♥♦♣♠•◘○\x0A♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼";
+const Chars0to1FCRLF = "・☺☻♥♦♣♠•◘○\x0A♂♀\x0D♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼";
 
 /**
- * Decode a 1-byte encoding from a byte array using the 128-byte-long table given.
+ * Decode a 1-byte encoding from a byte array using the 128-byte-long table given,
+ * as well as a table to display the first 32 characters.
  * @param {[uint8]} ansi - an array returned by readBytes.
  * @param {String[0x81]} dectbl - a decoding table; just make a const here in db/read for that
  * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
- * @param {Array} tbl032 (optional, default=Chars0to32CRLF) - which table to use for the first 32 characters
+ * @param {Array} tbl01F (optional, default=Chars0to1FCRLF) - which table to use for the first 32 characters
  * @returns {String} a string value usable with js.
  */
-function decEncoding(ansi, dectbl, zstop, tbl032) {
+function decEncoding(ansi, dectbl, zstop, tbl01F) {
     if(typeof zstop === 'undefined') zstop = true;
-    if(typeof tbl032 === 'undefined') tbl032 = Chars0to32CRLF;
+    if(typeof tbl01F === 'undefined') tbl01F = Chars0to1FCRLF;
     var s = "", bit8 = 0;
     for(var i=0; i < ansi.length; i++) {
         if (!ansi[i] && zstop) break;
         else if(ansi[i] < 0x80)
             switch(ansi[i]) { // 7-bit variation processing
             case 0x0E: if(dectbl == "JISX0201" || dectbl == "KOI8-R") bit8 = 0x80;
-                else s += Chars0to32[0xE]; break;
+                else s += tbl01F[0xE]; break;
             case 0x0F: if(dectbl == "JISX0201" || dectbl == "KOI8-R") bit8 = 0;
-                else s += Chars0to32[0xF]; break;
+                else s += tbl01F[0xF]; break;
             case 0x5C: if(dectbl == "JISX0201") s += "¥"; else s += "\\"; break;
             case 0x7E: if(dectbl == "JISX0201") s += "‾"; else s += "~"; break;
             case 0x7F: if(dectbl != "JISX0201") s += dectbl[0];
                 else s += String.fromCharCode(bit8+ansi[i]); break;
             default:
-                if(!bit8 && ansi[i] >= 0 && ansi[i] < 0x20) s += tbl032[ansi[i]];
+                if(!bit8 && ansi[i] >= 0 && ansi[i] < 0x20) s += tbl01F[ansi[i]];
                 else s += String.fromCharCode(bit8+ansi[i]);
             }
         else s += dectbl[ansi[i]-0x7F];
