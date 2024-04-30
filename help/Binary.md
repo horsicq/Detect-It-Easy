@@ -291,6 +291,11 @@ if(signature=="AA5411DD")
 
 ```
 ```
+
+**bool isProfiling()**
+
+```
+```
 **quint8 read_uint8(qint64 nOffset)**
 
 ```
