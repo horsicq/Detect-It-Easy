@@ -303,7 +303,7 @@ PE.getResourceNameSize = function(sName) {}
      */
 PE.getSectionCharacteristics = function(nSectionNumber) {}
     /**
-     * Get the file offset of a setion.
+     * Get the file offset of a section.
      * @param {Int} nSectionNumber - Section number (from 0).
      * @returns {UInt}
      */
