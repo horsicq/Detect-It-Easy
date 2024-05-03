@@ -53,12 +53,13 @@
 // Please do not read the code out loud unless you have exorcism skills
 
 const logType = {
-    warning: -2,
-    about: -1,
-    nothing: 0,
-    any: 1,
-    net: 2
-};
+        warning: -2,
+        about: -1,
+        nothing: 0,
+        any: 1,
+        net: 2
+    },
+    heurLabel = "HEUR";
 
 var lastOffsetDetected = "0x00";
 
@@ -814,7 +815,7 @@ function scanForObfuscations_NET() {
 
 
     if (isDetected) {
-        _setResult("protection", "Obfuscation", "HEUR", PE.isVerbose() ? options : String());
+        _setResult("protection", "Obfuscation", heurLabel, PE.isVerbose() ? options : String());
     }
 }
 
@@ -988,7 +989,7 @@ function scanForAntiAnalysis_NET() {
 
 
     if (options.length != 0) {
-        _setResult("protection", "Anti analysis", "HEUR", PE.isVerbose() ? options : String());
+        _setResult("protection", "Anti analysis", heurLabel, PE.isVerbose() ? options : String());
     }
 }
 
@@ -1535,8 +1536,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["tElock", null, "UPX!"], // ???
         ["YodasProtector", "1.0b", ".yP"],
         ["YodasCrypter", "1.X", "yC"],
-        ["MPRESS", null, ".MPRESS0"],
         ["MPRESS", null, ".MPRESS1"],
+        ["MPRESS", null, ".MPRESS2"],
         ["DxPack", "1.0", "coderpub"],
         ["SafeNet", null, ".AKS1"],
         ["SafeNet", null, ".AKS2"],
@@ -1747,7 +1748,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (isDetected) {
         var detectedType = isCryptor ? "cryptor" : "packer";
 
-        _setResult(detectedType, (isCryptor ? "Cryptor" : "Packer") + " detected", "HEUR", PE.isVerbose() ? options : String());
+        _setResult(detectedType, (isCryptor ? "Cryptor" : "Packer") + " detected", heurLabel, PE.isVerbose() ? options : String());
     }
 }
 
@@ -2096,7 +2097,7 @@ function scanForObfuscations_Native() {
 
 
     if (isDetected) {
-        _setResult("protection", "Generic", "HEUR", PE.isVerbose() ? options : String());
+        _setResult("protection", "Generic", heurLabel, PE.isVerbose() ? options : String());
     }
 }
 
@@ -2229,7 +2230,7 @@ function log(messageTypeId, messageText) {
     var prefix = String();
 
     if (messageTypeId !== -2) {
-        prefix = "Heur";
+        prefix = heurLabel;
     }
 
     if (messageTypeId > -2 && messageTypeId !== 0) {
@@ -2293,12 +2294,19 @@ function scanForLanguages_NET_and_Native() {
 
         var found = PE.findSignature(0x00, PE.getSize(), "'." + langExtName + "' 00 00");
         if (found !== -1 && PE.compare("** ** ** ** **", found - 5)) {
-            _setLang(langName, true, "HEUR");
+            _setLang(langName, true, heurLabel);
         }
     }
 
-    if (!_isLangDetected() && !_getNumberOfResults("compiler")) {
-        _setLang("ASMx" + (PE.is64() ? "64" : "86"), true, "HEUR");
+    if (!_getNumberOfResults("protector") &&
+        !_getNumberOfResults("cryptor") &&
+        !_getNumberOfResults("packer")) {
+
+        if (!_isResultPresent("language", "C++") && (PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
+            _setLang("C", true, heurLabel);
+        } else if (!_isLangDetected() && !_getNumberOfResults("compiler")) {
+            _setLang("ASMx" + (PE.is64() ? "64" : "86"), true, heurLabel);
+        }
     }
 }
 
