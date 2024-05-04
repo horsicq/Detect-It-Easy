@@ -2279,8 +2279,7 @@ function scanForLanguages_NET_and_Native() {
     const extdb = [
         ["C++", "cpp"],
         ["Rust", "rs"],
-        ["PHP", "php"],
-        ["Java", "jar"],
+        ["Java", "class"],
         ["JavaScript", "js"],
         ["Python", "pyd"]
     ];
@@ -2302,7 +2301,19 @@ function scanForLanguages_NET_and_Native() {
         !_getNumberOfResults("cryptor") &&
         !_getNumberOfResults("packer")) {
 
-        if (!_isResultPresent("language", "C++") && (PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
+        var isPpLibrary = false;
+
+        for (var i = 0; i < PE.getNumberOfImports() && !isPpLibrary; i++) {
+            const libraryName = PE.getImportLibraryName(i).toLowerCase();
+
+            if (libraryName.indexOf("++") !== -1 || libraryName.indexOf("cpp") !== -1) {
+                isPpLibrary = true;
+            }
+        }
+
+        if (isPpLibrary) {
+            _setLang("C++", true, heurLabel)
+        } else if (!_isResultPresent("language", "C++") && (PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
             _setLang("C", true, heurLabel);
         } else if (!_isLangDetected() && !_getNumberOfResults("compiler")) {
             _setLang("ASMx" + (PE.is64() ? "64" : "86"), true, heurLabel);
