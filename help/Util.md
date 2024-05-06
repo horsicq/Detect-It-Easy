@@ -16,5 +16,11 @@
 
 ```
 ```
+**Util.divu64(quint64 nDividend, quint64 nDivisor)**
 
+```
+```
+**Util.div64(qint64 nDividend, qint64 nDivisor)**
 
+```
+```
