@@ -48,7 +48,8 @@
 
 // For the script to work correctly, the following
 // official Detect It Easy components are required:
-// "FASM", "RosASM", "SpASM", "FPC", "PE\linker.6.sg"
+// "FASM", "RosASM", "SpASM", "FPC", "PE\linker.6.sg",
+// "Microsoft.6.sg"
 
 // Please do not read the code out loud unless you have exorcism skills
 
@@ -2222,40 +2223,6 @@ function validateImportHashes(dbCollection) {
 }
 
 
-function log(messageTypeId, messageText) {
-    if (messageText.indexOf("\n") != -1) {
-        throw "Illegal char at log( ... )";
-    }
-
-    var prefix = String();
-
-    if (messageTypeId !== -2) {
-        prefix = heurLabel;
-    }
-
-    if (messageTypeId > -2 && messageTypeId !== 0) {
-        prefix += "/";
-    }
-
-    switch (messageTypeId) {
-        case -2:
-            prefix = "!";
-            break;
-        case -1:
-            prefix += "About";
-            break;
-        case 1:
-            prefix += "Any";
-            break;
-        case 2:
-            prefix += ".NET";
-            break;
-    }
-
-    _log("[" + prefix + "] " + messageText);
-}
-
-
 function validateSectionNames(dbCollection) {
     for (var i = 0; i < dbCollection.length; i++) {
         const currentIndex = i,
@@ -2293,30 +2260,91 @@ function scanForLanguages_NET_and_Native() {
 
         var found = PE.findSignature(0x00, PE.getSize(), "'." + langExtName + "' 00 00");
         if (found !== -1 && PE.compare("** ** ** ** **", found - 5)) {
-            _setLang(langName, true, heurLabel);
+            _setLangByHeur(langName);
         }
     }
 
     if (!_getNumberOfResults("protector") &&
         !_getNumberOfResults("cryptor") &&
         !_getNumberOfResults("packer")) {
+        const c_or_cpp = _isResultPresent("language", "C/C++");
+
 
         var isPpLibrary = false;
 
         for (var i = 0; i < PE.getNumberOfImports() && !isPpLibrary; i++) {
             const libraryName = PE.getImportLibraryName(i).toLowerCase();
 
-            isPpLibrary = (libraryName.indexOf("++") !== -1 || libraryName.indexOf("cpp") !== -1 || libraryName.indexOf("msvcp") !== -1);
+            isPpLibrary = (
+                libraryName.indexOf("++") !== -1 ||
+                libraryName.indexOf("cpp") !== -1 ||
+                libraryName.indexOf("msvcp") !== -1
+            );
         }
 
-        if (isPpLibrary) {
-            _setLang("C++", true, heurLabel)
+
+
+        const rdataSection = PE.section[".rdata"];
+
+        if (rdataSection) {
+            if (c_or_cpp && // if C/C++ detected by DIE
+                PE.isSignaturePresent(
+                    rdataSection.FileOffset,
+                    rdataSection.FileSize,
+                    generateUnicodeSignatureMask("Visual C++"))) {
+
+                isPpLibrary = true; // Visual C++ Runtime library in resources
+            }
+        }
+
+
+        if (isPpLibrary || (c_or_cpp && PE.isSignaturePresent(0x00, PE.getSize() - PE.getOverlaySize(), "' C++ '"))) {
+            _setLangByHeur("C++");
         } else if (!_isResultPresent("language", "C++") && (PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
-            _setLang("C", true, heurLabel);
+            _setLangByHeur("C");
         } else if (!_isLangDetected() && !_getNumberOfResults("compiler")) {
-            _setLang("ASMx" + (PE.is64() ? "64" : "86"), true, heurLabel);
+            _setLangByHeur("ASMx" + (PE.is64() ? "64" : "86"));
         }
     }
+}
+
+
+function _setLangByHeur(languageName) {
+    _setLang(languageName, true, heurLabel);
+}
+
+
+function log(messageTypeId, messageText) {
+    if (messageText.indexOf("\n") != -1) {
+        throw "Illegal char at log( ... )";
+    }
+
+    var prefix = String();
+
+    if (messageTypeId !== -2) {
+        prefix = heurLabel;
+    }
+
+    if (messageTypeId > -2 && messageTypeId !== 0) {
+        prefix += "/";
+    }
+
+    switch (messageTypeId) {
+        case -2:
+            prefix = "!";
+            break;
+        case -1:
+            prefix += "About";
+            break;
+        case 1:
+            prefix += "Any";
+            break;
+        case 2:
+            prefix += ".NET";
+            break;
+    }
+
+    _log("[" + prefix + "] " + messageText);
 }
 
 
