@@ -1,0 +1,41 @@
+// Author: DosX
+// E-Mail: collab@kay-software.ru
+// GitHub: https://github.com/DosX-dev
+// Telegram: @DosX_dev
+
+
+// The best compiler for C. VC/Clang/GCC sucks!
+// Thank you, Bellard. ;)
+
+init("compiler", "Tiny C");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    var isLinkerDetected = false,
+        isInitFuncDetected = false,
+        isStdLibUsed = PE.isLibraryPresent("msvcrt.dll");
+
+    if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21546869732070726F6772616D2063616E6E6F742062652072756E20696E20444F53206D6F64652E0D0D0A2400000000000000'PE'0000")) {
+        _setResult("linker", "TCC Linker", "v6.0", "");
+        isLinkerDetected = true;
+    }
+
+    if (isStdLibUsed && PE.compareEP(PE.is64() ?
+            "554889e54881ec........b8........8945..b8........4989c24c89d1e8" :
+            "5589e581ec........908d45..50e8........83c4..b8........8945..b8........50e8........83c4"))
+        isInitFuncDetected = true;
+
+    if (isLinkerDetected || isInitFuncDetected) bDetected = true;
+
+    if (bDetected && !isInitFuncDetected && PE.compareEP("5589E581EC........90E8")) {
+        sVersion = "legacy";
+        isInitFuncDetected = true;
+    }
+
+    if (bDetected) {
+        if (!isStdLibUsed) sOptions = "no std"; // detectible on last versions
+        if (!isInitFuncDetected) sOptions += (sOptions ? " + " : "") + "no init"; // if EP is '_start()'
+    }
+
+    _setLang("C", bDetected);
+    return result(bShowType, bShowVersion, bShowOptions);
+}
