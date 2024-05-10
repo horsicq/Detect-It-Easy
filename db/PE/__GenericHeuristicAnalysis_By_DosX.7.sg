@@ -88,9 +88,14 @@ function main() {
         }
 
         scanForPackersAndCryptors_NET_and_Native();
-        scanForLanguages_NET_and_Native();
 
+        if (PE.isVerbose()) {
+            scanForLanguages_NET_and_Native();
+        }
+
+        // >> Happy end <<
         log(logType.nothing, "Scan completed.");
+
 
         // scanForMaciliousCode_NET_and_Native();
     } else {
@@ -2244,6 +2249,8 @@ function validateSectionNames(dbCollection) {
 
 
 function scanForLanguages_NET_and_Native() {
+    log(logType.nothing, "Scanning to programming language has started!");
+
     const extdb = [
         ["C++", "cpp"],
         ["Rust", "rs"],
@@ -2261,6 +2268,7 @@ function scanForLanguages_NET_and_Native() {
 
         var found = PE.findSignature(0x00, PE.getSize(), "'." + langExtName + "' 00 00");
         if (found !== -1 && PE.compare("** ** ** ** **", found - 5)) {
+            log(logType.any, "Lines of ." + langExtName + " files (" + langName + ") detected")
             _setLangByHeur(langName);
         }
     }
@@ -2268,19 +2276,32 @@ function scanForLanguages_NET_and_Native() {
     if (!_getNumberOfResults("protector") &&
         !_getNumberOfResults("cryptor") &&
         !_getNumberOfResults("packer")) {
-        const c_or_cpp = _isResultPresent("language", "C/C++");
 
 
-        var isPpLibrary = false;
+        var isPpLibraryPresent = false,
+            isCLibraryPresent = false;
 
-        for (var i = 0; i < PE.getNumberOfImports() && !isPpLibrary; i++) {
+        for (var i = 0; i < PE.getNumberOfImports(); i++) {
             const libraryName = PE.getImportLibraryName(i).toLowerCase();
 
-            isPpLibrary = (
-                libraryName.indexOf("++") !== -1 ||
-                libraryName.indexOf("cpp") !== -1 ||
-                libraryName.indexOf("msvcp") !== -1
-            );
+
+            if (!isCLibraryPresent) {
+                isCLibraryPresent = libraryName.indexOf("msvcr") !== -1;
+            }
+
+            if (!isPpLibraryPresent) {
+                isPpLibraryPresent = (
+                    libraryName.indexOf("++") !== -1 ||
+                    libraryName.indexOf("cpp") !== -1 ||
+                    libraryName.indexOf("msvcp") !== -1
+                );
+            }
+
+            if (isCLibraryPresent)
+                log(logType.any, "C library present -> \"" + libraryName + "\"");
+
+            if (isPpLibraryPresent)
+                log(logType.any, "C++ library present -> \"" + libraryName + "\"");
         }
 
 
@@ -2288,20 +2309,21 @@ function scanForLanguages_NET_and_Native() {
         const rdataSection = PE.section[".rdata"];
 
         if (rdataSection) {
-            if (c_or_cpp && // if C/C++ detected by DIE
+            if (c_cpp && // if C/C++ detected by DIE
                 PE.isSignaturePresent(
                     rdataSection.FileOffset,
                     rdataSection.FileSize,
                     generateUnicodeSignatureMask("Visual C++"))) {
 
-                isPpLibrary = true; // Visual C++ Runtime library in resources
+                log(logType.any, "Embedded Visual C++ Runtime detected.");
+                isPpLibraryPresent = true; // Visual C++ Runtime library in resources
             }
         }
 
 
-        if (isPpLibrary || (c_or_cpp && PE.isSignaturePresent(0x00, PE.getSize() - PE.getOverlaySize(), "' C++ '"))) {
+        if (isPpLibraryPresent || (c_cpp && PE.isSignaturePresent(0x00, PE.getSize() - PE.getOverlaySize(), "' C++ '"))) {
             _setLangByHeur("C++");
-        } else if (!_isResultPresent("language", "C++") && (PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
+        } else if (!_isResultPresent("language", "C++") && (isCLibraryPresent || PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
             _setLangByHeur("C");
         } else if (!_isLangDetected() && !_getNumberOfResults("compiler")) {
             _setLangByHeur("ASMx" + (PE.is64() ? "64" : "86"));
@@ -2311,6 +2333,7 @@ function scanForLanguages_NET_and_Native() {
 
 
 function _setLangByHeur(languageName) {
+    log(logType.any, languageName + " language detected!");
     _setLang(languageName, true, heurLabel);
 }
 
