@@ -24,3 +24,7 @@
 
 ```
 ```
+**QString secondsToTimeStr(qint32 nValue)**
+
+```
+```
