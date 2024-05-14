@@ -26,3 +26,11 @@
 
 ```
 ```
+**quint32 getNumberOfCommands()**
+
+```
+```
+**quint32 getCommandId(quint32 nNumber)**
+
+```
+```
