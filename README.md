@@ -94,7 +94,7 @@ Detailed usage instructions can be found in [RUN.md](docs/RUN.md).
 
 # Telegram Bot
 
-You could find the Bot in Telegram @detectiteasy_bot or simply enter in the search for Telegram "Detect It Easy"
+* ### [@detectiteasy_bot](https://t.me/detectiteasy_bot)
 
 # Thanks to all the people who already contributed!
 
