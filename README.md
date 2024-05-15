@@ -9,6 +9,10 @@
 
 # Detect It Easy
 
+> * ### [DOWNLOAD **RELEASE**](https://github.com/horsicq/Detect-It-Easy/releases/tag/Beta)
+> * ### [DOWNLOAD LATEST **BETA**](https://github.com/horsicq/Detect-It-Easy/releases/tag/Beta)
+> ### [DIE API Library (for developers)](https://github.com/horsicq/die_library)
+
 - Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
 
 You can help with translation: https://github.com/horsicq/XTranslation
@@ -19,9 +23,9 @@ You can help with translation: https://github.com/horsicq/XTranslation
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/4.png "4")
 ![alt text](https://github.com/horsicq/Detect-It-Easy/blob/master/docs/5.png "5")
 
-Detect It Easy, or abbreviated "DIE" is a program for determining types of files.
+**Detect It Easy**, or abbreviated "DIE" is a program for determining types of files.
 
-"DIE" is a cross-platform application, apart from Windows version there are also
+DIE is a cross-platform application, apart from Windows version there are also
 available versions for Linux and Mac OS.
 
 Many programs of the kind (PEID, PE tools) allow to use third-party signatures.
@@ -32,7 +36,7 @@ itself. Hence, to add a new complex detect one needs to recompile the entire
 project. No one, except the authors themselves, can change the algorithm of
 a detect. As time passes, such programs lose relevance without the constant support.
 
-Detect It Easy has totally open architecture of signatures. You can easily
+**Detect It Easy** has totally open architecture of signatures. You can easily
 add your own algorithms of detects or modify those that already exist. This
 is achieved by using scripts. The script language is very similar to JavaScript
 and any person, who understands the basics of programming, will understand easily
@@ -53,19 +57,6 @@ which lie in the corresponding folder. Currently the program defines the followi
 - ELF executable files Linux
 - MACH executable files Mac OS
 - Binary all other files
-
-# Downloads
-
-Detect-It-Easy can be downloaded from the [release](https://github.com/horsicq/DIE-engine/releases) page.
-
-DIE library: https://github.com/horsicq/die_library
-
-### Portable version (Linux)
-
-```bash
-wget https://github.com/horsicq/DIE-engine/releases/download/3.08/Detect_It_Easy-3.08-x86_64.AppImage
-chmod +x Detect_It_Easy-3.08-x86_64.AppImage
-```
 
 # Installing
 
