@@ -279,4 +279,11 @@
 
 ```
 ```
+**quint64 getImageFileHeader(QString sString)**
 
+```
+```
+**quint64 getImageOptionalHeader(QString sString)**
+
+```
+```
