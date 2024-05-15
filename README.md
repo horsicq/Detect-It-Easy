@@ -11,7 +11,7 @@
 
 > * ### [DOWNLOAD **RELEASE**](https://github.com/horsicq/Detect-It-Easy/releases/tag/Beta)
 > * ### [DOWNLOAD LATEST **BETA**](https://github.com/horsicq/Detect-It-Easy/releases/tag/Beta)
-> ### [DIE API Library (for developers)](https://github.com/horsicq/die_library)
+> * #### [DIE API Library (for developers)](https://github.com/horsicq/die_library)
 
 - Changelog: https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt
 
