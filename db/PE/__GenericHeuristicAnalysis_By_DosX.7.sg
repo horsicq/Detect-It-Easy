@@ -2247,6 +2247,8 @@ function validateSectionNames(dbCollection) {
 function scanForLanguages_NET_and_Native() {
     log(logType.nothing, "Scanning to programming language has started!");
 
+    var c_cpp = _isLangPresent("C/C++"); // Unknown; C or C++
+
     const extdb = [
         ["C++", "cpp"],
         ["Rust", "rs"],
@@ -2259,11 +2261,7 @@ function scanForLanguages_NET_and_Native() {
         const langName = extdb[i][0],
             langExtName = extdb[i][1];
 
-        // todo: REWRITE AFTER DIE OPTIMIZATION UPDATE!!!!!!!!!
-        // PE.findSignature(0x00, PE.getSize(), "** ** ** ** ** ** ** ** '." + langExtName + "' 00 00")
-
-        var found = PE.findSignature(0x00, PE.getSize(), "'." + langExtName + "' 00 00");
-        if (found !== -1 && PE.compare("** ** ** ** **", found - 5)) {
+        if (PE.isSignaturePresent(0x00, PE.getSize(), "** ** ** ** ** ** ** ** '." + langExtName + "' 00 00")) {
             log(logType.any, "Lines of ." + langExtName + " files (" + langName + ") detected")
             _setLangByHeur(langName);
         }
@@ -2279,7 +2277,6 @@ function scanForLanguages_NET_and_Native() {
 
         for (var i = 0; i < PE.getNumberOfImports(); i++) {
             const libraryName = PE.getImportLibraryName(i).toLowerCase();
-
 
             if (libraryName.indexOf("msvcr") !== -1) {
                 log(logType.any, "C library present -> \"" + libraryName + "\"");
@@ -2316,7 +2313,7 @@ function scanForLanguages_NET_and_Native() {
 
         if (isPpLibraryPresent || (c_cpp && PE.isSignaturePresent(0x00, PE.getSize() - PE.getOverlaySize(), "' C++ '"))) {
             _setLangByHeur("C++");
-        } else if (!_isResultPresent("language", "C++") && (isCLibraryPresent || PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
+        } else if (!_isLangPresent("C++") && (isCLibraryPresent || PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
             _setLangByHeur("C");
         } else if (!_isLangDetected() && !_getNumberOfResults("compiler")) {
             _setLangByHeur("ASMx" + (PE.is64() ? "64" : "86"));
