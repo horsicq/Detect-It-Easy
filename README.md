@@ -9,7 +9,7 @@
 
 # Detect It Easy
 
-> * ### [DOWNLOAD **RELEASE**](https://github.com/horsicq/Detect-It-Easy/releases/tag/Beta)
+> * ### [DOWNLOAD **RELEASE**](https://github.com/horsicq/DIE-engine/releases)
 > * ### [DOWNLOAD LATEST **BETA**](https://github.com/horsicq/Detect-It-Easy/releases/tag/Beta)
 > * #### [DIE API Library (for developers)](https://github.com/horsicq/die_library)
 
