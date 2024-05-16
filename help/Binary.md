@@ -517,32 +517,33 @@ iscii-mlm
 ```
 ```
 
+### Shorthands
 
-* function X.U8(a) { return File.read_uint8(a) }
-* function X.I8(a) { return File.read_int8(a) }
+`X.U8(a)` = `File.read_uint8(a)`\
+`X.I8(a)` = `File.read_int8(a)`
 
-* function X.U16(a,b) { return File.read_uint16(a,b) }
-* function X.I16(a,b) { return File.read_int16(a,b) }
-* function X.F16(a,b) { return File.read_float16(a,b) }
+`X.U16(a,b)` = `File.read_uint16(a,b)`\
+`X.I16(a,b)` = `File.read_int16(a,b)`\
+`X.F16(a,b)` = `File.read_float16(a,b)`
 
-* function X.U24(a,b) { return File.read_uint24(a,b) }
-* function X.I24(a,b) { return File.read_int24(a,b) }
+`X.U24(a,b)` = `File.read_uint24(a,b)`\
+`X.I24(a,b)` = `File.read_int24(a,b)`
 
-* function X.U32(a,b) { return File.read_uint32(a,b) }
-* function X.I32(a,b) { return File.read_int32(a,b) }
-* function X.F32(a,b) { return File.read_float32(a,b) }
+`X.U32(a,b)` = `File.read_uint32(a,b)`\
+`X.I32(a,b)` = `File.read_int32(a,b)`\
+`X.F32(a,b)` = `File.read_float32(a,b)`
 
-* function X.U64(a,b) { return File.read_uint64(a,b) }
-* function X.I64(a,b) { return File.read_int64(a,b) }
-* function X.F64(a,b) { return File.read_float64(a,b) }
+`X.U64(a,b)` = `File.read_uint64(a,b)`\
+`X.I64(a,b)` = `File.read_int64(a,b)`\
+`X.F64(a,b)` = `File.read_float64(a,b)`
 
-* function X.SA(a,b) { return File.read_ansiString(a,b) }
-* function X.SC(a,b,c) { return File.read_codePageString(a,b,c) }
-* function X.UСSD(a,b) { return File.read_ucsdString(a,b) }
-* function X.SU8(a,b,c) { return File.read_utf8String(a,b,c) }
-* function X.SU16(a,b,c) { return File.read_unicodeString(a,b,c) }
+`X.SA(a,b)` = `File.read_ansiString(a,b)`\
+`X.SC(a,b,c)` = `File.read_codePageString(a,b,c)`\
+`X.UСSD(a,b)` = `File.read_ucsdString(a,b)`\
+`X.SU8(a,b,c)` = `File.read_utf8String(a,b,c)`\
+`X.SU16(a,b,c)` = `File.read_unicodeString(a,b,c)`
 
-* function X.Sz() { return File.getSize() }
-* function X.fSig(a,b,c) { return File.findSignature(a,b,c) }
-* function X.fStr(a,b,c) { return File.findString(a,b,c) }
-* function X.c(a,b) { return File.compare(a,b) }
+`X.Sz()` = `File.getSize()`\
+`X.fSig(a,b,c)` = `File.findSignature(a,b,c)`\
+`X.fStr(a,b,c)` = `File.findString(a,b,c)`\
+`X.c(a,b)` = `File.compare(a,b)`
