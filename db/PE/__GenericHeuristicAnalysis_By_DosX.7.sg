@@ -105,7 +105,7 @@ function main() {
 
 function stubForLegacyEngines() {
     if (typeof PE.isNetObjectPresent === 'undefined') {
-        _setResult("DIE-Message", ">>> Update DIE Engine to 3.09 and higher for using Heuristic-analyser by DosX <<<", String(), String());
+        _setResult("DIE-Message", ">>> Update DIE Engine to 3.10 and higher for using Heuristic-analyser by DosX <<<", String(), String());
         return true;
     }
 
@@ -429,6 +429,9 @@ function scanForObfuscations_NET() {
         validateNetByteCode( // samples by: ConfuserEx (neo mod)
             opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.dup + opCodes.stloc_0 + opCodes.ldc_i4_3 + opCodes.rem_un + opCodes.switch__nobody
         ) ||
+        validateNetByteCode( // samples by: .NET Reactor (v6.9.8)
+            opCodes.setStrict(opCodes.ldc_i4, "00 00 00 00") + opCodes.br + opCodes.br + opCodes.ldloc
+        ) ||
         validateNetByteCode( // samples by: .NET Reactor
             opCodes.ldsfld + opCodes.brfalse + opCodes.pop +
             opCodes.setStrict(opCodes.ldc_i4, "01 00 00 00") + // MSIL: 'ldc.4 1'
@@ -465,6 +468,13 @@ function scanForObfuscations_NET() {
         validateNetByteCode( // samples by: DotNetPatcher
             opCodes.setStrict(opCodes.stloc_s, "05") + opCodes.nop + opCodes.ldloc_s + opCodes._unknown + opCodes.ceq + opCodes.brfalse_s + opCodes._unknown +
             opCodes.setStrict(opCodes.stloc_s, "05") + opCodes.nop + opCodes.ldloc_s + opCodes._unknown + opCodes.ceq + opCodes.brfalse_s
+        ) ||
+        validateNetByteCode( // samples by: VMProtect
+            opCodes.ldloc_0 + opCodes.setStrict(opCodes.ldc_i4, "?? ** ** **") + opCodes._unknown + opCodes.stloc_0 +
+            opCodes.ldloc_0 + opCodes.setStrict(opCodes.ldc_i4, "?? ** ** **") + opCodes.xor + opCodes.stloc_0
+        ) ||
+        validateNetByteCode( // samples by: VMProtect
+            opCodes.setStrict(opCodes.ldc_i4, "?? ** ** **") + opCodes._unknown + opCodes.stloc_0 + opCodes.setStrict(opCodes.ldftn, "** ?? ?? ??")
         )
     ) {
         log(logType.net, "Control flow obfuscation detected! Offset: " + lastOffsetDetected);
@@ -1488,7 +1498,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["YodasProtector", "1.0b", -1, 0x1303a51b],
         ["ASM Guard", "2.XX+", -1, 0xf1e0d63b],
         ["Themida", "2.XX-3.XX", 0, 0x3ffccc8a],
-        ["Amber", null, -1, 0x97c72051]
+        ["Amber", null, -1, 0x97c72051],
+        [".NET Reactor", null, 0, 0x96be8e26],
+        [".NET Reactor", null, 1, 0xb4cda32f]
     ];
 
     const importValidatingResult = validateImportHashes(dbCollectionOfHashesDictionary);
@@ -2269,7 +2281,11 @@ function scanForLanguages_NET_and_Native() {
 
     if (!_getNumberOfResults("protector") &&
         !_getNumberOfResults("cryptor") &&
-        !_getNumberOfResults("packer")) {
+        !_getNumberOfResults("packer") &&
+        !_getNumberOfResults("~protection") &&
+        !_getNumberOfResults("~cryptor") &&
+        !_getNumberOfResults("~packer")
+    ) {
 
 
         var isPpLibraryPresent = false,
