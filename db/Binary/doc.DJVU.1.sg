@@ -1,73 +1,112 @@
 // https://github.com/horsicq/Detect-It-Easy signature file
 // Author: Kaens TG@kaens
 
-init("format","DjVu document (.DJVU)");
+init("format", "DjVu document (.DJVU)");
 includeScript("read");
 
-function detect(bShowType,bShowVersion,bShowOptions) {
-	var sdjv = false;
-	if(X.c("'AT&TFORM'"))
-		if(X.c("'DJVM'........00",12)) sVersion = 'multi-page';
-		else if(X.c("'DJVU'........00",12)) sVersion = 'single-page';
-		else if(X.c("'DJVI'........00",12)) sVersion = 'multi-file';
-		else if(X.c("'THUMTH44'",12)) sVersion = 'thumbnails';
-		else return false;
-	else if(X.c("'SDJVFORM'")) { sName = "Secure "+sName; sdjv = true }
-	else return false;
-	bad = "";
-	sz = X.U32(8,_BE)+12;
-	if(X.Sz() < sz) bad = bad.addIfNone('!short');
-	if(X.isDeepScan() && !sdjv) { //can't say I've ever seen an sdjv so nothing to test on
-		var compfiles=minw=minh=mindpi=mingm=0xFFFFFFFF, maxw=maxh=maxdpi=maxgm=0;
-		p = 0x10; while(p < sz) {
-			hkhd = X.SA(p,4); hksz = X.U32(p+4,_BE); p += 8;
-//_log('@'+Hex(p-8)+':'+hkhd);
-			switch(hkhd) {
-			case 'INFO': sVersion = sVersion.appendS('image','/'); break;
-			case 'NAVM': if(X.isVerbose()) sOptions = sOptions.addIfNone(' bookmarks,'); break;
-			case 'ANTa': case 'ANTz': if(X.isVerbose()) sOptions = sOptions.addIfNone('annotated,'); break;
- 			case 'DIRM': compfiles = X.U16(p+1); break;
- 			case 'FORM':
-				if(!X.c("'DJV'",p) && !X.c("'THUM'",p)) {_log('bad subchunk '+X.SA(p,8)); return false }
-				q = p+4;
-				while(q < p+hksz) {
-					shd = X.SA(q,4); ssz = X.U32(q+4,_BE); q += 8;
-					if(q+ssz > p+hksz) { bad = bad.addIfNone('!short'); break }
-					switch(shd) {
-					case 'INFO':
-						var w = X.U16(q,_BE), h = X.U16(q+2,_BE), dpi = X.U16(q+6,_LE/*yes*/), gm = X.U8(q+8);
-						if(w < minw) minw = w; if(w > maxw) maxw = w;
-						if(h < minh) minh = h; if(h > maxh) maxh = h;
-						if(dpi < mindpi) mindpi = dpi; if(dpi > maxdpi) maxdpi = dpi;
-						if(gm < mingm) mingm = gm; if(gm > maxgm) maxgm = gm;
-						break;
-					case 'INCL':
-						//if(X.isVerbose()) sOptionT(X.SA(q,ssz),'includes '); //included filenames, normally too many
-						break;
-					case 'TXTa': case 'TXTz': if(X.isVerbose()) sOptions = sOptions.addIfNone('text&layoutinfo,'); break;
-					case 'Djbz': case 'Sjbz': case 'FG44': case 'BG44': case 'TH44':
-					case 'WMRM': case 'FGbz': case 'BGjp': case 'FGjp': case 'Smmr': break;
-					}
-					q += ssz; if(q%2) q++
-				}
-				break;
-			default: bad = bad.addIfNone('!badchunk<'+hkhd+'>@'+Hex(p-8));
-			}
-			p += hksz; if(p%2) p++
-		}
-	}
-	if(sOptions.length && sOptions[sOptions.length-1] == ',') sOptions = sOptions.slice(0,sOptions.length-1);
-	bDetected = true;
-	if(bad != '') sVersion = sVersion.appendS('malformed'+addEllipsis(bad,0x80,0x40),'/')
-	if(X.isVerbose()) {
-		if(X.isDeepScan()) {
-			sOption((minw != maxw ? '['+minw+'～'+maxw+']' : minw)+'×'
-				+(minh != maxh ? '['+minh+'～'+maxh+']' : minh));
-			sOption((mindpi != maxdpi ? '['+mindpi+'～'+maxdpi:mindpi),'','dpi');
-			sOption('gamma '+(mingm != maxgm ? '['+(mingm/10).toFixed(1)+'～'+(maxgm/10).toFixed(1)+']'
-				: (mingm/10).toFixed(1)));
-		}
-		sOption(outSz(sz),'sz:')
-	}
-	return result(bShowType,bShowVersion,bShowOptions);
+function detect(bShowType, bShowVersion, bShowOptions) {
+    var sdjv = false;
+    if (X.c("'AT&TFORM'"))
+        if (X.c("'DJVM'........00", 12)) sVersion = 'multi-page';
+        else if (X.c("'DJVU'........00", 12)) sVersion = 'single-page';
+    else if (X.c("'DJVI'........00", 12)) sVersion = 'multi-file';
+    else if (X.c("'THUMTH44'", 12)) sVersion = 'thumbnails';
+    else return false;
+    else if (X.c("'SDJVFORM'")) {
+        sName = "Secure " + sName;
+        sdjv = true
+    } else return false;
+    bad = "";
+    sz = X.U32(8, _BE) + 12;
+    if (X.Sz() < sz) bad = bad.addIfNone('!short');
+    if (X.isDeepScan() && !sdjv) { //can't say I've ever seen an sdjv so nothing to test on
+        var compfiles = minw = minh = mindpi = mingm = 0xFFFFFFFF,
+            maxw = maxh = maxdpi = maxgm = 0;
+        p = 0x10;
+        while (p < sz) {
+            hkhd = X.SA(p, 4);
+            hksz = X.U32(p + 4, _BE);
+            p += 8;
+            //_log('@'+Hex(p-8)+':'+hkhd);
+            switch (hkhd) {
+                case 'INFO':
+                    sVersion = sVersion.appendS('image', '/');
+                    break;
+                case 'NAVM':
+                    if (X.isVerbose()) sOptions = sOptions.addIfNone(' bookmarks,');
+                    break;
+                case 'ANTa':
+                case 'ANTz':
+                    if (X.isVerbose()) sOptions = sOptions.addIfNone('annotated,');
+                    break;
+                case 'DIRM':
+                    compfiles = X.U16(p + 1);
+                    break;
+                case 'FORM':
+                    if (!X.c("'DJV'", p) && !X.c("'THUM'", p)) { _log('bad subchunk ' + X.SA(p, 8)); return false }
+                    q = p + 4;
+                    while (q < p + hksz) {
+                        shd = X.SA(q, 4);
+                        ssz = X.U32(q + 4, _BE);
+                        q += 8;
+                        if (q + ssz > p + hksz) { bad = bad.addIfNone('!short'); break }
+                        switch (shd) {
+                            case 'INFO':
+                                var w = X.U16(q, _BE),
+                                    h = X.U16(q + 2, _BE),
+                                    dpi = X.U16(q + 6, _LE /*yes*/ ),
+                                    gm = X.U8(q + 8);
+                                if (w < minw) minw = w;
+                                if (w > maxw) maxw = w;
+                                if (h < minh) minh = h;
+                                if (h > maxh) maxh = h;
+                                if (dpi < mindpi) mindpi = dpi;
+                                if (dpi > maxdpi) maxdpi = dpi;
+                                if (gm < mingm) mingm = gm;
+                                if (gm > maxgm) maxgm = gm;
+                                break;
+                            case 'INCL':
+                                //if(X.isVerbose()) sOptionT(X.SA(q,ssz),'includes '); //included filenames, normally too many
+                                break;
+                            case 'TXTa':
+                            case 'TXTz':
+                                if (X.isVerbose()) sOptions = sOptions.addIfNone('text&layoutinfo,');
+                                break;
+                            case 'Djbz':
+                            case 'Sjbz':
+                            case 'FG44':
+                            case 'BG44':
+                            case 'TH44':
+                            case 'WMRM':
+                            case 'FGbz':
+                            case 'BGjp':
+                            case 'FGjp':
+                            case 'Smmr':
+                                break;
+                        }
+                        q += ssz;
+                        if (q % 2) q++
+                    }
+                    break;
+                default:
+                    bad = bad.addIfNone('!badchunk<' + hkhd + '>@' + Hex(p - 8));
+            }
+            p += hksz;
+            if (p % 2) p++
+        }
+    }
+    if (sOptions.length && sOptions[sOptions.length - 1] == ',') sOptions = sOptions.slice(0, sOptions.length - 1);
+    bDetected = true;
+    if (bad != '') sVersion = sVersion.appendS('malformed' + addEllipsis(bad, 0x80, 0x40), '/')
+    if (X.isVerbose()) {
+        if (X.isDeepScan()) {
+            sOption((minw != maxw ? '[' + minw + '～' + maxw + ']' : minw) + '×' +
+                (minh != maxh ? '[' + minh + '～' + maxh + ']' : minh));
+            sOption((mindpi != maxdpi ? '[' + mindpi + '～' + maxdpi : mindpi), '', 'dpi');
+            sOption('gamma ' + (mingm != maxgm ? '[' + (mingm / 10).toFixed(1) + '～' + (maxgm / 10).toFixed(1) + ']' :
+                (mingm / 10).toFixed(1)));
+        }
+        sOption(outSz(sz), 'sz:')
+    }
+    return result(bShowType, bShowVersion, bShowOptions);
 }
