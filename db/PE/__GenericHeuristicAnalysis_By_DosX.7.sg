@@ -49,7 +49,7 @@
 // For the script to work correctly, the following
 // official Detect It Easy components are required:
 // "FASM", "RosASM", "SpASM", "FPC", "PE\linker.6.sg",
-// "Microsoft.6.sg"
+// "Microsoft.6.sg", "language"
 
 // Please do not read the code out loud unless you have exorcism skills
 
@@ -1573,7 +1573,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Eronana", null, ".packer"],
         ["PE-SHiELD", null, "PESHiELD"],
         ["SVK Protector", null, "SVKP"],
-        ["obfus.h", null, ".obfh"]
+        ["obfus.h", null, ".obfh"],
+        ["Warbird", null, "?g_Encry"]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDictionary);
@@ -1669,13 +1670,12 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         "TVqQAA", // MZ ~[90 00 03]
         "TVpQAA", // MZ ~[50 00 02]
         "TVp4AA" // MZ ~[78 00 01]
-
     ];
 
-    var isPackedPeDetected = false;
+    var isEncodedPeDetected = false;
 
     // Iterate through signature variants
-    for (var s = 0; s < signaturesVariants.length && !isPackedPeDetected; s++) {
+    for (var s = 0; s < signaturesVariants.length && !isEncodedPeDetected; s++) {
         const trigger = signaturesVariants[s];
 
         // Check if the signature is valid using Unicode signature mask or the original signature
@@ -1684,11 +1684,11 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ) {
             log(logType.nothing, "Encoded PE detected! (with Base64)");
             isCryptor = true;
-            isPackedPeDetected = true;
+            isEncodedPeDetected = true;
         }
     }
 
-    if (isPackedPeDetected) options += (options.length != 0 ? " + " : String()) + "Base64 payload";
+    if (isEncodedPeDetected) options += (options.length != 0 ? " + " : String()) + "Base64 payload";
 
 
 
@@ -2058,15 +2058,43 @@ function scanForObfuscations_Native() {
 
 
 
+    /*
+        var isCheckSumEmpty = false;
 
-    var isCheckSumEmpty = false;
+        if (PE.getImageOptionalHeader("CheckSum") == 0) {
+            log(logType.any, "IMAGE_OPTIONAL_HEADER : CheckSum == 0");
+            isCheckSumEmpty = true;
+        }
 
-    if (PE.getImageOptionalHeader("CheckSum") == 0) {
-        log(logType.any, "IMAGE_OPTIONAL_HEADER : CheckSum == 0");
-        isCheckSumEmpty = true;
+        if (isCheckSumEmpty) options += (options.length != 0 ? " + " : String()) + "No checksum";
+    */
+
+
+
+
+    // Checks is executable application has been compiled or converted to a DLL
+    // Like https://github.com/hasherezade/exe_to_dll
+    var exeAsDll = false;
+
+    if (PE.isDll() && (
+            PE.isExportFunctionPresent("Start") ||
+            PE.isExportFunctionPresent("main") ||
+            PE.isExportFunctionPresent("_start"))) {
+        exeAsDll = true;
     }
 
-    if (isCheckSumEmpty) options += (options.length != 0 ? " + " : String()) + "No checksum";
+    if (exeAsDll) options += (options.length != 0 ? " + " : String()) + "EXE as DLL";
+
+
+
+
+    var aLotOfBreaks = false;
+
+    if (PE.isSignaturePresent(0x00, PE.getSize() - PE.getOverlaySize(), "CC CC CC CC CC CC CC CC CC CC CC CC CC")) {
+        aLotOfBreaks = true;
+    }
+
+    if (aLotOfBreaks) options += (options.length != 0 ? " + " : String()) + "A lot of \"__debugbreak()\"";
 
 
 
@@ -2296,7 +2324,7 @@ function scanForLanguages_NET_and_Native() {
                 if (!isPpLibraryPresent && functionName.length > 5 && functionName[0] == "?" && functionName.indexOf("@@") !== -1) {
                     log(logType.any, "Mangler detected -> \"" + libraryName + "\"");
 
-                    if (!_isLangDetected) isPpLibraryPresent = true; // if language is unknown
+                    if (!_isLangDetected()) isPpLibraryPresent = true; // if language is unknown
                 }
             }
 
