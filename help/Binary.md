@@ -516,6 +516,10 @@ iscii-mlm
 
 ```
 ```
+**QString cleanString(QString sString)**
+
+```
+```
 
 ### Shorthands
 
