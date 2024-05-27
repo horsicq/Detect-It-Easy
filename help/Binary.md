@@ -520,7 +520,28 @@ iscii-mlm
 
 ```
 ```
+**qint64 startTiming()**
+**qint64 endTiming(qint64 nHandle, const QString &sInfo)**
 
+```
+// Profiling flag should be set
+var nProfiling = Binary.startTiming();
+// slow code
+var nTime = PE.endTiming(nProfiling, "PROFILING");
+```
+
+**qint64 detectZLIB(qint64 nOffset, qint64 nSize)**
+
+```
+```
+**qint64 detectGZIP(qint64 nOffset, qint64 nSize)**
+
+```
+```
+**qint64 detectZIP(qint64 nOffset, qint64 nSize)**
+
+```
+```
 ### Shorthands
 
 `X.U8(a)` = `File.read_uint8(a)`\
