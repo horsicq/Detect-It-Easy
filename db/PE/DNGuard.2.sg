@@ -4,16 +4,24 @@ init("protector", "DNGuard");
 
 function detect(bShowType, bShowVersion, bShowOptions) {
     if (PE.isNET()) {
-        if (PE.isNetObjectPresent("ZYXDNGuarder")) {
-            bDetected = true;
-        } else if (PE.isNetObjectPresent("HVMRuntm.dll")) {
+        if (PE.isNetObjectPresent("ZYXDNGuarder") || PE.isNetObjectPresent("HVMRuntm.dll")) {
             bDetected = true;
         }
 
         if (!bDetected) {
             if (PE.isSignatureInSectionPresent(0, "'A newer version of DNGuard Runtime library is needed to run this application.'")) {
-                // TODO Version
                 bDetected = true;
+            }
+        }
+    } else if (PE.is64()) {
+        var rdataSection = PE.section[".rdata"];
+
+        if (rdataSection && PE.isSignaturePresent(rdataSection.FileOffset, rdataSection.FileSize, "'DNGuard'") &&
+            PE.isImportPositionHashPresent(0, 0x38432571) && PE.compareEP("48 83 EC 28 E8 07 AD")) {
+            bDetected = true;
+
+            if (!PE.section[".I:R"]) {
+                sOptions = "modified";
             }
         }
     }
