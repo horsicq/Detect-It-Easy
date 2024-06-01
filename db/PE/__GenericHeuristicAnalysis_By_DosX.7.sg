@@ -485,14 +485,14 @@ function scanForObfuscations_NET() {
     if (isCtrlFlowPresent) options += (options.length != 0 ? " + " : String()) + "Ctrl flow";
 
 
+    const afterCtorOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'<Module>'00**") + 8;
 
 
     // Indicates that the file uses short object names. Typically this indicates the presence of an obfuscation
-    var isShortNamesPresent = false;
-
     // There are two ways to detect short names - find one-letter objects or just use signature mask at Ctor offset :D
 
-    var afterCtorOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'<Module>'00**") + 8;
+    var isShortNamesPresent = false;
+
 
     if (PE.compare("00**00**00", afterCtorOffset) ||
         PE.compare("00****00****00****00", afterCtorOffset) ||
@@ -521,8 +521,52 @@ function scanForObfuscations_NET() {
         }
     }
 
-
     if (isShortNamesPresent) options += (options.length != 0 ? " + " : String()) + "Short names";
+
+
+
+
+    var badNamings = false;
+
+    var buffer = "";
+
+    // get next 0x12c bytes after <Module> .ctor
+    for (var i = 0; i < 0x12c; i++) {
+        var currentByte = PE.readByte(afterCtorOffset + i).toString(16);
+
+        if (currentByte === '0') currentByte += '0';
+
+        buffer += currentByte;
+        buffer += ' ';
+    }
+
+    var bufferString = String();
+
+    // 0x00 to [0x20, 0x20, 0x20]
+    const bufferArray = replaceAllInString(buffer, '00 ', '20 20 20 ').split(' ');
+
+    // buffer to a string
+    for (var i = 0; i < bufferArray.length; i++)
+        bufferString += String.fromCharCode(parseInt(bufferArray[i], 16));
+
+
+    const patternsToExplore = bufferString.split("   ");
+
+    var strangePatternsCounter = 0;
+
+    for (var i = 0; i < patternsToExplore.length && !badNamings; i++) {
+
+        const currentStringPattern = patternsToExplore[i];
+
+        if (currentStringPattern.indexOf("<") === -1 && currentStringPattern.match(/^(?=\d|[a-z])(?=.*[a-z]\d[a-z])(?=(?:.*\d){4,})/i))
+            strangePatternsCounter++;
+
+        if (strangePatternsCounter > 4)
+            badNamings = true;
+
+    }
+
+    if (badNamings) options += (options.length != 0 ? " + " : String()) + "Bad namings";
 
 
 
@@ -2290,7 +2334,7 @@ function isFunctionMangled(functionPattern) {
 
 function getNameOfMangledFunction(functionPattern) {
     if (isFunctionMangled(functionPattern)) {
-        if (functionPattern[0] === '?') return functionPattern.split("?")[1].split("@")[0]; // MSCPP mangler
+        if (functionPattern[0] === '?') return functionPattern.split("?")[1].split("@")[0]; // MSVCPP mangler
         else if (functionPattern[0] === '_') { // GNUCPP mangler
             const match = functionPattern.match(/_ZSt(\d+)(\w+)/);
 
