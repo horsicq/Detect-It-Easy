@@ -2038,7 +2038,7 @@ function scanForObfuscations_Native() {
     // Looks for sections whose names contain strange (or invalid) characters
     var isInvalidImportsPresent = false;
 
-    const badImportChars = '=+~!@#$%^&*()"№;%:?*():;,|\'`<> ';
+    const badImportChars = '=~!@#$%^&*()"№;%:?*():;,|\'`<> ';
 
     for (var i = 0; i < PE.getNumberOfImports() && !isInvalidImportsPresent; i++) {
         const libraryName = PE.getImportLibraryName(i).toLowerCase();
@@ -2278,13 +2278,31 @@ function getFirstEpAsmOpCode() {
 }
 
 
+// VC ?warp_size@cuda@at@@YAHXZ
+// GNU _ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_i
 function isFunctionMangled(functionPattern) {
-    return functionPattern.length > 5 && functionPattern[0] == "?" && functionPattern.indexOf("@@") !== -1;
+    return functionPattern.length > 5 && (
+        (functionPattern[0] == '?' && functionPattern.indexOf("@@") !== -1) || // MSVCPP mangler
+        (functionPattern.substring(0, 4) == "_ZSt") // GNUCPP mangler
+    );
 }
 
 
 function getNameOfMangledFunction(functionPattern) {
-    return isFunctionMangled(functionPattern) ? functionPattern.split("?")[1].split("@")[0] : functionPattern;
+    if (isFunctionMangled(functionPattern)) {
+        if (functionPattern[0] === '?') return functionPattern.split("?")[1].split("@")[0]; // MSCPP mangler
+        else if (functionPattern[0] === '_') { // GNUCPP mangler
+            const match = functionPattern.match(/_ZSt(\d+)(\w+)/);
+
+            if (match) {
+                return match[2].substring(0, parseInt(match[1], 10));
+            } else {
+                return functionPattern;
+            }
+        }
+    } else {
+        return functionPattern;
+    }
 }
 
 
@@ -2371,6 +2389,14 @@ function scanForLanguages_NET_and_Native() {
 
                 if (!isPpLibraryPresent && isFunctionMangled(functionName)) {
                     log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledFunction(functionName) + "\"");
+
+                    if (!_getNumberOfResults("compiler") && !_getNumberOfResults("~compiler")) {
+                        if (functionName[0] == '_') {
+                            _setResult("~compiler", "MinGW", String(), String());
+                        } else if (functionName[0] == '?') {
+                            _setResult("~compiler", "Microsoft Visual C/C++", String(), String());
+                        }
+                    }
 
                     if (!_isLangDetected()) isPpLibraryPresent = true; // if language is unknown
                 }
