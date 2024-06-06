@@ -2192,6 +2192,38 @@ function scanForObfuscations_Native() {
 
 
 
+    // Example:
+    //  xor eax, eax
+    //  je $+1
+    var isBreakerDetected = false;
+
+    /*
+    0:  31 c0  |  xor eax, eax
+    1:  31 db  |  xor ebx, ebx
+    2:  31 c9  |  xor ecx, ecx
+    3:  31 d2  |  xor edx, edx
+    4:  31 f6  |  xor esi, esi
+    5:  31 ff  |  xor edi, edi
+    6:  31 ed  |  xor ebp, ebp
+    7:  31 e4  |  xor esp, esp
+    */
+    const xorPatterns_x86 = [
+        "c0", "db", "c9", "d2", "f6", "ff", "ed", "e4"
+    ];
+
+    for (var i = 0; i < xorPatterns_x86.length && !isBreakerDetected; i++) {
+        const foundOffset = PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), "31 " + xorPatterns_x86[i] + "0F84......00"); // ... je $+[*] ...
+
+        if (foundOffset !== -1 && !PE.compare("%% %% %% %% %% %% %%", foundOffset - 7)) {
+            isBreakerDetected = true;
+        }
+    }
+
+    if (isBreakerDetected) options += (options.length != 0 ? " + " : String()) + "Anti-Decompile";
+
+
+
+
     // Check if NOP padding is present at the entry point
     var isNopPaddingPresent = false;
 
