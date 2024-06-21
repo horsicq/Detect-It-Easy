@@ -251,6 +251,10 @@
 
 ```
 ```
+**QString getExportFunctionName(quint32 nNumber)
+
+```
+```
 **bool isExportPresent()**
 
 ```
