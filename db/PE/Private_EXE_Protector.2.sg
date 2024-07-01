@@ -1,0 +1,61 @@
+// DIE's signature file
+
+init("protector", "Private EXE Protector");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    if (PE.compareEP("558BEC83C4F4FC5357568B7424208B7C242466813E4A430F85A502000083C60A33DB")) {
+        sVersion = "1.9.7";
+        bDetected = true;
+    } else if (PE.compareEP("B8........B9..9001..BE........68........6801......C3")) {
+        sVersion = "1.x";
+        bDetected = true;
+    } else if (PE.compareEP("89....380000008B..0000000081..........89..0000000081..0400000081..0400000081..000000000F85D6FFFFFF")) {
+        sVersion = "2.0";
+        bDetected = true;
+    } else if (PE.compareEP("52ba........c702########....50....53....51....52....56..57....55....81ee")) {
+        sVersion = "3.04";
+        bDetected = true;
+    } else if (PE.compareEP("EB08....0000000000007.009C")) {
+        sVersion = "4.0-4.12";
+        bDetected = true;
+    } else if (PE.compareEP("EB08....0000000000007.0068")) {
+        sVersion = "4.0-4.12";
+        bDetected = true;
+    } else if (PE.compareEP("6064ff35........b9........89ce81c6........ba........bd........8b0683c6..8b1e89dffcf829c333dd31c3891e")) {
+        sVersion = "4.x";
+        bDetected = true;
+    } else if (PE.section.length >= 3) {
+        if (PE.getNumberOfImports() == 1 &&
+            PE.getImportLibraryName(0) == "KERNEL32.DLL" &&
+            PE.getImportFunctionName(0, 0) == "ExitProcess") {
+            if (PE.getAddressOfEntryPoint() == 0x1000 &&
+                PE.section[0].FileSize != 0x200 &&
+                PE.section[0].FileSize != 0x400 &&
+                PE.section[0].Characteristics == 0xe0000020) {
+                bDetected = true;
+                sVersion = "1.X";
+            } else if (PE.section[0].Characteristics == 0xe4000000 &&
+                PE.section[1].Characteristics == 0xC0000000 &&
+                PE.section[2].Characteristics == 0x50000040) {
+                bDetected = true;
+                sVersion = "1.7";
+            }
+        } else if ((PE.getNumberOfImports() == 1) || (PE.getNumberOfImports() == 2)) {
+            if (PE.getImportLibraryName(0) == "KERNEL32.DLL") {
+                if (PE.getNumberOfImportThunks(0) == 1) {
+                    var nSection = PE.nLastSection;
+                    if (PE.section[nSection].Name == ".rsrc") {
+                        nSection--;
+                    }
+                    if (PE.section[nSection].Characteristics == 0xE0000000 &&
+                        PE.section[nSection - 1].Characteristics == 0xE0000000) {
+                        bDetected = true;
+                        sVersion = "2.X";
+                    }
+                }
+            }
+        }
+    }
+
+    return result(bShowType, bShowVersion, bShowOptions);
+}

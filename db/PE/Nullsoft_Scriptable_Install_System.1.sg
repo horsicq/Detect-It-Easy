@@ -1,0 +1,96 @@
+// DIE's signature file
+
+init("installer", "Nullsoft Scriptable Install System");
+
+function detect(bShowType, bShowVersion, bShowOptions) {
+    var nOffset = PE.getOverlayOffset();
+    if ((!PE.compareOverlay("EFBEADDE'Null'..'oftInst'", 4)) && (!PE.compareOverlay("EFBEADDE'nsisinstall'"))) {
+        //        if(!PE.section[".ndata"])
+        //        {
+        //            return "";
+        //        }
+        if (PE.isOverlayPresent()) {
+            nOffset += PE.readDword(nOffset);
+            if (nOffset + 4 >= PE.getSize() || !PE.compare("EFBEADDE'Null'..'oftInst'", nOffset + 4)) {
+                nOffset = 0;
+            }
+        }
+    }
+    if (nOffset && PE.isOverlayPresent()) {
+        // Method detection adapted from 7-Zip.
+        nOffset += 0x1C;
+        if (PE.compare("5D0000..00", nOffset)) {
+            sOptions = sOptions.append("lzma", "solid");
+        } else if (PE.compare("5D0000....00", nOffset + 4)) {
+            sOptions = sOptions.append("lzma");
+        } else {
+            function BorZ(nOffset) {
+                if (PE.readByte(nOffset) == 0x31 && PE.readByte(nOffset + 1) < 14) {
+                    return "bzip2";
+                } else {
+                    return "zlib";
+                }
+            }
+            if (PE.compare("8", nOffset + 3)) {
+                sOptions = sOptions.append(BorZ(nOffset + 4));
+            } else {
+                sOptions = sOptions.append(BorZ(nOffset), "solid");
+            }
+        }
+        bDetected = true;
+    }
+
+    var aVersion = PE.getManifest().match(/Null[sS]oft Install System v?(.*?)</);
+    if (aVersion) {
+        sVersion = aVersion[1];
+        bDetected = true;
+    } else if (PE.compareEP("558BEC83EC2C535633F657568975DC8975F4BBA49E4000FF1560704000BFC0B24000")) {
+        sVersion = "1.xx";
+        bDetected = true;
+    } else if (PE.compareEP("558BEC81EC....000056576A..BE........598DBD")) {
+        sVersion = "1.3x";
+        bDetected = true;
+    } else if (PE.compareEP("83EC5C53555657FF15")) {
+        sVersion = "1.x";
+        bDetected = true;
+    } else if (PE.compareEP("83EC0C535657FF15....40000")) {
+        switch (PE.readWord(PE.nEP + 8)) {
+            case 0x812C:
+                sVersion = "1.98";
+                break;
+            case 0x10B4:
+                sVersion = "2.0a0";
+                break;
+            default:
+                sVersion = "1.xx";
+        }
+        bDetected = true;
+    } else if (PE.compareEP("83EC0C53555657FF15..7040008B35..92400005E803000089442414B320FF152C704000")) {
+        sVersion = "2.0b2/2.0b3";
+        bDetected = true;
+    } else if (PE.compareEP("83EC14836424040053555657C644241320FF1530704000BE00207A00")) {
+        sVersion = "2.0b4";
+        bDetected = true;
+    } else if (PE.compareEP("83EC1053555657C7442414....400033EDC644241320FF152C704000")) {
+        switch (PE.readWord(PE.nEP + 11)) {
+            case 0x91F0:
+                sVersion = "2.0b4";
+                break;
+            case 0x9270:
+                sVersion = "2.0 RC2";
+                break;
+        }
+        bDetected = true;
+    } else if (PE.compareEP("83EC0C53555657C7442410........33DBC644241420FF15........53FF15")) {
+        sVersion = "2.0";
+        bDetected = true;
+    } else if (PE.compareEP("83EC2053555633DB57895C2418C7442410........C644241420FF15")) {
+        sVersion = "2.06";
+        bDetected = true;
+    } else if (PE.compareEP("558bec83ec..535633f657568975..8975..bb........ff15........bf........68........5750a3........ff15")) {
+        sVersion = "0.98";
+        bDetected = true;
+    }
+
+    return result(bShowType, bShowVersion, bShowOptions);
+}
