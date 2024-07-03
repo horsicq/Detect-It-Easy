@@ -2370,21 +2370,39 @@ function isFunctionMangled(functionPattern) {
 function getNameOfMangledFunction(functionPattern) {
     if (isFunctionMangled(functionPattern)) {
         if (functionPattern[0] === '?' && functionPattern[1] !== '?') {
-            return functionPattern.split("?")[1].split("@")[0]; // MSVCPP mangler
-        } else if (functionPattern[0] === '?' && functionPattern[1] === '?') { // MSVCPP mangler
 
+            // MSVCPP mangler (e.g., ??0_Lockit@std@@QEAA@H@Z)
+            return functionPattern.split("?")[1].split("@")[0];
+
+        } else if (functionPattern[0] === '?' && functionPattern[1] === '?' && functionPattern[3] === '?' && functionPattern[4] === '$') {
+
+            // MSVCPP mangler (e.g., ??1?$basic_streambuf@DU?$char_traits@D@std@@@std@@UEAA@XZ)
+            return functionPattern.split("$")[1].split("@")[0];
+
+        } else if (functionPattern[0] === '?' && functionPattern[1] === '?' && functionPattern[2] === '_') {
+            // MSVCPP mangler (e.g., ??_7_Facet_base@std@@6B@)
+            var functionName = functionPattern.split("?")[2].split("@")[0];
+
+            functionName = functionName.substring(1, functionName.length); // first char is a number
+            return functionName;
+
+        } else if (functionPattern[0] === '?' && functionPattern[1] === '?') {
+
+            // MSVCPP mangler
             var functionName = functionPattern.split("?")[2].split("@")[0];
             functionName = functionName.substring(1, functionName.length); // first char is a number
             return functionName;
 
-        } else if (functionPattern[0] === '_') { // GNUCPP mangler
-            const match = functionPattern.match(/_ZSt(\d+)(\w+)/);
+        } else if (functionPattern[0] === '_') {
 
+            // GNUCPP mangler (e.g., _ZSt12functionName)
+            var match = functionPattern.match(/_ZSt(\d+)(\w+)/);
             if (match) {
                 return match[2].substring(0, parseInt(match[1], 10));
             } else {
                 return functionPattern;
             }
+
         }
     } else {
         return functionPattern;
@@ -2476,6 +2494,7 @@ function scanForLanguages_NET_and_Native() {
                 if (!isPpLibraryPresent && isFunctionMangled(functionName)) {
                     log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledFunction(functionName) + "\"");
 
+
                     if (!_getNumberOfResults("compiler") && !_getNumberOfResults("~compiler")) {
                         if (functionName[0] == '_') {
                             _setResult("~compiler", "MinGW", String(), String());
@@ -2484,7 +2503,8 @@ function scanForLanguages_NET_and_Native() {
                         }
                     }
 
-                    if (!_isLangDetected()) isPpLibraryPresent = true; // if language is unknown
+                    // if (!_isLangDetected()) 
+                    isPpLibraryPresent = true; // if language is unknown
                 }
             }
 
