@@ -2240,6 +2240,36 @@ function scanForObfuscations_Native() {
 
 
 
+    var isCpuidLicensingPresent = false;
+
+    var cpuidOffset = 0x00;
+
+    var cpuidAddress = 0x00,
+        cpuidNextAddressDisasm;
+
+    while (!isCpuidLicensingPresent) {
+        cpuidOffset = PE.findSignature(cpuidOffset, PE.getSize() - PE.getOverlaySize(), "0F A2");
+
+        if (cpuidOffset === -1) break;
+
+        cpuidAddress = PE.OffsetToVA(cpuidOffset);
+
+        cpuidNextAddressDisasm = PE.getDisasmString(PE.getDisasmNextAddress(cpuidAddress));
+
+        switch (getAsmOpCode(cpuidNextAddressDisasm)) {
+            case "MOV":
+            case "JMP":
+                isCpuidLicensingPresent = true;
+                break;
+        }
+
+    }
+
+    if (isCpuidLicensingPresent) options += (options.length != 0 ? " + " : String()) + "Licensing with CPUID";
+
+
+
+
     // ASM Guard fake signatures
     if (PE.isSectionNamePresent(".asmg") || PE.isSectionNamePresent("ASMGUARD")) {
         for (var f = 0; f < 3; f++)
