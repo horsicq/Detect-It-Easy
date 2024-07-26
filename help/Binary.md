@@ -542,6 +542,14 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 
 ```
 ```
+**bool isOverlay()**
+
+```
+```
+**bool isResource()**
+
+```
+```
 ### Shorthands
 
 `X.U8(a)` = `File.read_uint8(a)`\
