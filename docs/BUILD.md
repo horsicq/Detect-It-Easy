@@ -73,7 +73,7 @@ make -j4
 sudo make install
 ```
 
-# How to build on OSX
+# How to build on macOS
 
 Install Qt 5.15.2: https://github.com/horsicq/build_tools
 
