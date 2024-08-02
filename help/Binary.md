@@ -512,6 +512,18 @@ iscii-mlm
 
 ```
 ```
+**QString getFileFormatName()**
+
+```
+```
+**QString getFileFormatVersion()**
+
+```
+```
+**QString getFileFormatOptions()**
+
+```
+```
 **bool isSigned()**
 
 ```
