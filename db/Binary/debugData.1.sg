@@ -23,20 +23,17 @@ function detect() {
     // Borland debug info
     if (Binary.find_ansiString(0, size, "RECORD_NAME_BORLANDDEBUGINFO") !== -1 && size >= 16) {
         if (Binary.readWord(0) === 0x52FB) {
-            // Version = major + (minor / 100)
-            var version = (Binary.readByte(3) + Binary.readByte(2) / 100.0).toFixed(2);
-            // Concatenate number of symbols if exists
-            var info = "TDS" + (Binary.readWord(0xE) ? " " + Binary.readWord(0xE) + " symbols" : "");
-            _setResult(sType, "Borland", version, info);
+            _setResult(sType, "Borland", (Binary.readByte(3) + Binary.readByte(2) / 100.0).toFixed(2), "TDS" + (Binary.readWord(0xE) ? " " + Binary.readWord(0xE) + " symbols" : ""));
         } else {
             _setResult(sType, "Borland", "N/A", "Borland debug info detected");
         }
         return true;
     }
 
+    var debugSize = Binary.readDword(size - 4);
+
     // Watcom debug info
     if (size > 16 && Binary.readWord(size - 14) === 0x8386) {
-        var debugSize = Binary.readDword(size - 4);
         if (size - debugSize >= 0) {
             _setResult(sType, "Watcom", Binary.readByte(size - 12) + "." + Binary.readByte(size - 11), "0x" + debugSize.toString(16) + " bytes");
         }
@@ -45,9 +42,7 @@ function detect() {
 
     // CodeView debug info
     if (size > 16 && Binary.readWord(size - 8) === 0x424E) {
-        var signature = Binary.read_ansiString(size - 8, 4);
-        if (/^NB0[5789]|NB1[01]$/.test(signature)) {
-            var debugSize = Binary.readDword(size - 4);
+        if (/^NB0[5789]|NB1[01]$/.test(Binary.read_ansiString(size - 8, 4))) {
             if (size - debugSize >= 0) {
                 _setResult(sType, "CodeView", "4.0", "0x" + debugSize.toString(16) + " bytes");
             }
@@ -58,8 +53,9 @@ function detect() {
     // DWARF debug info
     if (size > 16 && Binary.readDword(size - 16) === 0x534954) {
         if (Binary.readDword(size - 12) === 0 && Binary.readDword(size - 8) === 0) {
-            var debugSize = Binary.readDword(size - 4);
+
             var debugOffset = size - debugSize;
+
             if (debugOffset >= 0) {
                 var viStruct = get_DWRAF_vi(debugOffset, size - debugOffset);
                 if (viStruct.bIsValid) {
