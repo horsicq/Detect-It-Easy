@@ -7,13 +7,22 @@ This is a description of the Binary class. This class is used when no other clas
 **bool compare(QString sSignature,qint64 nOffset=0)** Compares bytes with a hexadecimal string signature.
 
 The signature may contain both lowercase and uppercase hexadecimal digits.
-Spaces are skipped, and . and ? represent any digit.
+Spaces are skipped, **AA BB** = **AABB**
 Text may be matched by using single quotes. For example **"01'Test'01"**.
 
-There are two additional symbols:
+There are additional symbols:
 
 * '#' for absolute jump (e.g. "68########55")
 * '$' for relative jump (e.g. "E8$$$$$$$$55")
+
+| Parameter | Description                                      |
+|-----------|--------------------------------------------------|
+| ..        | Represent any byte                               |
+| ??        | Represent any byte                               |
+| **        | Not null                                         |
+| %%        | ANSI                                             |
+| !%        | Not ANSI                                         |
+| _%        | Not ANSI and not null                            |
 
 ```
 if(Binary.compare("'7z'BCAF271C")) // compare file header (nOffset=0)
