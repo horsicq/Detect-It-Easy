@@ -296,6 +296,10 @@ if(signature=="AA5411DD")
 
 ```
 ```
+**bool isAggressiveScan()**
+
+```
+```
 **bool isVerbose()**
 
 ```
