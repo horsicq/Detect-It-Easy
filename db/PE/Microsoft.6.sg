@@ -117,7 +117,9 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 
         sLibraryDot_Version = PE.cleanString(sLibraryDot_Version); // remove strange symbols
 
-        if (!sLibraryDot_Name) {
+        if (PE.isSignaturePresent(0x00, PE.getSize(), "'.NETCoreApp'")) {
+            sLibraryDot_Name = ".NET Core";
+        } else if (!sLibraryDot_Name) {
             sLibraryDot_Name = ".NET Framework";
             sLibraryDot_Version = "Legacy";
         }
@@ -132,6 +134,7 @@ function detect(bShowType, bShowVersion, bShowOptions) {
         }
 
     } else {
+        var isNetNative = false;
 
         if (PE.isFunctionPresent("LoadLibraryExW") &&
             PE.isFunctionPresent("ShellExecuteW") &&
@@ -140,15 +143,21 @@ function detect(bShowType, bShowVersion, bShowOptions) {
             sLibraryDot_Version = "Loader";
         }
 
+        if (PE.section[".managed"] && PE.section["hydrated"]) {
+            isNetNative = true;
+        }
+
         if (PE.isExportFunctionPresent("DotNetRuntimeDebugHeader")) {
-            sLibraryDot_Options = "AOT";
+            isNetNative = true;
+
+            sLibraryDot_Options = "debug";
 
             const netCoreConfigPattern = findNetCoreConfigOffset();
 
             if (netCoreConfigPattern != -1) sLibraryDot_Version = getNetConfigStringByOffset(netCoreConfigPattern);
         }
 
-        if (sLibraryDot_Version !== String() || sLibraryDot_Options !== String()) sLibraryDot_Name = ".NET Core";
+        if (sLibraryDot_Version !== String() || sLibraryDot_Options !== String()) sLibraryDot_Name = ".NET " + (isNetNative ? "Native" : "Core");
     }
 
     //
@@ -1695,7 +1704,10 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 
 
     if (sLibraryDot_Name) {
+
+        if (PE.isNetObjectPresent("FSharp.Core")) _setLang("F#");
         if (!_isLangDetected()) _setLang("MSIL/C#");
+
         _setResult("library", sLibraryDot_Name, sLibraryDot_Version, sLibraryDot_Options);
     }
 
