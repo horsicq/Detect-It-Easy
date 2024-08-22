@@ -88,6 +88,7 @@ function main() {
         }
 
         scanForPackersAndCryptors_NET_and_Native();
+        scanForLicensingSystems_NET_and_Native();
 
         if (PE.isVerbose()) {
             scanForLanguages_NET_and_Native();
@@ -143,6 +144,7 @@ function scanForObfuscations_NET() {
         ],
         defaultEntries = [ // like MSIL, C#, C++ NET etc
             "Main",
+            "main", // F# entry
             "<Main>$", // For programs with top-level operators (C#)
             "mainCRTStartup", // C++ CLR .NET (CLI)
             "wWinMainCRTStartup" // C++ CLR .NET (GUI)
@@ -867,9 +869,9 @@ function scanForObfuscations_NET() {
     }
 
 
+
+
     if (options.length != 0) isDetected = true;
-
-
 
 
     if (isDetected) {
@@ -1826,6 +1828,59 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
+    var options = String();
+
+    var isDetected = Boolean();
+
+
+
+
+    if (PE.isNET()) {
+
+        var isLicenseProviderPresent = false;
+
+        if (PE.isNetObjectPresent("LicenseProviderAttribute")) {
+            isLicenseProviderPresent = true;
+        }
+
+        if (isLicenseProviderPresent) options = "LicenseProvider";
+
+    }
+
+
+
+
+    var isInterestingStringsFound = false;
+
+    const licesingStrings = [ /*[E]*/ "nter serial ", /*[S]*/ "erial key ", " activate ", " trial ", /*[W]*/ "rong activation", /*[W]*/ "rong licens", /*[L]*/ "icense expire"];
+
+    for (var i = 0; i < licesingStrings.length; i++) {
+        const currentPatternToFind = licesingStrings[i];
+
+        if (PE.isSignaturePresent(0x00, PE.getSize(), "'" + currentPatternToFind + "'") || (PE.isNET() ? generateUnicodeSignatureMask(currentPatternToFind) : false)) {
+            isInterestingStringsFound = true;
+            break;
+        }
+    }
+
+    if (isInterestingStringsFound) options += (options.length != 0 ? " + " : String()) + "Strings";
+
+
+
+
+
+    if (options.length != 0) isDetected = true;
+
+
+    if (isDetected) {
+        _setResult("~protection", "Licensing", "heurdev.0.01f", PE.isVerbose() ? options : String());
+    }
+}
+
+
+
+
 function isVbNetStandartLibraryPresent() {
     return PE.isNetObjectPresent("Microsoft.VisualBasic");
 }
@@ -2195,35 +2250,37 @@ function scanForObfuscations_Native() {
 
 
 
-
-    // Example:
-    //  xor eax, eax
-    //  je $+1
-    var isBreakerDetected = false;
-
+    // A lot of bugs! Todo.
     /*
-    0:  31 c0  |  xor eax, eax
-    1:  31 db  |  xor ebx, ebx
-    2:  31 c9  |  xor ecx, ecx
-    3:  31 d2  |  xor edx, edx
-    4:  31 f6  |  xor esi, esi
-    5:  31 ff  |  xor edi, edi
-    6:  31 ed  |  xor ebp, ebp
-    7:  31 e4  |  xor esp, esp
-    */
-    const xorPatterns_x86 = [
-        "c0", "db", "c9", "d2", "f6", "ff", "ed", "e4"
-    ];
+        // Example:
+        //  xor eax, eax
+        //  je $+1
+        var isBreakerDetected = false;
 
-    for (var i = 0; i < xorPatterns_x86.length && !isBreakerDetected; i++) {
-        const foundOffset = PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), "31 " + xorPatterns_x86[i] + "0F84......00"); // ... je $+[*] ...
+       //
+       // 0:  31 c0  |  xor eax, eax
+       // 1:  31 db  |  xor ebx, ebx
+       // 2:  31 c9  |  xor ecx, ecx
+       // 3:  31 d2  |  xor edx, edx
+       // 4:  31 f6  |  xor esi, esi
+       // 5:  31 ff  |  xor edi, edi
+       // 6:  31 ed  |  xor ebp, ebp
+       // 7:  31 e4  |  xor esp, esp
+       //
+        const xorPatterns_x86 = [
+            "c0", "db", "c9", "d2", "f6", "ff", "ed", "e4"
+        ];
 
-        if (foundOffset !== -1 && !PE.compare("%% %% %% %% %% %% %%", foundOffset - 7)) {
-            isBreakerDetected = true;
+        for (var i = 0; i < xorPatterns_x86.length && !isBreakerDetected; i++) {
+            const foundOffset = PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), "31 " + xorPatterns_x86[i] + "0F84......00"); // ... je $+[*] ...
+
+            if (foundOffset !== -1 && !PE.compare("%% %% %% %% %% %% %%", foundOffset - 7)) {
+                isBreakerDetected = true;
+            }
         }
-    }
 
-    if (isBreakerDetected) options += (options.length != 0 ? " + " : String()) + "Anti-Decompile";
+        if (isBreakerDetected) options += (options.length != 0 ? " + " : String()) + "Anti-Decompile";
+        */
 
 
 
@@ -2246,6 +2303,8 @@ function scanForObfuscations_Native() {
         for (var f = 0; f < 3; f++)
             _removeResult("packer", ["UPX", "MPRESS", "EP:MPRESS"][f]);
     }
+
+
 
 
     if (options.length != 0) isDetected = true;
