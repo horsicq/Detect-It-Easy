@@ -4,18 +4,33 @@
 init("protector", "PELock");
 
 function detect(bShowType, bShowVersion, bShowOptions) {
-    if (PE.getNumberOfImports() == 1) {
-        if (PE.isLibraryFunctionPresent("KERNEL32.DLL", "LoadLibraryA") &&
-            PE.isLibraryFunctionPresent("KERNEL32.DLL", "VirtualAlloc")) {
-            if (PE.getNumberOfResources() >= 1) {
-                if (PE.getNumberOfSections() >= 4) {
-                    if ((PE.getSectionName(0) == PE.getSectionName(1)) && (PE.getSectionName(0) == PE.getSectionName(3))) {
-                        bDetected = true;
-                    }
-                }
+
+    var bEnableNewEngine = true; // Need more researches
+    if (bEnableNewEngine) {
+        var da = ""; var clc = 0; var stc = 0; var movsx = 0; var movzx = 0;
+        var sub = 0; var imul = 0; var bt = 0; var bsf = 0;
+        var ep = PE.OffsetToVA(PE.getEntryPointOffset());
+        var count = 0;
+        while (count < 1000) {
+            count++;
+            var da = PE.getDisasmString(ep);
+            if (da.indexOf(' ') != -1) {
+                da = da.substr(0, da.indexOf(' '));
             }
+            if (da == "CLC") { clc++; }
+            if (da == "STC") { stc++; }
+            if (da == "MOVSX") { movsx++; }
+            if (da == "MOVZX") { movzx++; }
+            if (da == "SUB") { sub++; }
+            if (da == "IMUL") { imul++; }
+            if (da == "BT" || da == "BTR" || da == "BTS" || da == "BTC") { bt++; }
+            if (da == "BSF" || da == "BSR" || da == "BSWAP") { bsf++; }
+            ep = PE.getDisasmNextAddress(ep);
+        }
+        if (clc != 0 && stc != 0 && movsx != 0 && movzx != 0 && sub > imul && bt == 0 && bsf == 0)
+        {
+            bDetected = true;
         }
     }
-
     return result(bShowType, bShowVersion, bShowOptions);
 }
