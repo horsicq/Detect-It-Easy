@@ -6,6 +6,7 @@ sName = "RAR";
 
 function detect_RAR(bFile, bShowOptions) {
     var nOffset, nSize;
+
     if (bFile) {
         nOffset = 0;
         nSize = File.getSize();
@@ -13,6 +14,7 @@ function detect_RAR(bFile, bShowOptions) {
         nOffset = File.getOverlayOffset();
         nSize = File.getOverlaySize();
     }
+
     if (nSize >= 64) {
         if (File.compare("'Rar!'1A07", nOffset)) {
             switch (File.readByte(nOffset + 6)) {
@@ -23,28 +25,37 @@ function detect_RAR(bFile, bShowOptions) {
                     sVersion = "5";
                     break;
             }
-            bDetected = 1;
+
+            bDetected = true;
         } else if (File.compare("'RE~^'", nOffset)) {
             sVersion = "1.4";
-            bDetected = 1;
+            bDetected = true;
         }
+
         if (sVersion == "4") {
+
             var nOptions = File.readByte(nOffset + 10);
+
             if (nOptions & 8) {
                 sOptions = "solid";
             }
+
             if (nOptions & 0x80) {
-                sOptions = sOptions.append("encrypted");
+                sOptions += (sOptions !== String() ? ", " : "") + "encrypted";
             } else if (bShowOptions) {
                 var nDelta = 0;
+
                 nOffset += 7 + File.readWord(nOffset + 12);
                 while (File.readByte(nOffset + 2) != 0x74) {
                     nDelta = File.readWord(nOffset + 5) + File.readDword(nOffset + 7);
+
                     if (!nDelta) {
                         break;
                     }
+
                     nOffset += nDelta;
                 }
+
                 while (File.readByte(nOffset + 2) == 0x74) {
                     var nLen = File.readDword(nOffset + 7);
                     Archive.add(File.readDword(nOffset + 11), nLen,
@@ -53,8 +64,10 @@ function detect_RAR(bFile, bShowOptions) {
                     if (!nDelta) {
                         break;
                     }
+
                     nOffset += nDelta;
                 }
+
                 sOptions = sOptions.append(Archive.contents());
             }
         }
