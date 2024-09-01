@@ -1,0 +1,55 @@
+// https://github.com/horsicq/Detect-It-Easy signature file
+// Author: Kaens (TG@kaens)
+
+init("audio","");
+
+includeScript("read");
+
+function detect(bShowType,bShowVersion,bShowOptions) {
+	//ref https://ffmpeg.org/doxygen/trunk/dss_8c_source.html - but the ds2 files are different with no code in sight
+	if(X.c("02'dss'") || X.c("03'dss'"))
+		sName = "Digital Speech Standard audio (.DSS)";
+	else if(X.c("02'ds2'") || X.c("03'ds2'") || X.c("02'enc'") || X.c("03'enc'")) {
+		sName = "Digital Speech Standard Pro audio (.DS2)";
+	}
+	else return false;
+	nv = X.U8(0); v1 = X.c("'dss'",1);
+	hdrsz = nv * 0x200; if(X.Sz() < hdrsz) return false;
+	tm = X.SA(0x26,12);
+	if(charStat(tm,1).indexOf('allnum') < 0 || !isWithin(tm.slice(2,4),'01','12') || !isWithin(tm.slice(4,6),'01','31')
+	  || !isWithin(tm.slice(6,8),'00','23') || !isWithin(tm.slice(8,10),'00','59') || !isWithin(tm.slice(10,12),'00','59'))
+		return false; // I'm not checking the year, what if this script (and indeed civilisation) survives until the 2100s!
+	tm = '20'+tm.slice(0,2)+'-' + tm.slice(2,4)+'-' + tm.slice(4,6)
+		+ ' ' + tm.slice(6,8)+':' + tm.slice(8,10)+':' + tm.slice(10,12);
+	dur = X.SA(0x3E,6);
+	if(charStat(dur,1).indexOf('allnum') < 0 || !isWithin(dur.slice(2,4),'00','59') || !isWithin(dur.slice(4,6),'00','59'))
+		return false;
+	dur = dur.slice(0,2)+'h'+dur.slice(2,4)+'m'+dur.slice(4,6)+'s';
+	auth = readBytes(0xC,0x10);
+	if(charStat(auth,1).indexOf('allxsc') < 0) return false;
+	else auth = decEncoding(auth,CP437);
+	if(v1) switch(cn = X.U8(0x2A4)) {
+	case 0: co = 'DSS standard-play mode 11025Hz b/r '+(8*41*11025*512/(506*264)/1000).toFixed(3)+'k'; break;
+	case 2: co = 'g723.1 long-play mode 8000Hz'; break;
+	default: co = 'unknown ('+Hex(cn)+')'
+	} else {
+		cn = 0; co = 'DSS standard-play mode';
+	}
+	if(cn == 0) asz = hdrsz+3750*(dur.slice(0,2) * 3600 + dur.slice(3,5) * 60 + dur.slice(6,8)); else asz = -1
+	cmt = "";
+	if(v1) {
+		cmt = readBytes(0x31E,0x40);
+		if(charStat(cmt,1).indexOf('allxsc') < 0) return false;
+		else cmt = decEncoding(cmt,CP437)
+	} else for(i = 0x240; i < 0x3A6; i += 60) {
+		if((t = X.SC(i, 30, 'CP437').trim() + ': ' + X.SC(i+30, 30, 'CP437').trim()) != ': ') cmt = cmt.appendS(t,', ')
+	}
+	// TODO traverse the blocks to check the filesize
+	bDetected = 1; sVersion = 'v'+nv; if(X.c("'enc'",1)) sVersion += ' encrypted';
+	if(X.isVerbose()) {
+ 		sOptionT(auth,'by: '); sOption(tm,'on: '); sOption(cmt); sOption(co,'codec: '); sOption(dur,'duration: ');
+ 		if(asz > 0) sOption('approx.filesize: '+(asz/0x100000).toFixed(2)+'M')
+ 	}
+
+	return result(bShowType,bShowVersion,bShowOptions);
+}
