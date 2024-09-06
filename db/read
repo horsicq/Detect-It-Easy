@@ -4,11 +4,11 @@
 // TODO update the old scripts to use the new functions,
 // and get rid of the functions themselves
 
-const _BE = true; const _LE = false; //endianness for read_int16+
+const _BE = true, _LE = false; //endianness for read_int16+
 //little-endian = reversed notation (Intel, ZX Spectrum),
 //big-endian = direct notation (TCP/IP, Motorola, Amiga)
 //For the BitReader Object, BE is MSB and LE is LSB (intuitively)
-
+const CS_ALL = true, CS_BEST = false; //charStat needall 
 const TOEOF = -1; //use for the size parameter in findSignature
 
 // ---------- START OF PRE-v3.06 CODE --------------------
@@ -20,7 +20,7 @@ const TOEOF = -1; //use for the size parameter in findSignature
  * @alias Binary.readBEWord
  */
 File.readBEWord = function(nOffset) {
-    return File.read_uint16(nOffset,_BE)
+	return File.read_uint16(nOffset,_BE)
 }
 
 /**
@@ -30,7 +30,7 @@ File.readBEWord = function(nOffset) {
  * @alias Binary.readBEDword
  */
 File.readBEDword = function(nOffset) {
-    return File.read_uint32(nOffset,_BE)
+	return File.read_uint32(nOffset,_BE)
 }
 
 /**
@@ -41,7 +41,7 @@ File.readBEDword = function(nOffset) {
  * @alias Binary.readEWord
  */
 File.readEWord = function(nOffset,bBE) {
-    return File.read_uint16(nOffset,bBE)
+	return File.read_uint16(nOffset,bBE)
 }
 
 /**
@@ -52,7 +52,7 @@ File.readEWord = function(nOffset,bBE) {
  * @alias Binary.readEDWord
  */
 File.readEDword = function(nOffset,bBE) {
-    return File.read_uint16(nOffset,bBE)
+	return File.read_uint16(nOffset,bBE)
 }
 
 /**
@@ -62,7 +62,7 @@ File.readEDword = function(nOffset,bBE) {
  * @alias Binary.readShort
  */
 File.readShort = function(nOffset) {
-    return File.read_int16(nOffset,_LE)
+	return File.read_int16(nOffset,_LE)
 }
 
 
@@ -70,38 +70,58 @@ File.readShort = function(nOffset) {
 
 //the encoding tables start with 0x7F, not 0x80!
 const CP437 = "⌂"+
-    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ"+
-    "áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐"+
-    "└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀"+
-    "αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
+	"ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ"+
+	"áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐"+
+	"└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀"+
+	"αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
 const CP1252 = "⌂"+
-    "€?‚ƒ„…†‡ˆ‰Š‹Œ?Ž??‘’“”•–—˜™š›œ?žŸ"+
-    " ¡¢£¤¥¦§¨©ª«¬?®¯°±²³´µ¶·¸¹º»¼½¾¿"+
-    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
-    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+	"€?‚ƒ„…†‡ˆ‰Š‹Œ?Ž??‘’“”•–—˜™š›œ?žŸ"+
+	" ¡¢£¤¥¦§¨©ª«¬?®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+	"ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
+	"àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+const CP866 = "⌂"+
+'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'+
+'абвгдежзийклмноп░▒▓│┤╡╢╖╕╣║╗╝╜╛┐'+
+'└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀'+
+'рстуфхцчшщъыьэюяЁёЄєЇїЎў°∙·√№¤■ ';
+const KOI8R = "⌂"+
+'─│┌┐└┘├┤┬┴┼▀▄█▌▐░▒▓⌠■∙√≈≤≥ ⌡°²·÷'+
+'═║╒ё╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡Ё╢╣╤╥╦╧╨╩╪╫╬©'+
+'юабцдефгхийклмнопярстужвьызшэщчъ'+
+'ЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧЪ';
 const CPAmiga = "⫽"+ // alternatively, "▒""
-    "абвгдежзийклмнопрстуфхцчшщъыьэюя"+ //0x80~0xA0 display Cyrillics, just to fill the void
-    " ¡¢£¤¥¦§¨©ª«¬–®¯°±²³´µ¶·¸¹º»¼½¾¿"+
-    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
-    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+	"абвгдежзийклмнопрстуфхцчшщъыьэюя"+ //0x80~0xA0 display Cyrillics, just to fill the void
+	" ¡¢£¤¥¦§¨©ª«¬–®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+	"ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
+	"àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
 const CPRISCOS = "⌂"+
-    "€Ŵŵ◰﯀Ŷŷ�⇦⇨⇩⇧…™‰•‘’‹›“”„–—−Œœ†‡ﬁﬂ"+
-    " ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿"+
-    "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
-    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+	"€Ŵŵ◰﯀Ŷŷ�⇦⇨⇩⇧…™‰•‘’‹›“”„–—−Œœ†‡ﬁﬂ"+
+	" ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+	"ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
+	"àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
 const CPAtariST = "⌂"+
-    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥ßƒ"+
-    "áíóúñÑªº¿⌐¬½¼¡«»ãõØøœŒÀÃÕ¨´†¶©®™"+
-    "ĳĲאבגדהוזחטיכלמנסעפצקרשתןךםףץ§∧∞"+
-    "αβΓπΣσµτΦΘΩδ∮φ∈∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²³¯";
+	"ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥ßƒ"+
+	"áíóúñÑªº¿⌐¬½¼¡«»ãõØøœŒÀÃÕ¨´†¶©®™"+
+	"ĳĲאבגדהוזחטיכלמנסעפצקרשתןךםףץ§∧∞"+
+	"αβΓπΣσµτΦΘΩδ∮φ∈∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²³¯";
+const CPSpeccy = ['©', //too SPECIAL with all the tokens-for-characters, gotta use lists
+	'  ',' ▀','▀ ','▀▀',' ▄',' █','▀▄','▄█', '▄ ','▄▀','█ ','█▀','▄▄','▄█','█▄','██', //80~F
+	'𝘼','𝘽','𝘾','𝘿','𝙀','𝙁','𝙂','𝙃','𝙄','𝙅','𝙆','𝙇','𝙈','𝙉','𝙊','𝙋', //90~F
+	'𝙌','𝙍','𝙎','𝚉𝚇¹²⁸','⏯️','𝚁𝙽𝙳','𝙸𝙽𝙺𝙴𝚈$','π', '𝙵𝙽 ','𝙿𝙾𝙸𝙽𝚃 ','𝚂𝙲𝚁𝙴𝙴𝙽$ ','𝙰𝚃𝚃𝚁 ','𝙰𝚃 ','𝚃𝙰𝙱 ','𝚅𝙰𝙻$ ','𝙲𝙾𝙳𝙴' , //A0~F
+	'𝚅𝙰𝙻 ','𝙻𝙴𝙽 ','𝚂𝙸𝙽 ','𝙲𝙾𝚂 ','𝚃𝙰𝙽 ','𝙰𝚂𝙽 ','𝙰𝙲𝚂 ','𝙰𝚃𝙽 ', '𝙻𝙽 ','𝙴𝚇𝙿 ','𝙸𝙽𝚃 ','𝚂𝚀𝚁 ','𝚂𝙶𝙽 ','𝙰𝙱𝚂 ','𝙿𝙴𝙴𝙺 ','𝙸𝙽 ', //B0~F
+	'𝚄𝚂𝚁 ','𝚂𝚃𝚁$ ','𝙲𝙷𝚁$ ','𝙽𝙾𝚃 ','𝙱𝙸𝙽 ','𝙾𝚁 ','𝙰𝙽𝙳 ','≤', '≥','≠','𝙻𝙸𝙽𝙴 ','𝚃𝙷𝙴𝙽 ','𝚃𝙾 ','𝚂𝚃𝙴𝙿 ','𝙳𝙴𝙵 𝙵𝙽 ','𝙲𝙰𝚃 ', //C0~F
+	'𝙵𝙾𝚁𝙼𝙰𝚃 ','𝙼𝙾𝚅𝙴 ','𝙴𝚁𝙰𝚂𝙴 ','𝙾𝙿𝙴𝙽 # ','𝙲𝙻𝙾𝚂𝙴 # ','𝙼𝙴𝚁𝙶𝙴 ','𝚅𝙴𝚁𝙸𝙵𝚈 ', '𝙱𝙴𝙴𝙿 ','𝙲𝙸𝚁𝙲𝙻𝙴 ','𝙸𝙽𝙺 ','𝙿𝙰𝙿𝙴𝚁 ','𝙵𝙻𝙰𝚂𝙷 ','𝙱𝚁𝙸𝙶𝙷𝚃 ','𝙸𝙽𝚅𝙴𝚁𝚂𝙴 ','𝙾𝚅𝙴𝚁 ','𝙾𝚄𝚃 ', //D0~F
+	'𝙻𝙿𝚁𝙸𝙽𝚃 ','𝙻𝙻𝙸𝚂𝚃 ','𝚂𝚃𝙾𝙿 ','𝚁𝙴𝙰𝙳 ','𝙳𝙰𝚃𝙰 ','𝚁𝙴𝚂𝚃𝙾𝚁𝙴 ','𝙽𝙴𝚆 ', '𝙱𝙾𝚁𝙳𝙴𝚁 ','𝙲𝙾𝙽𝚃𝙸𝙽𝚄𝙴 ','𝙳𝙸𝙼 ','𝚁𝙴𝙼 ','𝙵𝙾𝚁 ','𝙶𝙾 𝚃𝙾 ','𝙶𝙾 𝚂𝚄𝙱 ','𝙸𝙽𝙿𝚄𝚃 ','𝙻𝙾𝙰𝙳 ', //E0~F
+	'𝙻𝙸𝚂𝚃 ','𝙻𝙴𝚃 ','𝙿𝙰𝚄𝚂𝙴 ','𝙽𝙴𝚇𝚃 ','𝙿𝙾𝙺𝙴 ','𝙿𝚁𝙸𝙽𝚃 ','𝙿𝙻𝙾𝚃 ', '𝚁𝚄𝙽 ','𝚂𝙰𝚅𝙴 ','𝚁𝙰𝙽𝙳𝙾𝙼𝙸𝚉𝙴 ','𝙸𝙵 ','𝙲𝙻𝚂','𝙳𝚁𝙰𝚆 ','𝙲𝙻𝙴𝙰𝚁 ','𝚁𝙴𝚃𝚄𝚁𝙽', '𝙲𝙾𝙿𝚈']; //F0~F
 const JISX0201 = "⌂"+
-    "→-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—˜™š›œ¢žŸ"+ //decided to mix it with cp1252
-    "→｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｶｷｸｹｺｻｼｽｾｿﾀ"+
-    "ﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ"+
-    "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
+	"→-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—˜™š›œ¢žŸ"+ //decided to mix it with cp1252
+	"→｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｶｷｸｹｺｻｼｽｾｿﾀ"+
+	"ﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ"+
+	"àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
 const Chars0to1F = "・☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼"; //#0 is a small dot from Japanese
 const Chars0to1FLF = "・☺☻♥♦♣♠•◘○\x0A♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼";
 const Chars0to1FCRLF = "・☺☻♥♦♣♠•◘○\x0A♂♀\x0D♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼";
+const Chars0to1FSpeccy = "\0\1\2\3\4\5，📝⬅➡⬇⬆⌫\x0A№\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F"; //not mixing...
 
 /**
  * Decode a 1-byte encoding from a byte array using the 128-byte-long table given,
@@ -113,28 +133,33 @@ const Chars0to1FCRLF = "・☺☻♥♦♣♠•◘○\x0A♂♀\x0D♫☼►◄
  * @returns {String} a string value usable with js.
  */
 function decEncoding(ansi, dectbl, zstop, tbl01F) {
-    if(typeof zstop === 'undefined') zstop = true;
-    if(typeof tbl01F === 'undefined') tbl01F = Chars0to1FCRLF;
-    var s = "", bit8 = 0;
-    for(var i=0; i < ansi.length; i++) {
-        if (!ansi[i] && zstop) break;
-        else if(ansi[i] < 0x80)
-            switch(ansi[i]) { // 7-bit variation processing
-            case 0x0E: if(dectbl == "JISX0201" || dectbl == "KOI8-R") bit8 = 0x80;
-                else s += tbl01F[0xE]; break;
-            case 0x0F: if(dectbl == "JISX0201" || dectbl == "KOI8-R") bit8 = 0;
-                else s += tbl01F[0xF]; break;
-            case 0x5C: if(dectbl == "JISX0201") s += "¥"; else s += "\\"; break;
-            case 0x7E: if(dectbl == "JISX0201") s += "‾"; else s += "~"; break;
-            case 0x7F: if(dectbl != "JISX0201") s += dectbl[0];
-                else s += String.fromCharCode(bit8+ansi[i]); break;
-            default:
-                if(!bit8 && ansi[i] >= 0 && ansi[i] < 0x20) s += tbl01F[ansi[i]];
-                else s += String.fromCharCode(bit8+ansi[i]);
-            }
-        else s += dectbl[ansi[i]-0x7F];
-    }
-    return s;
+	if(typeof zstop === 'undefined') zstop = true;
+	if(typeof tbl01F === 'undefined')
+		if(dectbl == CPSpeccy) tbl01F = Chars0to1FSpeccy;
+		else tbl01F = Chars0to1FCRLF;
+	var s = "", bit8 = 0;
+	for(var i=0; i < ansi.length; i++) {
+		if (!ansi[i] && zstop) break;
+		else if(ansi[i] < 0x80)
+			switch(ansi[i]) { // 7-bit variation processing
+			case 0x0E: if(dectbl == JISX0201 || dectbl == KOI8R) bit8 = 0x80;
+				else s += tbl01F[0xE]; break;
+			case 0x0F: if(dectbl == JISX0201 || dectbl == KOI8R) bit8 = 0;
+				else s += tbl01F[0xF]; break;
+			case 0x5C: if(dectbl == JISX0201) s += "¥"; else s += "\\"; break;
+			case 0x5E: if(dectbl == CPSpeccy) s += '↑'; else s += '^'; break;
+			case 0x60: if(dectbl == CPSpeccy) s += '£'; else s += '`'; break;
+			case 0x7E: if(dectbl == JISX0201) s += "‾"; else s += "~"; break;
+			case 0x7F:
+				if(dectbl != JISX0201) s += dectbl[0];
+				else s += String.fromCharCode(bit8+ansi[i]); break;
+			default:
+				if(!bit8 && ansi[i] >= 0 && ansi[i] < 0x20) s += tbl01F[ansi[i]];
+				else s += String.fromCharCode(bit8+ansi[i]);
+			}
+		else s += dectbl[ansi[i]-0x7F];
+	}
+	return s;
 }
 
 /**
@@ -145,13 +170,13 @@ function decEncoding(ansi, dectbl, zstop, tbl01F) {
  * @returns {[uint8]} The file slice. If you go beyond EoF, read_uint8 only knows what happens.
  */
 function readBytes(ofs, len, zspace) { //for now; feels like this should be a system function
-    var c, s = []; if(typeof zspace === 'undefined') zspace = false;
-    for (var i=0; i < len && ofs+i < File.getSize(); i++) {
-        c = File.read_uint8(ofs+i);
-        if(zspace && !c) c = 0x20;
-        s.push(c);
-    }
-    return s;
+	var c, s = []; if(typeof zspace === 'undefined') zspace = false;
+	for (var i=0; i < len && ofs+i < File.getSize(); i++) {
+		c = File.read_uint8(ofs+i);
+		if(zspace && !c) c = 0x20;
+		s.push(c);
+	}
+	return s;
 }
 
 /**
@@ -164,17 +189,31 @@ function readBytes(ofs, len, zspace) { //for now; feels like this should be a sy
  * @returns {String} a string value usable with js.
  */
 function decAnsi(ofs, len, dectbl, zstop, tbl01F) {
-    return(decEncoding(readBytes(ofs,len), dectbl, zstop, tbl01F))
+	return(decEncoding(readBytes(ofs,len), dectbl, zstop, tbl01F))
+}
+
+
+/**
+ * Checks for whether a value fits the limits using <=, as opposed to isInside.
+ * @param {Number} a - the value to check.
+ * @param {Number} mina
+ * @param {Number} maxa
+ * @returns {Bool}
+ */
+function isWithin(a, mina, maxa) {
+	return mina <= a && a <= maxa
 }
 
 /**
- * Your typical integer division with just the integer result.
- * Not tested on all weird cases, but __you know what you did.__
- * @param {Int} a
- * @param {Int} b
- * @returns {Int} something like div
+ * Checks for whether a value fits the limits using <, as opposed to isWithin. Useful for floats.
+ * @param {Number} a - the value to check.
+ * @param {Number} mina
+ * @param {Number} maxa
+ * @returns {Bool}
  */
-function div(a, b) { var s = a*b>0 ? 1 : a*b<0 ? -1 : 0; return s*Math.floor(Math.abs(a)/Math.abs(b)) }
+function isInside(a, mina, maxa) {
+	return mina < a && a < maxa
+}
 
 /**
  * Derive a string hexadecimal value, zero-padded.
@@ -183,30 +222,30 @@ function div(a, b) { var s = a*b>0 ? 1 : a*b<0 ? -1 : 0; return s*Math.floor(Mat
  * @returns {String} The hex value, capital letters A~F, ending with "h".
  */
 function Hex(a, padz) {
-    if(typeof a === 'undefined') return "!Hex("+a+")";
-    if(typeof padz === 'undefined') padz = 2;
-    var minus=""; if(a<0) { a = -a; minus = "-" }
-    var r = a.toString(16).toUpperCase(); var pads="";
-    if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
-    return minus+pads+r+"h"
+	if(typeof a === 'undefined') return "!Hex("+a+")";
+	if(typeof padz === 'undefined') padz = 2;
+	var minus=""; if(a<0) { a = -a; minus = "-" }
+	var r = a.toString(16).toUpperCase(); var pads="";
+	if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
+	return minus+pads+r+"h"
 }
 
 function Bin(a, padz) {
-    if(typeof a === 'undefined') return "!Bin("+a+")";
-    if(typeof padz === 'undefined') padz = 4;
-    var minus = ""; if(a < 0) { a = -a; minus = "-" }
-    var r = a.toString(2); var pads="";
-    if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
-    return minus+pads+r+"b"
+	if(typeof a === 'undefined') return "!Bin("+a+")";
+	if(typeof padz === 'undefined') padz = 4;
+	var minus = ""; if(a < 0) { a = -a; minus = "-" }
+	var r = a.toString(2); var pads="";
+	if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
+	return minus+pads+r+"b"
 }
 
 function Oct(a, padz) {
-    if(typeof a === 'undefined') return "!Oct("+a+")";
-    if(typeof padz === 'undefined') padz = 4;
-    var minus = ""; if(a < 0) { a = -a; minus = "-" }
-    var r = a.toString(8); var pads="";
-    if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
-    return minus+pads+r+"o"
+	if(typeof a === 'undefined') return "!Oct("+a+")";
+	if(typeof padz === 'undefined') padz = 4;
+	var minus = ""; if(a < 0) { a = -a; minus = "-" }
+	var r = a.toString(8); var pads="";
+	if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
+	return minus+pads+r+"o"
 }
 
 /**
@@ -215,16 +254,16 @@ function Oct(a, padz) {
  * @returns {List} [length,value] - if length (in physical bytes) = 0, the value had a problem.
 **/
 function readVarUInt(ofs) {
-    if(ofs < 0 || ofs >= File.getSize()) return [0,0];
-    var t = 0, wb = 1, r = 1, o = ofs;
-    var b = File.read_uint8(o++); t = (t << 7) | (b&0x7F);
-    var b_ = b; while(b_) { b_ >>= 1; wb++ }
-    while(r < 16 && (b&0x80)) {
-        b = File.read_uint8(o++); t = (t << 7) | (b&0x7F); r++
-    }
-    if(wb > 64) return [0,0xFFFFFFFFFFFFFFFF]; // sizeof(target) in bits. A 64bit value should be enough, right?
-    else if(b&0x80) return [0,-1]; //EOF
-    else return [r,t]
+	if(ofs < 0 || ofs >= File.getSize()) return [0,0];
+	var t = 0, wb = 1, r = 1, o = ofs;
+	var b = File.read_uint8(o++); t = (t << 7) | (b&0x7F);
+	var b_ = b; while(b_) { b_ >>= 1; wb++ }
+	while(r < 16 && (b&0x80)) {
+		b = File.read_uint8(o++); t = (t << 7) | (b&0x7F); r++
+	}
+	if(wb > 64) return [0,0xFFFFFFFFFFFFFFFF]; // sizeof(target) in bits. A 64bit value should be enough, right?
+	else if(b&0x80) return [0,-1]; //EOF
+	else return [r,t]
 }
 
 /**
@@ -242,44 +281,44 @@ function readVarUInt(ofs) {
  * Skip some bytes without changing state: bits.consume(2)
 **/
 function BitReader(nOffset, nEndian) {
-    this.n = 0; // the number of bits in the buffer
-    this.buf = 0; // the bit buffer
-    this.offset = nOffset ? nOffset : 0; // the file offset
-    this.endian = nEndian ? nEndian : _LE; // for different mechanics of bitstreaming; ogg/flac use _BE
+	this.n = 0; // the number of bits in the buffer
+	this.buf = 0; // the bit buffer
+	this.offset = nOffset ? nOffset : 0; // the file offset
+	this.endian = nEndian ? nEndian : _LE; // for different mechanics of bitstreaming; ogg/flac use _BE
 
-    // use this to change the pointer, which will reinit the reader, but not the logger
-    this.init = function(nOffset) { this.ofs = nOffset ? nOffset : 0; this.n = this.buf = 0 }
+	// use this to change the pointer, which will reinit the reader, but not the logger
+	this.init = function(nOffset) { this.ofs = nOffset ? nOffset : 0; this.n = this.buf = 0 }
 
-    // the method to read b bits from the file
-    this.read = function(nBits) {
-        if(nBits > 64) nBits = 64; if(nBits < 0) return 0;
-        if(this.endian === _LE) {
-            while(this.n < nBits) { // while the buffer is not enough
-                this.buf |= File.read_uint8(this.offset++) << this.n; // read a byte and append it to the buffer
-                this.n += 8; // increase the bit number by 8
-            }
-            var v = this.buf & ((1 << nBits) - 1); // extract the desired bits from the buffer
-            this.buf >>= nBits; // shift the buffer to the right
-        } else {
-            while(this.n < nBits) {
-                this.buf = (this.buf << 8) | File.read_uint8(this.offset++); // shift the buffer to the left and append a byte
-                this.n += 8;
-            }
-            var v = this.buf >> (this.n - nBits); // extract the desired bits from the most significant part of the buffer
-            this.buf &= ((1<<this.n)-1) >> nBits; // clear the extracted bits from the buffer
-        }
-        this.n -= nBits; // decrease the bit number by b
-        return v; // return the value even if the file is exhausted
-    }
+	// the method to read b bits from the file
+	this.read = function(nBits) {
+		if(nBits > 64) nBits = 64; if(nBits < 0) return 0;
+		if(this.endian === _LE) {
+			while(this.n < nBits) { // while the buffer is not enough
+				this.buf |= File.read_uint8(this.offset++) << this.n; // read a byte and append it to the buffer
+				this.n += 8; // increase the bit number by 8
+			}
+			var v = this.buf & ((1 << nBits) - 1); // extract the desired bits from the buffer
+			this.buf >>= nBits; // shift the buffer to the right
+		} else {
+			while(this.n < nBits) {
+				this.buf = (this.buf << 8) | File.read_uint8(this.offset++); // shift the buffer to the left and append a byte
+				this.n += 8;
+			}
+			var v = this.buf >> (this.n - nBits); // extract the desired bits from the most significant part of the buffer
+			this.buf &= ((1<<this.n)-1) >> nBits; // clear the extracted bits from the buffer
+		}
+		this.n -= nBits; // decrease the bit number by b
+		return v; // return the value even if the file is exhausted
+	}
 
-    // Skip some bytes without changing state: bits.consume(2)
-    this.consume = function(nBytes) { this.offset += nBytes; }
+	// Skip some bytes without changing state: bits.consume(2)
+	this.consume = function(nBytes) { this.offset += nBytes; }
 
-    // Set the bit-file's offset, in bytes, without changing state:
-    this.seek = function(nOfs) { this.offset = nOfs; }
+	// Set the bit-file's offset, in bytes, without changing state:
+	this.seek = function(nOfs) { this.offset = nOfs; }
 
-    // Set the bit-file's offset in bits:
-    this.bseek = function(nOfs) { this.offset = nOfs - (nOfs%8); this.buf = this.n = 0; this.read(nOfs%8); }
+	// Set the bit-file's offset in bits:
+	this.bseek = function(nOfs) { this.offset = nOfs - (nOfs%8); this.buf = this.n = 0; this.read(nOfs%8); }
 }
 
 /**
@@ -289,10 +328,10 @@ function BitReader(nOffset, nEndian) {
  * @returns {bool} True if the slice is all zeroes. If you go beyond EoF, always false.
  */
 function isAllZeroes(ofs, len) {
-    if(ofs+len>File.getSize()) return false;
-    var c = 0;
-    for(var i=0;i < len && ofs+i < File.getSize();i++) if(!File.read_uint8(ofs+i)) c++;
-    return c === len;
+	if(ofs+len>File.getSize()) return false;
+	var c = 0;
+	for(var i=0;i < len && ofs+i < File.getSize();i++) if(!File.read_uint8(ofs+i)) c++;
+	return c === len;
 }
 
 /**
@@ -306,7 +345,8 @@ function isAllZeroes(ofs, len) {
  * @returns {String} - the resulting string.
  */
 function addEllipsis(a, trim, mintrim) {
-	if(!trim) trim = 0x80; if(!mintrim) mintrim = 78; if(a.length < trim || mintrim > trim) return a.trim();
+	if(!trim) trim = 0xA0;
+	if(!mintrim) mintrim = 78; if(a.length < trim || mintrim > trim) return a.trim();
 	const spaces = " .,:;!\\/'\"=&\x09\x0D\x0A\x1A\x26。、｡,，・";
 	var i = trim, c = 0, ci = -1;
 	while(i >= mintrim && c < 2) {
@@ -352,17 +392,17 @@ function sOption(a, prefix, suffix) {
  * It's still a good idea to add "/malformed!short" to the version string — it's visible without isVerbose.
  */
 function outSz() { if(!arguments.length || typeof arguments[0] === 'undefined') return "?";
-    var sizes = [], origs = [];
-    for(i = 0; i < arguments.length; i++)
-      if(arguments[i] >= 0) if(!origs.length || origs.indexOf(arguments[i]) < 0) {
-        origs.push(arguments[i]);
-        sizes.push(
-            arguments[i] < File.getSize() ? arguments[i]+"(+"+(File.getSize()-arguments[i])+")"
-          : arguments[i] > File.getSize() ? arguments[i]+"(-"+(arguments[i]-File.getSize())+"!)"
-          : arguments[i]
-        )
-    }
-    return sizes.join("/")
+	var sizes = [], origs = [];
+	for(i = 0; i < arguments.length; i++)
+	  if(arguments[i] >= 0) if(!origs.length || origs.indexOf(arguments[i]) < 0) {
+		origs.push(arguments[i]);
+		sizes.push(
+			arguments[i] < File.getSize() ? arguments[i]+"(+"+(File.getSize()-arguments[i])+")"
+		  : arguments[i] > File.getSize() ? arguments[i]+"(-"+(arguments[i]-File.getSize())+"!)"
+		  : arguments[i]
+		)
+	  } else; else sizes.push("?");
+	return sizes.join("/")
 }
 
 /**
@@ -370,7 +410,7 @@ function outSz() { if(!arguments.length || typeof arguments[0] === 'undefined') 
  * @param {String} a - the expected file suffix, case-insensitive, no heading period unlike Python
  * @returns {bool} if a match is reached
  */
-function extIs(a) { return Binary.getFileSuffix().toLowerCase() == a.toLowerCase() }
+function extIs(a) { return File.getFileSuffix().toLowerCase() == a.toLowerCase() }
 
 /**
  * slashTag formats a string in a way that's useful when a tag has two versions (for ex. in different languages). It will either show both with "/" in between, or one of them if the other one's an empty string, or an empty string if both are empty.
@@ -379,14 +419,14 @@ function extIs(a) { return Binary.getFileSuffix().toLowerCase() == a.toLowerCase
  * @returns {String}
 */
 function slashTag(a, b) {
-    if(a == b) return a;
-    else if(a != "" && b == "")
-        return a;
-    else if(a == "" && b != "")
-        return b;
-    else if(a != "" && b != "")
-        return a+"/"+b;
-    else return ""
+	if(a == b) return a;
+	else if(a != "" && b == "")
+		return a;
+	else if(a == "" && b != "")
+		return b;
+	else if(a != "" && b != "")
+		return a+"/"+b;
+	else return ""
 }
 
 /**
@@ -398,26 +438,152 @@ function slashTag(a, b) {
 */
 // createOrderlyHuffmanTable is just for detections but it does return the table for further checks. Or it returns false.
 function createOrderlyHuffmanTable(lent, btl, br) {
-    var md = 32, Md = reall = code = 0; var _t = [], fi = [], li = [], ni = [];
-    for(i = 0; i < 33; i++) fi[i] = 0xFFFF;
-    for(i = 0; i < btl; i++) { len = lent[i]; if(len) {
-        if(len < md) md = len; if(len > Md) Md = len;
-        if(fi[len] == 0xFFFF) { fi[len] = li[len] = i } else { ni[li[len]] = i; li[len] = i } reall++ } }
-    if(!Md) return false;
-    for(d = md; d <= Md; d++) {
-        if(fi[d] != 0xFFFF) ni[li[d]] = btl;
-        for(i = fi[d]; i < btl; i = ni[i]) {
-            //insert HuffmanCode:
-            var j = 0, le = _t.length;
-            for(var cb = d; cb >= 0; cb--) {
-                var cob = (cb && ( ( (code>>(Md-d)) >> (cb-1) ) & 1 ) ) ? 1 : 0;
-                if(j != le) {
-                    if(!cb || (!_t[j][0] && !_t[j][1])) return false; //[0] is left, [1] is right, [2] is value
-                    if(!_t[j][cob]) _t[j][cob] = j = le; else j = _t[j][cob];
-                } else {
-                    _t.push([ (cb&&!cob)?le+1:0, (cb&&cob)?le+1:0, cb?0:i ]);
-                    j++; le++
-                } }
-            code += 1 << (Md-d) } }
-    return _t
+	var md = 32, Md = reall = code = 0; var _t = [], fi = [], li = [], ni = [];
+	for(i = 0; i < 33; i++) fi[i] = 0xFFFF;
+	for(i = 0; i < btl; i++) { len = lent[i]; if(len) {
+		if(len < md) md = len; if(len > Md) Md = len;
+		if(fi[len] == 0xFFFF) { fi[len] = li[len] = i } else { ni[li[len]] = i; li[len] = i } reall++ } }
+	if(!Md) return false;
+	for(d = md; d <= Md; d++) {
+		if(fi[d] != 0xFFFF) ni[li[d]] = btl;
+		for(i = fi[d]; i < btl; i = ni[i]) {
+			//insert HuffmanCode:
+			var j = 0, le = _t.length;
+			for(var cb = d; cb >= 0; cb--) {
+				var cob = (cb && ( ( (code>>(Md-d)) >> (cb-1) ) & 1 ) ) ? 1 : 0;
+				if(j != le) {
+					if(!cb || (!_t[j][0] && !_t[j][1])) return false; //[0] is left, [1] is right, [2] is value
+					if(!_t[j][cob]) _t[j][cob] = j = le; else j = _t[j][cob];
+				} else {
+					_t.push([ (cb&&!cob)?le+1:0, (cb&&cob)?le+1:0, cb?0:i ]);
+					j++; le++
+				} }
+			code += 1 << (Md-d) } }
+	return _t
+}
+
+/**
+ * Outputs time in seconds as short human-readable, with a "h:mm:ss" alternative when < 1 day.
+ * Millenia, centuries and years a sidereal years, a "month" duration is 1/12 of such year.
+ * @param {Number} seconds
+ * @returns {String}
+ * Ex. 𝑓(123456789) = "31Y10M4w21h33m9s"; 𝑓(1234567) = "2w6h56m7s"; 𝑓(12345) = "3:25:45"
+ */
+function secondsToTimeStr(s) {
+	const mul = [/*millenia*/315581497635,/*centuries*/3155814976,/*yrs*/31558150,/*mns*/2629846,/*wks*/604800,86400,3600,60];
+	var r = "", ss = s%mul[7], mm = Util.div64(s%mul[6],mul[7]), hh = Util.div64(s%mul[5],mul[6]),
+	dd = Util.div64(s%mul[4],mul[5]), ww = Util.div64(s%mul[3],mul[4]), mn = Util.div64(s%mul[2],mul[3]),
+	yy = Util.div64(s%mul[1],mul[2]), cc = Util.div64(s%mul[0],mul[1]), mi = Util.div64(s,mul[0]);
+	if(s < 86400) { r = mm.padStart(2,'0')+":"+ss.padStart(2,'0'); if(hh) r = hh+":"+r; return r }
+	if(ss) r = ss+"s"+r; if(mm) r = mm+"m"+r; if(hh) r = hh+"h"+r; if(dd) r = dd+"d"+r; if(ww) r = ww+"w"+r;
+	if(mn) r = mn+"M"+r; if(yy) r = yy+"Y"+r; if(cc) r = cc+"C"+r; if(mi) r = ci+"Mil"+r; return r
+}
+
+/**
+ * Examines a sequence and gives a generalised idea of what sort of characters a string is (mostly) made of.
+ * Could be useful for validating structured files with human-filled fields.
+ * @param {String/Number[]} s - your string in question, or a List of charcodes.
+ * @param {Boolean=false} needall - if true, you have "allascallt allnum" for a line of spaces, else just "allt ".
+ * @returns {String} - at least one or a combo of these, optional prefix "all" (otherwise "mostly"):
+ *  '?': wrong type; 'empty': 0 length; '00': zeroes; 't ': tabs/spaces; 'ctl': 0-1Fh & 7Fh; 'num': numerical;
+ *  'asc': 20h-7Eh; 'xsc': zeroes+tabs+♫+FFh+crlf+ascii; 'foreign': 00,t, ,crlf, 80h+; 'any': decision cannot be made.
+ * Parse the result using indexOf.
+ * Ex. 𝑓("-123 456.789") = "allnum", 𝑓("-123 456.789",1) = "allnumallascallxscallforeign"
+ */
+function charStat() {
+	if(!arguments.length) return "?";
+	if(typeof arguments[0] === "undefined" || typeof arguments[0] === "number") return "?";
+	str = arguments[0];
+	if(arguments.length<2) needall=false; else needall = !!arguments[1];
+	if(str=="" || str == []) return "empty";
+	var i, s=[], c = [ /*[0]00*/0, /*[1]t */0, /*[2]asc*/0, /*[3]xsc*/0, /*[4]num*/0,
+	  /*[5]ctl*/0, /*[6]foreign*/0 ], o = [0,0,0,0,0,0,0,0];
+	if(typeof str === "string") for(i=0;i<str.length;i++) s.push(str.charCodeAt(i)); else s = str;
+	for(i=0;i<s.length;i++) {
+		if(!s[i]) { c[0]++; c[3]++; c[5]++; c[6]++ }
+		else if(s[i]==9) { c[1]++; c[3]++; c[5]++; c[6]++ }
+		else if(s[i]==0xA || s[i]==0xD) { c[3]++; c[5]++; c[6]++ }
+		else if(s[i]==0xE) { c[3]++; c[5]++ }
+		else if(s[i]<=0x1F || s[i]==0x7F) c[5]++;
+		else if(s[i]==0x20) { c[1]++; c[2]++; c[3]++; c[4]++; c[6]++; }
+		else if(0x2B<=s[i]&&s[i]<=0x2D || 0x30<=s[i]&&s[i]<=0x39) { c[2]++; c[3]++; c[4]++; c[6]++ }
+		else if(s[i]<=0x7E) { c[2]++; c[3]++ }
+		else if(s[i]>0x7F) { c[3]++; c[6]++ }
+	} for(i=0;i<c.length;i++) o[i] = Util.div64(c[i]*100,s.length);
+	r = "";
+	//_log((typeof str)+" "+s+" {"+c+"} <"+o+">")
+	if(!needall) {
+		if(o[0]>70) { if(o[0]==100)r+="all"; r+="00" }
+		else if(o[1]>70) { if(o[1]==100)r+="all"; r+="t " }
+		else if(o[4]>70) { if(o[4]==100)r+="all"; r+="num" }
+		else if(o[2]>70) { if(o[2]==100)r+="all"; r+="asc" }
+		else if(o[3]>70) { if(o[3]==100)r+="all"; r+="xsc" }
+		else if(o[5]>70) { if(o[5]==100)r+="all"; r+="ctl" }
+		else if(o[6]>70) { if(o[6]==100)r+= "all"; r+="foreign" }
+	} else {
+		if(o[0]>70) { if(o[0]==100)r+="all"; r+="00" }
+		if(o[1]>70) { if(o[1]==100)r+="all"; r+="t " }
+		if(o[4]>70) { if(o[4]==100)r+="all"; r+="num" }
+		if(o[2]>70) { if(o[2]==100)r+="all"; r+="asc" }
+		if(o[3]>70) { if(o[3]==100)r+="all"; r+="xsc" }
+		if(o[5]>70) { if(o[5]==100)r+="all"; r+="ctl" }
+		if(o[6]>70) { if(o[6]==100)r+= "all"; r+="foreign" }
+	} 
+	if(r == "") return "any"+o; else return r
+}
+
+// PATCHING FUNCTIONALITY; promised to become native
+var patcheddata = [];
+function rpU8(adr) { //read patched data or passthrough, U8
+	for(var i=0; i < patcheddata.length; i++) if(patcheddata[i][0] == adr) return patcheddata[i][1];
+	return X.U8(adr)
+}
+function rpU16be(adr) { //read patched data or passthrough, U16 BE
+	return (rpU8(adr)<<8)|rpU8(adr+1)
+}
+function rpU32be(adr) { //read patched data or passthrough, U32 BE
+	return (rpU8(adr)<<24)|(rpU8(adr+1)<<16)|(rpU8(adr+2)<<8)|rpU8(adr+3)
+}
+function wpU8(adr,val) { //add to patches, U8
+	for(var i=0; i < patcheddata.length; i++)
+		if(patcheddata[i][0] == adr) { patcheddata[i][1] = val; return }
+	patcheddata.push([adr,val])
+}
+function wpU16be(adr,val) { //add to patches, U16 BE
+	wpU8(adr,(val>>8)&0xFF); wpU8(adr+1,val&0xFF)
+}
+function wpU32be(adr,val) { //add to patches, U32 BE
+	wpU8(adr,(val>>24)&0xFF); wpU8(adr+1,(val>>16)&0xFF);
+	wpU8(adr+2,(val>>8)&0xFF); wpU8(adr+3,val&0xFF)
+}
+function patchLength() { return patcheddata.length }
+function patchClear() { patcheddata = [] }
+
+b64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function toBase64(buf) {
+	var r = '', i = 0, indexOfLastCompleteTriple = buf.length - (buf.length%3);
+	for (i = 0; i < indexOfLastCompleteTriple; i += 3) {
+		r += b64Chars[buf[i] >> 2];
+		r += b64Chars[((buf[i] & 3) << 4) | ((buf[i+1] & 0xF0) >> 4)];
+		r += b64Chars[((buf[i+1] & 0xF) << 2) | ((buf[i+2] & 0xC0) >> 6)];
+		r += b64Chars[buf[i+2] & 0x3F]
+	}
+	if (i < buf.length) {
+		var i1 = buf[i],  i2 = (i+1 < buf.length) ? buf[i+1] : 0;
+		r += b64Chars[i1 >> 2];
+		r += b64Chars[((i1 & 0x03) << 4) | ((i2 & 0xF0) >> 4)];
+		if (i+1 < buf.length) {
+			r += b64Chars[((i2 & 0x0F) << 2)];
+		}
+		else r += '=';
+		r += '=';
+	}
+	return r
+}
+
+function _logBase64(buf) { //simply plops the buffer contents into log stream with a suitable MIME header
+	var fn = File.getFileBaseName()+'.'+File.getFileCompleteSuffix();
+	_log('MIME-Version: 1.0\nContent-Type: application/octet-stream; name="'+fn+'.dec"\n'+
+	'Content-Transfer-Encoding: base64\nContent-Disposition: attachment; filename="'+fn+'.dec"\n');
+	_log(buf)
 }
