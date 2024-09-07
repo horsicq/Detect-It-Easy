@@ -291,3 +291,16 @@
 
 ```
 ```
+**bool isNetGlobalCctorPresent()**
+
+```
+```
+**bool isNetTypePresent(QString sTypeNamespace, QString sTypeName)**
+
+```
+```
+**bool isNetMethodPresent(QString sTypeNamespace, QString sTypeName, QString sMethodName)**
+
+```
+```
+**bool isNetFieldPresent(QString sTypeNamespace, QString sTypeName, QString sFieldName)**
