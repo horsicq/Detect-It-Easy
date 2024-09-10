@@ -14,7 +14,7 @@ function detect(bShowType, bShowVersion, bShowOptions) {
         // from https://independent-software.com/dbase-dbf-dbt-file-format.html
         // & https://www.clicketyclick.dk/databases/xbase/format/dbf.html
         // & https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
-        nv = X.U8(0);
+        nv = X.U8(0); v5 = false;
         switch(nv) {
         case 0x02: sv = 'FoxBase 1.0'; break;
         case 0x03: sv = 'FoxBase 2.x / dBASE III, no memo file'; break;
@@ -26,10 +26,11 @@ function detect(bShowType, bShowVersion, bShowOptions) {
         case 0x32: sv = 'Visual FoxPro with varchar/varbinary'; break;
         case 0x43: sv = 'dBASE IV SQL Table, no memo file / Flagship .dbv memo var size'; break;
         case 0x64: sv = 'dBASE IV SQL System, no memo file'; break;
-        case 0x83: sv = 'FoxBase 2.x / dBase III+ with memo file'; break;
+        case 0x83: sv = 'FoxBase 2.x / dBASE III+ with memo file'; break;
         case 0x87: sv = 'VisualObjects 1.x with memo file'; break;
         case 0x8B: sv = 'dBASE IV with memo file'; break;
-        case 0x8E: sv = 'dBase IV with SQL table'; break; 
+        case 0x8C: sv = 'dBASE V with memo file'; break;
+        case 0x8E: sv = 'dBASE IV with SQL table'; break; 
         case 0xB3: sv = '.dbv with memo table'; break;
         case 0xCB: sv = 'dBASE IV SQL Table with memo file'; break;
         case 0xE5: sv = 'Clipper SIX with memo file'; break;
@@ -39,18 +40,18 @@ function detect(bShowType, bShowVersion, bShowOptions) {
         }
         if(nv == 2) {
             recc = X.U16(1); if(!recc) return false; recsz = X.U16(6); if(!recsz) return false;
-            hdrsz = 0x209; rectp = 8; enc = 'CP437';
+            hdrsz = 0x209; rectp = 8; enc = 'IBM437';
         } else {
             y = X.U8(1); if(y < 80) y += 2000; else y += 1900; m = X.U8(2); d = X.U8(3);
             if(X.c('000000',1)) { upd = 'never' } else {
                 if(!isWithin(y,1970,2100) || !isWithin(m,1,12) || !isWithin(d,1,31)) return false;
                 upd = y+'-'+m.padStart(2,'0')+d.padStart(2,'0') }
             recc = X.U32(4); if(!recc) return false;
-            hdrsz = X.U16(8); recsz = X.U16(10); if(hdrsz < 0x20 || !recsz) return false;
+            hdrsz = X.U16(8); recsz = X.U16(0xA); if(hdrsz < 0x20 || !recsz) return false;
             res0 = X.U24(0xC); res1 = readBytes(0xF,13); res2 = X.U32(0x1C);
             if([4,0x8C].indexOf(nv) >= 0) {
                 rectp = 0x44; enc = 'CP'+X.SA(0x22,3); if(isWithin((t=X.SA(0x25,1)),'0','9')) enc += t;
-                if(enc == 'CPKOI8') enc += X.SA(0x26,1)
+                if(enc == 'CPKOI8') enc += X.SA(0x26,1); v5 = true
             } else { rectp = 0x20;
                 switch(X.U8(0x1D)) {
                 case 0x02: enc = 'CP850'; break; //DOS Multilingual
@@ -79,19 +80,20 @@ function detect(bShowType, bShowVersion, bShowOptions) {
         validC = ['C','N','L','D','M','F','B','G','P','Y','T','I','V','X','@','O','+','0'];
         fldc = 0; totalfldsz = 1 /* we begin with a deletion flag */; p = rectp; old = [0,1];
         while(X.U8(p) != 0xD && p < hdrsz) {
-            name = readBytes(p,11); ns = charStat(name,1);
-//_log('fld#'+fldc+' @'+Hex(p)+': '+decEncoding(name,CP866)+' (ns=['+ns+']')
+            name = readBytes(p,v5? 0x1F: 11); ns = charStat(name,1);
+//_log('fld#'+fldc+' @'+Hex(p)+': '+decEncoding(name,CP866)+' (ns=['+ns+'])')
             if(!name[0] || (ns.indexOf('allxsc') < 0 && ns.indexOf('allforeign') < 0)) return false;
-            tp = X.SA(p+0xB,1); if(validC.indexOf(tp) < 0) return false;
-            if(nv == 2) fldst = X.U16(p+0xD); else fldst = X.U32(p+0xC);
-            fldsz = X.U8(nv == 2 ? p+0xC: p + 0x10); if(!fldsz) return false;
+            tp = X.SA(v5? p+0x20: p+0xB,1); if(validC.indexOf(tp) < 0) return false;
+            if(nv == 2) fldst = X.U16(p+0xD); else if(v5) fldst = 0; else fldst = X.U32(p+0xC);
+            fldsz = X.U8(nv == 2 ? p+0xC: v5? p+0x21: p+0x10); if(!fldsz) return false;
 //_log('  sz:'+fldsz+', old: '+old+'; '+old[0]+'+'+Hex(old[1])+' = '+Hex(old[0]+old[1])+' ?? '+Hex(fldst))
-            if(old[0] && old[0] + old[1] != fldst) return false; old = [fldsz,fldst];
+            if(old[0] && fldst && old[0] + old[1] != fldst) return false; old = [fldsz,fldst];
             totalfldsz += fldsz;
             decn = X.U8(nv == 2? p+0xF: p+0x11);
             if(tp === 'N' && decn > fldsz) return false;
-            fldc++; p += nv == 2? 0x10: 0x20;
-            if(ns.indexOf('foreign') >= 0 && enc == "CP437") enc = "CP1251"; //pesky Russians?
+            fldc++; p += nv == 2? 0x10: v5? 0x30 : 0x20;
+            if(charStat(name.slice(0,name.indexOf(0)),1).indexOf('foreign') >= 0
+                && enc == "IBM437") enc = "CP1251"; //pesky Russians?
         }
 //_log('@'+Hex(p)+': '+fldc+' fields total size '+totalfldsz+' vs. '+recsz)
         if(totalfldsz - recsz != 0) return false;
@@ -104,7 +106,7 @@ function detect(bShowType, bShowVersion, bShowOptions) {
     if(!bDetected && isDBF()) {
         sName = "DBase Database (.DBF)"; sVersion = sv; bDetected = true;
         if(X.isVerbose()) {
-            sOption('fld:'+fldc+' rec:'+recc+(del?'(* '+del+')':'')+' sz:'+outSz(sz))
+            sOption('fld:'+fldc+' rec:'+recc+(del?'(* '+del+')':'')+' enc:'+enc+' sz:'+outSz(sz))
         }
     }
 
