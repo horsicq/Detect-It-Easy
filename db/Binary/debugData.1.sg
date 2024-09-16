@@ -8,27 +8,15 @@ init("debug data", "");
 function detect() {
     var size = Binary.getSize();
 
-    // MinGW debug data
-    if (Binary.find_ansiString(0, size, "RECORD_NAME_MINGW") !== -1 && size >= 8) {
-        _setResult(sType, "MinGW", "", "Detected MinGW debug data");
-        return true;
-    }
-
-    // PDB File Link
-    if (Binary.find_ansiString(0, size, "RECORD_NAME_PDBFILELINK") !== -1 && size >= 8) {
-        _setResult(sType, "PDB File Link", "", "Detected PDB File Link");
-        return true;
-    }
-
     // Borland debug info
-    if (Binary.find_ansiString(0, size, "RECORD_NAME_BORLANDDEBUGINFO") !== -1 && size >= 16) {
-        if (Binary.readWord(0) === 0x52FB) {
-            _setResult(sType, "Borland", (Binary.readByte(3) + Binary.readByte(2) / 100.0).toFixed(2), "TDS" + (Binary.readWord(0xE) ? " " + Binary.readWord(0xE) + " symbols" : ""));
-        } else {
-            _setResult(sType, "Borland", "", "Borland debug info detected");
-        }
-        return true;
+    if (Binary.readWord(0) === 0x52FB) {
+        _setResult(sType, "Borland", (Binary.readByte(3) + Binary.readByte(2) / 100.0).toFixed(2), "TDS" + (Binary.readWord(0xE) ? " " + Binary.readWord(0xE) + " symbols" : ""));
+    } else if (Binary.compare("'FB09'")) {
+       _setResult(sType, "Borland", "", "Delphi TDS");
+    } else if (Binary.compare("'FB0A'")) {
+       _setResult(sType, "Borland", "", "C++ TDS");
     }
+    return true;
 
     var debugSize = Binary.readDword(size - 4);
 
