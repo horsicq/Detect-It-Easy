@@ -96,36 +96,39 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 
     var bEnableNewEngine = true; // Need more researches
 
-    if (bEnableNewEngine && (!bDetected) && (PE.isDeepScan())) {
-        var da = "";
-        var das = "";
-        var res = 0;
-        var jmp = 0;
-        var ep = PE.OffsetToVA(PE.getEntryPointOffset());
-        var count = 0;
+    if (bEnableNewEngine && !bDetected && PE.isDeepScan()) {
+        var da = "",
+            das = "",
+            res = 0,
+            jmp = 0;
 
-        while ((das.substr(0, das.indexOf('+')) != "MOV EDX, DWORD PTR [EAX*4 ") &&
-            (das.substr(0, das.indexOf('+')) != "MOV EBX, DWORD PTR [EAX*4 ") &&
-            (das.substr(0, das.indexOf('+')) != "MOV ECX, DWORD PTR [EAX*4 ") && count < 1000) {
+        var ep = PE.OffsetToVA(PE.getEntryPointOffset()),
+            count = 0;
+
+        while (das.substr(0, das.indexOf('+')) != "MOV EDX, DWORD PTR [EAX*4 " &&
+            das.substr(0, das.indexOf('+')) != "MOV EBX, DWORD PTR [EAX*4 " &&
+            das.substr(0, das.indexOf('+')) != "MOV ECX, DWORD PTR [EAX*4 " && count < 1000) {
             count++;
-            var byte = PE.readByte(PE.VAToOffset(ep));
-            var da = PE.getDisasmString(ep);
-            var das = da;
+
+            var byte = PE.readByte(PE.VAToOffset(ep)),
+                da = PE.getDisasmString(ep),
+                das = da;
 
             if (da.indexOf(' ') != -1) {
                 da = da.substr(0, da.indexOf(' '));
             }
 
+            var fresh = 0;
             if ((byte == 0xFF && da == "JMP") || ((byte == 0xC3 || byte == 0xC2) && da == "RET")) {
-                var fresh = 1;
+                fresh = 1;
                 break;
             }
 
-            if (byte == 0xFF && da == "CALL") { break; }
+            if (byte == 0xFF && da == "CALL") break;
 
-            if (da.indexOf(' ') != -1) {
+            if (da.indexOf(' ') != -1)
                 da = da.substr(0, da.indexOf(' '));
-            }
+
 
             if (da == "CLC" || da == "CMC") { res++; }
             if (da == "PUSHFD") { res++; }
@@ -153,10 +156,13 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 
 function detectVMP(sSectionName) {
     if (PE.section[sSectionName]) {
-        nCharacteristics = PE.section[sSectionName].Characteristics;
-        if ((nCharacteristics == 0x60000060) || (nCharacteristics == 0xE0000060) || (nCharacteristics == 0xE0000040) || (nCharacteristics == 0x68000060) || (nCharacteristics == 0xe2000060)) {
+        var nCharacteristics = PE.section[sSectionName].Characteristics;
+        if (nCharacteristics == 0x60000060 ||
+            nCharacteristics == 0xE0000060 ||
+            nCharacteristics == 0xE0000040 ||
+            nCharacteristics == 0x68000060 ||
+            nCharacteristics == 0xe2000060)
             return 1;
-        }
     }
 
     return 0;
@@ -164,31 +170,30 @@ function detectVMP(sSectionName) {
 
 function detectVMP2() {
     if (PE.section.length > 7) {
-        var nCount = 5;
-        var nResource = PE.getResourceSection();
-        var nRelocs = PE.getRelocsSection();
+        var nCount = 5,
+            nResource = PE.getResourceSection(),
+            nRelocs = PE.getRelocsSection();
 
-        if (nResource > PE.section.length - nCount) {
+        if (nResource > PE.section.length - nCount)
             nCount++;
-        }
-        if (nRelocs > PE.section.length - nCount) {
-            nCount++;
-        }
 
-        var nDetectCount = 0;
-        var nLastVMPSection = 0;
+        if (nRelocs > PE.section.length - nCount)
+            nCount++;
+
+
+        var nDetectCount = 0,
+            nLastVMPSection = 0;
 
         for (var nSection = PE.section.length - nCount; nSection < PE.section.length; nSection++) {
-            if ((nSection == nResource) || (nSection == nRelocs)) {
+            if ((nSection == nResource) || (nSection == nRelocs))
                 continue;
-            }
-            if ((PE.section[nSection].FileSize == 0) && (PE.section[nSection].FileOffset == 0)) {
-                nDetectCount++;
-            }
 
-            if ((PE.section[nSection].FileSize != 0) && (PE.section[nSection].FileOffset != 0)) {
+            if ((PE.section[nSection].FileSize == 0) && (PE.section[nSection].FileOffset == 0))
+                nDetectCount++;
+
+            if ((PE.section[nSection].FileSize != 0) && (PE.section[nSection].FileOffset != 0))
                 nLastVMPSection = nSection;
-            }
+
         }
 
         if (nDetectCount >= 3) {
@@ -199,12 +204,13 @@ function detectVMP2() {
                     }
                 } else if (PE.section[nLastVMPSection].Characteristics & 0x20000000) // Fix sent Deniskore
                 {
-                    var nSectionOffset = PE.section[nLastVMPSection].FileOffset;
-                    var nSectionSize = PE.section[nLastVMPSection].FileSize;
-                    var nOffset = nSectionOffset;
-                    var nSize = nSectionSize;
-                    var nCount = 0;
-                    var nSignatureOffset;
+                    var nSectionOffset = PE.section[nLastVMPSection].FileOffset,
+                        nSectionSize = PE.section[nLastVMPSection].FileSize,
+                        nOffset = nSectionOffset,
+                        nSize = nSectionSize,
+                        nCount = 0,
+                        nSignatureOffset = 0;
+
                     while (nSize > 0) {
                         nSignatureOffset = PE.findSignature(nOffset, nSize, "9c8d64");
                         if (nSignatureOffset == -1)
@@ -225,8 +231,6 @@ function detectVMP2() {
 }
 
 function detect_old(bShowType, bShowVersion, bShowOptions) {
-    var nSectionNumber = 0;
-    var nCharacteristics = 0;
     var collision = "";
 
     if (PE.section[".vmp0"] && (PE.compareEP("68........E9") || PE.compareEP("68........E8"))) {
