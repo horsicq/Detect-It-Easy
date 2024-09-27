@@ -98,3 +98,8 @@
 
 ```
 ```
+**QString getRunPath()**
+
+
+```
+```
