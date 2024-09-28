@@ -68,27 +68,33 @@ File.readShort = function(nOffset) {
 
 // -------- END OF PRE-v3.06 CODE
 
-//the encoding tables start with 0x7F, not 0x80!
+// The encoding tables start with 7F, not 80! 7F is undefined in many charsets but it's good to have something
+// The N(on)B(reakable)SP(ace) and S(oft)HY(phen) are kept as actual A0 and AD characters in this file 
 const CP437 = "⌂"+
 	"ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ"+
 	"áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐"+
 	"└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀"+
 	"αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
-const CP1252 = "⌂"+
-	"€?‚ƒ„…†‡ˆ‰Š‹Œ?Ž??‘’“”•–—˜™š›œ?žŸ"+
-	" ¡¢£¤¥¦§¨©ª«¬?®¯°±²³´µ¶·¸¹º»¼½¾¿"+
+const CP1251 = "⌂"+
+	"ЂЃ‚ѓ„…†‡€‰Љ‹ЊЌЋЏђ‘’“”•–—・™љ›њќћџ"+
+	" ЎўЈ¤Ґ¦§Ё©Є«¬­®Ї°±Ііґµ¶·ё№є»јЅѕї"+
+	"АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"+
+	"абвгдежзийклмнопрстуфхцчшщъыьэюя";
+const CP1252 = "⌂"+ //aka. Western aka. ISO-8859-1
+	"€・‚ƒ„…†‡ˆ‰Š‹Œ・Ž・・‘’“”•–—˜™š›œ・žŸ"+
+	" ¡¢£¤¥¦§¨©ª«¬・®¯°±²³´µ¶·¸¹º»¼½¾¿"+
 	"ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
 	"àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ";
-const CP866 = "⌂"+
-'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'+
-'абвгдежзийклмноп░▒▓│┤╡╢╖╕╣║╗╝╜╛┐'+
-'└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀'+
-'рстуфхцчшщъыьэюяЁёЄєЇїЎў°∙·√№¤■ ';
-const KOI8R = "⌂"+
-'─│┌┐└┘├┤┬┴┼▀▄█▌▐░▒▓⌠■∙√≈≤≥ ⌡°²·÷'+
-'═║╒ё╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡Ё╢╣╤╥╦╧╨╩╪╫╬©'+
-'юабцдефгхийклмнопярстужвьызшэщчъ'+
-'ЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧЪ';
+const CP866 = "⌂"+ //DOS Cyrillic
+	'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'+
+	'абвгдежзийклмноп░▒▓│┤╡╢╖╕╣║╗╝╜╛┐'+
+	'└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀'+
+	'рстуфхцчшщъыьэюяЁёЄєЇїЎў°∙·√№¤■ ';
+const KOI8R = "⌂"+ //aka. RFC 1489, Morse code based
+	'─│┌┐└┘├┤┬┴┼▀▄█▌▐░▒▓⌠■∙√≈≤≥ ⌡°²·÷'+
+	'═║╒ё╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡Ё╢╣╤╥╦╧╨╩╪╫╬©'+
+	'юабцдефгхийклмнопярстужвьызшэщчъ'+
+	'ЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧЪ';
 const CPAmiga = "⫽"+ // alternatively, "▒""
 	"абвгдежзийклмнопрстуфхцчшщъыьэюя"+ //0x80~0xA0 display Cyrillics, just to fill the void
 	" ¡¢£¤¥¦§¨©ª«¬–®¯°±²³´µ¶·¸¹º»¼½¾¿"+
@@ -241,7 +247,7 @@ function Bin(a, padz) {
 
 function Oct(a, padz) {
 	if(typeof a === 'undefined') return "!Oct("+a+")";
-	if(typeof padz === 'undefined') padz = 4;
+	if(typeof padz === 'undefined') padz = 3;
 	var minus = ""; if(a < 0) { a = -a; minus = "-" }
 	var r = a.toString(8); var pads="";
 	if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
@@ -294,18 +300,18 @@ function BitReader(nOffset, nEndian) {
 		if(nBits > 64) nBits = 64; if(nBits < 0) return 0;
 		if(this.endian === _LE) {
 			while(this.n < nBits) { // while the buffer is not enough
-				this.buf |= File.read_uint8(this.offset++) << this.n; // read a byte and append it to the buffer
+				this.buf |= Util.shlu64(File.read_uint8(this.offset++),this.n); // read a byte and append it to the buffer
 				this.n += 8; // increase the bit number by 8
 			}
-			var v = this.buf & ((1 << nBits) - 1); // extract the desired bits from the buffer
-			this.buf >>= nBits; // shift the buffer to the right
+			var v = this.buf & (Util.shlu64(1,nBits) - 1); // extract the desired bits from the buffer
+			this.buf = Util.shru64(this.buf,nBits); // shift the buffer to the right
 		} else {
 			while(this.n < nBits) {
-				this.buf = (this.buf << 8) | File.read_uint8(this.offset++); // shift the buffer to the left and append a byte
+				this.buf = Util.shlu64(this.buf,8) | File.read_uint8(this.offset++); // shift the buffer to the left and append a byte
 				this.n += 8;
 			}
-			var v = this.buf >> (this.n - nBits); // extract the desired bits from the most significant part of the buffer
-			this.buf &= ((1<<this.n)-1) >> nBits; // clear the extracted bits from the buffer
+			var v = Util.shru64(this.buf,this.n - nBits); // extract the desired bits from the most significant part of the buffer
+			this.buf &= Util.shru64((Util.shlu64(1,this.n)-1),nBits); // clear the extracted bits from the buffer
 		}
 		this.n -= nBits; // decrease the bit number by b
 		return v; // return the value even if the file is exhausted
@@ -403,6 +409,29 @@ function outSz() { if(!arguments.length || typeof arguments[0] === 'undefined') 
 		)
 	  } else; else sizes.push("?");
 	return sizes.join("/")
+}
+
+/**
+ * Converts an array to a better-looking line than the usual flat thing DiE's _log would output.
+ * @param {Array} a - Array to process consisting of any information including arrays
+ * @param {Int = 10} base - If an integer value is found, in which base to display it
+ * @param {Int} zeropad - If an integer value is found, how many zeroes to pad it with (smart by default)
+ * @returns {String} A beautiful output!
+ * Ex. 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 2) = "[0001, [0101, [1010, 11110]], [[10111], test]]"
+ * Ex. 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 16) = "[01, [05, [0A, 1E]], [[17], test]]"
+ */
+function outArray(a,base,pad) {
+	if(!Array.isArray(a)) return a;
+	if(typeof base !== 'number' || base % 1 !== 0) base = 10;
+	if(typeof pad !== 'number' || pad % 1 !== 0) //not integer
+		if(typeof pad === 'undefined')
+			if(base == 8) pad = 3; else if(base == 16) pad = 2; else if(base == 2) pad = 4; else pad = 0;
+	for(var i=0, s = []; i < a.length; i++)
+		if(Array.isArray(a[i])) s.push(outArray(a[i],base,pad)); else
+			if(typeof a[i] === 'number' && a[i] % 1 === 0) //integer
+				s.push(a[i].toString(base).toUpperCase().padStart(pad,'0'))
+			else s.push(a[i])
+	return '['+s.join(', ')+']' //put '[ '...' ]' for an even more spaced output
 }
 
 /**
@@ -559,6 +588,48 @@ function wpU32be(adr,val) { //add to patches, U32 BE
 function patchLength() { return patcheddata.length }
 function patchClear() { patcheddata = [] }
 
+/**
+ * Discovers gaps in an array of pairs of numbers, with a minimum-to-report gap as optional parameter.
+ * @param {Array of arrays[2]} lst - List to process consisting of ranges defined as [offset,length]
+ * @param {Number = 1} mingap - Minimum gap, default to at least 1 byte between the ranges
+ * @returns {Array of arrays[2]} Sorted list of gap ranges in the same format
+ * Ex. 𝑓([ [10,10], [25,5], [40,10] ]) = [[20,5], [30,10]] 
+ */
+function findGaps(lst, mingap) {
+	var i,r = []; /* tests for input typing follow */ if(!Array.isArray(lst) || lst.length < 2) return r;
+	for(i=0; i < lst.length; i++) if(!Array.isArray(lst[i]) || lst[i].length != 2
+		|| typeof lst[i][0] !== 'number' || typeof lst[i][1] !== 'number') return r;
+	if(typeof mingap !== 'number') mingap = 1;
+	function sf(a, b) { if(a[0] != b[0]) return a[0]-b[0]; else return a[1]-b[1] }
+	var a = lst.sort(sf);
+	for(i=1; i < a.length; i++)
+		if((t=a[i-1][0]+a[i-1][1]) < a[i][0] && a[i][0]-mingap >= 0) r.push([t, a[i][0]-t])
+	return r
+}
+
+/**
+ * Discovers intersections in an array of pairs of numbers, considering all possible pairs.
+ * @param {Array of arrays[2]} lst - List to process consisting of ranges defined as [offset,length]
+ * @param {Boolean = false} detectone - Stop searching after finding even one intersection
+ * @returns {Array of arrays[2]} Sorted list of intersection ranges in the same format; if length > 0, intersection present
+ * Ex. 𝑓([ [10,20], [15,10], [23,30] ]) = [[15,10], [23,2], [23,7]]
+ * Ex. 𝑓([ [10,20], [15,10], [23,30] ], true) = [[15,10]]
+ */
+function findIntersections(lst,detectone) {
+	var i,t,r = []; /* tests for input typing follow */ if(!Array.isArray(lst) || lst.length < 2) return r;
+	for(i=0; i < lst.length; i++) if(!Array.isArray(lst[i]) || lst[i].length != 2
+		|| typeof lst[i][0] !== 'number' || typeof lst[i][1] !== 'number') return r;
+	function sf(a, b) { if(a[0] != b[0]) return a[0]-b[0]; else return a[1]-b[1] }
+	var a = lst.sort(sf); var found = false;
+	for(i=1; i < a.length && !found; i++)
+		for(j=0; j < i && !found; j++)
+			if((t=a[j][0]+a[j][1]) > a[i][0]) { if(detectone) found = true;
+//_log(' item#'+j+' ['+lst[j][0]+' -> '+lst[j][1]+'] intersects with item#'+i+' ['+lst[i][0]+' -> '+lst[i][1]+']')
+				r.push([a[i][0], a[i][0]+a[i][1] <= t ? a[i][1] : t-a[i][0]])
+			}
+	return r.sort(sf);
+}
+
 b64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 function toBase64(buf) {
 	var r = '', i = 0, indexOfLastCompleteTriple = buf.length - (buf.length%3);
@@ -587,3 +658,19 @@ function _logBase64(buf) { //simply plops the buffer contents into log stream wi
 	'Content-Transfer-Encoding: base64\nContent-Disposition: attachment; filename="'+fn+'.dec"\n');
 	_log(buf)
 }
+
+function _logHex(buf) { //same but no header and in hex
+	var o = ''; for(i=0; i < buf.length; i++) o = o.appendS(buf[i].padStart(2,'0').toUpperCase())
+	_log('-8<---'); _log(o); _log('--->8-')
+}
+
+function _logText(buf) { //same but as text put through CP866, or all file with zeroes as spaces and control characters as emoji
+	_log('-8<---['+(typeof buf)+' '+(buf.length)+' bytes]---');
+	if(typeof buf === 'object') {
+		var bf = buf, i = 0; for(; i < buf.length; i++) if(bf[i] == 0) bf[i] = 0x20
+	}
+	_log(decEncoding((typeof buf === 'undefined'? readBytes(0,X.Sz(),true): bf), CP866, Chars0to1F));
+	_log('--->8-')
+}
+
+function _l2r(name,pos,issue) { _setResult('debug',name,'@'+Hex(pos),issue); }
