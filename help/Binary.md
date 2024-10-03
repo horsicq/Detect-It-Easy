@@ -580,6 +580,12 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 
 ```
 ```
+
+**List<qint32> readBytes(qint64 nOffset, qint64 nSize, bool bReplaceZeroWithSpace = false)**
+
+```
+```
+
 ### Shorthands
 
 `X.U8(a)` = `File.read_uint8(a)`\
