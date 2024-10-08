@@ -8,8 +8,6 @@ init("audio", "WAV Audio File");
 includeScript("read");
 
 function detect(bShowType, bShowVersion, bShowOptions) {
-	// redoing to include the other formats, make it chunk-aware,
-	// and, most importantly, include OGG-in-WAV
 
 	//chunks!
 	pn = 0;
@@ -40,10 +38,11 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 			switch (hkhd) {
 				case "fmt ":
 					bDetected = true;
-					nFormat = Binary.read_uint16(pc, _LE);
-					nChannels = Binary.read_uint16(pc + 2, _LE);
-					nRate = Binary.read_uint32(pc + 4, _LE);
-					nBPS = Binary.read_uint16(pc + 0x0E, _LE);
+					nFormat = X.U16(pc, _LE);
+					nChannels = X.U16(pc + 2, _LE);
+					nRate = X.U32(pc + 4, _LE);
+					nBPS = X.U16(pc + 0x0E, _LE);
+/* beautify preserve:start */
 					switch (nFormat) {
 						case 0x0001: sVersion = "Microsoft PCM (uncompressed)"; break;
 						case 0x0002: sVersion = "Microsoft ADPCM"; break;
@@ -287,34 +286,33 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 						case 0xF1AC: sVersion = "Free Lossless Audio Codec FLAC"; break;
 						case 0xFFFE: sVersion = "Extensible"; break;
 						case 0xFFFF: sVersion = "Development"; break;
-						default:
-							sVersion = "Unknown"
+						default: sVersion = "Unknown"
 					}
+/* beautify preserve:end */
 					break;
 				case "fact":
 					dcsamples = X.U32(pc, _LE); //the uncompressed (factual?) file size?
 				case "data":
-					if (nBPS && nFormat == 1 && (nBPS == 8 || nBPS == 16)) {
-						var nmSeconds = Math.round(X.U32(pc - 4) / (nBPS / 8) / nRate / nChannels * 1000);
+					if (nBPS && nFormat == 1 && !(nBPS % 8)) {
+						var nmSeconds = Math.round(X.U32(pc - 4) / (nBPS >> 3) / nRate / nChannels * 1000);
 						sOption(new Date(nmSeconds).toISOString().substr(11, 8),'len: ');
 					}
 					break;
 				case "INFO":
-					c = Binary.getString(pc).trim();
-					if (c != "") sOptions = sOptions.append(c);
+					sOptionT(X.SC(pc,hksz,'CP1252'));
 					break;
 			}
 			if(pn >= sz) break;
 		} // end of chunks
 
-		sOptions = sOptions.append(nRate + "Hz");
-		sOptions = sOptions.append("ch: " + nChannels);
+		sOption(nRate + 'Hz');
+		sOption(nChannels + ' ch');
 		if (nBPS) {
-			sOptions = sOptions.append(nBPS + "-bit");
+			sOption(nBPS + '-bit');
 		}
 		if (dcsamples > 0) //for compressed things only
-			sOptions = sOptions.append("fact: " + Math.round(dcsamples / 1024 / 1024) + "M")
-		//if (chunks != "") sOptions = sOptions.append(chunks);
+			sOption(Math.round(dcsamples / 0x100000),'fact: ','M')
+		//if (chunks != "") sOption(chunks);
 		sOption(outSz(sz),'sz:');
 	}
 

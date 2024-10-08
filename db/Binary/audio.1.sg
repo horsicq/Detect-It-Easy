@@ -9,6 +9,7 @@ debug = 0; //verbosity up to 3, where every note/command is shown
 
 function detect(bShowType,bShowVersion,bShowOptions) {
 // Due to the extreme script file size, many good code practices were sacrificed to ensure it loads
+/* beautify ignore:start */
 
 	if(X.c("'[1tracker module]'0D0A")) {
 		sName = "Shiru's 1tracker module (.1TM)"; bDetected = 1;
@@ -1140,22 +1141,42 @@ function detect(bShowType,bShowVersion,bShowOptions) {
 		sName = "EarAche module (.EA,.EAS)"; bDetected = 1;
 	}
 	else if(X.c("'FORM'.... ....'EMODEMIC'")
-	  && X.c("'PATT'",t=0x14+X.U32(0x10,_BE)) && X.c("'8SMP'",t+8+X.U32(t+4,_BE))) {
-		sName = "Quadra Composer module (.EMOD)"; bDetected = 1;
+	  && X.c("'PATT'",pt=0x14+X.U32(0x10,_BE)) && X.c("'8SMP'",q=pt+8+X.U32(pt+4,_BE))) {
+		//ref https://github.com/libxmp/libxmp/blob/master/src/loaders/emod_load.c
+		sName = "Bo Lincoln's Quadra Composer module (.EMOD)"; bDetected = 1; sVersion = 'v'+X.U16(0x14,_BE);
+		smp = X.U8(0x3F); if(smp) smps = []; sz = X.U32(4,_BE)+8;
+		for(i=ssz=0,p=0x40; i < smp; i++,p+=0x22) {
+			if((t=X.SC(p+4,0x14,'CP1252').trim()) != '') smps.push(t);
+			ssz += X.U16(p+2,_BE) << 1;
+		}
+		bad = ''; if(ssz != X.U32(q+4,_BE)) bad = bad.addIfNone('!badsmplen:'+X.U32(q+4,_BE)+' vs '+ssz)
+		ptn = X.U8(++p); p++;  p += 0x1A*ptn;
+		// for (i=0; i < ptn; i++,p+=0x1A) if((t=X.SC(p+2,0x14,'CP1252').trim()) != '') smps.push(t);
+		if(X.c("'MDIN'",q1=q+8+X.U32(q+4,_BE))) q = q1;
+		if(Math.abs(sz-(sz1=q+8+X.U32(q+4,_BE))) > 1) bad = bad.addIfNone('!badlen:'+sz+' vs '+sz1);
+		if(sz < sz1) sz = sz1; ord = X.U8(p++); if(bad != '') sVersion = sVersion.appendS('malformed'+bad,'/');
 		if(X.isVerbose()) {
-			sOptionT(X.SA(0x16,0x28));
-			sOptionT(X.SA(0x44,0x18),"by: ");
-			p = 0xC; sz = X.U32(4,_BE)+8;
-			while(p < Math.min(sz,X.Sz())) {
-				hkhd = X.SA(p,4); hksz = X.U32(p+4,_BE); p += 8;
-				sOption(hkhd); p += hksz
-			}
-			sOption(outSz(sz),'sz:')
+			sOptionT((t=X.SA(0x16,0x14)) === '<sans titre>'? '': t);
+			if(smp) sOptionT(addEllipsis(smps.join(' '),0xC0,0xA0),'smp/msg: "','"'); delete smps;
+			sOption('bpm:'+X.U8(0x3E)+' ord:'+ord+' ptn:'+ptn+' smp:'+smp+' sz:'+outSz(sz))
 		}
 	}
-	else if(X.c("'E.M.S. V6.'")) {
-		sName = "Electronic Music System module (.EMS)"; bDetected = 1;
-		sVersion = "v6."+X.SA(10,2)
+	else if(X.c("'E.M.S. V6.0'..00010000") && isWithin(X.U8(0xB),0x31,0x36)) {
+		sName = "Sean Connolly's Electronic Music System module (.EMS)"; bDetected = 1;
+		sVersion = "v6."+X.SA(10,2);
+		if(X.isVerbose()) {
+			//ref ems_player_dis.asm
+			a1 = X.U32(0xE,_BE); a2 = X.U32(0x12,_BE); a3 = X.U32(0x16,_BE); p = lb0 = 0x22;
+			p += a1; lb4 = p; p += a2; lb8 = p; p += a3; insp = p; sz = p+X.U32(0x1E,_BE);
+//_log(Hex(lb0)+'; [4]:'+Hex(lb4)+'; [8]:'+Hex(lb8)+'; insp:'+Hex(insp))
+			// p = a2 = lb4; lbdata = a5 = 0x13740;
+			// ssp = ( 0 & 0x1F)*0x84; ss1 = X.U16(p+ssp,_BE); ss2 = X.U16(p+ssp+2,_BE);
+//_log('subsong @'+Hex(p+ssp)+' has '+Hex(ss1)+' and '+Hex(ss2))
+			// In the player, the following bit was copying the modified offsets (of something) to the data buffer:
+			// p += ssp+4; p1 = p;
+			// for(d1 = 0, ptrs=[]; d1 < 0x20; d1++) { t = X.U32(p,_BE)+p1; p += 4; ptrs.push(t) }
+			sOption('sz:'+outSz(sz))
+		}
 	}
 	else if(X.c("'ZXAYEMUL'") && X.U8(9) <= 3) {
 		// ref https://vgmrips.net/wiki/AY_File_Format
@@ -1227,6 +1248,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
 				if(t < 0x1E) return false;
 			}
 			if(x == 1 && mp > X.Sz()) return false;
+			notes = -1;
 			if(t > p) { // the hard way
 				p = t+64;
 				//parse the last pattern
@@ -1237,7 +1259,7 @@ function detect(bShowType,bShowVersion,bShowOptions) {
 						while(p < X.Sz()) { //ParseChannel
 							cmd = X.U8(p++);
 							if(cmd >= 0xD2) { chncnt[c] -= cmd-0xD2; break }
-							else if(cmd >= 0x72) {} //set note cmd-0x72
+							else if(cmd >= 0x72) notes++; //set note cmd-0x72
 							else if(cmd >= 0x52) {} //set sample cmd-0x52
 							else if(cmd >= 0x51) break; //isn't this just if cmd == 0x51?
 							//else if(cmd >= 0x50) {} //set ornament cmd-0x30
@@ -1259,7 +1281,8 @@ function detect(bShowType,bShowVersion,bShowOptions) {
 		}
 		if(X.isVerbose()) {
 			if(x > 1) sOption(x,'×');
-			sOption('ord:'+ords.join('+')+(lp?' looped':'')+' ptn:'+ptns.join('+')+(xpos?' xpos:'+xpos:'')+' sz:'+outSz(sz))
+			sOption('ord:'+ords.join('+')+(lp?' looped':'')+' ptn:'+ptns.join('+')+(xpos?' xpos:'+xpos:'')
+				+(notes>-1?' notes:'+notes:'')+' sz:'+outSz(sz))
 		}
 	}
 	else if((X.Sz() > 2048+6+6)
@@ -3534,11 +3557,13 @@ function detect(bShowType,bShowVersion,bShowOptions) {
 								case"comment": case "ｃｏｍｍｅｎｔ": c = tag[1]; break;
 							}
 						}
-						sOption(t); sOption(a,"by: "); sOption(y,"'");
-						sOption(g,"for: "); sOption(s,"on: "); sOption(c);
+						sOption(t); sOption(a,'by: '); sOption(y,"'");
+						sOption(g,'for: '); sOption(s,'on: '); sOption(c);
 						dev = X.U32(0x1C,_LE); if(!dev) dev = 1;
-						if(dev > 64) sVersion += "/malformed";
-						sOption("devices: "+dev)
+						if(dev > 64) sVersion += '/malformed!devnum';
+						sOption(dev,'devices: ');
+						if(ptags > 6 && X.c("'[S98]'",ptags-5) && (t=X.fSig("00",ptags) > -1))
+							sOption(outSz(ptags+Math.min(0x200,t)),'sz:')
 						break
 					} //if correct tag
 			}//switch sV
@@ -11061,7 +11086,8 @@ if(X.isHeuristicScan()) { //parallel block
 
 
 	function isTwinTeam() {
-		if(!X.c("01000000", 0x06) || X.Sz() < 1500 || X.Sz() > 9000 || X.calculateEntropy(12,1200) < 7.8) return false; //a quick check because that's a lot of algo
+		if(!X.c("01000000", 0x06) || X.Sz() < 1500 || X.Sz() > 9000 || X.calculateEntropy(12,1200) < 7.8)
+			return false; //a quick check because that's a lot of algo
 		//ideally, get the checks from https://github.com/adplug/adplug/blob/master/src/dmo.cpp
 		return true
 	}
@@ -11072,5 +11098,6 @@ if(X.isHeuristicScan()) { //parallel block
 
 } //isHeuristicScan parallel block
 
+/* beautify ignore:end */
 	return result(bShowType,bShowVersion,bShowOptions);
 }
