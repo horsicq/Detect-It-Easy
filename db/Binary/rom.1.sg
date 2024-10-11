@@ -5,575 +5,758 @@
 //   Kaens TG@kaens
 //   (...yes I'm looking at you, you obviously want to add something so go ahead)
 
-init("ROM", "");
+init("ROM","");
 
 includeScript("read");
 
-function detect(bShowType, bShowVersion, bShowOptions) {
+function detect(bShowType,bShowVersion,bShowOptions) {
+/* beautify ignore:start */
 
-    //ref 64copy / formats.zip/CRT.TXT
-    p = File.read_uint32(0x10, _BE);
-    if (File.compare("'C64 CARTRIDGE   '") && p >= 0x40 && File.compare("'CHIP'", p)) {
-        bDetected = true;
-        sName = "C64 cartridge (.CRT)";
-        sVersion = "v" + File.read_uint8(0x14) + "." + File.read_uint8(0x15).padStart(2, '0');
-        while (p < File.getSize()) {
-            p += File.read_uint32(p + 4, _BE);
-            if (p > File.getSize()) sVersion += "/malformed!short";
-            break;
-            if (!File.compare("'CHIP'", p)) sVersion += "/malformed!badchip";
-            break;
-        }
-        if (File.isVerbose()) {
-            sOption(File.read_codePageString(0x20, 0x20, "Shift_JIS"));
-            switch (File.read_uint16(0x16, _BE)) {
-                case 0:
-                    hw = "Normal cartridge";
-                    break;
-                case 1:
-                    hw = "Action Replay";
-                    break;
-                case 2:
-                    hw = "KCS Power Cartridge";
-                    break;
-                case 3:
-                    hw = "Final Cartridge III";
-                    break;
-                case 4:
-                    hw = "Simons Basic";
-                    break;
-                case 5:
-                    hw = "Ocean type 1";
-                    break;
-                case 6:
-                    hw = "Expert Cartridge";
-                    break;
-                case 7:
-                    hw = "Fun Play, Power Play";
-                    break;
-                case 8:
-                    hw = "Super Games";
-                    break;
-                case 9:
-                    hw = "Atomic Power";
-                    break;
-                case 10:
-                    hw = "Epyx Fastload";
-                    break;
-                case 11:
-                    hw = "Westermann Learning";
-                    break;
-                case 12:
-                    hw = "Rex Utility";
-                    break;
-                case 13:
-                    hw = "Final Cartridge I";
-                    break;
-                case 14:
-                    hw = "Magic Formel";
-                    break;
-                case 15:
-                    hw = "C64 Game System/System 3";
-                    break;
-                case 16:
-                    hw = "WarpSpeed";
-                    break;
-                case 17:
-                    hw = "Dinamic";
-                    break;
-                case 18:
-                    hw = "Zaxxon, Super Zaxxon (SEGA)";
-                    break;
-                case 19:
-                    hw = "Magic Desk/Domark/HES Australia";
-                    break;
-                case 20:
-                    hw = "Super Snapshot 5";
-                    break;
-                case 21:
-                    hw = "Comal-80";
-                    break;
-                case 22:
-                    hw = "Structured Basic";
-                    break;
-                case 23:
-                    hw = "Ross";
-                    break;
-                case 24:
-                    hw = "Dela EP64";
-                    break;
-                case 25:
-                    hw = "Dela EP7x8";
-                    break;
-                case 26:
-                    hw = "Dela EP256";
-                    break;
-                case 27:
-                    hw = "Rex EP256";
-                    break;
-                case 28:
-                    hw = "Mikro Assembler";
-                    break;
-                case 29:
-                    hw = "reserved";
-                    break;
-                case 30:
-                    hw = "Action Replay 4";
-                    break;
-                case 31:
-                    hw = "StarDOS";
-                    break;
-                case 32:
-                    hw = "EasyFlash";
-                    break;
-                default:
-                    hw = "?";
-            }
-            sOption("hw.type: " + hw + " /EXROM:" + (File.read_uint8(0x18) ? "inactive" : "active") +
-                " /GAME:" + (File.read_uint8(0x19) ? "inactive" : "active") + " sz:" + p);
-        }
-    } else if (File.compare("000003F0", 4) && File.compare("'SEGA 32X '", 0x100) && File.compare("'(C)'", 0x110) &&
-        File.compare("22D822D822D822D822D822D822D8", 0x4A8)) {
-        sName = "Sega MD/Genesis/32X (.32X)";
-        bDetected = 1
-    }
+	if((X.c("'A2R1'FF0A0D0A ................'DATA'")) || X.c("'A2R'..FF0A0D0A 'INFO'") && isWithin(X.U8(3),0x32,0x33)) {
+		//ref https://applesaucefdc.com/a2r/ & https://applesaucefdc.com/a2r2-reference/
+		sName = "Apple II Applesauce disk archival image (.A2R)"; sVersion = 'v'+X.SA(3,1);
+		if(v1 = X.c("'1'",3)) { bDetected = true; p = 0x10 } else p = 8;
+		meta = bad = '';
+		while(p < X.Sz()) {
+			var hkhd = X.SA(p,4), hksz = X.U32(p+4,v1?_BE:_LE); p += 8;
+			switch(hkhd) {
+			case 'INFO':
+				if(v1) meta = X.SC(p,hksz,'UTF8').replace(/\x0A/g,",").replace(/\x09/g,":"); else {
+					iV = X.U8(p); bDetected = true;
+					switch(X.U8(p+33)) {
+					case 1: dim = '5¼" SS 40trk 0.25 step'; break;
+					case 2: dim = '3½" DS 80trk Apple CLV'; break;
+					case 3: dim = '5¼" DS 40trk'; break;
+					case 4: dim = '5¼" DS 80trk'; break;
+					case 5: dim = '3½" DS 80trk'; break;
+					case 6: dim = '8" DS'; break;
+					case 7: dim = '3" DS 80trk'; break;
+					case 8: dim = '3" DS 40trk'; break;
+					default: dim = '?'
+					}
+					sOption('disk:'+dim);
+					if(X.U8(p+34) == 1) sOption('write-protected');
+					if(iV >= 2) {
+						if(t=X.U8(p+42)) sOption(t,'min.RAM:','k');
+						t = ''; fl = X.U16(p+40); if(!fl) t = '?'; if(fl & (1 << 0)) t = t.append('][');
+						if(fl & (1 << 1)) t = t.append('][ Plus'); if(fl & (1 << 2)) t = t.append('//e');
+						if(fl & (1 << 3)) t = t.append('//c'); if(fl & (1 << 4)) t = t.append('//e Enhanced');
+						if(fl & (1 << 5)) t = t.append('IIgs'); if(fl & (1 << 6)) t = t.append('//c Plus');
+						if(fl & (1 << 7)) t = t.append('///'); if(fl & (1 << 8)) t = t.append('/// Plus');
+						sOption(t,'for Apple ');
+					}
+				}
+				break;
+			case 'DATA': case 'STRM': case 'RWCP': case 'SLVD': break;
+			case 'META': meta = X.SC(p,hksz,'UTF8').replace(/\x0A/g,",").replace(/\x09/g,":"); break
+			}
+			p += hksz;
+		}
+		if(p > X.Sz()) bad = bad.addIfNone('!short');
+		//if(X.isDeepScan() && X.calculateCRC32(12,sz-12) != X.U32(8)) bad = bad.addIfNone('!badcrc');
+		if(bad != '') sVersion = sVersion.appendS('/malformed'+bad,'/')
+		if(X.isVerbose()) {
+			sOptionT(addEllipsis(meta),'info:"','"');
+			sOption(outSz(p), 'sz:');
+		}
+	}
 
-    //ref https://www.nesdev.org/wiki/INES & https://www.nesdev.org/wiki/NES_2.0
-    else if (File.compare("'NES'1A") && (File.getSize() > 15)) {
-        bDetected = true;
-        sName = "NES ROM image (.nes)";
-        malformed = false;
-        szprg = File.read_uint8(4) * 16384;
-        szchr = File.read_uint8(5) * 8192;
-        flg9 = File.read_uint8(9); //v1.0: ROMs don't use it; v2.0: sz*msb
-        flg6 = File.read_uint8(6);
-        //fmirroring = (flg6&1)>0; //0 for hrz 1 for vrt, tons of fallout though so better to ignore this
-        fstorage = (flg6 & 2) > 0;
-        trainer = (flg6 & 4) * 0x80;
-        f4scrvram = (flg6 & 8) > 0;
-        flg7 = File.read_uint8(7);
-        mapper = ((flg6 & 0xF0) >> 4) + (flg7 & 0xF0);
-        fvsunisystem = (flg7 & 1) > 0;
-        fplaychoice10 = (flg7 & 2) > 0;
-        fv20_ = ((flg7 & 0x0C) == 8);
-        fv20 = false;
-        szprgmsb = ((flg9 & 0x0F) << 8) * 16384;
-        szchrmsb = ((flg9 & 0xF0) << 4) * 8192;
-        ex = "";
-        region = "";
-        tv = "";
-        if (fv20_)
-            fv20 = 16 + trainer + szprg + szprgmsb + szchr + szchrmsb < File.getSize();
-        if (fv20) {
-            szprg += szprgmsb;
-            szchr += szchrmsb;
-            flg8 = File.read_uint8(8);
-            flg11 = File.read_uint8(11);
-            flg12 = File.read_uint8(12);
-            flg13 = File.read_uint8(13);
-            flg14 = File.read_uint8(14);
-            flg15 = File.read_uint8(15);
-            sVersion = "NES v2.0";
-            mapper += (flg8 & 0x0F) << 8;
-            submapper = (flg8 & 0xF0) >> 4;
-            switch (flg7 & 2) {
-                case 0:
-                    sVersion += " #NES/Famicom/Dendy";
-                    break;
-                case 1:
-                    sVersion += " #Nintendo Vs. System (";
-                    switch (flg13 & 0x0F) {
-                        case 0:
-                            sVersion += "RP2C03B)";
-                            break;
-                        case 1:
-                            sVersion += "RP2C03G)";
-                            break;
-                        case 2:
-                            sVersion += "RP2C04-0001)";
-                            break;
-                        case 3:
-                            sVersion += "RP2C04-0002)";
-                            break;
-                        case 4:
-                            sVersion += "RP2C04-0003)";
-                            break;
-                        case 5:
-                            sVersion += "RP2C04-0004)";
-                            break;
-                        case 6:
-                            sVersion += "RC2C03B)";
-                            break;
-                        case 7:
-                            sVersion += "RC2C03C)";
-                            break;
-                        case 8:
-                            sVersion += "RC2C05-01)";
-                            break;
-                        case 9:
-                            sVersion += "RC2C05-02)";
-                            break;
-                        case 0x0A:
-                            sVersion += "RC2C05-03)";
-                            break;
-                        case 0x0B:
-                            sVersion += "RC2C05-04)";
-                            break;
-                        case 0x0C:
-                            sVersion += "RC2C05-05)";
-                            break;
-                        default:
-                            sVersion += "unk.PPU)"
-                    }
-                    break;
-                case 2:
-                    sVersion += " #Nintendo Playchoice 10";
-                    break;
-                default:
-                    switch (flg13 & 0x0F) {
-                        case 0:
-                            sVersion += " #NES/Famicom/Dendy";
-                            break;
-                        case 1:
-                            sVersion += " #Nintendo Vs. System";
-                            break;
-                        case 2:
-                            sVersion += " #Nintendo Playchoice 10";
-                            break;
-                        case 3:
-                            sVersion += " #Famiclone+DecimalMode";
-                            break;
-                        case 4:
-                            sVersion += " #NES/Famicom+EPSM/plug-through";
-                            break;
-                        case 5:
-                            sVersion += " #V.R. VT01 red/cyan";
-                            break;
-                        case 6:
-                            sVersion += " #V.R. Technology VT02";
-                            break;
-                        case 7:
-                            sVersion += " #V.R. Technology VT03";
-                            break;
-                        case 8:
-                            sVersion += " #V.R. Technology VT09";
-                            break;
-                        case 9:
-                            sVersion += " #V.R. Technology VT32";
-                            break;
-                        case 0x0A:
-                            sVersion += " #V.R. Technology VT369";
-                            break;
-                        case 0x0B:
-                            sVersion += " #UMC UM6578";
-                            break;
-                        case 0x0C:
-                            sVersion += " #Famicom Network System";
-                            break;
-                        default:
-                            sVersion += " #(reserved)"
-                    }
-            }
-            switch (flg12 & 3) {
-                case 0:
-                    region = "NA/JP/SK/TW: NTSC NES";
-                    break;
-                case 1:
-                    region = "WE/AU: Licenced PAL NES";
-                    break;
-                case 2:
-                    region = "Multiple";
-                    break;
-                default:
-                    region = "EU/RU/ZH/IN/AF: Dendy"
-            }
-            switch (flg15 & 0x3F) {
-                case 0x00:
-                    break;
-                case 0x01:
-                    ex = "Std. Sontrollers";
-                    break;
-                case 0x02:
-                    ex = "NES Four Score/Satellite + 2 Std. Controllers";
-                    break;
-                case 0x03:
-                    ex = "Famicom 4P Adapter";
-                    break;
-                case 0x04:
-                    ex = "Vs. System (1P via $4016)";
-                    break;
-                case 0x05:
-                    ex = "Vs. System (1P via $4017)";
-                    break;
-                case 0x06:
-                    ex = "(obsolete MAME behaviour)";
-                    break;
-                case 0x07:
-                    ex = "Vs. Zapper";
-                    break;
-                case 0x08:
-                    ex = "Zapper ($4017)";
-                    break;
-                case 0x09:
-                    ex = "2 Zappers";
-                    break;
-                case 0x0A:
-                    ex = "Bandai Hyper Shot Lightgun";
-                    break;
-                case 0x0B:
-                    ex = "Power Pad Side A";
-                    break;
-                case 0x0C:
-                    ex = "Power Pad Side B";
-                    break;
-                case 0x0D:
-                    ex = "Family Trainer Side A";
-                    break;
-                case 0x0E:
-                    ex = "Family Trainer Side B";
-                    break;
-                case 0x0F:
-                    ex = "Arkanoid Vaus Controller (NES)";
-                    break;
-                case 0x10:
-                    ex = "Arkanoid Vaus Controller (Famicom)";
-                    break;
-                case 0x11:
-                    ex = "2 Vaus Controllers + Famicom Data Recorder";
-                    break;
-                case 0x12:
-                    ex = "Konami Hyper Shot Controller";
-                    break;
-                case 0x13:
-                    ex = "Coconuts Pachinko Controller";
-                    break;
-                case 0x14:
-                    ex = "Exciting Boxing Punching Bag (Blowup Doll)";
-                    break;
-                case 0x15:
-                    ex = "Jissen Mahjong Controller";
-                    break;
-                case 0x16:
-                    ex = "Party Tap";
-                    break;
-                case 0x17:
-                    ex = "Oeka Kids Tablet";
-                    break;
-                case 0x18:
-                    ex = "Sunsoft Barcode Battler";
-                    break;
-                case 0x19:
-                    ex = "Miracle Piano Keyboard";
-                    break;
-                case 0x1A:
-                    ex = "Pokkun Moguraa (Whack-a-Mole Mat & Mallet)";
-                    break;
-                case 0x1B:
-                    ex = "Top Rider (Inflatable Bicycle)";
-                    break;
-                case 0x1C:
-                    ex = "Double-Fisted";
-                    break;
-                case 0x1D:
-                    ex = "Famicom 3D System";
-                    break;
-                case 0x1E:
-                    ex = "Doremikko Keyboard";
-                    break;
-                case 0x1F:
-                    ex = "R.O.B. Gyro Set";
-                    break;
-                case 0x20:
-                    ex = "Famicom Data Recorder (\"silent\" keyboard)";
-                    break;
-                case 0x21:
-                    ex = "ASCII Turbo File";
-                    break;
-                case 0x22:
-                    ex = "IGS Storage Battle Box";
-                    break;
-                case 0x23:
-                    ex = "Family BASIC Keyboard + Famicom Data Recorder";
-                    break;
-                case 0x24:
-                    ex = "Dongda PEC-586 Keyboard";
-                    break;
-                case 0x25:
-                    ex = "Bit Corp. Bit-79 Keyboard";
-                    break;
-                case 0x26:
-                    ex = "Subor Keyboard";
-                    break;
-                case 0x27:
-                    ex = "Subor Keyboard + Mouse (3x8-bit)";
-                    break;
-                case 0x28:
-                    ex = "Subor Keyboard + Mouse (24-bit)";
-                    break;
-                case 0x29:
-                    ex = "SNES Mouse ($4017.d0)";
-                    break;
-                case 0x2A:
-                    ex = "Multicart";
-                    break;
-                case 0x2B:
-                    ex = "2 SNES Controllers";
-                    break;
-                case 0x2C:
-                    ex = "RacerMate Bicycle";
-                    break;
-                case 0x2D:
-                    ex = "U-Force";
-                    break;
-                case 0x2E:
-                    ex = "R.O.B. Stack-Up";
-                    break;
-                case 0x2F:
-                    ex = "City Patrolman Lightgun";
-                    break;
-                case 0x30:
-                    ex = "Sharp C1 Cassette Interface";
-                    break;
-                case 0x31:
-                    ex = "Std. Controller w/swapped ←→/↑↓/BA";
-                    break;
-                case 0x32:
-                    ex = "Excalibor Sudoku Pad";
-                    break;
-                case 0x33:
-                    ex = "ABL Pinball";
-                    break;
-                case 0x34:
-                    ex = "Golden Nugget Casino extra buttons";
-                    break;
-                default:
-                    ex = "(unknown)"
-            }
-        } else {
-            if (!(flg7 & 0x0C) && File.compare("0000 0000", 12)) sVersion = "iNES";
-            else if ((flg7 & 0x0C) == 4) sVersion = "archaic iNES";
-            else sVersion = "iNES v0.7 or archaic";
+	else if(X.c("'AT8X'") && isWithin(t0p=X.U32(0x1C),0x24,0x40) && X.c("0000",t0p+4)
+	  && isWithin(t0sz=X.U32(t0p), (t0hdsz=X.U32(t0p+0x14))+X.U32(t0p+t0hdsz), 0x1000)
+	  && isWithin(t0sec=X.U16(t0p+0xA),1,40) && X.U32(t0p+t0hdsz) == 8+8*t0sec) {
+		//ref http://www.whizzosoftware.com/sio2arduino/vapi.html
+		sName = "Atari VAPI/ATX disk image (.ATX)"; sVersion = 'v'+X.U16(4); bDetected = true;
+		if(X.isVerbose()) {
+			for(trk = 0, p = t0p, sec = 0; trk < 40 && p < X.Sz(); trk++, p += X.U32(p))
+				sec += X.U16(p+0xA);
+			sOption('trk:'+trk+' sec.total:'+sec+' sz:'+outSz(p))
+		}
+	}
 
-            szprgram = File.read_uint8(8) * 8192;
-            if (!szprgram) szprgram = 8192; //PRG RAM size
-            flg10 = File.read_uint8(10);
-            switch (flg10 & 3) {
-                case 0:
-                    tv = "NTSC";
-                    break;
-                case 2:
-                    tv = "PAL";
-                    break;
-                default:
-                    tv = "NTSC/PAL"
-            }
-            if (File.compare("0000 0000", File.getSize() - 4)) {
-                fprgram = (flg10 & 0x10) > 0;
-                fbusconflicts = (flg10 & 0x20) > 0
-            } else {
-                fprgram = false;
-                fbusconflicts = false;
-            }
-            region = "n/a";
-        }
-        if (Binary.isVerbose()) {
-            sOption(tv, "tv: ");
-            sOption(region, "region: ");
-            sOption(mapper, "mapper: ");
-            sOption(ex, "expansion: ");
-            if (fplaychoice10) sOption("PlayChoice-10");
-            if (trainer) sOption("trainer");
-            if (fstorage) sOption("battery-backed RAM");
-        }
-    } else if (File.compare("'UNIF'???????? 0000 0000 0000 0000 0000 0000 0000") &&
-        (File.getSize() > 32)) {
-        bDetected = true;
-        sName = "UNIF NES cartridge (.UNF)";
-        sVersion = "v" + File.read_uint32(4, _LE);
-        if (Binary.isVerbose()) {
-            p = 8;
-            t = '';
-            mapr = '';
-            tv = '';
-            ex = '';
-            fstorage = false;
-            while (p < File.getSize()) {
-                hkhd = File.read_ansiString(p, 4);
-                hksz = File.read_uint32(p + 4, _LE);
-                p += 0x08; //chunk header = 4xfourcc + 4xsize
-                switch (hkhd) {
-                    case "MAPR":
-                        mapr = File.read_ansiString(p, hksz);
-                        break;
-                    case "NAME":
-                        t = File.read_ansiString(p, hksz);
-                        break;
-                    case "TCVI":
-                        switch (File.read_uint8(p)) {
-                            case 0:
-                                tv = "NTSC";
-                                break;
-                            case 1:
-                                tv = "PAL";
-                                break;
-                            case 2:
-                                tv = "NTSC/PAL"
-                        }
-                        break;
-                    case "CTRL":
-                        exa = [];
-                        var bm = File.read_uint8(p);
-                        if (bm & 1) exa.append("Std. Controller");
-                        if (bm & 2) exa.append("Zapper");
-                        if (bm & 4) exa.append("R.O.B.");
-                        if (bm & 8) exa.append("Arkanoid Controller");
-                        if (bm & 0x10) exa.append("Power Pad");
-                        if (bm & 0x20) exa.append("Four Score");
-                        if (bm) ex = "#" + exa.join("+");
-                        break;
-                    case "BATR":
-                        fstorage = true;
-                        break
-                }
-                p += hksz;
-            }
-            sOptionT(t);
-            sOption(tv);
-            sOption(ex, "expansion: ");
-            if (fstorage) sOption("battery-backed RAM");
-        }
-    } else if (File.compare("'FCSX'") && File.read_uint32(4) > File.read_uint32(8) &&
-        File.read_uint32(8) <= File.getSize()) { //found this one in a collection of NES ROMs
-        sName = "FCSX zlib format (.FCS)";
-        bDetected = true;
-        if (File.isVerbose()) sOptions = "Zlib @10h, unp.sz:" + File.read_uint32(4) + " sz:" + File.read_uint32(8)
-    } else if (File.compare("01'CD001'01''", 0x53000)) {
-        bDetected = true;
-        sName = "CD image (.NRG)";
-        sOptions = File.read_ansiString(0x53028, 0x20).trim();
-    } else if (File.compare("'C64-TAPE-RAW'") && File.read_uint8(0xC) < 2) {
-        bDetected = true;
-        sName = "C64 cassette tape (.TAP)";
-        sVersion = "v" + File.read_uint8(0xC);
-        sz = File.read_uint32(0x10) + 0x14;
-        if (sz > File.getSize()) sVersion += "/malformed!short";
-        if (File.isVerbose()) sOptions = "sz:" + sz
-    } else if (File.compare("'VICE Snapshot File'1A")) {
-        sName = "C64 VICE emulator snapshot (.VSF)";
-        bDetected = true;
-        sVersion = "v" + File.read_uint8(0x13) + "." + File.read_uint8(0x14).padStart(2, '0');
-        p = 0x25;
-        while (p < File.getSize()) {
-            hkhd = File.read_ansiString(p, 0x10);
-            hksz = File.read_uint32(p + 0x12, _BE);
-            if (!/([A-Z0-9-]{3,}|Acia1)/.test(hkhd) || !isAllZeroes(p + hkhd.length, 0x10 - hkhd.length)) {
-                sVersion += "/malformed!badchunk";
-                break
-            } else p += hksz;
-        }
-        if (p > hksz) sVersion += "/malformed!short";
-        if (File.isVerbose()) sOptions = File.read_ansiString(0x15, 0xF) + " sz:" + sz;
-    }
+	else if(X.c("'<BALLY format=1>'") && X.c("'</BALLY>'",(sz=X.U16(0x11,_LE))-8)) {
+		sName = "Bally Arcade/Astrocade BASIC tape (.BIN)"; bDetected = true; if(X.isVerbose()) sOption(outSz(sz),'sz:')
+	}
 
-    return result(bShowType, bShowVersion, bShowOptions);
+	else if(X.c("0E0000800E..FFFE........FFFFFFFF020000000200..FFFFFFFFFE")
+		&& [0x1F,0x2F].indexOf(X.U8(5)) >= 0 && [0x1F,0x7F].indexOf(X.U8(0x161)) >= 0) {
+		sName = "Casio Loopy (big-endian) cartridge (.BIN)"; bDetected = true
+	}
+
+	else if(X.c("4C....4C....01'CBM::::::::'") && X.c("FF",0x333E) && X.c("FF",0x3980)) {
+		sName = "Commodore Plus/4 cartridge (.BIN)"; bDetected = true
+	}
+
+	else if(X.c("000003", 0x08) && X.c("'DMC '", 0x100) && X.c("'                                GM 00000000-00'", 0x160)) {
+		sName = "AtGames/中娛/愛勝 Firecore digital media cartridge (.BIN)"; bDetected = true
+	}
+
+	// else if([0x1F,0x20].indexOf(X.U8(0) >= 0) &&
+	//   (X.fSig(1,0x200,"929376..7702") > 0) || X.fSig(1,0x200,"9276..937702") > 0) { // quite a few ROMs mismatch it
+	// 	// 2560 is a pretty unique CPU, may be possible to statistically analyse the instructions and go from there
+	// 	sName = "Emerson Arcadia 2001 cartridge (.BIN)"; bDetected = true
+	// }
+
+	else if(X.c("F50400") && X.c("04",0x800) && X.c("8383",0x808) && F.Sz() == 0x1000) {
+		sName = "Entex Adventure Vision cartridge (.BIN)"; bDetected = true
+	}
+
+	else if((X.c("55..40..40....00") || X.c("5512521252B0")) && X.U8(1) == X.U8(3)
+	  && (X.Sz() == 0x2000 || X.Sz() == 0x4000)) {
+		sName = "Epoch ゲームポケコン/Game Pocket Computer cartridge (.BIN)"; bDetected = true
+	}
+
+	else if(X.c("BBA56EB3E9C5A7A4CCB3D7B2CFA8CEA5CCAAA3A46FB1EFB9BBA56EB3E9C569B6E6A6F4A5F3A6CFA456A675A47BB5'r(vereese gnniee)rB'A1CFA4D5B2B6C442A1CFA473BDB6C4CEA9F3A7EFA7BBA56EB3E9C5ECAD6CA97BB5A1A65DB370AD57A4EFB96EB3E9C5BAAAEAC277A950BBD1B8A3B0EAC277A9'rTdamera kybU inet diMrceoeltcorinscC ro.pa dnF nuethcE tnreatniemtnC ro.pA llr gith seresvrde .iLecsn esip reimttde'002E",0x2000)
+	  || X.c("1E00E32AE401E501 E601E7011B48E801 E901EAC401300EEB 01B426ECEED26401 EF26F00108604E30 F201F301F4010128")) {
+		sName = "Funtech Super Acan cartridge (.BIN)"; bDetected = true
+	}
+
+	else if((X.c("AA04FFFF68FF") || X.c("AA4E840D196900") || X.c("AA544E85706A90")
+	  || X.c("AA54E9A7640202") || X.c("AAC0BA69004DCC") || X.c("AA694169146914"))
+	  && isWithin(X.Sz(),0x2000,0x8000) && !(X.Sz() & 0xFFF)) {
+		sName = "Hartung Game Master cartridge (.BIN)"; bDetected = true
+	}
+
+	else if(X.c("'C64 CARTRIDGE   '") && (p=X.U32(0x10,_BE)) >= 0x40 && X.c("'CHIP'",p)) {
+		//ref 64copy / formats.zip/CRT.TXT
+		bDetected = true; sName = "Commodore 64 cartridge (.CRT)";
+		sVersion = "v"+X.U8(0x14)+"."+X.U8(0x15).padStart(2,'0'); bad = '';
+		while(p < X.Sz()) {
+			if(!X.c("'CHIP'",p)) break;
+			var hksz = X.U32(p+4,_BE), romsz = X.U16(0x0E,_BE);
+			if(romsz > hksz-0x10) bad = bad.addIfNone('!badchipsz');
+			if(p+hksz > X.Sz())
+				if(p+0x10+romsz <= X.Sz()) { //ignore the weird chunk length, use the ROM length
+					p += romsz+0x10; bad = bad.addIfNone('!badchunk'); continue }
+				else if(!X.isVerbose() && p+hksz > X.Sz()) { bad = bad.addIfNone('!short') }
+			p += hksz
+		}
+		if(bad != '') sVersion = sVersion.appendS('malformed'+bad,'/');
+		if(X.isVerbose()) {
+			sOption(X.SC(0x20,0x20,"Shift_JIS"));
+			switch(X.U16(0x16,_BE)) {
+			case 0: hw = "normal cartridge"; break;
+			case 1: hw = "Action Replay"; break;
+			case 2: hw = "KCS Power Cartridge"; break;
+			case 3: hw = "Final Cartridge III"; break;
+			case 4: hw = "Simons Basic"; break;
+			case 5: hw = "Ocean type 1"; break;
+			case 6: hw = "Expert Cartridge"; break;
+			case 7: hw = "Fun Play, Power Play"; break;
+			case 8: hw = "Super Games"; break;
+			case 9: hw = "Atomic Power"; break;
+			case 10: hw = "Epyx Fastload"; break;
+			case 11: hw = "Westermann Learning"; break;
+			case 12: hw = "Rex Utility"; break;
+			case 13: hw = "Final Cartridge I"; break;
+			case 14: hw = "Magic Formel"; break;
+			case 15: hw = "C64 Game System/System 3"; break;
+			case 16: hw = "WarpSpeed"; break;
+			case 17: hw = "Dinamic"; break;
+			case 18: hw = "Zaxxon, Super Zaxxon (SEGA)"; break;
+			case 19: hw = "Magic Desk/Domark/HES Australia"; break;
+			case 20: hw = "Super Snapshot 5"; break;
+			case 21: hw = "Comal-80"; break;
+			case 22: hw = "Structured Basic"; break;
+			case 23: hw = "Ross"; break;
+			case 24: hw = "Dela EP64"; break;
+			case 25: hw = "Dela EP7x8"; break;
+			case 26: hw = "Dela EP256"; break;
+			case 27: hw = "Rex EP256"; break;
+			case 28: hw = "Mikro Assembler"; break;
+			case 29: hw = "reserved"; break;
+			case 30: hw = "Action Replay 4"; break;
+			case 31: hw = "StarDOS"; break;
+			case 32: hw = "EasyFlash"; break;
+			default: hw = "?";
+			}
+			sOption('hw.type: '+hw+' /EXROM:'+(X.U8(0x18)?'inactive':'active')
+				+' /GAME:'+(X.U8(0x19)?'inactive':'active')+' sz:'+outSz(p));
+		}
+	}
+
+	function isDC42() {
+		// https://www.discferret.com/wiki/Apple_DiskCopy_4.2
+		if(X.Sz() < 0x32000 || !X.c("0100",0x52) || !isWithin(tl=X.U8(0),1,0x3F)) return false;
+		title = X.SC(1,tl,'CP1252'); var tcs = charStat(title,true); if(tcs.indexOf('allxsc') < 0) return false;
+		if(tl != X.U8(0x478) || title != X.SC(0x479,X.U8(0x478),'CP1252')) return false; //the volume label, I presume
+		var discsz = X.U32(0x40,_BE),tagsz = X.U32(0x44,_BE);
+		if(!isWithin(discsz,0x32000,0x200000) || (tagsz && discsz*12/512 != tagsz)) return false;
+		if(!tagsz && X.U32(0x4C,_BE)) return false;
+		sz = 0x54+discsz+X.U32(0x44,_BE); discszt = Util.divu64(discsz,1024)+'k';
+		switch(X.U8(0x50)) {
+		case 0: discszt += ' GCR CLV ssdd'; break; case 1: discszt += ' GCR CLV dsdd'; break;
+		case 2: discszt += ' MFM CAV dsdd'; break; case 3: discszt += ' MFM CAV dshd'; break;
+		default: discszt += ' unk.type'
+		}
+		return true
+	}
+	if(!bDetected && isDC42()) {
+		sName = "Apple DiskCopy 4.2 disk image (.DC42)"; sVersion = discszt; bDetected = true;
+		if(X.isVerbose()) {
+			sOption(title); sOption(outSz(sz),'sz:')
+		}
+	}
+
+	if(!bDetected) if(X.c("'ACT Apricot disk image'1A04") && isAllZeroes(0x18,0x58)) {
+		//ref https://github.com/latchdevel/HxCFloppyImageConverter/blob/master/libhxcfe/trunk/sources/loaders/apridisk_loader/apridisk_format.h
+		sName = "Jonathan Marsters's ACT/Apricot PC ApriDisk image (.DSK)"; bDetected = true;
+		var cyl = sec = 0, interrupt = false, cmt = by = '';
+		for(p=0x80; p < X.Sz();) {
+			var hkhd = X.U32(p), hdsz = X.U16(p+6), hksz = X.U32(p+8);
+			switch(hkhd) {
+			case 0xE31D0000: break; //del
+			case 0xE31D0001: //sec
+				if((t=X.U8(p+13)) > sec) sec = t; if((t=X.U16(p+14)+1) > cyl) cyl = t;
+				break;
+			case 0xE31D0002: cmt = X.SA(p+hdsz,hksz); break;
+			case 0xE31D0003: by = X.SA(p+hdsz,hksz); break;
+			default: interrupt = true
+			}
+			if(interrupt) break;
+			p += hdsz+hksz;
+			if(hkhd == 0xE31D0002) break
+		}
+		if(X.isVerbose()) {
+			sOption(cmt); sOption(by,'by: '); sOption('cyl:'+cyl+' sec:'+sec+' sz:'+outSz(p))
+		} else if(p > X.Sz()) sVersion = 'malformed!short'
+	}
+
+	else if((X.c("'EXTENDED CPC DSK File'0D0A'Disk-Info'0D0A") || X.c("'MV - CPCEMU Disk-File'0D0A'Disk-Info'0D0A")
+	  || X.c("'MV - CPC'")) && isWithin(trk=X.U8(0x30),20,84) && isWithin(sd=X.U8(0x31),1,2)
+	  && X.c("'Track-Info'0D0A000000",0x100)) {
+		//ref https://github.com/latchdevel/HxCFloppyImageConverter/blob/master/libhxcfe/trunk/sources/loaders/cpcdsk_loader/*
+		sName = "Amstrad CPC disk image (.DSK)"; bDetected = true;
+		if(X.c("'E'")) {trksz = 0; sVersion = 'extended' } else trksz = X.U16(0x32)+1;
+		if(X.isVerbose()) {
+			sOption(X.SA(0x22,0xE)); sOption('trk:'+trk+(trksz?' trksz:'+trksz:'')+' sides:'+sd)
+		}
+	}
+	
+	else if(X.c("'FCSX'") && X.U32(4) > X.U32(8) && X.U32(8) <= X.Sz()) { //found this one in a collection of NES ROMs
+		sName = "FCSX zlib format (.FCS)"; bDetected = true;
+		if(X.isVerbose()) sOptions = 'Zlib @10h, unp.sz:'+X.U32(4)+' sz:'+outSz(X.U32(8))
+	}
+
+	//.GG has no clear header...
+
+	else if(X.c("EB0A9090'IPL1'0000001EA08405B48ECD1BA8",0x1000) &&
+	  X.c("E9D102'                                                                                NEC 'CADFB0BFC5D9BADDCBDFADB0C08CC592E8836683428358834E8B4E93AE8381836A8385815B8376838D834F8389838020CADEB0BCDEAEDD' 2.'....' Copyright (C) NEC Corporation 1985,'", 0x1400)) {
+		sName = "NEC PS-98 hard disk image (.HDI)"; bDetected = true
+	}
+
+	else if((X.c("EB1C904E") || X.c("EB2790B1") || X.c("EB279028") || X.c("EB3C9027") || X.c("EB3C904E"))
+	  && X.c("000401010002C000D004FE0200080002000000",0xB)
+	  || (X.c("EB..90") && X.Sz() == 0x134000)) { // and no real way to detect user disks
+		sName = "NEC PC-98 disk image (.HDM)"; bDetected = true
+	}
+
+	else if(X.c("'HXCPICFE'") && isWithin(sides=X.U8(0xA),1,2)
+		&& isWithin(baud=X.U16(0xC)*1000,150000,3000000) && (ro=X.U8(0x11)) <= 1) {
+		//ref https://github.com/latchdevel/HxCFloppyImageConverter/blob/master/libhxcfe/trunk/sources/loaders/hfe_loader/hfe_format.h
+		// & hfe_writer.c & hfe_loader.c
+		sName = "HxC PIC/HFE disk image (.HFE)"; sVersion = 'rev.'+X.U8(8); bDetected = true;
+		if(X.isVerbose()) {
+			const trkencs = ["ISO IBM MFM", "Amiga MFM", "ISO IBM FM", "emulated FM", "unk."],
+				ifmodes = ["IBM PC DD", "IBM PC HD", "Atari ST DD", "Atari ST HD", "Amiga DD", "Amiga HD",
+					"Amstrad CPC DD", "generic Shugart DD", "IBM PC ED", "MSX2 DD", "Commodore 64 DD",
+					"emulated Shugart"];
+			var trk = X.U8(9), ifmode=X.U8(0x10), tofs = [], t = X.U8(0xB), sz = 0x200, datasz = 0;
+			p = 0x200; trkenc = t > 3 ? trkencs[4]: trkencs[t] & 3; ifmode = ifmode <= 0xB? ifmodes[ifmode]: 'unk.';
+			for(i=0; i < trk && p < X.Sz(); i++,p+=4) {
+				datasz += t=X.U16(p+2)
+			}
+			t = t&0x1FF? 0x200+(t&0xFFFFFE00): t; sz = X.U16(p-4)*0x200+t;
+			sOption('trk:'+trk+(sides==2?' DS':' SS'));
+			sOption(trkenc,'trkenc:'); sOption(ifmode,'floppy mode:'); sOption(ro?'write-protected':'');
+			sOption(baud+' baud = '+(baud/8192).toFixed(1)+'k/s');
+			sOption('datasz:'+datasz+' sz:'+outSz(sz))
+		}
+	}
+
+	else if(X.c("'CHKH'........00000000") && X.c("'CHKH'........01000000",X.U32(4)) && X.Sz() > 12) {
+		//ref https://github.com/latchdevel/HxCFloppyImageConverter/blob/11ee45a77f237846eebdf1c6f1c732e5c0505be5/libhxcfe/trunk/sources/loaders/hxcstream_loader/hxcstream.c#L143
+		sName = "HxC Stream Loader disk track (.hxcstream)"; bDetected = true;
+	}
+
+	else if(X.c("'CAPS'0000000C1CD573BA'INFO'00000060") && X.c("'IMGE'",0x6C)) {
+		//ref http://info-coach.fr/atari/documents/_mydoc/IPF-Documentation.pdf
+		sName = "SPS's KryoFlux Interchangeable Preservation Format disk image (.IPF)"; bDetected = true;
+		switch(X.U32(0x048,_BE)) {
+		case 0: sVersion = 'no-platform'; break; case 1: sVersion = 'Amiga'; break;
+		case 2: sVersion = 'Atari ST'; break; case 3: sVersion = 'PC'; break; case 4: sVersion = 'Amstrad CPC'; break;
+		case 5: sVersion = 'ZX Spectrum'; break; case 6: sVersion = 'SAM Coupe'; break;
+		case 7: sVersion = 'Acorn Archimedes'; break; case 8: sVersion = 'C64'; break;
+		case 9: sVersion = 'Atari 8-bit'; break; default: sVersion = 'unk.'
+		}
+		sVersion += X.U32(0x18,_BE) == 1? ' floppy': ' unk.media';
+		if(X.isVerbose()) {
+			for(p = 0x6C, density = '', densities = []; p < X.Sz(); ) {
+				hkhd = X.SA(p,4); if(!/[A-Z]{4}/.test(hkhd) || !X.c("0000",p+4)/*a floppy block can't be this long*/) break;
+				hksz = X.U32(p+4,_BE);
+				if(hkhd === 'IMGE') {
+					switch(X.U32(p+20)) {
+					case 3: density = 'Copylock Amiga'; break; case 4: density = 'Copylock Amiga new'; break;
+					case 5: density ='Copylock ST'; break; case 6: density = 'Speedlock Amiga'; break;
+					case 7: density = 'Speedlock Amiga old'; break; case 8: density = 'Adam Brierley Amiga'; break;
+					case 9: density = 'Adam Brierley & density key Amiga'; break;
+					}
+					if(densities.indexOf(density) < 0) densities.push(density);
+				}
+				else if(hkhd === 'DATA') p += X.U32(p+12,_BE);
+				p += hksz }
+			sOption(X.U32(0x28,_BE),'rev.');
+			sOption('tracks:'+X.U32(0x30,_BE)+'-'+X.U32(0x34,_BE)+' sides:'+(1+X.U32(0x3C,_BE)));
+			sOption(X.U32(0x1C,_BE) == 1? 'CAPS': X.U32(0x1C,_BE) == 2? 'SPS': 'unk.','encoder:',' rev.'+X.U32(0x20,_BE));
+			sOption(Hex(X.U32(0x24,_BE),8),'cat.ID:'); sOption(densities.join(' + '),'copy protection:'); sOption('sz:'+outSz(p))
+		}
+	}
+
+	else if(X.c("'JFDI'") && isWithin(tt=X.U32(0x18),0x130,X.Sz()) && isWithin(st=X.U32(0x1C),tt,X.Sz())
+	  && isWithin(dt=X.U32(0x20),st,X.Sz()) && X.c("FFFFFFFF",st-4) && X.c("FFFFFFFF",dt-8)
+	  && (!(dtt=X.U32(0x24)) || isWithin(dtt,dt,X.Sz())) && (!(dst=X.U32(0x28)) || isWithin(dst,dt,X.Sz()))
+	  && (!(ddt=X.U32(0x2C)) || isWithin(ddt,dt,X.Sz()))) {
+		//ref https://gist.github.com/Kaens/a139d96dc429b49788e47ea57e55017d
+		sName = "Acorn Archimedes ADFFS JFD disk image (.JFD)"; bDetected = 1;
+		nV = Util.divu64(nv=X.U32(4,_LE),100); nv %= 100; sVersion = 'v'+nV+'.'+nv;
+			+'+/img v'+((iv=X.U8(0x14))>>5)+'.'+(iv&0x1F);
+		if(X.isVerbose()) {
+			sOption('tt:'+Hex(tt)+' st:'+Hex(st)+' dt:'+Hex(dt))
+			sOption(addEllipsis(decAnsi(0x30,0x100,CPRISCOS).trim(),0xC0,0xA0));
+			if((ds = X.U16(0xE)) > 1) sOptions += ' ('+X.U16(0xC)+'/'+ds+')';
+			sOption('trk:'+Util.divu64(st-tt,4)+' sec:'+(Util.divu64(dt-st-tt*4,8)));
+			if(X.U32(4) >= 204) { fl = X.U32(0x130);
+				if(fl & (1 << 0)) sOption('write-protected'); if(fl & (1 << 2)) sOption('Protect CMOS req.');
+				if(fl & (1 << 3)) sOption('Protect Modules req.'); if(fl & (1 << 5)) sOption('Shift+Break to load');
+				sOption('for:');
+				if(fl & (1 << 8)) sOption('ARM3'); if(fl & (1 << 9)) sOption('ARM250');
+				if(fl & (1 << 10)) sOption('ARM610/710'); if(fl & (1 << 11)) sOption('ARM7500');
+				if(fl & (1 << 12)) sOption('StrongArm'); if(fl & (1 << 13)) sOption('ARMv5/v6/v7');
+				if(fl & (1 << 16)) sOption('RiscOS 2'); if(fl & (1 << 17)) sOption('RiscOS 3.1');
+				if(fl & (1 << 18)) sOption('RiscOS 3.5'); if(fl & (1 << 19)) sOption('RiscOS 3.7');
+				if(fl & (1 << 20)) sOption('RiscOS 3.8/4.x'); if(fl & (1 << 21)) sOption('RiscOS 5.x');
+				if(fl & (1 << 22)) sOption('RiscOS 6.x');
+				if(X.U8(0x134)) sOption('fps:'+(X.U8(0x134)/2)); if(X.U32(0x138)) sOption('Obey file sz:'+X.U32(0x138));
+				sOption('datasz:'+X.U32(8)); if(ddt) sOption('delta data')
+			}
+		}
+	}
+
+	else if((X.c("'SEGA 32X '",0x100) || X.c("'SEGA GENESIS'",0x100)) && X.c("'(C)'",0x110)) {
+		sName = "Sega MD/Genesis/32X (.MD,.32X)"; bDetected = true
+	}
+
+	else if(X.c("'NES'1A") && (X.Sz() > 15)) {
+		//ref https://www.nesdev.org/wiki/INES & https://www.nesdev.org/wiki/NES_2.0
+		sName = "NES ROM image (.nes)"; bDetected = true; malformed = false;
+		szprg = X.U8(4)*16384; szchr = X.U8(5)*8192;
+		flg9 = X.U8(9); //v1.0: ROMs don't use it; v2.0: sz*msb
+		flg6 = X.U8(6);
+		//fmirroring = (flg6&1)>0; //0 for hrz 1 for vrt, tons of fallout though so better to ignore this
+		fstorage = (flg6&2)>0; trainer = (flg6&4)*0x80; f4scrvram = (flg6&8)>0; flg7 = X.U8(7);
+		mapper = ((flg6&0xF0)>>4)+(flg7&0xF0); fvsunisystem = (flg7&1)>0; fplaychoice10 = (flg7&2)>0;
+		fv20_ = ((flg7&0x0C)==8); fv20 = false; szprgmsb = ((flg9&0x0F)<<8)*16384;
+		szchrmsb = ((flg9&0xF0)<<4)*8192; ex = region = tv = "";
+		sz = 16+trainer+szprg+szprgmsb+szchr+szchrmsb;
+		if(fv20_) fv20 = sz < X.Sz();
+		if(fv20) {
+			szprg += szprgmsb; szchr += szchrmsb; flg8 = X.U8(8); flg11 = X.U8(11); flg12 = X.U8(12);
+			flg13 = X.U8(13); flg14 = X.U8(14); flg15 = X.U8(15); sVersion = "NES v2.0";
+			mapper += (flg8&0x0F)<<8; submapper = (flg8&0xF0)>>4;
+			switch(flg7&2) {
+			case 0: sVersion += " #NES/Famicom/Dendy"; break;
+			case 1:
+				sVersion += " #Nintendo Vs. System (";
+				switch(flg13 & 0x0F) {
+				case 0: sVersion += "RP2C03B)"; break; case 1: sVersion += "RP2C03G)"; break;
+				case 2: sVersion += "RP2C04-0001)"; break; case 3: sVersion += "RP2C04-0002)"; break;
+				case 4: sVersion += "RP2C04-0003)"; break; case 5: sVersion += "RP2C04-0004)"; break;
+				case 6: sVersion += "RC2C03B)"; break; case 7: sVersion += "RC2C03C)"; break;
+				case 8: sVersion += "RC2C05-01)"; break; case 9: sVersion += "RC2C05-02)"; break;
+				case 0x0A: sVersion += "RC2C05-03)"; break; case 0x0B: sVersion += "RC2C05-04)"; break;
+				case 0x0C: sVersion += "RC2C05-05)"; break; default: sVersion += "unk.PPU)"
+				}
+			break;
+			case 2: sVersion += " #Nintendo Playchoice 10"; break;
+			default:
+				switch(flg13 & 0x0F) {
+				case 0: sVersion += " #NES/Famicom/Dendy"; break;
+				case 1: sVersion += " #Nintendo Vs. System"; break;
+				case 2: sVersion += " #Nintendo Playchoice 10"; break;
+				case 3: sVersion += " #Famiclone+DecimalMode"; break;
+				case 4: sVersion += " #NES/Famicom+EPSM/plug-through"; break;
+				case 5: sVersion += " #V.R. VT01 red/cyan"; break;
+				case 6: sVersion += " #V.R. Technology VT02"; break;
+				case 7: sVersion += " #V.R. Technology VT03"; break;
+				case 8: sVersion += " #V.R. Technology VT09"; break;
+				case 9: sVersion += " #V.R. Technology VT32"; break;
+				case 0x0A: sVersion += " #V.R. Technology VT369"; break;
+				case 0x0B: sVersion += " #UMC UM6578"; break;
+				case 0x0C: sVersion += " #Famicom Network System"; break;
+				default: sVersion += " #(reserved)"
+				}
+			}
+			switch(flg12 & 3) {
+			case 0: region = "NA/JP/SK/TW: NTSC NES"; break; case 1: region = "WE/AU: Licenced PAL NES"; break;
+			case 2: region = "Multiple"; break; default: region = "EU/RU/ZH/IN/AF: Dendy"
+			}
+			switch(flg15 & 0x3F) {
+			case 0x00: break;
+			case 0x01: ex = "Std. Sontrollers"; break;
+			case 0x02: ex = "NES Four Score/Satellite + 2 Std. Controllers"; break;
+			case 0x03: ex = "Famicom 4P Adapter"; break;
+			case 0x04: ex = "Vs. System (1P via $4016)"; break;
+			case 0x05: ex = "Vs. System (1P via $4017)"; break;
+			case 0x06: ex = "(obsolete MAME behaviour)"; break;
+			case 0x07: ex = "Vs. Zapper"; break;
+			case 0x08: ex = "Zapper ($4017)"; break;
+			case 0x09: ex = "2 Zappers"; break;
+			case 0x0A: ex = "Bandai Hyper Shot Lightgun"; break;
+			case 0x0B: ex = "Power Pad Side A"; break;
+			case 0x0C: ex = "Power Pad Side B"; break;
+			case 0x0D: ex = "Family Trainer Side A"; break;
+			case 0x0E: ex = "Family Trainer Side B"; break;
+			case 0x0F: ex = "Arkanoid Vaus Controller (NES)"; break;
+			case 0x10: ex = "Arkanoid Vaus Controller (Famicom)"; break;
+			case 0x11: ex = "2 Vaus Controllers + Famicom Data Recorder"; break;
+			case 0x12: ex = "Konami Hyper Shot Controller"; break;
+			case 0x13: ex = "Coconuts Pachinko Controller"; break;
+			case 0x14: ex = "Exciting Boxing Punching Bag (Blowup Doll)"; break;
+			case 0x15: ex = "Jissen Mahjong Controller"; break;
+			case 0x16: ex = "Party Tap"; break;
+			case 0x17: ex = "Oeka Kids Tablet"; break;
+			case 0x18: ex = "Sunsoft Barcode Battler"; break;
+			case 0x19: ex = "Miracle Piano Keyboard"; break;
+			case 0x1A: ex = "Pokkun Moguraa (Whack-a-Mole Mat & Mallet)"; break;
+			case 0x1B: ex = "Top Rider (Inflatable Bicycle)"; break;
+			case 0x1C: ex = "Double-Fisted"; break;
+			case 0x1D: ex = "Famicom 3D System"; break;
+			case 0x1E: ex = "Doremikko Keyboard"; break;
+			case 0x1F: ex = "R.O.B. Gyro Set"; break;
+			case 0x20: ex = 'Famicom Data Recorder ("silent" keyboard)'; break;
+			case 0x21: ex = "ASCII Turbo File"; break;
+			case 0x22: ex = "IGS Storage Battle Box"; break;
+			case 0x23: ex = "Family BASIC Keyboard + Famicom Data Recorder"; break;
+			case 0x24: ex = "Dongda PEC-586 Keyboard"; break;
+			case 0x25: ex = "Bit Corp. Bit-79 Keyboard"; break;
+			case 0x26: ex = "Subor Keyboard"; break;
+			case 0x27: ex = "Subor Keyboard + Mouse (3x8-bit)"; break;
+			case 0x28: ex = "Subor Keyboard + Mouse (24-bit)"; break;
+			case 0x29: ex = "SNES Mouse ($4017.d0)"; break;
+			case 0x2A: ex = "Multicart"; break;
+			case 0x2B: ex = "2 SNES Controllers"; break;
+			case 0x2C: ex = "RacerMate Bicycle"; break;
+			case 0x2D: ex = "U-Force"; break;
+			case 0x2E: ex = "R.O.B. Stack-Up"; break;
+			case 0x2F: ex = "City Patrolman Lightgun"; break;
+			case 0x30: ex = "Sharp C1 Cassette Interface"; break;
+			case 0x31: ex = "Std. Controller w/swapped ←→/↑↓/BA"; break;
+			case 0x32: ex = "Excalibor Sudoku Pad"; break;
+			case 0x33: ex = "ABL Pinball"; break;
+			case 0x34: ex = "Golden Nugget Casino extra buttons"; break;
+			default: ex = "(unknown)"
+			}
+			sz = 16+trainer+szprg+szprgmsb+szchr+szchrmsb
+		}
+		else {
+			if(!(flg7&0x0C) && X.c("0000 0000",12)) sVersion = "iNES";
+			else if((flg7&0x0C) == 4) sVersion = "archaic iNES";
+			else sVersion = "iNES v0.7 or archaic";
+
+			szprgram = X.U8(8)*8192; if(!szprgram) szprgram = 8192; //PRG RAM size
+			flg10 = X.U8(10);
+			switch(flg10 & 3) {
+			case 0: tv = "NTSC"; break;
+			case 2: tv = "PAL"; break;
+			default: tv = "NTSC/PAL"
+			}
+			if(X.c("0000 0000",X.Sz()-4)) { fprgram = (flg10&0x10)>0; fbusconflicts = (flg10&0x20)>0 }
+			else { fprgram = false; fbusconflicts = false; }
+			region = "n/a";
+		}
+		if(X.isVerbose()) {
+			sOption(tv,"tv: "); sOption(region,"region: "); sOption(mapper,"mapper: "); sOption(ex,"expansion: ");
+			if(fplaychoice10) sOption("PlayChoice-10"); if(trainer) sOption("trainer");
+			if(fstorage) sOption("battery-backed RAM"); sOption(outSz(sz),'sz:')
+		}
+	}
+
+	else if(X.c("'MNIB-1541-RAW'..000002..04..06..08..0A")) { bDetected = true; sVersion = 'v'+X.U8(0xD);
+		sName = "Markus Brenner's MNIB/Peter Rittwage's C64PP NIBTools disk image (.NIB)"
+	}
+
+	else if(X.c("01'CD001'01''",0x53000)) {
+		n = X.c("'NERO'",X.Sz()-8) ? 1 : X.c("'NER5'",X.Sz()-12) ? 2 : 0;
+		sName = (n? "Nero AG's ": '')+"optical disc image (.NRG)"; if(n) sVersion = "Nero AG/v"+n;
+		if(X.isVerbose()) sOptions = X.SA(0x53028,0x20).trim(); bDetected = true;
+	}
+
+	else if(X.c("0D04..00'host_date='") && X.fSig(0,0x80,"'KryoFlux DiskSystem'")) {
+		sName = "SPS's KryoFlux DiskSystem disk sector (.RAW)"; bDetected = true
+	}
+
+	else if(X.c("'CAPS'0000000C1CD573BA'DATA'") && X.c("'PACK'",X.U32(0x10,_BE)+0x14)) {
+		//ref https://www.kryoflux.com/download/spsdeclib_5.1_source.zip / Codec/CapsDefinitions.h
+		sName = "SPS's KryoFlux CT Raw disk image (.RAW)"; bDetected = true;
+		if(X.isVerbose()) {
+			for(p = 0xC, trk = unpsz = 0; p < X.Sz(); ) {
+				hkhd = X.SA(p,4); if(!/[A-Z]{4}/.test(hkhd) || !X.c("0000",p+4)/*a floppy block can't be this long*/) break;
+				hksz = X.U32(p+4,_BE);
+				switch(hkhd) {
+				case 'DATA': hksz += X.U32(p+12,_BE); break;
+				case 'PACK': unpsz += hksz; hksz = X.U32(p+12,_BE)+0x18; break;
+				case 'TRCK': trk++; break }
+				p += hksz }
+			sOption('trk:'+trk+' sz:'+outSz(p))
+		}
+	}
+
+	function isSCP() {
+		if(!X.c("'SCP'") || X.U8(6) > 165 || X.U8(7) > 165 || X.U8(0xA) > 2) return false;
+		var p, mtdp = mtdsz = 0, r = X.U8(5), bitw = X.U8(9);
+		sz = 0x2B0; if(!bitw) bitw = 2; else bitw >>= 3;
+		for(p = 0x10; p < 0x2B0; p += 4) {
+			var tdhp = X.U32(p); if(!tdhp) continue; if(!X.c("'TRK'",tdhp)) return false;
+			var i = 0; for(q = tdhp+4; i < r; i++) {
+				var tdsz = X.U32(q+4) * bitw, tdp = X.U32(q+8)+tdhp;
+				if(tdp > mtdp) { mtdp = tdp; mtdsz = tdsz }
+				q += 12
+			}
+		}
+		if(mtdp) if(mtdp > X.Sz()) return false; else sz = mtdp + mtdsz;
+		return true
+	}
+	if(!bDetected && isSCP()) {
+		sName = "SuperCard Pro disk image (.SCP)"; bDetected = true;
+		var v = X.U8(3); if(v) v = 'v'+(v>>4)+' rev.'+(v&0xF); else v = 'v.?';
+		var tp = X.U8(4), revolutions = X.U8(5), sttrk = X.U8(6), edtrk = X.U8(7), fl = X.U8(8),
+			tpi5in = fl & 2? '96': '48', rpm = fl&1? (fl & 4? '360': '300'): '300/360',
+			quality = fl & 8? 'normalised': 'preservation', ro = fl & 0x10? 'read/write': 'read-only', ext = fl & 0x20,
+			side = !X.U8(0xA)? 'double': (X.U8(0xA) == 1? 'bottom': 'top'), made, dtp;
+		if(ext) {
+			v = 'app v'+(X.U8(sz+0x28)>>4)+'.'+(X.U8(sz+0x28)&0xF)+
+				'h/w v'+(X.U8(sz+0x29)>>4)+'.'+(X.U8(sz+0x29)&0xF);
+			if(!X.c("'FPCS'",sz+0x2C)) v += '/malformed!noendtag'; sz += 0x30
+		}
+		sVersion = v;
+		if(X.isVerbose()) {
+			switch(tp&0xF) {
+			case 0: dtp = 'CBM'; break;  case 1: dtp = 'Amiga'; break;  case 2: dtp = 'Apple ]['; break;
+			case 3: dtp = 'Atari ST'; break;  case 4: dtp = 'Atari 800'; break;  case 5: dtp = 'Mac 800'; break;
+			case 6: dtp = '360k/720k'; break;  case 7: dtp = '1.44M'; break;  default: dtp = 'unk.'
+			}
+			switch(tp >> 4) {
+			case 0: made = 'Commodore'; break;  case 1: made = 'Atari'; break;  case 2: made = 'Apple'; break;
+			case 3: made = 'PC'; break;  case 4: made = 'Tandy'; break;  case 5: made = 'Texas Inst.'; break;
+			case 6: made = 'Roland'; break; case 8: made = '(other)'; break;  default: made = 'unk.'
+			}
+			sOption('type '+dtp+' by '+made); sOption('trk:'+sttrk+'-'+edtrk+' side:'+side);
+			sOption(ro); sOption(quality,'quality:'); sOption(rpm,'',' rpm');
+			sOption(outSz(sz),'sz:');
+		}
+	}
+
+	if(!bDetected)
+	if(X.c("EC..A50000") && X.c("EC00",0x100) && X.c("55AA55AA55AA55AAFFFFFFFFFFFFFFFF0000",0x110)
+	  && X.c("FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF",0x400)
+	  && X.c("4199015564F0FFFF 201B0C824118EA61 F00107F60301EE1B 0C834118EA617001 07760301EE15140500",0X4630)) {
+		sName = "GamePark GP32 SmartMedia card (.SMC)"; bDetected = true //may not catch all options, but the official games are there
+	}
+
+	else if(X.c("'RSY'000300")) {
+		//ref http://info-coach.fr/atari/documents/_mydoc/Pasti-documentation.pdf
+		sName = "Jorge 'Ijor' Cwik's Pasti disk image (.STX)"; bDetected = true;
+		sVersion = 'v3'+(X.U8(11) == 2?' new':X.U8(11) == 0?' old':'');
+		if(X.isVerbose()) {
+			sOption(X.U8(10),'trk.total:');
+			for(i=0,p=0x10; i < X.U8(10) && p < X.Sz(); i++,p += X.U32(p)) {}
+			sOption(outSz(p),'sz:')
+		}
+	}
+
+	else if(/^C64S?\s*tape.*file/.test(X.SA(0,0x20))) {
+		sName = "C64 cassette tape (.T64)"; bDetected = true;
+		sVersion = 'v'+X.U8(0x20)+"."+X.U8(0x21).padStart(2,'0');
+		if(X.isVerbose()) {
+			var files = [], totalent = X.U16(0x22,_LE), usedent = X.U16(0x24,_LE);
+			for(i=0; i < totalent; i++)
+				if(i < usedent) files[i] = X.SA(0x50+i*0x20,0x20).trim();
+			sOption(usedent," entries:");
+			for(i=0; i < files.length; i++) sOptions = sOptions.appendS(files[i]," ");
+		}
+	}
+
+	else if(X.c("'XM7 TAPE IMAGE 0'")) {
+		//ref https://github.com/yas-sim/xm7-related-tools/blob/main/t77dec/t77dec.cpp
+		//& https://web.archive.org/web/20191207131958/http://xm7.la.coocan.jp:80/xm7/xm7.html
+		sName = "Fujitsu FM-7 emulator XM7 tape (.T77)"; bDetected = true
+	}
+
+	else if(X.c("'C64-TAPE-RAW'") && X.U8(0xC) < 2) { bDetected = true;
+		sName = "C64 cassette tape (.TAP)"; sVersion = "v"+X.U8(0xC);
+		var sz = X.U32(0x10)+0x14; if(!X.isVerbose()) { if(sz > X.Sz()) sVersion += '/malformed!short' }
+		else sOptions = "sz:"+outSz(sz)
+	}
+
+	else if(X.c("'UEF File!'00") && X.U8(0xB) <= 2) {
+		//ref http://electrem.emuunlim.com/UEFSpecs.html
+		sName = "Acorn PC Unified Emulator Format data (.UEF)"; bDetected = true;
+		sVersion = 'v'+X.U8(0xB)+'.'+X.U8(0xA);
+		var title = info = man = gear = kb = tp = '', interrupt = false;
+		for(p = 0xC; p < X.Sz();) {
+			var hkhd = X.U16(p), hksz = X.U32(p+2);
+			if([0,1,2,3,4,0xFF].indexOf(hkhd>>8) < 0) break; //unrelated info follows?
+			p += 6; switch(hkhd) {
+			case 0x0000: info = info.appendS(X.SA(p,hksz),'/'); break;
+			case 0x0001: man = man.appendS(X.SA(p,hksz),' '); break;
+			case 0x0005: gear = 'Acorn ';
+				switch(X.U8(p)>>4) {
+				case 0: gear += 'BBC Model A'; break;  case 1: gear += 'Electron'; break;
+				case 2: gear += 'BBC Model B'; break;  case 3: gear += 'BBC Master'; break;
+				case 4: gear += 'Atom'; break
+				}
+				switch(X.U8(p) & 0xF) {
+				case 0: kb = 'any'; break;  case 1: kb = 'target PC'; break;  case 2: kb = 'host PC'; break
+				}
+				break;
+			case 0x0009: title = X.SA(p,hksz); break;
+			case 0x0101: case 0x0102: case 0x0103: case 0x0104:
+			case 0x0110: case 0x0111: case 0x0112: case 0x0113: case 0x0114: case 0x0115:
+			case 0x0116: case 0x0117: case 0x0120: case 0x0131:
+				tp = tp.addIfNone('#tape'); break;
+			case 0x0130:
+				switch(X.U8(p)) {
+				case 0: t = 'unit'; break;  case 1: t = 'tape'; break;  case 2: t = 'disc'; break;
+				case 3: t = 'vtape'; break;  case 4: t = 'cartridge'; break;  default: 'unk.media'
+				}
+				if(X.U8(p+1) > 1) t += ' ×'+X.U8(p+1);
+				if(X.U8(p+2) > 1) t += (X.U8(p) == 1 || X.U8(p) == 3)? ' ch:': X.U8(p) == 2? ' '+X.U8(p+2)+' audiotracks':'..?';
+				info += ' #'+t; break;
+			case 0x0200: case 0x0201: case 0x0202: tp = tp.addIfNone('#disc'); break;
+			case 0x0300: tp = tp.addIfNone('#ROM');
+				t = 'content:';
+				switch(X.U8(p)) {
+				case 0: t += 'generic'; break;  case 1: t += 'OS'; break;  case 2: t += 'BASIC'; break;
+				case 3: t += 'language'; break;  case 4: t += 'utility'; break;  case 5: t += 'filing system'; break;
+				case 6: t += 'h/w driver'; break;  case 7: t += 'game'; break;  default: t += 'unk'
+				} info += ' #'+t; break;
+			case 0x0301: tp = tp.addIfNone('#ROM'); break;
+			case 0x0400: case 0x0401: case 0x0402: case 0x0403:
+			case 0x0410: case 0x0411: case 0x0412: case 0x0420:
+				tp = tp.addIfNone('#snapshot'); break;
+			case 0xFF00: info += '#emu:'+X.SA(p,hksz); break;
+			case 0x0100: break; //the "implicit data chunk"! eh?
+			default:
+				if(hkhd > 0xFF00) tp = tp.addIfNone('#customdata');
+				else interrupt = true // unknown chunk = unrelated tailing data?
+			}
+			if(interrupt) { p -= 6; break }
+//_log(Hex(p-6)+' > '+Hex(hkhd));
+			p += hksz
+		}
+		sVersion += tp;
+		if(X.isVerbose()) {
+			sOption(title); sOptionT(info,'info:'); sOptionT(man,'manual:');
+			sOptionT(gear,'gear:'); sOptionT(kb,'layout:');
+			sOption(outSz(p),'sz:')
+		}
+	}
+
+	else if(X.c("'UNIF'???????? 0000 0000 0000 0000 0000 0000 0000") && (X.Sz() > 32)) {
+		sName = "UNIF NES cartridge (.UNF)"; sVersion = "v"+X.U32(4,_LE); bDetected = true;
+		if(X.isVerbose()) {
+			p=8;
+			t=''; mapr = ''; tv = ''; ex = ''; fstorage = lastchunk = false;
+			while (p < X.Sz() && !lastchunk) {
+				var hkhd = X.SA(p,4), hksz = X.U32(p+4); p += 0x08;
+				switch(hkhd) {
+					case "MAPR": mapr = X.SA(p,hksz); break;
+					case "NAME": t = X.SA(p,hksz); break;
+					case "TCVI": switch(X.U8(p)) {
+						case 0: tv = "NTSC"; break;
+						case 1: tv = "PAL"; break;
+						case 2: tv = "NTSC/PAL" }
+						break;
+					case "CTRL":
+						var exa = [], bm = X.U8(p);
+						if(bm&1) exa.push("Std. Controller");
+						if(bm&2) exa.push("Zapper");
+						if(bm&4) exa.push("R.O.B.");
+						if(bm&8) exa.push("Arkanoid Controller");
+						if(bm&0x10) exa.push("Power Pad");
+						if(bm&0x20) exa.push("Four Score");
+						if(bm) ex = "#"+exa.join("+");
+						break;
+					case "BATR": fstorage = true; break;
+					case "MIRR": lastchunk = true; break
+				}
+				p += hksz;
+			}
+			sOptionT(t);
+			sOption(tv);
+			sOption(ex,'expansion: ');
+			if(fstorage) sOption('battery-backed RAM');
+			if(lastchunk) sOption(outSz(p),'sz:'); else sVersion += '/malformed!short'
+		}
+	}
+
+	else if(X.c("'g GCE 198'..80")) {
+		sName = "GCE Vectrex cartridge (.VEC)"; bDetected = true;
+		if(X.isVerbose()) {
+			p = X.fSig(0x11,0x20,"80"); if(p > 0) sOption(X.SA(0x11,p-0x11))
+		}
+	}
+
+	else if(X.c("'VICE Snapshot File'1A")) {
+		sName = "C64 VICE emulator snapshot (.VSF)"; bDetected = 1;
+		sVersion = 'v'+X.U8(0x13)+'.'+X.U8(0x14).padStart(2,'0');
+		p = 0x25; bad = ''
+		while(p < X.Sz()) {
+			var hkhd = X.SA(p,0x10), hksz = X.U32(p+0x12,_BE);
+			if(!/([A-Z0-9-]{3,}|Acia1)/.test(hkhd) || !isAllZeroes(p+hkhd.length, 0x10-hkhd.length)) {
+				bad = bad.addIfNone('badchunk'); break }  else p += hksz;
+		}
+		if(X.isVerbose()) sOptions = X.SA(0x15,0xF)+' sz:'+outSz(sz);
+		else if(p > X.Sz()) bad = bad.addIfNone('!short');
+		if(bad != '') sVersion = sVersion.appendS('/malformed'+bad,'/')
+	}
+
+	else if(X.c("'WOZ'..FF0A0D0A ........ 'INFO'") && isWithin(X.U8(3),0x31,0x32)) {
+		//ref https://applesaucefdc.com/woz/reference2/
+		sName = "Apple II Applesauce disk image (.WOZ)"; sVersion = 'v'+X.SA(3,1);
+		p = 0xC; meta = bad = '';
+		while(p < X.Sz()) {
+			var hkhd = X.SA(p,4), hksz = X.U32(p+4); p += 8;
+			switch(hkhd) {
+			case 'INFO':
+				iV = X.U8(p); bDetected = true;
+				dim = X.U8(p+1) == 1? '5¼"': X.U8(p+1) == 2? '3½"': '?';
+				if(iV >= 2) ds = X.U8(p+37) == 1? ' SS': X.U8(p+37) == 2? ' DS':' ?'; else ds = '';
+				sOption('disk:'+dim+ds);
+				if(X.U8(p+2) == 1) sOption('write-protected');
+				if(iV >= 2) {
+					if(t=X.U8(p+42)) sOption(t,'min.RAM:','k');
+					t = ''; fl = X.U16(p+40); if(!fl) t = '?'; if(fl & (1 << 0)) t = t.append('][');
+					if(fl & (1 << 1)) t = t.append('][ Plus'); if(fl & (1 << 2)) t = t.append('//e');
+					if(fl & (1 << 3)) t = t.append('//c'); if(fl & (1 << 4)) t = t.append('//e Enhanced');
+					if(fl & (1 << 5)) t = t.append('IIgs'); if(fl & (1 << 6)) t = t.append('//c Plus');
+					if(fl & (1 << 7)) t = t.append('///'); if(fl & (1 << 8)) t = t.append('/// Plus');
+					sOption(t,'for Apple ');
+				}
+				break;
+			case 'TMAP': case 'TRKS': case 'FLUX': case 'WRIT': break;
+			case 'META': meta = X.SC(p,hksz,'UTF8').replace(/\x0A/g,",").replace(/\x09/g,":"); break
+			}
+			p += hksz;
+		}
+		if(p > X.Sz()) bad = bad.addIfNone('!short');
+		//if(X.isDeepScan() && X.calculateCRC32(12,sz-12) != X.U32(8)) bad = bad.addIfNone('!badcrc');
+		if(bad != '') sVersion = sVersion.appendS('/malformed'+bad, '/')
+		if(X.isVerbose()) {
+			sOptionT(addEllipsis(meta),'info:"','"');
+			sOption(outSz(p), 'sz:');
+		}
+	}
+/* beautify ignore:end */
+
+	return result(bShowType,bShowVersion,bShowOptions);
 }
