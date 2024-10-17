@@ -97,7 +97,7 @@ Edit build_winxp.bat ( check VSVARS_PATH, SEVENZIP_PATH, QMAKE_PATH variables)
 
 Run build_winxp.bat
 
-# How to build on Windows(7-10)
+# How to build on Windows(7-11)
 
 Install Visual Studio 2019: https://github.com/horsicq/build_tools
 
