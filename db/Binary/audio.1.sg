@@ -3,13 +3,14 @@
 // Kaens TG@kaens (for all the https://en.wikipedia.org/wiki/Music_tracker stuff)
 // hypn0 <hypn0@mail.ru>
 
+// Due to the extreme script file size, many good code practices were sacrificed to ensure it loads
+/* beautify ignore:start */
+
 init("audio", "");
 includeScript("read");
 debug = 0; //verbosity up to 3, where every note/command is shown
 
-function detect(bShowType, bShowVersion, bShowOptions) {
-    // Due to the extreme script file size, many good code practices were sacrificed to ensure it loads
-    /* beautify ignore:start */
+function detect(bShowType,bShowVersion,bShowOptions) {
 
 	if(X.c("'[1tracker module]'0D0A")) {
 		sName = "Shiru's 1tracker module (.1TM)"; bDetected = 1;
@@ -3456,7 +3457,7 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 		//from https://github.com/OpenMPT/openmpt/blob/master/soundlib/S3MTools.h & Load_s3m.cpp
 		// & http://asle.free.fr/prowiz/prowiz.src.zip / r/S3M.c
 		//TODO perform deep version detection
-		bDetected = 1; sName = "ScreamTracke 3 module (.S3M)"
+		bDetected = 1; sName = "ScreamTracker 3 module (.S3M)"
 		_V = Hex(X.U16(0x28,_LE)); tracker = '';
 		sVersion = "v"+_V.substr(1,1)+"."+_V.substr(2,2);
 		if(_V === "1300") sVersion = "v3.00"; else //because they're weird duh
@@ -11049,39 +11050,44 @@ if(X.isHeuristicScan()) { //parallel block
 	function isV2M() {
 		//ref https://github.com/farbrausch/fr_public/blob/master/v2/v2mplayer.cpp ::InitBase
 		//with kind commentary from Tammo "kb" Hinrichs
-		notes = 0; chs = 0;
+		notes = chs = 0;
 		if(X.Sz() < 480) return false;
-		timediv = X.U32(0,_LE); if(!timediv) return false;
-		maxtime = X.U32(4,_LE); if(!maxtime) return false;
-		gdnum = X.U32(8,_LE); if(!gdnum) return false;
-		p = 12+10*gdnum;
+		timediv = X.U32(0,_LE); if(!timediv || [0x60,0x80,480].indexOf(timediv) < 0) return false; //empirical
+		maxtime = X.U32(4); if(!maxtime) return false;
+		gdnum = X.U32(8); if(!gdnum) return false;
+		p = 12+10*gdnum; var pcs = pbs = ccs = 0;
 		for(ch=0; ch < 16; ch++) {
-			notenum = X.U32(p,_LE); p += 4; notes += notenum;
+			notenum = X.U32(p); p += 4; notes += notenum;
+			if(notenum > 1000000) return false; // nobody'll write a million-note synth epic, will they @_@
 			if(notenum) { chs++;
-				p += 5*notenum;
-				if(p > X.Sz()) return false;
-				pcnum = X.U32(p,_LE); p += 4+4*pcnum; //pgm change events
-				if(p > X.Sz()) return false;
-				pbnum = X.U32(p,_LE); p += 4+5*pbnum; //pitch bends
-				if(p > X.Sz()) return false;
+				p += 5*notenum; if(p > X.Sz()) return false;
+				pcnum = X.U32(p); pcs += pcnum; p += 4+4*pcnum; //pgm change events
+				pbnum = X.U32(p); pbs += pbnum; p += 4+5*pbnum; //pitch bends
 				for(cn=0; cn < 7; cn++) {
-					ccnum = X.U32(p,_LE); p += 4+4*ccnum; //control changes
-					if(p > X.Sz()) return false;
+					ccnum = X.U32(p); ccs += ccnum; p += 4+4*ccnum; //control changes
 				}
 			}
+			if(p > X.Sz()) return false;
 		}
-		size = X.U32(p,_LE); if(size > 16384) return false; //uint32 so "|| size<0" removed
+		if(!notes || ccs > notes*50 || pbs > notes*3 || pcs > notes*3 || maxtime < notes) { //*50 & 3 are arbitrary
+//_l2r('V2M',p,'notes:'+notes+' pcs:'+pcs+' pbs:'+pbs+' ccs:'+ccs)
+			return false }
+		size = X.U32(p); if(size > 0x4000) return false; //globals
 		p += 4+size; if(p > X.Sz()) return false;
-		size = X.I32(p,_LE);
-		if(size > 1048576 || size<0) return false;
+		size = X.U32(p); if(size > 0x100000) return false; //patchmap
 		p += 4+size; if(p > X.Sz()) return false;
-		return true;
+//_l2r('V2M',p,'speech -> '+Hex(p+4+X.U32(p)))
+		spsize = X.U32(p); p += 4; if(spsize < 0x2000) {
+			for(i=p+4; i < p+4+X.U32(p)*4; i+=4) if(!isWithin(X.U32(i), X.U32(p)*4, p-4+spsize)) return false;
+			p += spsize //speech size -- except tons of files are shorter than that, so we'll read the pointers!
+		}
+		sz = p; return true;
 	}
 	if(!bDetected && X.isDeepScan() && isV2M()) {
 		sName = "farbrausch V2 Synthesizer module (.V2M)"; bDetected = 1;
 		if(X.isVerbose())
-			sOption = "ch:"+chs+" notes:"+notes+" timediv:"+timediv+" maxtime:"+maxtime;
-		//TODO add the final tags
+			sOptions = 'ch:'+chs+' notes:'+notes+' timediv:'+timediv+' maxtime:'+maxtime
+				+(spsize?' syn.speech':'')+' sz:'+outSz(sz);
 	}
 
 
@@ -11098,6 +11104,6 @@ if(X.isHeuristicScan()) { //parallel block
 
 } //isHeuristicScan parallel block
 
-/* beautify ignore:end */
-    return result(bShowType, bShowVersion, bShowOptions);
+	return result(bShowType,bShowVersion,bShowOptions);
 }
+/* beautify ignore:end */
