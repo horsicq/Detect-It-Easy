@@ -755,6 +755,36 @@ function scanForObfuscations_NET() {
 
 
 
+    var isProtectionRuntimePresent = false;
+
+    var runtimeFound = String();
+
+    const protectionsRuntime = [ // Need more
+        { lib: "AgileDotNet.VMRuntime.dll", name: "Agile" },
+        { lib: "Xerin.Runtime.dll", name: "XerinFuscator" },
+        { lib: "OneVM.Runtime.dll", name: "OneVM" },
+        { lib: "HVMRuntm.dll", name: "DNGuard" }
+    ];
+
+    for (var i = 0; i < protectionsRuntime.length; i++) {
+        const
+            runtimeInfo = protectionsRuntime[i],
+            runtimeLibraryName = runtimeInfo.lib,
+            protectorName = runtimeInfo.name;
+
+        if (PE.isNetObjectPresent(runtimeLibraryName) || // "runtime.dll"
+            PE.isNetObjectPresent(runtimeLibraryName.substring(0, runtimeLibraryName.length - 4))) { // "runtime"
+            isProtectionRuntimePresent = true;
+            runtimeFound = protectorName;
+            break;
+        }
+    }
+
+    if (isProtectionRuntimePresent) options += (options.length != 0 ? " + " : String()) + runtimeFound + " runtime";
+
+
+
+
     const obfuscatorsAttributes = [
         "Xenocode.Client.Attributes.AssemblyAttributes.ProcessedByXenocode",
         "CryptoObfuscator.ProtectedWithCryptoObfuscatorAttribute",
@@ -839,11 +869,12 @@ function scanForObfuscations_NET() {
 
 
     const protectorsLabelsToRemove = [ // Protectors with these names will be removed from results
+            "SafeNet Sentinel LDK .NET",
             "Xenocode Postbuild",
             "Smart Assembly",
+            "XerinFuscator",
             "Dotfuscator",
             "Babel .NET",
-            "Agile .NET",
             "Spices.Net",
             "Maxtocode",
             "FISH .NET",
@@ -853,9 +884,13 @@ function scanForObfuscations_NET() {
             "Sixxpack",
             "DNGuard",
             "Goliath",
+            "Agile",
             "Yano"
         ],
         packersLabelsToRemove = [
+            "ChainskiCrypter",
+            "Quest PowerGUI",
+            "DataAnubis",
             "NsPack",
             "ASPack"
         ],
@@ -879,6 +914,7 @@ function scanForObfuscations_NET() {
         }
 
         for (var d = 0; d < packersLabelsToRemove.length; d++) {
+            _removeResult("cryptor", packersLabelsToRemove[d]);
             _removeResult("packer", packersLabelsToRemove[d]);
         }
 
@@ -1569,6 +1605,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         [".NET Reactor", null, 1, 0xb4cda32f],
         ["Bat To Exe Converter", null, 0, 0x72a2ca64],
         ["Vbs To Exe Converter", null, 0, 0x182aac68],
+        ["DNGuard", null, 0, 0x38432571]
     ];
 
     const importValidatingResult = validateImportHashes(dbCollectionOfHashesDictionary);
