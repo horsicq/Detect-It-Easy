@@ -33,16 +33,16 @@
 // Did you like my work? :D Thank you! But what
 // about donation? I'll be very grateful <3
 //
-// >> Payeer: P1066822521
+// >> Payeer: P1066822521 [Recommended]
 //
 // >> BTC:  37uRiHBqK3QiJ2jamqmmk1Q3sCmAmWngcC
-//          0.0005 BTC minimum
+//                        0,0005 BTC minimum
 //
 // >> LTC:  MCwRK1Z7K4GYHt9ZrbTR2SMCEqzqQaTbRF
-//          0.001 LTC minimum
+//                        0,001 LTC minimum
 //
 // >> USDT: TUVH7QkcZws78QMC3XyAwfuzxUbaeLnfAC
-//          TRC-20, 5 USDT minimum
+//    TRC-20              5 USDT minimum
 // ================================================
 
 // ================= [ CONTACTS ] =================
@@ -56,8 +56,8 @@
 
 // For the script to work correctly, the following
 // official Detect It Easy components are required:
-// "FASM", "RosASM", "SpASM", "FPC", "PE\linker.6.sg",
-// "Microsoft.6.sg", "language"
+// "language", "FASM", "RosASM", "SpASM", "FPC"
+// "PE\linker.6.sg", "Microsoft.6.sg"
 
 // Please do not read the code out loud unless you have exorcism skills
 
@@ -75,6 +75,8 @@ var lastOffsetDetected = "0x00";
 const detect = main;
 
 function main() {
+
+    stdout("test")
 
     if (stubForWrongEnvironment()) return null; // 'PE' is undefined
     if (stubForLegacyEngines()) return null; // old DIE version
@@ -112,9 +114,10 @@ function main() {
     }
 }
 
+
 function stubForLegacyEngines() {
-    if (typeof PE.isNetObjectPresent === 'undefined') {
-        _setResult("DIE-Message", ">>> Update DIE Engine to 3.10 and higher for using Heuristic-analyser by DosX <<<", String(), String());
+    if (typeof PE.isNetGlobalCctorPresent === 'undefined') {
+        stdout(">>> Update DIE Engine to 3.10 and higher for using Heuristic-analyser by DosX <<<");
         return true;
     }
 
@@ -122,11 +125,24 @@ function stubForLegacyEngines() {
 }
 
 
+
 function stubForWrongEnvironment() {
     if (typeof PE === 'undefined') {
-        _setResult("DIE-Message", ">>> Wrong environment! 'PE' is undefined. Check DIE-engine for correct installation <<<");
+        stdout(">>> Wrong environment! 'PE' is undefined. Check DIE-engine for correct installation <<<");
+        return true;
     }
+
     return false;
+}
+
+
+
+function stdout(stringToOut) {
+    if (typeof console === 'object') {
+        console.warn(stringToOut);
+    } else if (typeof File === 'object') {
+        _setResult("~Warning", stringToOut, String(), String());
+    }
 }
 
 
@@ -248,9 +264,10 @@ function scanForObfuscations_NET() {
 
 
 
+    // Check if the specified DOS message is not found in the DOS stub
+
     var isDosMessageModified = false;
 
-    // Check if the specified DOS message is not found in the DOS stub
     if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") === -1) {
         log(logType.net, "DOS-stub modified!");
         isDosMessageModified = true;
@@ -261,11 +278,12 @@ function scanForObfuscations_NET() {
 
 
 
+    // Check PE image for strange sections
+
     var strangeSections = false;
 
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
 
-    // Check conditions for strange sections
     if (PE.getNumberOfSections() > (!isClrNET() ? 6 : 10) || !PE.isSectionNamePresent(".text")) { strangeSections = true; } else {
         // Iterate through each section
         for (var i = 0; i < PE.getNumberOfSections() && !strangeSections; i++) {
@@ -298,6 +316,7 @@ function scanForObfuscations_NET() {
 
 
     // A popular way to obfuscate numbers/booleans
+
     var isIntConfusionPresent = false;
 
     const intConfusionXorPattern = opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.ldc_i4;
@@ -327,6 +346,7 @@ function scanForObfuscations_NET() {
 
 
     // Virtualization is a method of protection in which some code segments are rewritten into instructions inherent in the built-in virtual machine and executed by it
+
     var isVirtualizationPresent = false;
 
     if (
@@ -353,6 +373,7 @@ function scanForObfuscations_NET() {
 
 
     // Hiding calls using delegate tricks
+
     var callsEncrypt = false;
 
     if (
@@ -375,6 +396,7 @@ function scanForObfuscations_NET() {
 
 
     // https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.suppressildasmattribute
+
     var isAntiIldasmPresent = false;
 
     if (validateNetObject("SuppressIldasmAttribute")) {
@@ -387,6 +409,7 @@ function scanForObfuscations_NET() {
 
 
     // Anti de4dot via inheritance
+
     var isAntiDe4dotPresent = false;
 
     if (
@@ -402,6 +425,7 @@ function scanForObfuscations_NET() {
 
 
     // An obfuscation method in which calli is used instead of regular calls
+
     var isCalliInvokesPresent = false;
 
     if (validateNetByteCode( // samples by: MindLated
@@ -443,6 +467,7 @@ function scanForObfuscations_NET() {
 
 
     // Turns the code into spaghetti by splitting it into blocks that it executes depending on the situation
+
     var isCtrlFlowPresent = false;
 
     if (validateNetByteCode( // samples by: ConfuserEx
@@ -594,6 +619,7 @@ function scanForObfuscations_NET() {
 
 
     // AntiTamper protects the file from modification
+
     var isAntiTamperPresent = false;
 
     if (
@@ -623,14 +649,15 @@ function scanForObfuscations_NET() {
 
 
     // If in the assembly you can find a second object starting with “<Module>”, then this is a fakeee!
+
     var isModuleCtorMultiple = false;
 
     var currentCtorOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "00'<Module>'00");
 
-    if (currentCtorOffset != -1) {
+    if (currentCtorOffset !== -1) {
         var secondCtorNameOffset = PE.findSignature(currentCtorOffset + 10, PE.getSize() - PE.getOverlaySize(), "'<Module>'");
 
-        if (secondCtorNameOffset != -1 && PE.readByte(secondCtorNameOffset + 8) != 0x00) {
+        if (secondCtorNameOffset !== -1 && PE.readByte(secondCtorNameOffset + 8) !== 0x00) {
             log(logType.net, "Fake <Module> detected! Offset: 0x" + Number(secondCtorNameOffset).toString(16));
             isModuleCtorMultiple = true;
         }
@@ -641,7 +668,19 @@ function scanForObfuscations_NET() {
 
 
 
+    var isBadCctor = false;
+
+    if (currentCtorOffset === -1) {
+        isBadCctor = true;
+    }
+
+    if (isBadCctor) options += (options.length != 0 ? " + " : String()) + "Bad .cctor format";
+
+
+
+
     // Detects the use of unusual mathematical expressions that would be simplified by the compiler. For example, an expression like "912874 + 39188124^834"
+
     var isMutationsPresent = false;
 
     const mathOpCodes = [
@@ -1877,7 +1916,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (isDetected) {
         var detectedType = isCryptor ? "cryptor" : "packer";
 
-        _setResult("~" + detectedType, (isCryptor ? "Cryptor" : "Packer") + " detected", String(), PE.isVerbose() ? options : String());
+        _setResult("~" + detectedType, (isCryptor ? "Encrypted" : "Compressed") + " data", String(), PE.isVerbose() ? options : String());
     }
 }
 
@@ -1900,7 +1939,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
             isLicenseProviderPresent = true;
         }
 
-        if (isLicenseProviderPresent) options = "LicenseProvider";
+        if (isLicenseProviderPresent) options = "License provider";
 
     }
 
@@ -1921,7 +1960,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
         }
     }
 
-    if (isInterestingStringsFound) options += (options.length != 0 ? " + " : String()) + "Strings";
+    if (isInterestingStringsFound) options += (options.length != 0 ? " + " : String()) + "Texts";
 
 
 
@@ -1931,7 +1970,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
 
     if (isDetected) {
-        _setResult("~protection", "Licensing", "heurdev.0.01f", PE.isVerbose() ? options : String());
+        _setResult("~licesing", "Licensing", String(), PE.isVerbose() ? options : String());
     }
 }
 
@@ -2074,6 +2113,7 @@ function scanForObfuscations_Native() {
 
 
     // Check for section names containing forbidden characters
+
     var strangeSections = false;
 
     // Define forbidden characters
@@ -2158,6 +2198,7 @@ function scanForObfuscations_Native() {
 
 
     // It works if the file contains an import without an extension (for example, instead of "kernel32.dll" it is written "kernel32"). Compilers don't do that
+
     var isContainsNoExtensionLibrary = false;
 
     for (var i = 0; i < PE.getNumberOfImports() && !isContainsNoExtensionLibrary; i++) {
@@ -2178,6 +2219,7 @@ function scanForObfuscations_Native() {
 
 
     // .exe files in imports are a separate type of sophistication. But this happens.
+
     var exeInImports = false;
 
     for (var i = 0; i < PE.getNumberOfImports() && !exeInImports; i++) {
@@ -2196,6 +2238,7 @@ function scanForObfuscations_Native() {
 
 
     // Looks for sections whose names contain strange (or invalid) characters
+
     var isInvalidImportsPresent = false;
 
     const badImportChars = '=~!@#$%^&*()"№;%:?*():;,|\'`<> ';
@@ -2216,6 +2259,7 @@ function scanForObfuscations_Native() {
 
 
     // Checks if application resources can be read or if they are compressed/encrypted
+
     var isUnreadableResourcesPresent = false;
 
     for (var i = 0; i < PE.getNumberOfResources() && !isUnreadableResourcesPresent; i++) {
@@ -2257,6 +2301,7 @@ function scanForObfuscations_Native() {
 
     // Checks is executable application has been compiled or converted to a DLL
     // Like https://github.com/hasherezade/exe_to_dll
+
     var exeAsDll = false;
 
     if (PE.isDll() && (
@@ -2272,6 +2317,7 @@ function scanForObfuscations_Native() {
 
 
     // The .text section should always come first
+
     var isTextSectionNotFirst = false;
 
     if ((PE.section[0].Name != ".text" && PE.section[0].Name != ".textbss") && (PE.section[".text"] && PE.section[".textbss"])) {
@@ -2284,6 +2330,7 @@ function scanForObfuscations_Native() {
 
 
     // If IAT (Import Address Table) is missing
+
     var isIatMissing = false;
 
     if (PE.getNumberOfImports() == 0 &&
@@ -2297,6 +2344,7 @@ function scanForObfuscations_Native() {
 
 
     // Check if the entry point starts with NOP
+
     var isStartsWithNop = false;
 
     // Condition to check if the first instruction is NOP
@@ -2343,6 +2391,7 @@ function scanForObfuscations_Native() {
 
 
     // Check if NOP padding is present at the entry point
+
     var isNopPaddingPresent = false;
 
     // Condition to check for NOP padding
@@ -2356,6 +2405,7 @@ function scanForObfuscations_Native() {
 
 
     // ASM Guard fake signatures
+
     if (PE.isSectionNamePresent(".asmg") || PE.isSectionNamePresent("ASMGUARD")) {
         for (var f = 0; f < 3; f++)
             _removeResult("packer", ["UPX", "MPRESS", "EP:MPRESS"][f]);
@@ -2371,6 +2421,7 @@ function scanForObfuscations_Native() {
         _setResult("~protection", "Generic", String(), PE.isVerbose() ? options : String());
     }
 }
+
 
 
 const _patternSplitter = "|";
@@ -2410,6 +2461,7 @@ function getEpAsmPattern(onlyOpCodes, numberOf) {
 }
 
 
+
 // Function to get assembly instruction by index
 
 function getAsmInstructionByIndex(index) {
@@ -2433,6 +2485,7 @@ function getAsmInstructionByIndex(index) {
         }
     }
 }
+
 
 
 // Makes it possible to get a subpattern to search for instructions in a
@@ -2460,11 +2513,13 @@ function getFirstEpAsmInstruction() {
 }
 
 
+
 // Gets an opcode from an instruction
 
 function getAsmOpCode(instruction) {
     return instruction.indexOf(" ") !== -1 ? instruction.split(" ")[0] : instruction;
 }
+
 
 
 // Returns only the name of the opcode used, without arguments
@@ -2474,14 +2529,17 @@ function getFirstEpAsmOpCode() {
 }
 
 
+
 // VC ?warp_size@cuda@at@@YAHXZ
 // GNU _ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_i
+
 function isFunctionMangled(functionPattern) {
     return functionPattern.length > 5 && (
         (functionPattern[0] == '?' && functionPattern.indexOf("@@") !== -1) || // MSVCPP mangler
         (functionPattern.substring(0, 4) == "_ZSt") // GNUCPP mangler
     );
 }
+
 
 
 function getNameOfMangledFunction(functionPattern) {
@@ -2527,12 +2585,15 @@ function getNameOfMangledFunction(functionPattern) {
 }
 
 
+
 function validateImportHashes(dbCollection) {
     for (var i = 0; i < dbCollection.length; i++) {
-        const currentIndex = i,
+        const
+            currentIndex = i,
             currentArrayPattern = dbCollection[currentIndex];
 
-        const name = currentArrayPattern[0],
+        const
+            name = currentArrayPattern[0],
             version = currentArrayPattern[1],
             position = currentArrayPattern[2],
             hash = currentArrayPattern[3];
@@ -2546,12 +2607,15 @@ function validateImportHashes(dbCollection) {
 }
 
 
+
 function validateSectionNames(dbCollection) {
     for (var i = 0; i < dbCollection.length; i++) {
-        const currentIndex = i,
+        const
+            currentIndex = i,
             currentArrayPattern = dbCollection[currentIndex];
 
-        const name = currentArrayPattern[0],
+        const
+            name = currentArrayPattern[0],
             version = currentArrayPattern[1],
             sectionName = currentArrayPattern[2];
 
@@ -2691,10 +2755,12 @@ function scanForLanguages_NET_and_Native() {
 }
 
 
+
 function _setLangByHeur(languageName) {
     log(logType.any, languageName + " language detected!");
     _setLang(languageName, true, heurLabel);
 }
+
 
 
 function log(messageTypeId, messageText) {
@@ -2765,6 +2831,7 @@ function scanForMaciliousCode_NET_and_Native() {
 
     if (_TakeScreenshot) heurAvSetResult("TakeScreenshot", 3);
 }
+
 
 
 function heurAvSetResult(label, scores) {
