@@ -9,65 +9,68 @@ includeScript("read");
 function detect(bShowType, bShowVersion, bShowOptions) {
 	//ref https://jichu4n.github.io/palm-pdb/assets/Palm%20File%20Format%20Specification.pdf
 	// & https://github.com/jichu4n/palm-os-sdk/blob/master/sdk-3.1/include/Core/System/DataPrv.h
-	bad = '';
+	var bad = '', sus = 0;
 
 	function palmDateToStr(dt,desc) {
 		// Palm OS date starts from Jan 1, 1904......
-		if(typeof desc != 'string') desc = ''
-		var msecs = new Date(1904, 0, 1).getTime()+dt * 1000;
+		if(typeof desc != 'string') desc = '';
+		var msecs = new Date(1904, 0, 1).getTime() + dt * 1000;
 		var date = new Date(msecs);
-		if(!isWithin(date.getFullYear(),1996,2040) //...but not many file makers seem to have actually known that lol
+		if(!isWithin(date.getFullYear(), 1996, 2040) //...but not many file makers seem to have actually known that lol
 		 && date.getFullYear() != 1907) { // 1907 is courtesy Graffiti Sniper - Golgo 13 xmas cards. The game's from 2001
 			msecs = new Date(0).getTime() + (dt * 1000); date = new Date(msecs) }
 		if(!isWithin(date.getFullYear(), 1996, 2040) && date.getFullYear() != 1907)
-			if(isWithin(dt,1996,2040))
+			if(isWithin(dt, 1996, 2040))
 				return 'y'+dt // some don't even realise it has a format and think it's just the year. (ZioGolf's zgrsc.pdb :D)
 			else return ''; //thankfully even with the special snowflakes it's' tight enough for detection
-		var r = date.toISOString().slice(0,19);
-		return r.slice(0,4) == '1907'? '2001'+r.slice(4,19): r
+		var r = date.toISOString().slice(0, 19);
+		return r.slice(0, 4) == '1907'? '2001'+r.slice(4, 19): r
 	}
 
 	const dmHdrAttrBackup = 1, dmHdrAttrLaunchableData = 2;
 	var name = X.SA(0,0x20), nc = charStat(name,true);
-	if(nc.indexOf('allasc') < 0) return false;
+	if(nc.indexOf('asc') < 0) return;
 	var attr = X.U16(0x20,_BE), v = X.U16(0x22,_BE), dtCre = X.U32(0x24,_BE), dtMod = X.U32(0x28,_BE),
 		dtBak = X.U32(0x2C,_BE), modnum = X.U32(0x30,_BE), appinfo = X.U32(0x34,_BE),
 		sortinfo = X.U32(0x38,_BE), tp = 'PDB', tp_ = X.SA(0x3C,4), by = X.SA(0x40,4);
 	var idseed = X.U32(0x44,_BE), nextrec = X.U16(0x48,_BE), numrec = X.U16(0x4C,_BE),
 		p = numrec? 0x4E: 0x50;
 	if(nextrec) bad = bad.addIfNone('!baddbdir'); //Palm specs say reject this db (artefacts of pre-v4 OSes)
-	if(!/\w{3,}/.test(by)) return false;
+	if(!/\w{3,}/.test(by)) return;
 	switch(tp_) { case 'appl': tp = 'PRC'; break;
-		case 'pqa ': if(by == 'clpr') tp = 'PQA'; else return false;
+		case 'pqa ': if(by == 'clpr') tp = 'PQA'; else return;
 		default:
-			if(['SOS5HMBS','SOS5Hm2g','SSNYHm2g','SOS5HmTp','SSNYHmTp',
-				'CARTGBoy','levlBiKD','DATAGGRF','dataSSv1','dataJMBL','librMEDQ'].indexOf(tp_+by) >= 0) {
+			if(charStat(readBytes(p,4),true).indexOf('allasc') >= 0) {
 				tp = 'PRC'; bad = bad.addIfNone('!badtype')} }
 	var dt = palmDateToStr(dtMod,'mod'),endp,reclen=8,m=i=0,mhk='',uniq=[];
-	if(dtMod && dt === '' || dtCre && palmDateToStr(dtCre,'cre') === '' //not sure if creation timestamp has to be present
-	  || dtBak && palmDateToStr(dtBak,'bak') === '') return false;
+	if(dtMod && dt === '') sus += 2;
+	if(dtCre && palmDateToStr(dtCre,'cre') === '') sus++;
+	if(dtBak && palmDateToStr(dtBak,'bak') === '') sus++;
 
-	if(tp === 'PRC') for(reclen=10,endp = p+reclen*numrec; p < endp; p += reclen) { // PRC RsrcEntryType
-		if(p+10 > X.Sz()) { /*debug('lookahead shorted out');*/ return false }
+	if(tp === 'PRC') for(reclen=10, endp = p+reclen*numrec; p < endp; p += reclen) { // PRC RsrcEntryType
+		if(p+10 > X.Sz()) { /*debug('lookahead shorted out');*/ return }
 		var hkhd = X.SA(p,4), hkid = X.U16(p+4,_BE), hkofs = X.U32(p+6,_BE);
-		if(!isWithin(hkofs,p,X.Sz()) || !/\w{3,}/.test(hkhd) || uniq.indexOf(hkofs) >= 0) return false;
+		if(!isWithin(hkofs,p,X.Sz()) || !/\w{3,}/.test(hkhd) || uniq.indexOf(hkofs) >= 0) return;
 		uniq.push(hkofs); if(m < hkofs) { m = hkofs; mhk = hkhd }
 		if(hkhd === 'tver') sVersion = 'v'+X.SA(m,0x100).trim()
 		}
-	else if(tp === 'PDB') for(reclen=8,endp = p+reclen*numrec; p < endp; p += reclen) { // PDB RecordEntryType
-		if(p+8 > X.Sz()) return false;
-		var hkofs = X.U32(p,_BE), hkattr = X.U8(p+4), hkid = X.U24(p+5,_BE); //they say the ID's unique but not in reality
-		if(!isWithin(hkofs,p,X.Sz()) || uniq.indexOf(hkofs) >= 0) return false;
+	else if(tp === 'PDB') for(reclen=8, endp = p+reclen*numrec; p < endp; p += reclen) { // PDB RecordEntryType
+		if(p+8 > X.Sz()) return;
+		var hkofs = X.U32(p,_BE), hkattr = X.U8(p+4), hkid = X.U24(p+5,_BE); //the ID is unique. Not in reality though
+		if(!isWithin(hkofs,p,X.Sz()) || uniq.indexOf(hkofs) >= 0) return;
 		uniq.push(hkofs); if(m < hkofs) m = hkofs
-		}
+	}
 	//else TODO parse PQA reclist
 	if(appinfo && !isWithin(appinfo,0x4E+reclen*numrec,X.Sz())
 	  || sortinfo && !isWithin(sortinfo, 0x4C+reclen*numrec, X.Sz())
-	  || (appinfo && sortinfo && sortinfo < appinfo)) {
-		/*debug('appinfo/sortinfo bad address');*/ return false }
+	  || appinfo && sortinfo && sortinfo < appinfo) {
+		/*debug('appinfo/sortinfo bad address');*/ return }
 
 	if(sVersion != '') sVersion = tp_.appendS(sVersion,' '); else sVersion = tp_;
-	if(appinfo && Math.abs(appinfo-p) > 0x10) { _l2r('Palm OS file',p,'appinfo should be '+Hex(appinfo)); return false }
+	if(appinfo && Math.abs(appinfo-p) > 0x10) {
+		//_l2r('Palm OS file',p,'appinfo should be '+Hex(appinfo));
+		return }
+	if(sus > 3) return;
 	if(tp == 'PRC')
 		if(['taic','tAIN','tver','tSTR'].indexOf(mhk) >= 0)
 			sz = outSz(X.fSig(m,-1,'00')+1); //text fields, most end with 0. Some do have 0 padding...
