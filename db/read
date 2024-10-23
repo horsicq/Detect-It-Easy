@@ -270,7 +270,7 @@ function readVarUInt(ofs) {
  * @returns {UInt} read value as integer, -1 if EoF reached
  * @example
  * First create an instance with the file object: var bits = new BitReader(10);
- * Then call the readBits method with the number of bits you want: var value = bits.read(5);
+ * Then call the readBits method with the number of bits you want: var value = bits.read(5)
  * Or put the reader towards a different place: bits.init(10)
  * Receive the current bit-file offset: bits.offset
  * Set the bit-file's offset, in bytes, without changing state: bits.seek(10)
@@ -319,22 +319,32 @@ function BitReader(nOffset, nEndian) {
 }
 
 /**
- * Check a file slice for being all zeroes.
+ * Check a file slice for being all one of a lineup of specified characters.
  * @param {UInt} ofs - the offset to start from.
- * @param {Int} len - the amount of bytes to check.
- * @returns {bool} True if the slice is all zeroes. If you go beyond EoF, always false.
+ * @param {UInt} len - the amount of bytes to check.
+ * @param {[Array(UInt)] | UInt} bl = [0] - the list of possible u_int8 codes, or just one u_int8. 0 by default.
+ * @returns {UInt} - offset if a byte in the slice doesn't belong to the list. If you go beyond EoF or all good, -1.
+ * @example
+ * For '00 01 02 01' at offset 6, firstNotOf (6, 4, [0,1]) === 8, and firstNotOf(6, 4, 1) === 6
  */
-function isAllZeroes(ofs, len) {
-	if(ofs+len>File.getSize()) return false;
-	var c = 0;
-	for(var i=0;i < len && ofs+i < File.getSize();i++) if(!File.read_uint8(ofs+i)) c++;
-	return c === len;
+function firstNotOf(ofs, len, bl) {
+	if(ofs+len > X.Sz()) return -1; var c = i = 0;
+	if(Array.isArray(bl)) {
+		for(i = 0; i < bl.length; i++) if(typeof bl[i] !== 'number' || bl < 0 || bl % 1 != 0) break; 
+		if(i < bl.length) throw new Error('firstNotOf cannot parse: '+outArray(bl));
+	}
+	else if(typeof bl === 'number' && bl > 0 && bl % 1 == 0) bl = [bl]; else bl = [0];
+	// and now test the slice
+	for(i = 0; i < len && ofs+i < X.Sz(); i++) if(bl.indexOf(X.U8(ofs+i)) < 0) break;
+	return i < len? ofs+i : -1
 }
+
+function isAllZeroes(ofs, len) { return firstNotOf(ofs, len, 0) < 0 } //a subcase for whether a slice is all zeroes 
 
 /**
  * If the string was too long and has been read incompletely, adds an ellipsis after the last
  * complete word, to avoid cut-off words. If `space characters' are not detected,
- * replaces the last character with an ellipsis.
+ * replaces the last character with an ellipsis. Does NOT do the trim().
  * Mostly usable for lengthy multiline comments/messages.
  * @param {String} a - the original incomplete string.
  * @param {Number} trim - the buffer size; if a.length == trim, we decide it was cropped.
@@ -348,7 +358,7 @@ function addEllipsis(a, trim, mintrim) {
 	var i = trim, c = 0, ci = -1;
 	while(i >= mintrim && c < 2) {
 		if(spaces.indexOf(a[i]) >= 0) { c++; while(spaces.indexOf(a[i]) >= 0) i--; if(ci < 0) ci = i+1 }
-		while(spaces.indexOf(a[i]) < 0 && i) i--
+		while(spaces.indexOf(a[i]) < 0 && i >= 0) i--
 	}
 	if((i < mintrim && c < 2) //we conclude this language doesn't really have that many spaces...
 	  || !c) //...or none at all in the trimmable slice...
@@ -420,8 +430,9 @@ function outArray(a,base,pad) {
 	for(var i=0, s = []; i < a.length; i++)
 		if(Array.isArray(a[i])) s.push(outArray(a[i],base,pad)); else
 			if(typeof a[i] === 'number' && a[i] % 1 === 0) //integer
-				s.push(a[i].toString(base).toUpperCase().padStart(pad,'0'))
-			else s.push(a[i])
+				s.push(a[i].toString(base).toUpperCase().padStart(pad,'0'));
+			else if(typeof a[i] === 'string') s.push('"'+a[i]+'"');
+			else s.push(a[i]);
 	return '['+s.join(', ')+']' //put '[ '...' ]' for an even more spaced output
 }
 
@@ -583,7 +594,7 @@ function patchClear() { patcheddata = [] }
 /**
  * Discovers gaps in an array of pairs of numbers, with a minimum-to-report gap as optional parameter.
  * @param {Array of arrays[2]} lst - List to process consisting of ranges defined as [offset,length]
- * @param {Number = 1} mingap - Minimum gap, default to at least 1 byte between the ranges
+ * @param {UInt = 1} mingap - Minimum gap, default to at least 1 byte between the ranges
  * @returns {Array of arrays[2]} Sorted list of gap ranges in the same format
  * Ex. 𝑓([ [10,10], [25,5], [40,10] ]) = [[20,5], [30,10]] 
  */
@@ -642,6 +653,30 @@ function toBase64(buf) {
 		r += '=';
 	}
 	return r
+}
+
+/**
+ * If it's an Amiga hunk file, proceeds to process hunks
+ * @returns {Int} -1 in case of errors, otherwise expected size
+ */
+function calcAmigaFileSize() {
+	if(!X.c("000003F3")) return -1; //is it an Amiga hunk file?
+	var p = 4, x = sz = i = reslibs = 0, sizes = [], load = true;
+	//library strings:
+	while(p < X.Sz()) {
+		x = X.U32(4,_BE); p += 4; if(!reslibs && x) load = false; if(x) reslibs++; else break; p += 4*x
+	}
+	var hunks = X.U32(p+8,_BE) - X.U32(p+4,_BE) + 1; p += 12;
+sOption(hunks+' hunks')
+	//hunk table:
+	for(i=0; i < hunks && p < X.Sz(); i++,p+=4) {
+		var t = X.U32(p,_BE), add = (t>>30) == 3? 4: 0; t &= 0x3FFFFFFF; t <<= 2; t += add;
+_log('@'+Hex(p)+' hunk#'+i+' = '+Hex(t));
+		sizes.push(t); sz += t
+	}
+	//traverse hunks:
+	sz += p; //if(sz >= X.Sz()) return -1;
+	return sz
 }
 
 function _logBase64(buf) { //simply plops the buffer contents into log stream with a suitable MIME header
