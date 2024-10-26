@@ -3,7 +3,7 @@
 init("compiler", "PureBasic");
 
 function detect(bShowType, bShowVersion, bShowOptions) {
-    if (!PE.isPEPlus()) {
+    if (!PE.is64()) {
         if (PE.compareEP("68....0000680000000068......00E8......0083C40C6800000000E8......00A3")) {
             sVersion = "4.X-6.X";
             bDetected = true;
@@ -28,6 +28,14 @@ function detect(bShowType, bShowVersion, bShowOptions) {
         }
     }
 
-    _setLang("Basic", bDetected);
+    if (!bDetected && PE.getImportLibraryName(0) === "KERNEL32.dll") {
+        const rdataSection = PE.section[".rdata"];
+
+        if (rdataSection) {
+            bDetected = PE.findSignature(rdataSection.FileOffset, 5120, "1415161718191A1B1C1D1E1F202122232425262728292A2B2C2D2E2F30313233") !== -1;
+        }
+    }
+
+    _setLang("PureBasic", bDetected);
     return result(bShowType, bShowVersion, bShowOptions);
 }
