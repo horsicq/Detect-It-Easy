@@ -1,15 +1,15 @@
 // Detect It Easy: detection rule file format
 // Authors: LinXP, Kae (TG@kaens)
 
-init("image", "ZSoft Paintbrush (.PCX)");
+init("image", "ZSoft PiCture eXchange file (.PCX)");
 
 includeScript("read");
 
 function detect() {
     //ref https://www.fileformat.info/format/pcx/spec/a10e75307b3a4cc49c3bbe6db4c41fa2/view.htm
-    if (File.getSize() >= 0x0E) {
+    if (File.getSize() >= 0x50) {
         if (File.compare("0a") && !File.read_uint8(0x40)) {
-            switch (File.read_uint8(0x01)) {
+            switch (nv = File.read_uint8(0x01)) {
                 case 0:
                     sVersion = "v2.5 using a fixed EGA palette";
                     break;
@@ -23,31 +23,43 @@ function detect() {
                     sVersion = "Windows";
                     break;
                 case 5:
-                    sVersion = "v3.0/+, including 24-bit images";
+                    sVersion = "v3.0+ or 24-bit";
                     break;
                 default:
                     return;
             }
+            var sus = '', inv = 0; // strictly-speaking-invalid or highly unlikely parameter counter
             var rle = File.read_uint8(0x02);
             if (rle > 1) return;
+            if (!rle) { inv++; sus += '!uncompressed' }
             var w = File.read_uint16(0x08) - File.read_uint16(0x04) + 1,
                 h = File.read_uint16(0x0A) - File.read_uint16(0x06) + 1;
             if (w <= 0 || h <= 0) return;
-            if (File.isVerbose()) sOption(w + "x" + h);
-            if (rle && File.isVerbose()) sOption("RLE");
             var bpplane = File.read_uint8(0x03),
-                nplanes = File.read_uint8(0x41);
-            if ([1, 2, 4, 8].indexOf(bpplane) < 0 || !isAllZeroes(0x4A, 0x36)) return;
-            var bpline = File.read_uint16(0x42);
-            if (bpline % 2 || bpline < h) return;
+                nplanes = File.read_uint8(0x41),
+                bpx = bpplane * nplanes,
+                pal = false;
+            if ([1, 2, 4, 8, 24].indexOf(bpplane) < 0) return;
+            if (!nplanes || nplanes > 4) return;
+            if (!X.c("00",0x40)) { inv++; sus += '!resnon0' }
+            if (!isAllZeroes(0x4A, 0x36)) ext = true;
+            if (pal && ([0, 3].indexOf(nv) < 0 || bpx > 4)) { inv++; sus += '!badpalette' }
+            var bpline = File.read_uint16(0x42); if (bpline % 2) return;
+            if (bpline < w*bpx >> 3) { inv++; sus += '!bpline'+bpline+'<w'+(w*bpx/8) }
+            if (inv > 2) return;
+            if (inv) sVersion = sVersion.appendS('sus'+sus,'/')
             if (File.isVerbose()) {
-                sOption(bpplane * nplanes, "bpx:");
-                sOption(bpplane, "bpl:");
-                sOption(File.read_uint16(0x0C) + "x" + File.read_uint16(0x0E), "dpi:");
+                sOption(w + "x" + h);
+                if (rle) sOption("RLE");
+                if (ext) sOption("extra_block");
+                sOption(bpx, "bit/pixel:");
+                sOption(bpplane, "bit/plane:");
+                if(bpline < w*bpx >> 3) sOption(bpline, "scanline:");
+                sOption(File.read_uint16(0x0C) + "x" + File.read_uint16(0x0E), "res:", " dpi");
                 var scrw = File.read_uint16(0x46),
                     scrh = File.read_uint16(0x48);
                 if (scrw * scrh) sOption(scrw + "x" + scrh, "screen:");
-                if (!rle) sOption(0x80 + (w * h * bpplane * nplanes >> 3), "sz:")
+                if (!rle) sOption(0x80 + (w * h * bpx >> 3), "sz:") //but it's never not RLE, sorry
             }
             bDetected = true;
         }
