@@ -9,40 +9,40 @@ includeScript("read");
 
 function detect() {
 
-	//chunks!
-	pn = 0;
-	pc = 0;
-	hkhd = "";
-	hksz = 4; //12 skips the static header bit
-	nRate = 0;
-	nChannels = 0;
-	nBPS = 0;
+    //chunks!
+    pn = 0;
+    pc = 0;
+    hkhd = "";
+    hksz = 4; //12 skips the static header bit
+    nRate = 0;
+    nChannels = 0;
+    nBPS = 0;
 
-	function nextChunk() {
-		if (pn + hksz + 8 < X.Sz()) {
-			pn += hksz + 8;
-			hkhd = X.SA(pn, 4);
-			hksz = X.U32(pn + 4, _LE);
-			hksz += hksz % 2;
-			pc = pn + 8; //chunk's internal pointer (pn points at hkhd)
-			return true;
-		} else return false;
-	}
+    function nextChunk() {
+        if (pn + hksz + 8 < X.Sz()) {
+            pn += hksz + 8;
+            hkhd = X.SA(pn, 4);
+            hksz = X.U32(pn + 4, _LE);
+            hksz += hksz % 2;
+            pc = pn + 8; //chunk's internal pointer (pn points at hkhd)
+            return true;
+        } else return false;
+    }
 
-	if (X.Sz() >= 36 && X.c("'RIFF'........'WAVE'") && (sz = 8+X.U32(4, _LE)) > 12) {
-		sName = "RIFF container/WAVE";
-		dcsamples = 0;
-		//chunks = "";
-		while (nextChunk()) {
-			//chunks += " *" + hkhd + " [" + Hex(hksz) + "] @" + Hex(pc);
-			switch (hkhd) {
-				case "fmt ":
-					bDetected = true;
-					nFormat = X.U16(pc, _LE);
-					nChannels = X.U16(pc + 2, _LE);
-					nRate = X.U32(pc + 4, _LE);
-					nBPS = X.U16(pc + 0x0E, _LE);
-/* beautify preserve:start */
+    if (X.Sz() >= 36 && X.c("'RIFF'........'WAVE'") && (sz = 8 + X.U32(4, _LE)) > 12) {
+        sName = "RIFF container/WAVE";
+        dcsamples = 0;
+        //chunks = "";
+        while (nextChunk()) {
+            //chunks += " *" + hkhd + " [" + Hex(hksz) + "] @" + Hex(pc);
+            switch (hkhd) {
+                case "fmt ":
+                    bDetected = true;
+                    nFormat = X.U16(pc, _LE);
+                    nChannels = X.U16(pc + 2, _LE);
+                    nRate = X.U32(pc + 4, _LE);
+                    nBPS = X.U16(pc + 0x0E, _LE);
+                    /* beautify preserve:start */
 					switch (nFormat) {
 						case 0x0001: sVersion = "Microsoft PCM (uncompressed)"; break;
 						case 0x0002: sVersion = "Microsoft ADPCM"; break;
@@ -289,32 +289,31 @@ function detect() {
 						default: sVersion = "Unknown"
 					}
 /* beautify preserve:end */
-					break;
-				case "fact":
-					dcsamples = X.U32(pc, _LE); //the uncompressed (factual?) file size?
-				case "data":
-					if (nBPS && nFormat == 1 && !(nBPS % 8)) {
-						var nmSeconds = Math.round(X.U32(pc - 4) / (nBPS >> 3) / nRate / nChannels * 1000);
-						sOption(new Date(nmSeconds).toISOString().substr(11, 8),'len: ');
-					}
-					break;
-				case "INFO":
-					sOptionT(X.SC(pc,hksz,'CP1252'));
-					break;
-			}
-			if(pn >= sz) break;
-		} // end of chunks
+                    break;
+                case "fact":
+                    dcsamples = X.U32(pc, _LE); //the uncompressed (factual?) file size?
+                case "data":
+                    if (nBPS && nFormat == 1 && !(nBPS % 8)) {
+                        var nmSeconds = Math.round(X.U32(pc - 4) / (nBPS >> 3) / nRate / nChannels * 1000);
+                        sOption(new Date(nmSeconds).toISOString().substr(11, 8), 'len: ');
+                    }
+                    break;
+                case "INFO":
+                    sOptionT(X.SC(pc, hksz, 'CP1252'));
+                    break;
+            }
+            if (pn >= sz) break;
+        } // end of chunks
 
-		sOption(nRate + 'Hz');
-		sOption(nChannels + ' ch');
-		if (nBPS) {
-			sOption(nBPS + '-bit');
-		}
-		if (dcsamples > 0) //for compressed things only
-			sOption(Math.round(dcsamples / 0x100000),'fact: ','M')
-		//if (chunks != "") sOption(chunks);
-		sOption(outSz(sz),'sz:');
-	}
+        sOption(nRate + 'Hz');
+        sOption(nChannels + ' ch');
+        if (nBPS) {
+            sOption(nBPS + '-bit');
+        }
+        if (dcsamples > 0) //for compressed things only
+            sOption(Math.round(dcsamples / 0x100000), 'fact: ', 'M')
+            //if (chunks != "") sOption(chunks);
+        sOption(outSz(sz), 'sz:');
+    }
 
-	return result();
 }
