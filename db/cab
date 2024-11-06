@@ -4,7 +4,7 @@
 includeScript("archive-file");
 sName = "Microsoft Cabinet File";
 
-function detect_Cab(nOffset, nSize, bShowOptions) {
+function detect_Cab(nOffset, nSize) {
     if (nSize > 48) {
         if (File.compare("'MSCF'00000000", nOffset)) {
             bDetected = true;
@@ -26,18 +26,17 @@ function detect_Cab(nOffset, nSize, bShowOptions) {
                     sOptions = sOptions.append("LZX");
                     break;
             }
-            if (bShowOptions) {
-                // Packed size is not stored directly, so assume the first
-                // folder's data is first and just skip the names.
-                nPacked -= File.readDword(nOffset + 0x24);
-                while (nFiles--) {
-                    Archive.add(File.readDword(nFilesOffset), nPacked,
-                        File.readByte(nFilesOffset + 14) & 16);
-                    nFilesOffset = File.findByte(nFilesOffset + 16, 256, 0) + 1;
-                    nPacked = 0;
-                }
-                sOptions = sOptions.append(Archive.contents());
+            // Packed size is not stored directly, so assume the first
+            // folder's data is first and just skip the names.
+            nPacked -= File.readDword(nOffset + 0x24);
+            while (nFiles--) {
+                Archive.add(File.readDword(nFilesOffset), nPacked,
+                    File.readByte(nFilesOffset + 14) & 16);
+                nFilesOffset = File.findByte(nFilesOffset + 16, 256, 0) + 1;
+                nPacked = 0;
             }
+            sOptions = sOptions.append(Archive.contents());
+
             return 1;
         }
     }
