@@ -575,12 +575,14 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 
 ```
 ```
-
 **bool isDebugData()**
 
 ```
 ```
+**bool isFilePart()**
 
+```
+```
 **List<qint32> readBytes(qint64 nOffset, qint64 nSize, bool bReplaceZeroWithSpace = false)**
 
 ```
