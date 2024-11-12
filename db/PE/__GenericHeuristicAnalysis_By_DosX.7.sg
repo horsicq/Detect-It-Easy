@@ -19,7 +19,7 @@
           ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝╚═╝   ╚══════╝╚═╝╚══════╝
  */
 
-// Detect It Easy: detection rule file format
+// Detect It Easy: detection rule file
 
 // =================== [ ABOUT ] ===================
 // This heuristic analysis will help identify
@@ -97,7 +97,6 @@ function main() {
 
         scanForPackersAndCryptors_NET_and_Native();
         scanForLicensingSystems_NET_and_Native();
-        scanForDebugData_NET_and_Native();
 
         if (PE.isVerbose()) {
             scanForLanguages_NET_and_Native();
@@ -776,7 +775,6 @@ function scanForObfuscations_NET() {
 
 
     // A technique that allows you to avoid code decompilation. dnSpy gives a parsing error when trying to open such a file
-
     var invalidOpCodes = false;
 
     if (
@@ -795,8 +793,6 @@ function scanForObfuscations_NET() {
 
 
 
-
-    // Check for the presence of a protection runtime
 
     var isProtectionRuntimePresent = false;
 
@@ -1259,8 +1255,7 @@ function NetOpCodes() {
         }
 
         return replaceAllInString(opCodeMask, "??", "00");
-    }
-}
+    }}
 
 
 function removeSpaces(inputString) {
@@ -1988,52 +1983,6 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
 
 
-function scanForDebugData_NET_and_Native() {
-    var options = String();
-
-    var isDetected = Boolean();
-
-
-
-
-    var isDebugSectionPresent = false;
-
-    for (var i = 0; i < PE.getNumberOfSections() && !isDebugSectionPresent; i++) {
-        const sectionName = PE.getSectionName(i).toLowerCase();
-
-        // If section name is already encountered, set collision flag and break
-        if (sectionName.indexOf("debug") !== -1) {
-            log(logType.nothing, "Debug section found: '" + sectionName + "'");
-            isDebugSectionPresent = true;
-        }
-    }
-
-    if (isDebugSectionPresent) options += (options.length != 0 ? " + " : String()) + "Sections";
-
-
-
-
-    // In .NET, the presence of the "DotNetRuntimeDebugHeader" export indicates the presence of debug data
-
-    var isNetNativeDebugExportPresent = false;
-
-    if (PE.isExportFunctionPresent("DotNetRuntimeDebugHeader")) {
-        isNetNativeDebugExportPresent = true;
-    }
-
-    if (isNetNativeDebugExportPresent) options += (options.length != 0 ? " + " : String()) + "Exports";
-
-
-
-
-    if (options.length != 0) isDetected = true;
-
-    if (isDetected) {
-        _setResult("~debug data", "Found", String(), PE.isVerbose() ? options : String());
-    }
-}
-
-
 
 function isVbNetStandartLibraryPresent() {
     return PE.isNetObjectPresent("Microsoft.VisualBasic");
@@ -2216,6 +2165,8 @@ function scanForObfuscations_Native() {
                 strangeSections = true;
             }
         }
+
+
     }
 
     if (strangeSections) options += (options.length != 0 ? " + " : String()) + "Strange sections";
@@ -2380,7 +2331,7 @@ function scanForObfuscations_Native() {
 
     var isTextSectionNotFirst = false;
 
-    if ((PE.section[0].Name != ".text" && PE.section[0].Name != ".textbss") && (PE.section[".text"] || PE.section[".textbss"])) {
+    if ((PE.section[0].Name != ".text" && PE.section[0].Name != ".textbss") && (PE.section[".text"] && PE.section[".textbss"])) {
         isTextSectionNotFirst = true;
     }
 
@@ -2824,8 +2775,6 @@ function _setLangByHeur(languageName) {
 
 
 function log(messageTypeId, messageText) {
-    return;
-
     // if (PE.isProfiling()) return null;
 
     if (messageText.indexOf("\n") != -1) {
