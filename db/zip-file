@@ -61,31 +61,26 @@ function detect_Zip(bFile) {
 
         var nVer = 0;
 
-        // Just take the first file and assume it carries through.
-        if (File.readByte(nOffset + 6) & 1) {
+        var bEncrypted = 0;
+        do {
+            var v = File.readByte(nOffset + 4);
+            if (v > nVer) {
+                nVer = v;
+            }
+            if (!bEncrypted && (File.readByte(nOffset + 6) & 1)) {
+                bEncrypted = 1;
+            }
+            var nPacked = File.readDword(nOffset + 0x12);
+            var nName = File.readWord(nOffset + 0x1A);
+            Archive.add(File.readDword(nOffset + 0x16), nPacked,
+                nPacked == 0 && File.readByte(nOffset + 0x1E + nName - 1) == 0x2F);
+            nOffset += 0x1E + nName + File.readWord(nOffset + 0x1C) + nPacked;
+        } while (File.compare("'PK'0304", nOffset));
+
+        if (bEncrypted) {
             sOptions = "encrypted";
         }
-        nVer = File.readByte(nOffset + 4);
-
-        /*  var bEncrypted = 0;
-            do {
-                var v = File.readByte(nOffset + 4);
-                if (v > nVer) {
-                    nVer = v;
-                }
-                if (!bEncrypted && (File.readByte(nOffset + 6) & 1)) {
-                    bEncrypted = 1;
-                }
-                var nPacked = File.readDword(nOffset + 0x12);
-                var nName = File.readWord(nOffset + 0x1A);
-                Archive.add(File.readDword(nOffset + 0x16), nPacked,
-                    nPacked == 0 && File.readByte(nOffset + 0x1E + nName - 1) == 0x2F);
-                nOffset += 0x1E + nName + File.readWord(nOffset + 0x1C) + nPacked;
-            } while (File.compare("'PK'0304", nOffset));
-            if (bEncrypted) {
-                sOptions = "encrypted";
-            }
-            sOptions = sOptions.append(Archive.contents()); */
+        sOptions = sOptions.append(Archive.contents());
 
         sVersion = (nVer / 10).toFixed(1);
     }
