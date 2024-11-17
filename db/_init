@@ -53,16 +53,12 @@ function result() {
  * @type {string}
  */
 String.prototype.append = function() {
-    var
-        s = this.valueOf(),
+    var s = this.valueOf(),
         sep = ",";
 
     if (arguments.length) {
         if (s) s += sep;
-        s += arguments[0];
-        for (var i = 1; i < arguments.length; i++) {
-            s += sep + arguments[i];
-        }
+        s += Array.prototype.join.call(arguments, sep);
     }
 
     return s;
@@ -77,24 +73,23 @@ String.prototype.append = function() {
  * @example
  * sOptions=sOptions.appendS("debug","::");
  */
-String.prototype.appendS = function() {
-    var
-        s = this.valueOf(),
-        sep = arguments[1] ? arguments[1] : ",";
+String.prototype.appendS = function(sString, sSep) {
+    var s = this.valueOf(),
+        sep = sSep || ",";
 
-    if (arguments.length) {
+    if (sString) {
         if (s) s += sep;
-        s += arguments[0];
+        s += sString;
     }
 
-    return s
+    return s;
 }
 
-String.prototype.addIfNone = function() {
+String.prototype.addIfNone = function(substring) {
     var s = this.valueOf();
 
-    if (arguments.length)
-        if (s.indexOf(arguments[0]) < 0) s += arguments[0];
+    if (substring && s.indexOf(substring) < 0)
+        s += substring;
 
     return s;
 }
@@ -109,45 +104,40 @@ String.prototype.addIfNone = function() {
  * @example
  * var a = 12; ...; if("aba12" === a.padStart(5,"ab")) ...
  */
-String.prototype.padStart = function() {
+String.prototype.padStart = function(targetLength, padString) {
     var s = this.valueOf();
 
-    if (!s.length || !arguments.length || s.length <= arguments[0].length) return s;
+    targetLength = targetLength >> 0; // truncate if number or convert non-number to 0;
+    padString = String(padString || ' ');
 
-    var c = 0,
-        p = ' ';
-    if (arguments.length > 1) p = arguments[1].toString();
-
-    var pp = "";
-
-    for (var i = 0; i < Math.max(0, arguments[0] - s.length); i++) {
-        pp += p[c];
-        c++;
-        if (c === p.length) c = 0
+    if (s.length >= targetLength) {
+        return String(s);
     }
 
-    return pp + s
+    targetLength = targetLength - s.length;
+    if (targetLength > padString.length) {
+        padString += padString.repeat(targetLength / padString.length); // append to original to ensure we are longer than needed
+    }
+
+    return padString.slice(0, targetLength) + String(s);
 }
 
-Number.prototype.padStart = function() {
+Number.prototype.padStart = function(targetLength, padString) {
     var s = this.valueOf().toString();
 
-    if (!arguments.length || s.length >= arguments[0]) return s;
+    targetLength = targetLength >> 0; // truncate if number or convert non-number to 0;
+    padString = String(padString || ' ');
 
-    var c = 0,
-        p = ' ';
-
-    if (arguments.length > 1) p = arguments[1].toString();
-
-    var pp = "";
-
-    for (var i = 0; i < Math.max(0, arguments[0] - s.length); i++) {
-        pp += p[c];
-        c++;
-        if (c === p.length) c = 0
+    if (s.length >= targetLength) {
+        return s;
     }
 
-    return pp + s
+    targetLength = targetLength - s.length;
+    if (targetLength > padString.length) {
+        padString += padString.repeat(Math.ceil(targetLength / padString.length)); // append to original to ensure we are longer than needed
+    }
+
+    return padString.slice(0, targetLength) + s;
 }
 
 includeScript("language");
