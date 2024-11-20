@@ -3,23 +3,6 @@
 
 init("protector", "Arxan");
 
-function skipJumpsAndNops(offset) { 
-    var rva = PE.OffsetToRVA(offset);
-    while (true) {
-        var byte = PE.readByte(PE.RVAToOffset(rva));
-        if (byte == 0xE9) 
-            rva += PE.readSDword(PE.RVAToOffset(rva + 1)) + 5;
-        else if (byte == 0xEB)
-            rva += PE.readSByte(PE.RVAToOffset(rva + 1)) + 2;
-        else if (byte == 0x90)
-            rva++;
-        else
-            break;
-    }
-
-    return PE.RVAToOffset(rva);
-}
-
 function detect() {
     if (PE.is64() && !PE.isNET()) {
         if (PE.compareEP("40 50 40 51 40 52 40 53 55 56 57 9C 48 83 EC 38 FC B8 01 00 00 00 B9 FF FF 00 00 E0 FE")) {
@@ -27,48 +10,37 @@ function detect() {
             sVersion = "GuardIT ~2013";
         } else {
             var ep = skipJumpsAndNops(PE.getEntryPointOffset()),
-                rva = -1;
-
-            if (PE.compare("48 83 EC 28 E8", ep))
-                rva = PE.OffsetToRVA(ep) + PE.readSDword(ep + 5) + 9;
-            else
-                rva = PE.OffsetToRVA(ep);
+                rva = PE.compare("48 83 EC 28 E8", ep) ? PE.OffsetToRVA(ep) + PE.readSDword(ep + 5) + 9 : PE.OffsetToRVA(ep);
 
             if (rva != -1) {
                 var addr = PE.OffsetToVA(PE.RVAToOffset(rva));
                 const limit = 32;
 
                 var pushCount = 0;
+
                 for (var i = 0; i < limit; i++) {
-                    var disasm = PE.getDisasmString(addr);
-                    if (disasm.indexOf("PUSH") != 0)
-                        break;
+                    if (PE.getDisasmString(addr).indexOf("PUSH") !== 0) break;
                     pushCount++;
                     addr = PE.getDisasmNextAddress(addr);
                 }
 
-                if (pushCount > 3 && PE.getDisasmString(addr).indexOf("LEA RSP,") == 0) {
+                if (pushCount > 3 && PE.getDisasmString(addr).indexOf("LEA RSP,") === 0) {
                     addr = PE.getDisasmNextAddress(addr);
 
                     var movupdCount = 0;
                     for (var i = 0; i < limit; i++) {
-                        var disasm = PE.getDisasmString(addr);
-                        if (disasm.indexOf("MOVUPD") != 0)
-                            break;
+                        if (PE.getDisasmString(addr).indexOf("MOVUPD") !== 0) break;
                         movupdCount++;
                         addr = PE.getDisasmNextAddress(addr);
                     }
 
                     if (movupdCount > 0 &&
-                        PE.getDisasmString(addr) == "PUSH 0X10" &&
-                        PE.getDisasmString(PE.getDisasmNextAddress(addr)) == "TEST RSP, 0XF") {
+                        PE.getDisasmString(addr) === "PUSH 0X10" &&
+                        PE.getDisasmString(PE.getDisasmNextAddress(addr)) === "TEST RSP, 0XF") {
 
                         bDetected = true;
                         sVersion = "GuardIT ";
-                        if (pushCount < 14 || movupdCount < 16)
-                            sVersion += "12.0+";
-                        else
-                            sVersion += "2014-2021";
+                        sVersion += (pushCount < 14 || movupdCount < 16) ? "12.0+" : "2014-2021";
                     }
                 }
             }
@@ -76,4 +48,22 @@ function detect() {
     }
 
     return result();
+}
+
+function skipJumpsAndNops(offset) {
+    var rva = PE.OffsetToRVA(offset);
+    while (true) {
+        const byte = PE.readByte(PE.RVAToOffset(rva));
+        if (byte === 0xE9) {
+            rva += PE.readSDword(PE.RVAToOffset(rva + 1)) + 5;
+        } else if (byte === 0xEB) {
+            rva += PE.readSByte(PE.RVAToOffset(rva + 1)) + 2;
+        } else if (byte === 0x90) {
+            rva++;
+        } else {
+            break;
+        }
+    }
+
+    return PE.RVAToOffset(rva);
 }
