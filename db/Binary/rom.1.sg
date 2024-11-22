@@ -1,4 +1,5 @@
-// https://github.com/horsicq/Detect-It-Easy signature file
+// Detect It Easy: detection rule file
+// https://github.com/horsicq/Detect-It-Easy
 // Covers cartridge, tape, or CD-delivered software, such as ROM images for various
 //videogame systems, and/or for their emulators.
 //Also includes snapshots like VSF or SNA, and resource packs like WAD.
@@ -411,6 +412,7 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 
 	function isMGT() {
 		//ref https://sinclair.wiki.zxnet.co.uk/wiki/MGT_filesystem
+		//TODO test on SAM with subdirs, +D, HDD...
 		if([0x32000,0x64000,0xC8000].indexOf(X.Sz()) < 0) return false; // single-sided 40-cylinder, ds40/ss80, ds80
 		var p = files = erased = subdir = 0, ds = X.Sz() > 0x64000, msz = Math.min(X.Sz(),0xC8000);
 		var xroot = X.U8(0xFF); if(xroot > 35) return false; //betaDOS/MasterDOS extra tracks for root
@@ -420,17 +422,17 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 		soption = ''; fnames = []; label = ''; sus = 0;
 		if(!extIs('mgt')) sus++; //could be gzipped which removes the extension as far as DiE is concerned
 		if(X.Sz() != 0xC8000) sus++; //in practice, only ds 80-cyl is seen around
-		const fts = ['erased','ZXBASIC','ZXnum.array','ZXstr.array','ZXcode','ZX48ksnap','ZXMD','ZXscr','special',
-			'ZX128ksnap','Opentype','ZXexec', 'UNI-DOSsubdir','UNI-DOScreate','SAMBASIC','SAMnum.array',
-			'SAMstr.array','SAMcode','SAMscr','MasterDOSsubdir','SAMDriverapp','SAMDriverbootstrap','EDOSNOMEN',
-			'EDOSsys','EDOSovl','HDOSHdos','HDOSHdir','HDOSHdisk','HDOSHfree/Htmp'];
+		const fts = [/*0*/'erased','ZXBASIC','ZXnum.array','ZXstr.array','ZXcode','ZX48ksnap','ZXMD','ZXscr','special',
+		/*9*/'ZX128ksnap','Opentype','ZXexec','UNI-DOSdir','UNI-DOScreate','14?','15?','SAMBASIC','SAMnum.array',
+		/*18*/'SAMstr.array','SAMcode','SAMscr','MasterDOSdir','SAMDriverapp','SAMDriverbootstrap','EDOSNOMEN',
+			'EDOSsys','EDOSovl','27?','HDOSHdos','HDOSHdir','HDOSHdisk','HDOSHfree/Htmp'];
 		if((X.U8(0) & 0x3F) != 19 && charStat(readBytes(0xD2,10),1).indexOf('allasc') >= 0) {
 			sam[0] += 10; label = X.SA(0xD2,10).trim() }
 //if(xroot) _l2r('mgt',0xFF,xroot+' xroot found!'); if(samboot) _l2r('mgt',0x100,'SAM BOOT found!')
 		for(p=_sec=_side=_trk=0,end=false; _trk < 4+xroot && p < X.Sz(); ) {
 			for(s=0; s < 2; s++) { //go through the 2 records per sector
 				if(samboot && files == 1) { files++; continue }
-//_l2r('mgt',p,'exploring record '+files+'"'+X.SA(p+1,10)+'": T'+_trk+'S'+_side+'s'+_sec+' type '+X.U8(p))
+//_l2r('mgt',p,'looking at rec #'+files+'"'+X.SA(p+1,10)+'": T'+_trk+'S'+_side+'s'+_sec+' type '+X.U8(p))
 				if(!X.U8(p+1)) {end = true; continue }
 				if(end) sus++; files++;
 				var fname1 = readBytes(p+2,9); if(charStat(fname1,1).indexOf('allasc') < 0) return false; //space-padded
@@ -468,7 +470,7 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 		sName = "Miles Gordon Technology floppy image (.MGT)";
 		sVersion = sv; bDetected = 1;
 		if(X.isVerbose()) {
-			sOption((files-erased-subdir)+(erased?'+'+erased+' erased':'')+(subdir?'+'+subdir+'subdirs':''),'files:');
+			sOption((subdir?'≈':'')+(files-erased-subdir)+(erased?'+'+erased+' erased':'')+(subdir?'+'+subdir+'subdirs':''),'files:');
 			if(files) sOption('('+addEllipsis(fnames.join('; '))+')');
 			if(sus) sOption('possibly malformed (level '+sus+')');
 		}
@@ -788,7 +790,41 @@ function detect(bShowType, bShowVersion, bShowOptions) {
 		else sOptions = "sz:"+outSz(sz)
 	}
 
-	else if(X.c("'ZXTape!'1A")) { // a bit large
+	function isTAP() {
+		//from https://github.com/0sAND1s/HCDisk/blob/master/Tape/tap.cpp
+		if(X.Sz() < 17 || X.Sz() < X.U16(0)+2) return false;
+		p = blk = sus = 0; fnames = bad = ''; const types = ['B','N','S','C'];
+		while(p < X.Sz()) { //parse the blocks
+			hksz = X.U16(p); if(!hksz) return false; p += 2; if(X.Sz() < p+hksz) break;
+			var c = 0, tp = X.U8(p); if([0,0xFF].indexOf(tp) < 0) break;
+			if(p < 0xC000 && blk < 5) { /*CRC test. No need to test the WHOLE file*/
+				for(i=p; i < p+hksz-1; i++) c ^= X.U8(i);  if(c != X.U8(i)) return false;
+			}
+			if(tp == 0) {
+				if(charStat(t=readBytes(p+2,10), 1).indexOf('allasc') < 0) { sus++; bad = bad.addIfNone('!nonASCII:'+decEncoding(t,CPSpeccy)) }
+				t = decEncoding(t,CPSpeccy).trim();
+				if(!t) if(X.U8(p+1) < 3) return false; else { sus++; bad = bad.addIfNone('!emptyname') }
+				fnames = fnames.appendS(t+'.'+types[X.U8(p+1)], ',') }
+			else fnames = fnames.appendS((hksz-3),':');
+			if(sus > 2) return false;  blk++; p += hksz
+		}
+		if(!fnames.length && blk) { sus++; bad = bad.addIfNone('!nonameblk0') }
+		if(blk < 2 && bad.indexOf('!nonASCII')) sus++;
+		//if(X.Sz() != p) sus++;
+		if(sus > 2 || !blk || !fnames.length) { delete bad; return false }
+		return true
+	}
+	if(!bDetected && isTAP()) {
+		sName = 'ZX Spectrum tape (.TAP)'; bDetected = true;
+		if(bad.length) sVersion = 'malformed#'+sus+bad;
+		if(X.isVerbose()) {
+			sOptionT(addEllipsis(fnames,0xA0),'blocks:'+blk+' (',')');
+			sOption(outSz(p),'sz:')
+		}
+	}
+
+	if(!bDetected)
+	if(X.c("'ZXTape!'1A")) { // a bit large
 		// from https://www.alessandrogrussu.it/tapir/tzxform120.html
 		// & https://www.msx.org/wiki/Emulation_related_file_formats#.TSX
 		sVersion = 'v'+X.U8(8)+'.'+X.U8(9).padStart(2,'0'); bDetected = true;
