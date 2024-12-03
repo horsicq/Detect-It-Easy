@@ -34,3 +34,7 @@
 
 ```
 ```
+**bool isCommandPresent(quint32 nNumber)**
+
+```
+```
