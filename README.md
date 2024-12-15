@@ -68,7 +68,8 @@ Unknown formats undergo heuristic analysis, providing identification for both kn
   - **openSUSE**: [OBS](https://build.opensuse.org/package/show/home:mnhauke/detect-it-easy)
   - **REMnux**: Malware analysis distribution
 
-> **NOTE**: Use **Detect It Easy** bot via **Telegram** to quickly check files: [**@detectiteasy_bot**](https://t.me/detectiteasy_bot)
+> [!NOTE]
+> Use **Detect It Easy** bot via **Telegram** to quickly check files: [**@detectiteasy_bot**](https://t.me/detectiteasy_bot)
 
 ### ⚙️ Build from Source
 
