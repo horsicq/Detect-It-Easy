@@ -97,6 +97,7 @@ function main() {
 
         scanForPackersAndCryptors_NET_and_Native();
         scanForLicensingSystems_NET_and_Native();
+        scanForDebugData_NET_and_Native();
 
         if (PE.isVerbose()) {
             scanForLanguages_NET_and_Native();
@@ -111,6 +112,7 @@ function main() {
         log(logType.warning, "Heuristic scan is disabled. Use '--heuristicscan' to enable");
     }
 }
+
 
 
 function stubForLegacyEngines() {
@@ -135,11 +137,22 @@ function stubForWrongEnvironment() {
 
 
 
+/**
+ * Outputs a warning message to the appropriate output stream.
+ *
+ * Depending on the environment, this function will:
+ * - Use `console.warn` if `console` is available.
+ * - Use `_setResult` if `File` is available.
+ * - Use `_error` if it is defined as a function.
+ * - Throw an error if none of the above conditions are met.
+ *
+ * @param {string} stringToOut - The warning message to output.
+ */
 function stdout(stringToOut) {
     if (typeof console === 'object') {
         console.warn(stringToOut);
     } else if (typeof File === 'object') {
-        _setResult("~Warning", stringToOut, String(), String());
+        _setResult("~warning", stringToOut, String(), String());
     } else {
         if (typeof _error === 'function') {
             _error(stringToOut);
@@ -1268,9 +1281,11 @@ function NetOpCodes() {
 }
 
 
+
 function removeSpaces(inputString) {
     return inputString.split(" ").join("");
 }
+
 
 
 function replaceAllInString(inputString, search, replacement) {
@@ -1279,6 +1294,12 @@ function replaceAllInString(inputString, search, replacement) {
     }
 
     return inputString;
+}
+
+
+
+function clearSectionName(sectionName) {
+    return sectionName.trim();
 }
 
 
@@ -1787,7 +1808,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         // If section name is already encountered, set collision flag and break
         if (sectionNamesDictionary[sectionName]) {
-            log(logType.nothing, "Section names repeating: '" + sectionName + "'");
+            log(logType.nothing, "Section names repeating: '" + clearSectionName(sectionName) + "'");
             isSectionNamesRepeatingPresent = true;
         } else {
             sectionNamesDictionary[sectionName] = true;
@@ -1914,7 +1935,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         }
     }
 
-    if (isCompressedSectionPresent) options += (options.length != 0 ? " + " : String()) + "Section " + sectionNumber + " (\"" + PE.getSectionName(sectionNumber) + "\") compressed";
+    if (isCompressedSectionPresent) options += (options.length != 0 ? " + " : String()) + "Section " + sectionNumber + " (\"" + clearSectionName(PE.getSectionName(sectionNumber)) + "\") compressed";
 
 
 
@@ -1988,24 +2009,123 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
 
     if (isDetected) {
-        _setResult("~licensing", "Licensing", String(), PE.isVerbose() ? options : String());
+        _setResult("~licensing", "Contains", String(), PE.isVerbose() ? options : String());
     }
 }
 
 
 
+function scanForDebugData_NET_and_Native() { // For .NET and Native apps
+    var options = String();
 
+    var isDetected = Boolean();
+
+
+
+
+    var isDebugSectionPresent = false;
+
+    var sectionNumber = 0;
+
+    for (var i = 0; i < PE.getNumberOfSections() && !isDebugSectionPresent; i++) {
+        sectionNumber = i;
+
+        const currentSectionName = PE.getSectionName(i).toLowerCase();
+
+        if (currentSectionName.indexOf("debug") !== -1 || // Modern LLVM debug sections
+            currentSectionName === ".stab" || currentSectionName === ".stabstr") { // TCC/GCC
+            log(logType.any, "Debug section detected: \"" + clearSectionName(PE.getSectionName(sectionNumber)) + "\"");
+            isDebugSectionPresent = true;
+        }
+    }
+
+    if (isDebugSectionPresent) options = "Section " + sectionNumber + " (\"" + clearSectionName(PE.getSectionName(sectionNumber)) + "\")";
+
+
+
+
+    // .NET Native debug header, EAT function
+
+    var isNetNativeDebugDataPresent = false;
+
+    if (!PE.isNET() && PE.isExportFunctionPresent("DotNetRuntimeDebugHeader")) {
+        log(logType.any, ".NET Native debug function detected");
+        isNetNativeDebugDataPresent = true;
+    }
+
+    if (isNetNativeDebugDataPresent) options += (options.length != 0 ? " + " : String()) + "DotNET runtime header";
+
+
+
+
+    var isPdbFullPathPresent = false;
+
+    var pdbExtensionPatternOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'.pdb'");
+
+    if (pdbExtensionPatternOffset != -1) {
+        var pdbPathBeginOffset;
+
+        for (var i = pdbExtensionPatternOffset; i > 0; i--) {
+            if (PE.readByte(i) === 0x00) {
+                pdbPathBeginOffset = i + 1;
+                break;
+            }
+        }
+
+        var pdbFullPath = PE.getString(pdbPathBeginOffset, 1024);
+
+        if (pdbFullPath.match(/^[a-zA-Z]:\\/) !== null) {
+            log(logType.any, "PDB absolute path: \"" + pdbFullPath + "\"");
+            isPdbFullPathPresent = true;
+        }
+    }
+
+    if (isPdbFullPathPresent) options += (options.length != 0 ? " + " : String()) + "Absolute PDB path";
+
+
+
+
+    if (options.length != 0) isDetected = true;
+
+
+    if (isDetected) {
+        _setResult("~debug data", "Contains", String(), PE.isVerbose() ? options : String());
+    }
+}
+
+
+
+/**
+ * Checks if the .NET Visual Basic standard library is present.
+ *
+ * @returns {boolean} True if the Microsoft.VisualBasic library is found; otherwise false.
+ */
 function isVbNetStandartLibraryPresent() {
     return PE.isNetObjectPresent("Microsoft.VisualBasic");
 }
 
 
-// Check if the file is a .NET Framework component
+
+/**
+ * Determines if the current file is a .NET DLL signed by Microsoft Corporation.
+ *
+ * @returns {boolean} True if the file meets the criteria, false otherwise.
+ */
 function isFrameworkComponent() {
     return PE.isNET() && PE.isDll() && PE.isSigned() && PE.findSignature(PE.getOverlayOffset(), 300, "'Microsoft Corporation'") != -1;
 }
 
-// Validate the presence of a signature in the file
+
+
+/**
+ * Validates the presence of a signature (pattern) within a specified range in a PE file.
+ *
+ * Searches for the given pattern starting from the DOS stub end until the PE size excluding the overlay.
+ * Logs a message if the pattern is found and returns a boolean indicating the result.
+ *
+ * @param {string} pattern - The pattern to search for within the file.
+ * @returns {boolean} True if the pattern is found, false otherwise.
+ */
 function validateSignature(pattern) {
     const
         offsetFound = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), pattern),
@@ -2019,6 +2139,14 @@ function validateSignature(pattern) {
 }
 
 
+
+/**
+ * Searches all sections in the current PE file for the specified byte code.
+ * If discovered, logs the offset at which it appears and returns true.
+ * 
+ * @param {string} byteCode - The byte code signature to locate.
+ * @returns {boolean} True if the byte code is found in any section, otherwise false.
+ */
 function validateNetByteCode(byteCode) {
     for (var s = 0; s < PE.getNumberOfSections(); s++) {
         const
@@ -2036,6 +2164,13 @@ function validateNetByteCode(byteCode) {
 }
 
 
+
+/**
+ * Validates if the given object is a .NET object.
+ *
+ * @param {Object} object - The object to be validated.
+ * @returns {boolean} - Returns true if the object is a .NET object, otherwise false.
+ */
 function validateNetObject(object) {
     const result = PE.isNetObjectPresent(object);
     if (result) log(logType.net, "Object present: " + object);
@@ -2043,6 +2178,13 @@ function validateNetObject(object) {
 }
 
 
+
+/**
+ * Validates if a .NET Unicode string is present in the PE file.
+ *
+ * @param {string} ustring - The Unicode string to validate.
+ * @returns {boolean} - Returns true if the Unicode string is present, otherwise false.
+ */
 function validateNetUnicodeString(ustring) {
     const result = PE.isNetUStringPresent(ustring);
     if (result) log(logType.net, "String present: \"" + ustring + "\"");
@@ -2050,6 +2192,17 @@ function validateNetUnicodeString(ustring) {
 }
 
 
+
+/**
+ * Validates if a given Unicode string exists within the PE file.
+ *
+ * This function searches for the specified Unicode string within the PE file's
+ * memory range, excluding the DOS stub and overlay sections. If the string is
+ * found, it logs a message indicating the presence of the string.
+ *
+ * @param {string} ustring - The Unicode string to search for within the PE file.
+ * @returns {boolean} - Returns true if the Unicode string is found, otherwise false.
+ */
 function validateGlobalUnicodeString(ustring) {
     const result = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), generateUnicodeSignatureMask(ustring)) != -1;
     if (result) log(logType.nothing, "Unicode string found: \"" + ustring + "\"");
@@ -2057,9 +2210,19 @@ function validateGlobalUnicodeString(ustring) {
 }
 
 
-// Function to generate Unicode signature mask from an input string
-// "test" -> "'t'00'e'00's'00't'"
 
+/**
+ * Generates a Unicode signature mask for the given input string.
+ *
+ * This function iterates through each character in the input string and appends
+ * its Unicode representation to the output string. The first character is appended
+ * without a prefix, while subsequent characters are prefixed with "00".
+ * 
+ * "test" -> "'t'00'e'00's'00't'"
+ *
+ * @param {string} inputString - The input string for which to generate the Unicode signature mask.
+ * @returns {string} The generated Unicode signature mask.
+ */
 function generateUnicodeSignatureMask(inputString) {
     var output = String();
 
@@ -2074,8 +2237,13 @@ function generateUnicodeSignatureMask(inputString) {
 }
 
 
-// Function to check if all specified .NET references are missing
 
+/**
+ * Checks if all .NET references in the provided array are missing.
+ *
+ * @param {Array} references - An array of .NET references to check.
+ * @returns {boolean} - Returns true if all .NET references are missing, otherwise false.
+ */
 function isAllNetReferencesMissing(references) {
     // Iterate through the array of .NET references
     for (var i = 0; i < references.length; i++) {
@@ -2093,8 +2261,13 @@ function isAllNetReferencesMissing(references) {
 }
 
 
-// Function to check if all specified .NET references are present
 
+/**
+ * Checks if all .NET references are present.
+ *
+ * @param {Array} references - An array of .NET references to check.
+ * @returns {boolean} - Returns true if all .NET references are present, otherwise false.
+ */
 function isAllNetReferencesPresent(references) {
     // Iterate through the array of .NET references
     for (var i = 0; i < references.length; i++) {
@@ -2112,9 +2285,14 @@ function isAllNetReferencesPresent(references) {
 }
 
 
-// "isFullName = true"  = 00'sign'00
-// "isFullName = false" = 00'sign'
 
+/**
+ * Searches for a signature in the first section of a PE file and marks it if found.
+ *
+ * @param {string} sign - The signature to search for.
+ * @param {boolean} isFullName - A flag indicating whether to append '00' to the signature.
+ * @returns {string} - The found signature if present, otherwise an empty string.
+ */
 function findAndMark(sign, isFullName) {
     if (PE.isSignatureInSectionPresent(0,
             ("00'" + sign + "'") + // 00'string
@@ -2449,10 +2627,13 @@ function scanForObfuscations_Native() {
 
 const _patternSplitter = "|";
 
-
-// Makes it possible to disassemble the entry point code and output
-// a specified number of instructions through a splitter (_patternSplitter)
-
+/**
+ * Generates a pattern of assembly instructions or opcodes from the entry point.
+ *
+ * @param {boolean} onlyOpCodes - If true, only the opcodes of the instructions are included in the pattern.
+ * @param {number} numberOf - The number of instructions to include in the pattern.
+ * @returns {string} The generated assembly pattern.
+ */
 function getEpAsmPattern(onlyOpCodes, numberOf) {
     // Initialize the result with a pattern splitter
     var result = _patternSplitter;
@@ -2485,8 +2666,12 @@ function getEpAsmPattern(onlyOpCodes, numberOf) {
 
 
 
-// Function to get assembly instruction by index
-
+/**
+ * Retrieves the assembly instruction at the specified index from the entry point of a PE file.
+ *
+ * @param {number} index - The index of the assembly instruction to retrieve.
+ * @returns {string} The assembly instruction at the specified index.
+ */
 function getAsmInstructionByIndex(index) {
     // Get the address of the entry point
     var disasmAddress = PE.getAddressOfEntryPoint();
@@ -2511,15 +2696,21 @@ function getAsmInstructionByIndex(index) {
 
 
 
-// Makes it possible to get a subpattern to search for instructions in a
-// pattern divided through a separator (_patternSplitter)
-//
-// like "|OPCODE1|OPCODE2|OPCODE3|".indexOf("|OPCODE2|")
-// but  "|OPCODE1|OPCODE2|OPCODE3|".indexOf(getInstructionsAsmPattern("OPCODE2"))
-//  or
-// like "|OPCODE1|OPCODE2|OPCODE3|".indexOf("|OPCODE2|OPCODE3|")
-// but  "|OPCODE1|OPCODE2|OPCODE3|".indexOf(getInstructionsAsmPattern(["OPCODE2", "OPCODE3"]))
-
+/**
+ * Generates a subpattern string to search for instructions within a pattern divided by a separator.
+ *
+ * This function allows you to create a subpattern that can be used to search for specific instructions
+ * within a larger pattern string that is divided by a separator (_patternSplitter).
+ *
+ * Examples:
+ * - "|OPCODE1|OPCODE2|OPCODE3|".indexOf("|OPCODE2|")
+ * - "|OPCODE1|OPCODE2|OPCODE3|".indexOf(getInstructionsAsmPattern("OPCODE2"))
+ * - "|OPCODE1|OPCODE2|OPCODE3|".indexOf("|OPCODE2|OPCODE3|")
+ * - "|OPCODE1|OPCODE2|OPCODE3|".indexOf(getInstructionsAsmPattern(["OPCODE2", "OPCODE3"]))
+ *
+ * @param {string|string[]} instruction - The instruction or array of instructions to create the subpattern for.
+ * @returns {string} The generated subpattern string.
+ */
 function getInstructionsAsmPattern(instruction) {
     return _patternSplitter +
         (
@@ -2531,31 +2722,55 @@ function getInstructionsAsmPattern(instruction) {
 }
 
 
+
+/**
+ * Retrieves the first assembly instruction at the entry point of the PE file.
+ *
+ * @returns {string} The disassembled string of the first instruction at the entry point.
+ */
 function getFirstEpAsmInstruction() {
     return PE.getDisasmString(PE.OffsetToVA(PE.getEntryPointOffset()));
 }
 
 
 
-// Gets an opcode from an instruction
-
+/**
+ * Extracts the opcode from an assembly instruction.
+ *
+ * @param {string} instruction - The assembly instruction.
+ * @returns {string} - The opcode of the instruction.
+ */
 function getAsmOpCode(instruction) {
     return instruction.indexOf(" ") !== -1 ? instruction.split(" ")[0] : instruction;
 }
 
 
 
-// Returns only the name of the opcode used, without arguments
-
+/**
+ * Retrieves the first assembly operation code from the entry point of the executable.
+ *
+ * @returns {string} The assembly operation code of the first instruction at the entry point.
+ */
 function getFirstEpAsmOpCode() {
     return getAsmOpCode(getFirstEpAsmInstruction());
 }
 
 
 
-// VC ?warp_size@cuda@at@@YAHXZ
-// GNU _ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_i
-
+/**
+ * Checks if a given function name pattern is mangled.
+ *
+ * This function determines if a function name pattern is mangled by checking
+ * specific characteristics of the pattern. It supports detection for both
+ * Microsoft Visual C++ (MSVCPP) and GNU C++ (GNUCPP) mangled names.
+ *
+ * Examples:
+ * - MSVCPP: ??0_Lockit@std@@QEAA@H@Z
+ * - GNUCPP: _ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_i
+ * 
+ * @param {string} functionPattern - The function name pattern to check.
+ * @returns {boolean} - Returns true if the function name pattern is mangled, otherwise false.
+ */
 function isFunctionMangled(functionPattern) {
     return functionPattern.length > 5 && (
         (functionPattern[0] == '?' && functionPattern.indexOf("@@") !== -1) || // MSVCPP mangler
@@ -2565,6 +2780,12 @@ function isFunctionMangled(functionPattern) {
 
 
 
+/**
+ * Extracts the name of a mangled function from a given function pattern.
+ *
+ * @param {string} functionPattern - The mangled function pattern to analyze.
+ * @returns {string} - The extracted function name if the pattern is recognized as mangled, otherwise returns the original pattern.
+ */
 function getNameOfMangledFunction(functionPattern) {
     if (isFunctionMangled(functionPattern)) {
         if (functionPattern[0] === '?' && functionPattern[1] !== '?') {
@@ -2609,6 +2830,17 @@ function getNameOfMangledFunction(functionPattern) {
 
 
 
+/**
+ * Validates import hashes in a given database collection.
+ *
+ * @param {Array} dbCollection - The database collection to validate. Each element in the collection is expected to be an array with the following structure:
+ *   [name, version, position, hash]
+ *   - name {string}: The name of the import.
+ *   - version {string}: The version of the import.
+ *   - position {number}: The position of the import.
+ *   - hash {string}: The hash of the import.
+ * @returns {Array|null} The first array pattern that has a matching import position and hash, or null if no match is found.
+ */
 function validateImportHashes(dbCollection) {
     for (var i = 0; i < dbCollection.length; i++) {
         const
@@ -2631,6 +2863,19 @@ function validateImportHashes(dbCollection) {
 
 
 
+/**
+ * Validates section names in a given database collection.
+ *
+ * Iterates through the provided database collection and checks if the section name
+ * is present using the PE.isSectionNamePresent function. If a section name is found,
+ * it returns the corresponding array pattern. If no section name is found, it returns null.
+ *
+ * @param {Array} dbCollection - The database collection to validate, where each element is an array pattern.
+ * @param {string} dbCollection[].0 - The name in the array pattern.
+ * @param {string} dbCollection[].1 - The version in the array pattern.
+ * @param {string} dbCollection[].2 - The section name in the array pattern.
+ * @returns {Array|null} The array pattern with the valid section name, or null if no valid section name is found.
+ */
 function validateSectionNames(dbCollection) {
     for (var i = 0; i < dbCollection.length; i++) {
         const
@@ -2668,7 +2913,8 @@ function scanForLanguages_NET_and_Native() {
 
 
     for (var i = 0; i < extdb.length; i++) {
-        const langName = extdb[i][0],
+        const
+            langName = extdb[i][0],
             langExtName = extdb[i][1];
 
         if (PE.isSignaturePresent(0x00, PE.getSize(), "%% %% %% %% %% %% %% %% '." + langExtName + "' 00 00")) {
@@ -2779,6 +3025,11 @@ function scanForLanguages_NET_and_Native() {
 
 
 
+/**
+ * Sets the language based on heuristic analysis.
+ *
+ * @param {string} languageName - The name of the detected language.
+ */
 function _setLangByHeur(languageName) {
     log(logType.any, languageName + " language detected!");
     _setLang(languageName, true, heurLabel);
@@ -2786,9 +3037,19 @@ function _setLangByHeur(languageName) {
 
 
 
+/**
+ * Logs a message with a specific type and text.
+ *
+ * @param {number} messageTypeId - The type of the message. 
+ *                                 -2: Error, 
+ *                                 -1: About, 
+ *                                  1: Any, 
+ *                                  2: .NET.
+ * @param {string} messageText - The text of the message to log. 
+ *                               Must not contain newline characters.
+ * @throws Will throw an error if the messageText contains a newline character.
+ */
 function log(messageTypeId, messageText) {
-    // if (PE.isProfiling()) return null;
-
     if (messageText.indexOf("\n") != -1) {
         _error("Illegal char at log( ... )");
     }
@@ -2866,4 +3127,4 @@ function heurAvSetResult(label, scores) {
 }
 
 
-// Every time I start writing bad code I get hit with my head on the keybofewuihdsowefjfqodgsa79dowqhdsioefurogrwhuoguethuhofrwyi
+// Every time I start writing bad code I get hit with my head on the keybofewuihdsowefjfqodgsa79dowqhdsioefurogrwhuoguethuhofrwyioguqwehuf
