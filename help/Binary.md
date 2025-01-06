@@ -587,6 +587,22 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 
 ```
 ```
+**bool isReleaseBuild()**
+
+```
+```
+**bool isDebugBuild()**
+
+```
+```
+**QList<QString> getFormatErrorMessages()**
+
+```
+```
+**QList<QString> getFormatWarningMessages()**
+
+```
+```
 
 ### Shorthands
 
