@@ -603,6 +603,43 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 
 ```
 ```
+**bool isChecksumCorrect()**
+
+```
+```
+**bool isEntryPointCorrect()**
+
+```
+```
+**bool isSectionAlignmentCorrect()**
+
+```
+```
+**bool isFileAlignmentCorrect()**
+
+```
+```
+**bool isHeaderValid()**
+
+```
+```
+**bool isRelocsTableValid()**
+
+```
+```
+**bool isImportTableValid()**
+
+```
+```
+**bool isExportTableValid()**
+
+```
+```
+**bool isResourcesTableValid()**
+
+```
+```
+**bool isSectionsTableValid()**
 
 ### Shorthands
 
