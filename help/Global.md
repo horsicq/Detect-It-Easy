@@ -45,7 +45,35 @@ _log(123); // display a number
 
 ```
 ```
-**_encodingList()** Show in log all text codecs 
+**void _encodingList()** Show in log all text codecs 
+
+```
+```
+**bool _isConsoleMode()**
+
+```
+```
+**bool _isLiteMode()**
+
+```
+```
+**bool _isGuiMode()**
+
+```
+```
+**bool _isLibraryMode()**
+
+```
+```
+**void _breakScan()** 
+
+```
+```
+**QString _getEngineVersion()** 
+
+```
+```
+**QString _getOS()** 
 
 ```
 ```

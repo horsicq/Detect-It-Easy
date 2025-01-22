@@ -595,11 +595,7 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 
 ```
 ```
-**QList<QString> getFormatErrorMessages()**
-
-```
-```
-**QList<QString> getFormatWarningMessages()**
+**QList<QString> getFormatMessages()**
 
 ```
 ```
