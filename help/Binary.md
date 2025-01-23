@@ -615,27 +615,27 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 
 ```
 ```
-**bool isHeaderValid()**
+**bool isHeaderCorrect()**
 
 ```
 ```
-**bool isRelocsTableValid()**
+**bool isRelocsTableCorrect()**
 
 ```
 ```
-**bool isImportTableValid()**
+**bool isImportTableCorrect()**
 
 ```
 ```
-**bool isExportTableValid()**
+**bool isExportTableCorrect()**
 
 ```
 ```
-**bool isResourcesTableValid()**
+**bool isResourcesTableCorrect()**
 
 ```
 ```
-**bool isSectionsTableValid()**
+**bool isSectionsTableCorrect()**
 
 ### Shorthands
 
