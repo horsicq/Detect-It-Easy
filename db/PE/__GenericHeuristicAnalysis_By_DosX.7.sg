@@ -75,7 +75,6 @@ var lastOffsetDetected = "0x00";
 const detect = main;
 
 function main() {
-
     if (stubForWrongEnvironment()) return null; // 'PE' is undefined
     if (stubForLegacyEngines()) return null; // old DIE version
 
@@ -97,6 +96,7 @@ function main() {
 
         scanForPackersAndCryptors_NET_and_Native();
         scanForLicensingSystems_NET_and_Native();
+        scanForBadFileFormat_NET_and_Native();
         scanForDebugData_NET_and_Native();
 
         if (PE.isVerbose()) {
@@ -116,7 +116,7 @@ function main() {
 
 
 function stubForLegacyEngines() {
-    if (typeof _error === 'undefined') {
+    if (typeof _error === "undefined") {
         stdout(">>> Update DIE Engine to 3.11 and higher for using Heuristic-analyser by DosX <<<");
         return true;
     }
@@ -127,7 +127,7 @@ function stubForLegacyEngines() {
 
 
 function stubForWrongEnvironment() {
-    if (typeof PE === 'undefined') {
+    if (typeof PE === "undefined") {
         stdout(">>> Wrong environment! 'PE' is undefined. Check DIE-engine for correct installation <<<");
         return true;
     }
@@ -149,12 +149,12 @@ function stubForWrongEnvironment() {
  * @param {string} stringToOut - The warning message to output.
  */
 function stdout(stringToOut) {
-    if (typeof console === 'object') {
+    if (typeof console === "object") {
         console.warn(stringToOut);
-    } else if (typeof File === 'object') {
+    } else if (typeof File === "object") {
         _setResult("~warning", stringToOut, String(), String());
     } else {
-        if (typeof _error === 'function') {
+        if (typeof _error === "function") {
             _error(stringToOut);
         } else {
             throw stringToOut;
@@ -202,7 +202,7 @@ function scanForObfuscations_NET() {
         }
 
         if (isEntryPointModified) {
-            log(logType.net, "No 'Main' method found")
+            log(logType.net, "No \"Main\" method found")
         }
     }
 
@@ -210,6 +210,8 @@ function scanForObfuscations_NET() {
 
 
 
+
+    // <Module>.cctor can execute code before the Main method is called 
 
     var isNetCctorPresent = false;
 
@@ -222,6 +224,8 @@ function scanForObfuscations_NET() {
 
 
 
+
+    // If .NET meta headers are not present in the default .NET section, then the file is mutant
 
     var isStrangeEpPosition = false;
 
@@ -254,6 +258,8 @@ function scanForObfuscations_NET() {
 
 
 
+
+    // .NET files has a specific pattern of the entry point
 
     var isNativeEntryPointModified = false;
 
@@ -552,6 +558,8 @@ function scanForObfuscations_NET() {
     if (isCtrlFlowPresent) options += (options.length != 0 ? " + " : String()) + "Ctrl flow";
 
 
+
+
     const afterCtorOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'<Module>'00**") + 8;
 
 
@@ -559,7 +567,6 @@ function scanForObfuscations_NET() {
     // There are two ways to detect short names - find one-letter objects or just use signature mask at Ctor offset :D
 
     var isShortNamesPresent = false;
-
 
     if (PE.compare("00**00**00", afterCtorOffset) ||
         PE.compare("00****00****00****00", afterCtorOffset) ||
@@ -796,6 +803,7 @@ function scanForObfuscations_NET() {
 
 
     // A technique that allows you to avoid code decompilation. dnSpy gives a parsing error when trying to open such a file
+
     var invalidOpCodes = false;
 
     if (
@@ -814,6 +822,8 @@ function scanForObfuscations_NET() {
 
 
 
+
+    // Some protections include their own dependencies in the form of runtime libraries
 
     var isProtectionRuntimePresent = false;
 
@@ -847,33 +857,33 @@ function scanForObfuscations_NET() {
 
 
     const obfuscatorsAttributes = [
-        "Xenocode.Client.Attributes.AssemblyAttributes.ProcessedByXenocode",
-        "CryptoObfuscator.ProtectedWithCryptoObfuscatorAttribute",
-        "SecureTeam.Attributes.ObfuscatedByAgileDotNetAttribute",
-        "Xenocode.Client.Attributes.AssemblyAttributes",
-        "SmartAssembly.Attributes.PoweredByAttribute",
-        "ObfuscatedByAgileDotNetAttribute",
-        "NineRays.Obfuscator.Evaluation",
-        "ObfuscatedByCliSecureAttribute",
-        "BabelObfuscatorAttribute",
-        "AsStrongAsFuckAttribute",
-        "ProtectedByDotnetsafer",
-        "Macrobject.Obfuscator",
-        "DotfuscatorAttribute",
-        "CodeWallTrialVersion",
-        "ConfusedByAttribute",
-        "ObfuscatedByGoliath",
-        "NETSpider.Attribute",
-        "NineRays.Obfuscator",
+        "Xenocode.Client.Attributes.AssemblyAttributes.ProcessedByXenocode", // Xenocode
+        "CryptoObfuscator.ProtectedWithCryptoObfuscatorAttribute", // Crypto Obfuscator
+        "SecureTeam.Attributes.ObfuscatedByAgileDotNetAttribute", // Agile.NET
+        "Xenocode.Client.Attributes.AssemblyAttributes", // Xenocode
+        "SmartAssembly.Attributes.PoweredByAttribute", // Smart Assembly
+        "ObfuscatedByAgileDotNetAttribute", // Agile.NET
+        "NineRays.Obfuscator.Evaluation", // Spices.Net
+        "ObfuscatedByCliSecureAttribute", // CliSecure
+        "BabelObfuscatorAttribute", // Babel
+        "AsStrongAsFuckAttribute", // AsStrongAsFuck
+        "ProtectedByDotnetsafer", // DotNetSafer
+        "Macrobject.Obfuscator", // Macrobject
+        "DotfuscatorAttribute", // Dotfuscator
+        "CodeWallTrialVersion", // CodeWall
+        "ConfusedByAttribute", // ConfuserEx
+        "ObfuscatedByGoliath", // Goliath
+        "NETSpider.Attribute", // NETSpider
+        "NineRays.Obfuscator", // Spices.Net
         "PoweredByAttribute", // Smart Assembly
-        "RustemSoft.Skater",
-        "BabelAttribute",
+        "RustemSoft.Skater", // Skater
+        "BabelAttribute", // Babel
         "MRuntime3.dll", // Maxtocode
-        "YanoAttribute",
-        "EMyPID_8234_",
-        "ZYXDNGuarder",
+        "YanoAttribute", // Yano
+        "EMyPID_8234_", // Eazfuscator.NET
+        "ZYXDNGuarder", // DNGuard
         "SkiDzEX", // ConfuserEx based
-        "Sixxpack",
+        "Sixxpack", // Sixxpack
         "____KILL", // CodeVeil
         "Reactor", // Fake .NET Reactor
     ];
@@ -1001,6 +1011,7 @@ function scanForAntiAnalysis_NET() {
 
 
     // Assumes the file can detect debugging protection
+
     var isAntiDebugPresent = false;
 
     const debuggerObject = "Debugger", // MSIL: 'System.Diagnostics.Debugger' from System.Diagnostics.dll
@@ -1008,15 +1019,18 @@ function scanForAntiAnalysis_NET() {
         isLogging = "IsLogging" // MSIL: '*.Debugger::IsLogging()'
 
     if (
-        (( // .NET Functions
+        (
+            ( // .NET Functions
                 validateNetObject(debuggerObject) || validateNetUnicodeString(debuggerObject) // Check for 'Debugger'
             ) && (
                 (validateNetObject(isAttached) || validateNetUnicodeString(isAttached)) || // Check for 'get_IsAttached' property
                 (validateNetObject(isLogging) || validateNetUnicodeString(isLogging)) // Check for 'IsLogging' function
             ) ||
             ( // Native (WinAPI) functions
-                validateNetObject("CheckRemoteDebuggerPresent") || validateNetObject("IsDebuggerPresent")
-            )) && !isFrameworkComponent()
+                validateNetObject("CheckRemoteDebuggerPresent") || validateNetObject("IsDebuggerPresent") ||
+                validateNetObject("NtRemoveProcessDebug") || validateNetObject("NtQueryInformationProcess")
+            )
+        ) && !isFrameworkComponent()
     ) {
         isAntiDebugPresent = true;
     }
@@ -1027,6 +1041,7 @@ function scanForAntiAnalysis_NET() {
 
 
     // A type of protection in which, after launching an application, it erases the headers and/or PE signature behind itself
+
     var isAntiDumpPresent = false;
 
     if (
@@ -1187,6 +1202,7 @@ function isClrNET() {
 
 
 // .NET OpCodes for static emulations
+
 function NetOpCodes() {
     this.add = "58"; // MSIL: 'add'
     this.sub = "59"; // MSIL: 'sub'
@@ -1289,12 +1305,26 @@ function NetOpCodes() {
 
 
 
+/**
+ * Removes all spaces from the given input string.
+ *
+ * @param {string} inputString - The string from which spaces will be removed.
+ * @returns {string} - The input string without any spaces.
+ */
 function removeSpaces(inputString) {
     return inputString.split(" ").join("");
 }
 
 
 
+/**
+ * Replaces all occurrences of a specified substring within a given string with a new substring.
+ *
+ * @param {string} inputString - The original string in which to perform the replacements.
+ * @param {string} search - The substring to search for within the input string.
+ * @param {string} replacement - The substring to replace each occurrence of the search substring with.
+ * @returns {string} - The modified string with all occurrences of the search substring replaced by the replacement substring.
+ */
 function replaceAllInString(inputString, search, replacement) {
     while (inputString.indexOf(search) !== -1) {
         inputString = inputString.replace(search, replacement)
@@ -1306,6 +1336,10 @@ function replaceAllInString(inputString, search, replacement) {
 
 
 function clearSectionName(sectionName) {
+    if (sectionName.length > 0 && sectionName.trim() === String()) {
+        return sectionName;
+    }
+
     return sectionName.trim();
 }
 
@@ -1400,7 +1434,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
         // Check if any class from System.IO.Compression namespace is used (non-full name)
-        if ((findAndMark("System.IO.Compression", isFullName = false).length != 0)) {
+        if (findAndMark("System.IO.Compression", isFullName = false).length != 0) {
 
             // Specify compression classes to look for
             const compressionClasses = [
@@ -1430,6 +1464,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Self-Extracting archives
     // TODO: Upgrade
+
     var isSfx = false;
 
     if (!PE.isDll() && PE.isOverlayPresent()) {
@@ -1791,6 +1826,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
     // Check if there is a collision in sections
+
     var isCollisionInSectionsPresent = false;
 
     // Get section name collision between "0" and "1"
@@ -1808,26 +1844,20 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
     // Check if there are repeating section names
+
     var isSectionNamesRepeatingPresent = false;
 
-    // Dictionary to track encountered section names
-    var sectionNamesDictionary = {};
+    var sectionCount = PE.getNumberOfSections(),
+        sectionNamesDictionary = {};
 
-    // Iterate through sections to check for collisions
-    for (var i = 0; i < PE.getNumberOfSections() && !isSectionNamesRepeatingPresent; i++) {
-        const sectionName = PE.getSectionName(i);
-
-        // If section name is already encountered, set collision flag and break
-        if (sectionNamesDictionary[sectionName]) {
+    for (var i = 0; i < sectionCount && !isSectionNamesRepeatingPresent; i++) {
+        var sectionName = PE.getSectionName(i);
+        sectionNamesDictionary[sectionName] = (sectionNamesDictionary[sectionName] || 0) + 1;
+        if (sectionNamesDictionary[sectionName] > 1) {
             log(logType.nothing, "Section names repeating: '" + clearSectionName(sectionName) + "'");
             isSectionNamesRepeatingPresent = true;
-        } else {
-            sectionNamesDictionary[sectionName] = true;
         }
     }
-
-    // Clean up: release the dictionary
-    sectionNamesDictionary = undefined;
 
     if (isSectionNamesRepeatingPresent) options += (options.length != 0 ? " + " : String()) + "Section names repeating";
 
@@ -1835,6 +1865,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
     // Check if the first instruction at entry point starts with a stack operation
+
     var isStartsWithStackOperation = false;
 
     // Get the opcode of the first instruction at entry point
@@ -1902,6 +1933,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
     // Check for a strange overlay in the PE file
+
     var hasStrangeOverlay = false;
 
     // Conditions to check for a strange overlay
@@ -1922,6 +1954,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
     // Flag to indicate high entropy
+
     var isHighEntropy = false;
 
     // Checks for high entropy (ignore overlay)
@@ -1947,6 +1980,26 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     if (isCompressedSectionPresent) options += (options.length != 0 ? " + " : String()) + "Section " + sectionNumber + " (\"" + clearSectionName(PE.getSectionName(sectionNumber)) + "\") compressed";
+
+
+
+
+    // Check for recurring import names
+
+    var recurringImports = false;
+
+    var importCount = PE.getNumberOfImports(),
+        importNames = {};
+
+    for (var i = 0; i < importCount && !recurringImports; i++) {
+        var name = PE.getImportLibraryName(i);
+        importNames[name] = (importNames[name] || 0) + 1;
+        if (importNames[name] >= 3) {
+            recurringImports = true;
+        }
+    }
+
+    if (recurringImports) options += (options.length != 0 ? " + " : String()) + "Recurring import names";
 
 
 
@@ -2033,6 +2086,112 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
 
 
+function scanForBadFileFormat_NET_and_Native() {
+    var options = String();
+
+    var isDetected = Boolean();
+
+
+
+
+    var isEntryPointIncorrect = false;
+
+    if (!PE.isEntryPointCorrect()) {
+        isEntryPointIncorrect = true;
+    }
+
+    if (isEntryPointIncorrect) options += (options.length != 0 ? " + " : String()) + "EntryPoint";
+
+
+
+
+    var isSectionAlignmentIncorrect = false;
+
+    if (!PE.isSectionAlignmentCorrect()) {
+        isSectionAlignmentIncorrect = true;
+    }
+
+    if (isSectionAlignmentIncorrect) options += (options.length != 0 ? " + " : String()) + "Section aligment";
+
+
+
+
+    var isFileAlignmentIncorrect = false;
+
+    if (!PE.isFileAlignmentCorrect()) {
+        isFileAlignmentIncorrect = true;
+    }
+
+    if (isFileAlignmentIncorrect) options += (options.length != 0 ? " + " : String()) + "File alignment";
+
+
+
+
+    var isHeaderIncorrect = false;
+
+    if (!PE.isHeaderCorrect()) {
+        isHeaderIncorrect = true;
+    }
+
+    if (isHeaderIncorrect) options += (options.length != 0 ? " + " : String()) + "Header";
+
+
+
+
+    var isRelocsTableIncorrect = false;
+
+    if (!PE.isRelocsTableCorrect()) {
+        isRelocsTableIncorrect = true;
+    }
+
+    if (isRelocsTableIncorrect) options += (options.length != 0 ? " + " : String()) + "Relocs";
+
+
+
+
+    var isImportTableIncorrect = false;
+
+    if (!PE.isImportTableCorrect()) {
+        isImportTableIncorrect = true;
+    }
+
+    if (isImportTableIncorrect) options += (options.length != 0 ? " + " : String()) + "IAT";
+
+
+
+
+    var isExportTableIncorrect = false;
+
+    if (!PE.isExportTableCorrect()) {
+        isExportTableIncorrect = true;
+    }
+
+    if (isExportTableIncorrect) options += (options.length != 0 ? " + " : String()) + "EAT";
+
+
+
+
+    var isResourcesTableIncorrect = false;
+
+    if (!PE.isResourcesTableCorrect()) {
+        isResourcesTableIncorrect = true;
+    }
+
+    if (isResourcesTableIncorrect) options += (options.length != 0 ? " + " : String()) + "Resources";
+
+
+
+
+    if (options.length != 0) isDetected = true;
+
+
+    if (isDetected) {
+        _setResult("~corrupted data", "Bad format", String(), PE.isVerbose() ? options : String());
+    }
+}
+
+
+
 function scanForDebugData_NET_and_Native() { // For .NET and Native apps
     var options = String();
 
@@ -2084,8 +2243,9 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     var pdbExtensionPatternOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'.pdb'");
 
-    if (pdbExtensionPatternOffset != -1) {
-        var pdbPathBeginOffset;
+    var pdbPathBeginOffset, pdbPath = String();
+
+    if (pdbExtensionPatternOffset !== -1) {
 
         for (var i = pdbExtensionPatternOffset; i > 0; i--) {
             if (PE.readByte(i) === 0x00) {
@@ -2094,20 +2254,50 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
             }
         }
 
-        var pdbFullPath = PE.getString(pdbPathBeginOffset, 256);
+        pdbPath = PE.getString(pdbPathBeginOffset, 256);
 
-        if (pdbFullPath.length > 255)
-            pdbFullPath = pdbFullPath.substring(0, 255) + " . . .";
+        if (pdbPath.length > 255)
+            pdbPath = pdbPath.substring(0, 255) + " . . .";
 
-        pdbFullPath = pdbFullPath.replace(/[\n\r]/g, "");
+        pdbPath = pdbPath.replace(/[\n\r]/g, "");
 
-        if (pdbFullPath.match(/^[a-zA-Z]:\\/) !== null) {
-            log(logType.any, "PDB absolute path: \"" + pdbFullPath + "\"");
+        if (pdbPath.match(/^[a-zA-Z]:\\/) !== null) {
+            log(logType.any, "PDB absolute path: \"" + pdbPath + "\"");
             isPdbFullPathPresent = true;
         }
     }
 
     if (isPdbFullPathPresent) options += (options.length != 0 ? " + " : String()) + "Absolute PDB path";
+
+
+
+
+    // Check for portable (relative path) or embedded PDB
+
+    var isPortableOrEmbeddedPdbDetected = false;
+
+    var pdbTextType = String();
+
+    if (pdbPath && !isPdbFullPathPresent) {
+        pdbTextType = validateSignature("00 52 53 44 53") ? "Embedded" : "Portable";
+
+        log(logType.any, pdbTextType + " PDB name: \"" + pdbPath + "\"");
+        isPortableOrEmbeddedPdbDetected = true;
+    }
+
+    if (isPortableOrEmbeddedPdbDetected) options += (options.length != 0 ? " + " : String()) + pdbTextType + " PDB (release)";
+
+
+
+
+    var isCosturaEmbeddedDebugData = false;
+
+    if (PE.isNET() && PE.isNetObjectPresent("costura.costura.pdb.compressed")) {
+        log(logType.any, "Costura embedded PDB detected");
+        isCosturaEmbeddedDebugData = true;
+    }
+
+    if (isCosturaEmbeddedDebugData) options += (options.length != 0 ? " + " : String()) + "Costura.Fody embedded PDB";
 
 
 
@@ -2391,6 +2581,7 @@ function scanForObfuscations_Native() {
 
 
     // Check for DOS header in the PE file
+
     var isDosMissing = false,
         isCustomDosPresent = false;
 
@@ -2424,7 +2615,8 @@ function scanForObfuscations_Native() {
 
 
 
-    // It works if the file contains an import without an extension (for example, instead of "kernel32.dll" it is written "kernel32"). Compilers don't do that
+    // It works if the file contains an import without an extension (for example, instead of "kernel32.dll" it is written "kernel32").
+    // Compilers don't do that
 
     var isContainsNoExtensionLibrary = false;
 
@@ -3077,7 +3269,9 @@ function _setLangByHeur(languageName) {
  * @throws Will throw an error if the messageText contains a newline character.
  */
 function log(messageTypeId, messageText) {
-    if (messageText.indexOf("\n") != -1) {
+    if (!messageText) {
+        return;
+    } else if (messageText.indexOf("\n") != -1) {
         _error("Illegal char at log( ... )");
     }
 
@@ -3106,7 +3300,11 @@ function log(messageTypeId, messageText) {
             break;
     }
 
-    _log("[" + prefix + "] " + messageText);
+    if (typeof _log !== "undefined") {
+        _log("[" + prefix + "] " + messageText);
+    } else {
+        _error("Unable to write log message");
+    }
 }
 
 
@@ -3147,7 +3345,7 @@ function scanForMaciliousCode_NET_and_Native() {
 
 function heurAvSetResult(label, scores) {
     if (scores <= 10 && scores >= 0) {
-        _setResult("macilious", ("Win" + (PE.is64() ? "64" : "32") + ".") + label, "Heuristic AV", scores + "/10");
+        _setResult("~macilious", ("Win" + (PE.is64() ? "64" : "32") + ".") + label, "Heuristic AV", scores + "/10");
     } else {
         _error("Incorrect scores value for '" + label + "'");
     }

@@ -1,141 +1,97 @@
-// https://github.com/horsicq/Detect-It-Easy signature file
+// Detect It Easy: detection rule file
 // Author: Kaens TG@kaens
 
 init("audio", "Creative (Sound Blaster) Voice waveform (.VOC)");
 includeScript("read");
+/* beautify ignore:start */
 
 function detect() {
-    // from https://sourceforge.net/p/sox/code/ci/master/tree/src/voc.c
-    if (!X.c("'Creative Voice File'1A")) return false;
-    nV = X.U16(0x16);
-    if ((((~nV) + 0x1234) & 0xFFFF) != X.U16(0x18)) return false; //version validation
-    function getCodec(bCodec) {
-        switch (bCodec) {
-            case 0:
-                codec = '8-bit uPCM';
-                break;
-            case 1:
-                codec = 'Creative 8 to 4-bit ADPCM';
-                break;
-            case 2:
-                codec = 'Creative 8 to 3-bit ADPCM';
-                break;
-            case 3:
-                codec = 'Creative 8 to 2-bit ADPCM';
-                break;
-            case 4:
-                codec = '16-bit sPCM';
-                break;
-            case 5:
-                codec = 'CCITT a-Law';
-                break;
-            case 6:
-                codec = 'CCITT u-Law';
-                break;
-            case 0x2000:
-                codec = 'Creative 16 to 4-bit ADPCM';
-                break;
-            default:
-                codec = "invalid codec " + Hex(bCodec)
-        }
-        return codec
-    }
-    sV = nV.toString(16).padStart(4, '0');
-    sVersion = 'v' + sV[1] + '.' + sV.slice(2, 4);
-    bad = '';
-    bn = sz = -1; // block counter, expected filesize
-    extended = z = false; // "extended info overrides" flag, 0 (terminator) flag 
-    p = 0x1A;
-    rate = Hz = bps = bCodec = 0;
-    info = [];
-    while (p < (X.isDeepScan() ? X.Sz() : 0xFFFF) && !z) { //scan blocks
-        bst = p;
-        bhd = X.U8(p++);
-        bn++; // block start, header byte, number
-        bsz = X.U24(p);
-        p += 3;
-        at = ''; // '@'+Hex(bst)+'['+bn+']: ';
-        switch (bhd) {
-            case 0:
-                info.push(at + 'EoF');
-                p -= 3;
-                z = true;
-                break;
-            case 1: // sound data
-                if (!extended) {
-                    rate = 1000000 / (256 - X.U8(p));
-                    Hz = rate < 100000 ? Math.round(rate) + "Hz" : (rate / 1000).toFixed(1) + 'kHz';
-                    bCodec = X.U8(p + 1);
-                }
-                info.push(at + 'audio data in ' + codec + ' at ' + Hz /*+' ->'+Hex(p+bsz)*/ ); //if extended, treat as case 2
-                p += bsz;
-                break;
-            case 2: // sound data continues
-                p += bsz;
-                break;
-            case 3: // silence
-                len = X.U16(p) + 1;
-                rate = 1000000 / (256 - X.U8(p + 2));
-                Hz = rate < 100000 ? Math.round(rate) + "Hz" : (rate / 1000).toFixed(1) + 'kHz';
-                info.push(at + 'silence (' + (len / rate).toFixed(2) + ' sec at ' + Hz + ')');
-                p += bsz;
-                break;
-            case 4: // marker
-                info.push(at + 'marker #' + X.U16(p));
-                p += bsz;
-                break;
-            case 5: // asciiz string
-                s = X.SA(p, bsz);
-                p += bsz;
-                info.push(at + '"' + s + '"');
-                break;
-            case 6:
-                n = X.U16(p);
-                p += bsz;
-                info.push(at + (n == 0xFFFF ? 'infinite' : n) + ' repeats { ');
-                break;
-            case 7:
-                info.push(at + 'end repeat }');
-                break;
-            case 8: //extended info
-                if (!extended) {
-                    chn = X.U8(p + 3) + 1;
-                    rate = 256000000 / (chn * (65536 - X.U16(p)));
-                    Hz = rate < 100000 ? Math.round(rate) + "Hz" : (rate / 1000).toFixed(1) + 'kHz';
-                    bCodec = X.U8(p + 2);
-                }
-                extended = true;
-                p += bsz;
-                info.push(at + 'set to ' + getCodec(bCodec) + ' at ' + Hz + ', ' + chn + 'chn');
-                break;
-            case 9: // new-format audio data
-                if (nV < 0x112) bad = bad.addIfNone('!badver');
-                rate = X.U32(p);
-                if (!rate) bad = bad.addIfNone('!badrate@' + Hex(bst));
-                z = true;
-                break;
-                Hz = rate < 100000 ? rate + "Hz" : (rate / 1000).toFixed(1) + 'kHz';
-                bps = X.U8(p + 4);
-                chn = X.U8(p + 5);
-                bCodec = X.U16(p + 6);
-                info.push(at + 'audio in ' + bps + 'bps ' + getCodec(bCodec) + ' at ' + Hz + ', ' + chn + 'chn ' /*+'->'+Hex(bsz)*/ );
-                p += bsz;
-                break;
-            default:
-                bad = bad.addIfNone('!invalidblock@' + Hex(bst));
-                z = true;
-        }
-        if (p == X.Sz()) z = true;
-        if (X.isDeepScan())
-            if (p > X.Sz()) bad = bad.addIfNone('!short'); // for ripping, we should test this in each audiodata block
-            else sz = p
-    }
-    bDetected = true;
-    if (bad != '') sVersion = sVersion.appendS('malformed' + addEllipsis(bad, 0x80, 0x40), '/')
-    if (X.isVerbose()) {
-        sOption(addEllipsis(info.join('; '), 0x200, 0x100));
-        sOption(outSz(sz), 'sz:')
-    }
-
-    return result();
+	//from https://sourceforge.net/p/sox/code/ci/master/tree/src/voc.c
+	bad = '';
+	if(!X.c("'Creative Voice File'1A"))
+		if(X.c("'Creative Voice File'..1A")) bad = bad.addIfNone('!bad1Asig');
+		else return false;
+	nV = X.U16(0x16); if((((~nV)+0x1234)&0xFFFF) != X.U16(0x18)) return false; //version validation
+	codec = '<default codec>';
+	function getCodec(bCodec) {
+		switch(bCodec) {
+		case 0: codec = '8-bit uPCM'; break;
+		case 1: codec = 'Creative 8 to 4-bit ADPCM'; break;
+		case 2: codec = 'Creative 8 to 3-bit ADPCM'; break;
+		case 3: codec = 'Creative 8 to 2-bit ADPCM'; break;
+		case 4: codec = '16-bit sPCM'; break;
+		case 5: codec = 'CCITT a-Law'; break;
+		case 6: codec = 'CCITT u-Law'; break;
+		case 0x2000: codec = 'Creative 16 to 4-bit ADPCM'; break;
+		default: codec = "invalid codec "+Hex(bCodec)
+		}
+		return codec
+	}
+	sV = nV.toString(16).padStart(4,'0'); sVersion = 'v'+sV[1]+'.'+sV.slice(2,4);
+	bn = sz = -1; // block counter, expected filesize
+	extended = z = false; // "extended info overrides" flag, 0 (terminator) flag 
+	p = 0x1A; rate = Hz = bps = bCodec = 0; info = [];
+	while(p < (X.isDeepScan() ? X.Sz() : 0xFFFF) && !z) { //scan blocks
+		bst = p; bhd = X.U8(p++); bn++; // block start, header byte, number
+		bsz = X.U24(p); p += 3;
+		at = '';// '@'+Hex(bst)+'['+bn+']: ';
+		switch(bhd) {
+		case 0: info.push(at+'EoF'); p -= 3; z = true; break;
+		case 1: // sound data
+			if(!extended) {
+				rate = 1000000/(256-X.U8(p));
+				Hz = rate < 100000 ? Math.round(rate)+"Hz" : (rate/1000).toFixed(1)+'kHz';
+				bCodec = X.U8(p+1);
+			}
+			info.push(at+'audio data in '+codec+' at '+Hz/*+' ->'+Hex(p+bsz)*/); //if extended, treat as case 2
+			p += bsz;
+			break;
+		case 2: // sound data continues
+			p += bsz;
+			break;
+		case 3: // silence
+			len = X.U16(p)+1; rate = 1000000/(256-X.U8(p+2));
+			Hz = rate < 100000 ? Math.round(rate)+"Hz" : (rate/1000).toFixed(1)+'kHz';
+			info.push(at+'silence ('+(len/rate).toFixed(2)+' sec at '+Hz+')'); p += bsz; break;
+		case 4: // marker
+			info.push(at+'marker #'+X.U16(p)); p += bsz; break;
+		case 5: // asciiz string
+			s = X.SA(p,bsz); p += bsz;
+			info.push(at+'"'+s+'"'); break;
+		case 6:
+			n = X.U16(p); p += bsz;
+			info.push(at+(n==0xFFFF?'infinite':n)+' repeats { '); break;
+		case 7: info.push(at+'end repeat }'); break;
+		case 8: //extended info
+			if(!extended) {
+				chn = X.U8(p+3)+1;
+				rate = 256000000 / (chn * (65536 - X.U16(p)));
+				Hz = rate < 100000 ? Math.round(rate)+"Hz" : (rate/1000).toFixed(1)+'kHz';
+				bCodec = X.U8(p+2);
+			}
+			extended = true; p += bsz;
+			info.push(at+'set to '+getCodec(bCodec)+' at '+Hz+', '+chn+'chn'); break;
+		case 9: // new-format audio data
+			if(nV < 0x112) bad = bad.addIfNone('!badver');
+			rate = X.U32(p); if(!rate) bad = bad.addIfNone('!badrate@'+Hex(bst)); z = true; break;
+			Hz = rate < 100000 ? rate+"Hz" : (rate/1000).toFixed(1)+'kHz';
+			bps = X.U8(p+4);
+			chn = X.U8(p+5); bCodec = X.U16(p+6);
+			info.push(at+'audio in '+bps+'bps '+getCodec(bCodec)+' at '+Hz+', '+chn+'chn '/*+'->'+Hex(bsz)*/);
+			p += bsz; break;
+		default: bad = bad.addIfNone('!invalidblock@'+Hex(bst)); z = true;
+		}
+		if(p == X.Sz()) z = true;
+		if(X.isDeepScan())
+			if(p > X.Sz()) bad = bad.addIfNone('!short'); // for ripping, we should test this in each audiodata block
+			else sz = p
+	}
+	bDetected = true;
+	if(bad != '') sVersion = sVersion.appendS('malformed'+addEllipsis(bad,0x80,0x40),'/')
+	if(X.isVerbose()) {
+		sOption(addEllipsis(info.join('; '),0x200,0x100));
+		sOption(outSz(sz),'sz:')
+	}
+	return result();
 }
+/* beautify ignore:end */
