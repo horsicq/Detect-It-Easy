@@ -1019,15 +1019,18 @@ function scanForAntiAnalysis_NET() {
         isLogging = "IsLogging" // MSIL: '*.Debugger::IsLogging()'
 
     if (
-        (( // .NET Functions
+        (
+            ( // .NET Functions
                 validateNetObject(debuggerObject) || validateNetUnicodeString(debuggerObject) // Check for 'Debugger'
             ) && (
                 (validateNetObject(isAttached) || validateNetUnicodeString(isAttached)) || // Check for 'get_IsAttached' property
                 (validateNetObject(isLogging) || validateNetUnicodeString(isLogging)) // Check for 'IsLogging' function
             ) ||
             ( // Native (WinAPI) functions
-                validateNetObject("CheckRemoteDebuggerPresent") || validateNetObject("IsDebuggerPresent")
-            )) && !isFrameworkComponent()
+                validateNetObject("CheckRemoteDebuggerPresent") || validateNetObject("IsDebuggerPresent") ||
+                validateNetObject("NtRemoveProcessDebug") || validateNetObject("NtQueryInformationProcess")
+            )
+        ) && !isFrameworkComponent()
     ) {
         isAntiDebugPresent = true;
     }
@@ -2240,8 +2243,9 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     var pdbExtensionPatternOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'.pdb'");
 
-    if (pdbExtensionPatternOffset != -1) {
-        var pdbPathBeginOffset;
+    var pdbPathBeginOffset, pdbPath = String();
+
+    if (pdbExtensionPatternOffset !== -1) {
 
         for (var i = pdbExtensionPatternOffset; i > 0; i--) {
             if (PE.readByte(i) === 0x00) {
@@ -2250,20 +2254,49 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
             }
         }
 
-        var pdbFullPath = PE.getString(pdbPathBeginOffset, 256);
+        pdbPath = PE.getString(pdbPathBeginOffset, 256);
 
-        if (pdbFullPath.length > 255)
-            pdbFullPath = pdbFullPath.substring(0, 255) + " . . .";
+        if (pdbPath.length > 255)
+            pdbPath = pdbPath.substring(0, 255) + " . . .";
 
-        pdbFullPath = pdbFullPath.replace(/[\n\r]/g, "");
+        pdbPath = pdbPath.replace(/[\n\r]/g, "");
 
-        if (pdbFullPath.match(/^[a-zA-Z]:\\/) !== null) {
-            log(logType.any, "PDB absolute path: \"" + pdbFullPath + "\"");
+        if (pdbPath.match(/^[a-zA-Z]:\\/) !== null) {
+            log(logType.any, "PDB absolute path: \"" + pdbPath + "\"");
             isPdbFullPathPresent = true;
         }
     }
 
     if (isPdbFullPathPresent) options += (options.length != 0 ? " + " : String()) + "Absolute PDB path";
+
+
+
+
+    var isPdbRelativePathPresent = false;
+
+    var isEmbeddedPdbPresent = false,
+        pdbTextType = String();
+
+    if (pdbPath && !isPdbFullPathPresent) {
+        pdbTextType = validateSignature("00 52 53 44 53") ? "Embedded" : "Portable";
+
+        log(logType.any, pdbTextType + " PDB name: \"" + pdbPath + "\"");
+        isPdbRelativePathPresent = true;
+    }
+
+    if (isPdbRelativePathPresent) options += (options.length != 0 ? " + " : String()) + pdbTextType + " PDB (release)";
+
+
+
+
+    var isCosturaEmbeddedDebugData = false;
+
+    if (PE.isNET() && PE.isNetObjectPresent("costura.costura.pdb.compressed")) {
+        log(logType.any, "Costura embedded PDB detected");
+        isCosturaEmbeddedDebugData = true;
+    }
+
+    if (isCosturaEmbeddedDebugData) options += (options.length != 0 ? " + " : String()) + "Costura.Fody embedded PDB";
 
 
 
