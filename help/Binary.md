@@ -667,3 +667,5 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 `X.fSig(a,b,c)` = `File.findSignature(a,b,c)`\
 `X.fStr(a,b,c)` = `File.findString(a,b,c)`\
 `X.c(a,b)` = `File.compare(a,b)`
+
+`X.BA(a, b, c)` = `File.readBytes(a, b, c)`
