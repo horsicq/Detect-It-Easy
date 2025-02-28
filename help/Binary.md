@@ -4,7 +4,7 @@ This is a description of the Binary class. This class is used when no other clas
 
 ```
 ```
-**bool compare(QString sSignature,qint64 nOffset=0)** Compares bytes with a hexadecimal string signature.
+**bool compare(QString sSignature, qint64 nOffset=0)** Compares bytes with a hexadecimal string signature.
 
 The signature may contain both lowercase and uppercase hexadecimal digits.
 Spaces are skipped, **AA BB** = **AABB**
@@ -25,31 +25,27 @@ There are additional symbols:
 | _%        | Not ANSI and not null                            |
 
 ```
-if(Binary.compare("'7z'BCAF271C")) // compare file header (nOffset=0)
-{
-    sVersion=Binary.readByte(6)+"."+Binary.readByte(7);
-    bDetected=1;
+if(Binary.compare("'7z'BCAF271C")) { // compare file header (nOffset=0)
+    sVersion = Binary.readByte(6)+"."+Binary.readByte(7);
+    bDetected = true;
 }
  
-if(Binary.compare("'WAVEfmt '",8)) // compare file from offset 8
-{
-    bDetected=1;
+if (Binary.compare("'WAVEfmt '", 8)) { // compare file from offset 8
+    bDetected = true;
 }
 ```
-**bool compareEP(QString sSignature,qint64 nOffset=0)** Compare bytes at the Entry Point.
+**bool compareEP(QString sSignature ,qint64 nOffset=0)** Compare bytes at the Entry Point.
 
 * sSignature - The signature.
 * nOffset - The offset from the entry point.
 
 ```
-if(PE.compareEP("2C81",8))
-{
-    sVersion="1.98";
+if (PE.compareEP("2C81", 8)) {
+    sVersion = "1.98";
 }
 
-if(PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24"))
-{
-    bDetected=1;
+if (PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24")) {
+    bDetected = true;
 }
 ```
 **quint8 readByte(qint64 nOffset)** Read a byte value from the file.
@@ -84,40 +80,40 @@ if(PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24"))
 
 ```
 ```
-**QString getString(qint64 nOffset,qint64 nMaxSize=50)** Get a text string from the file. A string is read up to the first unreadable character or up to the maximum length.
+**QString getString(qint64 nOffset, qint64 nMaxSize=50)** Get a text string from the file. A string is read up to the first unreadable character or up to the maximum length.
 
 * nOffset - The offset in the file.
 * nMaxSize - The maximum size of the string, in bytes.
 
 ```
-var sString=Binary.getString(0x100,32); // read a string from offset 0x100, maximum length 32 bytes
-var sString=Binary.getString(60); // read a string from offset 60, maximum length 50 bytes (default value)
+var sString = Binary.getString(0x100, 32); // read a string from offset 0x100, maximum length 32 bytes
+var sString = Binary.getString(60); // read a string from offset 60, maximum length 50 bytes (default value)
 ```
-**qint64 findSignature(qint64 nOffset,qint64 nSize,QString sSignature)** Search for a signature in the file.
+**qint64 findSignature(qint64 nOffset, qint64 nSize, QString sSignature)** Search for a signature in the file.
 
 * Returns Offset in the file if the value is found; **-1** otherwise.
 
 ```
 ```
-**qint64 findString(qint64 nOffset,qint64 nSize,QString sString)** Search for a string in the file.
+**qint64 findString(qint64 nOffset, qint64 nSize, QString sString)** Search for a string in the file.
 
 * Returns Offset in the file if the value is found; **-1** otherwise.
 
 ```
 ```
-**qint64 findByte(qint64 nOffset,qint64 nSize,quint8 nValue)** Search for a byte in the file.
+**qint64 findByte(qint64 nOffset, qint64 nSize, quint8 nValue)** Search for a byte in the file.
 
 * Returns Offset in the file if the value is found; **-1** otherwise.
 
 ```
 ```
-**qint64 findWord(qint64 nOffset,qint64 nSize,quint16 nValue)** Search for a word in the file.
+**qint64 findWord(qint64 nOffset, qint64 nSize, quint16 nValue)** Search for a word in the file.
 
 * Returns Offset in the file if the value is found; **-1** otherwise.
 
 ```
 ```
-**qint64 findDword(qint64 nOffset,qint64 nSize,quint32 nValue)** Search for a dword in the file.
+**qint64 findDword(qint64 nOffset, qint64 nSize, quint32 nValue)** Search for a dword in the file.
 
 * Returns Offset in the file if the value is found; **-1** otherwise.
 
@@ -143,11 +139,11 @@ var sString=Binary.getString(60); // read a string from offset 60, maximum lengt
 
 ```
 ```
-**bool compareOverlay(QString sSignature,qint64 nOffset=0)**
+**bool compareOverlay(QString sSignature ,qint64 nOffset=0)**
 
 ```
 ```
-**bool isSignaturePresent(qint64 nOffset,qint64 nSize,QString sSignature)** Check if a signature (see {@link Binary.compare compare}) exists in a region of the file.
+**bool isSignaturePresent(qint64 nOffset, qint64 nSize, QString sSignature)** Check if a signature (see {@link Binary.compare compare}) exists in a region of the file.
 
 ```
 ```
@@ -190,26 +186,26 @@ For example **0x11223344** becomes **0x44332211**.
 
 ```
 ```
-**QString getSignature(qint64 nOffset,qint64 nSize)** Get a signature string from the file.
+**QString getSignature(qint64 nOffset, qint64 nSize)** Get a signature string from the file.
 
 ```
 var signature=Binary.getSignature(0,4);
 if(signature=="AA5411DD")
 {
-    bDetected=1;
+    bDetected = true;
 }
 ```
-**QString calculateCRC32(qint64 nOffset,qint64 nSize)** Calculate the CRC32 hash of a region of the file.
+**QString calculateCRC32(qint64 nOffset, qint64 nSize)** Calculate the CRC32 hash of a region of the file.
 
 ```
 ```
-**double calculateEntropy(qint64 nOffset,qint64 nSize)** Calculate the entropy of a region of the file.
+**double calculateEntropy(qint64 nOffset, qint64 nSize)** Calculate the entropy of a region of the file.
 
 * Result in the form of quantity of bits per byte. Since there are 8 bits in a byte, the maximum entropy will be 8.0.
 
 ```
 ```
-**QString calculateMD5(qint64 nOffset,qint64 nSize)** Calculate the MD5 hash of a region of the file.
+**QString calculateMD5(qint64 nOffset, qint64 nSize)** Calculate the MD5 hash of a region of the file.
 
 ```
 ```
@@ -228,7 +224,7 @@ if(signature=="AA5411DD")
 
 ```
 ```
-**bool isSignatureInSectionPresent(quint32 nNumber,QString sSignature)**
+**bool isSignatureInSectionPresent(quint32 nNumber, QString sSignature)**
 
 ```
 ```
@@ -317,39 +313,39 @@ if(signature=="AA5411DD")
 
 ```
 ```
-**quint16 read_uint16(qint64 nOffset,bool bIsBigEndian=false)**
+**quint16 read_uint16(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**qint16 read_int16(qint64 nOffset,bool bIsBigEndian=false)**
+**qint16 read_int16(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**quint32 read_uint32(qint64 nOffset,bool bIsBigEndian=false)**
+**quint32 read_uint32(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**qint32 read_int32(qint64 nOffset,bool bIsBigEndian=false)**
+**qint32 read_int32(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**quint64 read_uint64(qint64 nOffset,bool bIsBigEndian=false)**
+**quint64 read_uint64(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**qint64 read_int64(qint64 nOffset,bool bIsBigEndian=false)**
+**qint64 read_int64(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**QString read_ansiString(qint64 nOffset,qint64 nMaxSize=50)**
+**QString read_ansiString(qint64 nOffset, qint64 nMaxSize=50)**
 
 ```
 ```
-**QString read_unicodeString(qint64 nOffset,qint64 nMaxSize=50)**
+**QString read_unicodeString(qint64 nOffset, qint64 nMaxSize=50)**
 
 ```
 ```
-**QString read_utf8String(qint64 nOffset,qint64 nMaxSize=50)**
+**QString read_utf8String(qint64 nOffset, qint64 nMaxSize=50)**
 
 ```
 ```
@@ -361,15 +357,15 @@ if(signature=="AA5411DD")
 
 ```
 ```
-**qint64 find_ansiString(qint64 nOffset,qint64 nSize,QString sString)**
+**qint64 find_ansiString(qint64 nOffset, qint64 nSize, QString sString)**
 
 ```
 ```
-**qint64 find_unicodeString(qint64 nOffset,qint64 nSize,QString sString)**
+**qint64 find_unicodeString(qint64 nOffset, qint64 nSize, QString sString)**
 
 ```
 ```
-**qint64 find_utf8String(qint64 nOffset,qint64 nSize,QString sString)**
+**qint64 find_utf8String(qint64 nOffset, qint64 nSize, QString sString)**
 
 ```
 ```
@@ -377,39 +373,39 @@ if(signature=="AA5411DD")
 
 ```
 ```
-**QString read_UUID(qint64 nOffset,bool bIsBigEndian=false)**
+**QString read_UUID(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**float read_float(qint64 nOffset,bool bIsBigEndian=false)**
+**float read_float(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**double read_double(qint64 nOffset,bool bIsBigEndian=false)**
+**double read_double(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**float read_float16(qint64 nOffset,bool bIsBigEndian=false)**
+**float read_float16(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**float read_float32(qint64 nOffset,bool bIsBigEndian=false)**
+**float read_float32(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**float read_float64(qint64 nOffset,bool bIsBigEndian=false)**
+**float read_float64(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**quint32 read_uint24(qint64 nOffset,bool bIsBigEndian=false)**
+**quint32 read_uint24(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**qint32 read_int24(qint64 nOffset,bool bIsBigEndian=false)**
+**qint32 read_int24(qint64 nOffset, bool bIsBigEndian=false)**
 
 ```
 ```
-**QString read_codePageString(qint64 nOffset,qint64 nMaxByteSize=256,QString sCodePage="System")**
+**QString read_codePageString(qint64 nOffset, qint64 nMaxByteSize=256,QString sCodePage="System")**
 
 ```
 System
