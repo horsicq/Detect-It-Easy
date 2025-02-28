@@ -17,11 +17,7 @@ includeScript("Cab"); // include script $APP/db/Cab
 _log("Hello world!"); // display a string
 _log(123); // display a number
 ```
-**result(bShowType,bShowVersion,bShowOptions)** Get a result string appropriate to the class.
-
-* bShowType - True to include the type.
-* bShowVersion - True to include the version.
-* bShowOptions - True to include the options.
+**result()** Get a result string appropriate to the class.
 
 ```
 ```

@@ -25,7 +25,7 @@ There are additional symbols:
 | _%        | Not ANSI and not null                            |
 
 ```
-if(Binary.compare("'7z'BCAF271C")) { // compare file header (nOffset=0)
+if (Binary.compare("'7z'BCAF271C")) { // compare file header (nOffset=0)
     sVersion = Binary.readByte(6)+"."+Binary.readByte(7);
     bDetected = true;
 }
@@ -86,8 +86,8 @@ if (PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24")) {
 * nMaxSize - The maximum size of the string, in bytes.
 
 ```
-var sString = Binary.getString(0x100, 32); // read a string from offset 0x100, maximum length 32 bytes
-var sString = Binary.getString(60); // read a string from offset 60, maximum length 50 bytes (default value)
+var sString = Binary.getString(0x100, 32), // read a string from offset 0x100, maximum length 32 bytes
+    sString = Binary.getString(60); // read a string from offset 60, maximum length 50 bytes (default value)
 ```
 **qint64 findSignature(qint64 nOffset, qint64 nSize, QString sSignature)** Search for a signature in the file.
 
@@ -189,9 +189,7 @@ For example **0x11223344** becomes **0x44332211**.
 **QString getSignature(qint64 nOffset, qint64 nSize)** Get a signature string from the file.
 
 ```
-var signature=Binary.getSignature(0,4);
-if(signature=="AA5411DD")
-{
+if (Binary.getSignature(0,4) == "AA5411DD") {
     bDetected = true;
 }
 ```
@@ -638,30 +636,30 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 `X.U8(a)` = `File.read_uint8(a)`\
 `X.I8(a)` = `File.read_int8(a)`
 
-`X.U16(a,b)` = `File.read_uint16(a,b)`\
-`X.I16(a,b)` = `File.read_int16(a,b)`\
-`X.F16(a,b)` = `File.read_float16(a,b)`
+`X.U16(a, b)` = `File.read_uint16(a, b)`\
+`X.I16(a, b)` = `File.read_int16(a, b)`\
+`X.F16(a, b)` = `File.read_float16(a, b)`
 
-`X.U24(a,b)` = `File.read_uint24(a,b)`\
-`X.I24(a,b)` = `File.read_int24(a,b)`
+`X.U24(a, b)` = `File.read_uint24(a, b)`\
+`X.I24(a, b)` = `File.read_int24(a, b)`
 
-`X.U32(a,b)` = `File.read_uint32(a,b)`\
-`X.I32(a,b)` = `File.read_int32(a,b)`\
-`X.F32(a,b)` = `File.read_float32(a,b)`
+`X.U32(a, b)` = `File.read_uint32(a, b)`\
+`X.I32(a, b)` = `File.read_int32(a, b)`\
+`X.F32(a, b)` = `File.read_float32(a, b)`
 
-`X.U64(a,b)` = `File.read_uint64(a,b)`\
-`X.I64(a,b)` = `File.read_int64(a,b)`\
-`X.F64(a,b)` = `File.read_float64(a,b)`
+`X.U64(a, b)` = `File.read_uint64(a, b)`\
+`X.I64(a, b)` = `File.read_int64(a, b)`\
+`X.F64(a, b)` = `File.read_float64(a, b)`
 
-`X.SA(a,b)` = `File.read_ansiString(a,b)`\
-`X.SC(a,b,c)` = `File.read_codePageString(a,b,c)`\
-`X.UСSD(a,b)` = `File.read_ucsdString(a,b)`\
-`X.SU8(a,b,c)` = `File.read_utf8String(a,b,c)`\
-`X.SU16(a,b,c)` = `File.read_unicodeString(a,b,c)`
+`X.SA(a, b)` = `File.read_ansiString(a, b)`\
+`X.SC(a, b, c)` = `File.read_codePageString(a, b, c)`\
+`X.UСSD(a, b)` = `File.read_ucsdString(a, b)`\
+`X.SU8(a, b, c)` = `File.read_utf8String(a, b, c)`\
+`X.SU16(a, b, c)` = `File.read_unicodeString(a, b, c)`
 
 `X.Sz()` = `File.getSize()`\
-`X.fSig(a,b,c)` = `File.findSignature(a,b,c)`\
-`X.fStr(a,b,c)` = `File.findString(a,b,c)`\
-`X.c(a,b)` = `File.compare(a,b)`
+`X.fSig(a, b, c)` = `File.findSignature(a, b, c)`\
+`X.fStr(a, b, c)` = `File.findString(a, b, c)`\
+`X.c(a, b)` = `File.compare(a, b)`
 
 `X.BA(a, b, c)` = `File.readBytes(a, b, c)`

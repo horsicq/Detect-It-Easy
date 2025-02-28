@@ -107,11 +107,11 @@
 
 ```
 ```
-**bool isLibraryFunctionPresent(QString sLibraryName,QString sFunctionName)**
+**bool isLibraryFunctionPresent(QString sLibraryName, QString sFunctionName)**
 
 ```
 ```
-**QString getImportFunctionName(quint32 nImport,quint32 nFunctionNumber)**
+**QString getImportFunctionName(quint32 nImport, quint32 nFunctionNumber)**
 
 ```
 ```
@@ -251,7 +251,7 @@
 
 ```
 ```
-**QString getExportFunctionName(quint32 nNumber)
+**QString getExportFunctionName(quint32 nNumber)**
 
 ```
 ```

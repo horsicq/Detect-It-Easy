@@ -90,7 +90,7 @@
 
 ```
 ```
-**bool isStringInTablePresent(QString sSectionName,QString sString)**
+**bool isStringInTablePresent(QString sSectionName, QString sString)**
 
 ```
 ```
