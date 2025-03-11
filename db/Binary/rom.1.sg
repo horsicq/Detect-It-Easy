@@ -830,10 +830,18 @@ function detect() {
 		sVersion = 'v'+X.U8(8)+'.'+X.U8(9).padStart(2,'0'); bDetected = true;
 		var ismsx = end = false, x = 0;
 		var bad = title = publisher = auth = year = lang = apptype = price = protload
-			= org = cmt = hw = sel = '';
+			= org = cmt = hw = sel = fnames = '';
+		const types = ['B','N','S','C']
 		p = 10; while(!end && p < X.Sz()) {
 			switch(X.U8(p++)) {
-			case 0x10: p += 4+X.U16(p+2); break;
+			case 0x10:
+				if(!X.U8(p+4)) { //loading flag(?)
+					if(charStat(t=X.readBytes(p+6,10), 1).indexOf('allasc') < 0) bad = bad.addIfNone('!nonASCIIfn');
+					t = decEncoding(t,CPSpeccy).trim(); tp = X.U8(p+5);
+					if(!t && tp < 3) bad = bad.addIfNone('!emptyfn');
+					fnames = fnames.appendS(t+'.'+types[tp], ',')
+				}
+				p += 4+X.U16(p+2); break;
 			case 0x11: p += 0x12+X.U24(p+0xF); break;
 			case 0x12: p += 4; break;
 			case 0x13: p += 1+2*X.U8(p); break;
@@ -1035,7 +1043,8 @@ function detect() {
 			sOptionT(title); if(x > 1) sOption(x,'x'); sOptionT(auth,'by:'); sOptionT(year,"'"); sOptionT(publisher,'(c) ');
 			sOptionT(lang,'in:'); sOptionT(apptype,'apptype:'); sOptionT(price,'price:');
 			sOptionT(org,'origin:'); sOptionT(protload,'prot/ldr:'); sOption(hw);
-			sOptionT(addEllipsis(cmt,0xA0)); sOptionT(sel,'choices:'); sOption(outSz(p),'sz:')
+			sOptionT(addEllipsis(cmt,0xA0)); sOptionT(addEllipsis(fnames,0xA0),'files:');
+			sOptionT(sel,'choices:'); sOption(outSz(p),'sz:')
 		}
 	}
 
@@ -1318,8 +1327,9 @@ if(X.isHeuristicScan()) {
 		  0x20000,0x40000,0x60000,0x80000,0x100000].indexOf(X.Sz()) >= 0) {
 			_setResult("ROM","Microsoft MSX/MSX 2 cartridge (.ROM)",'','')
 		}
-		//else {}
 
+	if(extIs('sna') && X.Sz() == 49179)
+		_setResult("ROM","ZX Spectrum 48k state snapshot file (.SNA)",'','')
 }
 
 	return result()
