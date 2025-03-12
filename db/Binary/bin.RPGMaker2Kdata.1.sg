@@ -120,21 +120,21 @@ function isLMT() {
 	title = ''; maps = [];
 	for(idx = i = 0; p < X.Sz() && i < len; ) {
 		if(idx == 0x33) {
-			p += readVarUInt(p)[0]; t = readVarUInt(p); p += t[0]; // array idx skip
-			if(t[1] < ++i) { bad = bad.addIfNone('!badidx'); break }
+			p += readVarUInt(p)[0]; aid = readVarUInt(p); p += aid[0]; aid = aid[1]; //array idx
+			if(aid < ++i) { bad = bad.addIfNone('!badidx'); break }
 		}
 		if(i >= len) break;
 		idx = readVarUInt(p); if(!isWithin(idx[0],1,3)) return false; p += idx[0]; idx = idx[1];
 		sz = readVarUInt(p); if(!isWithin(sz[0],1,5) || !sz[1]) return false; p += sz[0]; sz = sz[1];
 		switch(idx) {
 		case 1: t = X.SC(p,sz,'SJIS');
-			if(!title.length) title = t; else maps.push(t);
+			if(!title.length) title = t; else maps.push(aid+'.'+t);
 			break;
 		}
 		p += sz;
 	}
-	//tree_order length is in t[1]
-	for(i=0; i < t[1]+1; i++) p += readVarUInt(p)[0]; // tree_order + active_node
+	//tree_order length is in aid
+	for(i=0; i < aid+1; i++) p += readVarUInt(p)[0]; // tree_order + active_node
 //_l2r('lmt',p,'Start')
 	for(i = 0; p < X.Sz(); ) {
 		idx = readVarUInt(p); if(!isWithin(idx[0],1,3)) return false; p += idx[0]; idx = idx[1];
@@ -150,7 +150,7 @@ if(!bDetected && isLMT()) {
 	sName = "RPGMaker 2000/2003 map tree data (.LMT)"; bDetected = true;
 	if(bad.length) sVersion = sVersion.appendS('malformed'+bad,'/')
 	if(X.isVerbose()) {
-		sOption('for: '+title); sOption(addEllipsis(maps.join(','),0xA0),len+' maps:'); sOption(outSz(sz),'sz:')
+		sOption('for: '+title); sOption(addEllipsis(maps.join(', '),0xC0), len+' maps:'); sOption(outSz(sz),'sz:')
 	}
 }
 
