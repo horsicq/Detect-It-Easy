@@ -577,7 +577,7 @@ var nTime = PE.endTiming(nProfiling, "PROFILING");
 
 ```
 ```
-**List<qint32> readBytes(qint64 nOffset, qint64 nSize, bool bReplaceZeroWithSpace = false)**
+**List<quint32> readBytes(qint64 nOffset, qint64 nSize, bool bReplaceZeroWithSpace = false)**
 
 ```
 ```
