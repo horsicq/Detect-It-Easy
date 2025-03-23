@@ -3,7 +3,7 @@
 ```bash
 git clone https://github.com/horsicq/DIE-engine.git
 cd DIE-engine
-docker build . -t horsicq:diec
+sudo docker build . -t horsicq:diec
 ```
 
 # How to build on Linux based on Debian
