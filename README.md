@@ -10,7 +10,7 @@
 ## 🚀 Getting Started
 
 - **[💎 Download release](https://github.com/horsicq/DIE-engine/releases)**
-- **[🧪 Download dev/beta](https://github.com/horsicq/Detect-It-Easy/releases/tag/Beta)**
+- **[🧪 Download dev/beta](https://github.com/horsicq/DIE-engine/releases/tag/Beta)**
 - **[🚀 DIE API Library (for Developers)](https://github.com/horsicq/die_library)**
 - [📋 Changelog](https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt)
 - [💬 Contribute to Translations](https://github.com/horsicq/XTranslation)
