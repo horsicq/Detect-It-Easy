@@ -1,0 +1,83 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "master" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+
+      # Set git to use CRLF line endings
+      - name: Configure git CRLF
+        run: |
+          git config --global core.autocrlf true
+          
+      # Clone Detect-It-Easy repository
+      - name: Clone Detect-It-Easy
+        run: |
+          git clone https://github.com/horsicq/Detect-It-Easy DIE
+          
+      # Create zip archives
+      - name: Create zip archives
+        run: |
+          cd DIE
+          zip -r ../db.zip db
+          zip -r ../db_extra.zip db_extra
+          cd ..
+          ls -la *.zip  # Verify the zip files were created
+
+      # Calculate MD5 checksums
+      - name: Calculate MD5 checksums
+        id: md5
+        run: |
+          DB_MD5=$(md5sum db.zip | awk '{print $1}')
+          DB_EXTRA_MD5=$(md5sum db_extra.zip | awk '{print $1}')
+          echo "DB_MD5=$DB_MD5" >> $GITHUB_OUTPUT
+          echo "DB_EXTRA_MD5=$DB_EXTRA_MD5" >> $GITHUB_OUTPUT
+          
+      # Get the current date for the update message
+      - name: Get current date
+        id: date
+        run: echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          
+      # Update the "Current database" pre-release
+      - name: Update Database Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            db.zip
+            db_extra.zip
+          name: "Current database"
+          tag_name: current-database
+          body: |
+            # Detect-It-Easy Database Files
+            
+            Last updated: ${{ steps.date.outputs.DATE }}
+            
+            This pre-release contains the latest database files from Detect-It-Easy:
+            - db.zip: Contains main database files
+            - db_extra.zip: Contains extra database files
+
+            ### MD5 Checksums
+            - db.zip: `${{ steps.md5.outputs.DB_MD5 }}`
+            - db_extra.zip: `${{ steps.md5.outputs.DB_EXTRA_MD5 }}`
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
