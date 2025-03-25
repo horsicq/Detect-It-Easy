@@ -1,0 +1,307 @@
+name: Build Beta
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "master" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  SRC_PATH: ${{ github.workspace }}/src
+  SRC_PATH_WIN: ${{ github.workspace }}\src
+  RELEASE_PATH: ${{ github.workspace }}/src/release
+
+# the jobs are based on these notes:
+# https://github.com/horsicq/Detect-It-Easy/blob/master/docs/BUILD.md
+jobs:
+  build-ubuntu-24:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+         submodules: 'recursive'
+         path: ${{ env.SRC_PATH }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install qtbase5-dev qtscript5-dev qttools5-dev-tools libqt5svg5-dev qtchooser qt5-qmake build-essential -y
+      - name: Build
+        working-directory: ${{ env.SRC_PATH }}
+        run: |
+          bash -x build_dpkg.sh
+      - name: Upload Release as Artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu24-artifact
+          path: |
+            ${{ env.RELEASE_PATH }}/*.deb
+      - name: Upload Release as Download
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          tag_name: Beta
+          release_name: Beta
+          draft: false
+          prerelease: true
+          files: |
+            ${{ env.RELEASE_PATH }}/*.deb
+            
+  build-ubuntu-24-arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+         submodules: 'recursive'
+         path: ${{ env.SRC_PATH }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install qtbase5-dev qtscript5-dev qttools5-dev-tools libqt5svg5-dev qtchooser qt5-qmake build-essential -y
+      - name: Build
+        working-directory: ${{ env.SRC_PATH }}
+        run: |
+          bash -x build_dpkg.sh
+      - name: Upload Release as Artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu24-arm-artifact
+          path: |
+            ${{ env.RELEASE_PATH }}/*.deb
+      - name: Upload Release as Download
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          tag_name: Beta
+          release_name: Beta
+          draft: false
+          prerelease: true
+          files: |
+            ${{ env.RELEASE_PATH }}/*.deb
+  build-ubuntu-22:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+         submodules: 'recursive'
+         path: ${{ env.SRC_PATH }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install qtbase5-dev qtscript5-dev qttools5-dev-tools libqt5svg5-dev qtchooser qt5-qmake build-essential -y
+      - name: Build
+        working-directory: ${{ env.SRC_PATH }}
+        run: |
+          bash -x build_dpkg.sh
+      - name: Upload Release as Artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu22-artifact
+          path: |
+            ${{ env.RELEASE_PATH }}/*.deb
+      - name: Upload Release as Download
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          tag_name: Beta
+          release_name: Beta
+          draft: false
+          prerelease: true
+          files: |
+            ${{ env.RELEASE_PATH }}/*.deb
+  build-ubuntu-20:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+         submodules: 'recursive'
+         path: ${{ env.SRC_PATH }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install qtbase5-dev qtscript5-dev qttools5-dev-tools libqt5svg5-dev qt5-default build-essential -y
+      - name: Build
+        working-directory: ${{ env.SRC_PATH }}
+        run: |
+          bash -x build_dpkg.sh
+      - name: Upload Release as Artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu20-artifact
+          path: |
+            ${{ env.RELEASE_PATH }}/*.deb
+      - name: Upload Release as Download
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          tag_name: Beta
+          release_name: Beta
+          draft: false
+          prerelease: true
+          files: |
+            ${{ env.RELEASE_PATH }}/*.deb
+  build-windows-32:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v4
+        with:
+         submodules: 'recursive'
+         path: ${{ env.SRC_PATH }}
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x86
+          vs-version: '[16.0,17.0)'
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.15.2'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win32_msvc2019'
+          dir: ${{ github.workspace }}
+          modules: qtscript
+
+      - name: Build
+        shell: cmd
+        working-directory: ${{ env.SRC_PATH }}
+        run: |
+          set VSVARS_PATH="C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
+          set QMAKE_PATH="${{ github.workspace }}\Qt\5.15.2\msvc2019\bin\qmake.exe"
+          set SEVENZIP_PATH="C:\Program Files\7-Zip\7z.exe"
+          set INNOSETUP_PATH="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          set X_BUILD_NAME=die
+          set X_BUILD_PREFIX=win32
+          set X_SOURCE_PATH=${{ env.SRC_PATH_WIN }}
+          for /f "delims=" %%x in ('type "%X_SOURCE_PATH%\release_version.txt"') do set X_RELEASE_VERSION=%%x
+          echo on
+          call "%X_SOURCE_PATH%\build_win_generic_check.cmd"
+          dir "%X_SOURCE_PATH%\release\*.zip" >nul 2>&1
+          if %ERRORLEVEL% neq 0 (
+            echo "ZIP file does not exist"
+            exit /b 1
+          )
+      - name: Upload Release as Artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows32-artifact
+          path: |
+            ${{ env.RELEASE_PATH }}/*.zip
+      - name: Upload Release as Download
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          tag_name: Beta
+          release_name: Beta
+          draft: false
+          prerelease: true
+          files: |
+            ${{ env.RELEASE_PATH }}/*.zip
+  build-windows-64:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v4
+        with:
+         submodules: 'recursive'
+         path: ${{ env.SRC_PATH }}
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+          vs-version: '[16.0,17.0)'
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.15.2'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
+          dir: ${{ github.workspace }}
+          modules: qtscript
+
+      - name: Build
+        shell: cmd
+        working-directory: ${{ env.SRC_PATH }}
+        run: |
+          set VSVARS_PATH="C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          set QMAKE_PATH="${{ github.workspace }}\Qt\5.15.2\msvc2019_64\bin\qmake.exe"
+          set SEVENZIP_PATH="C:\Program Files\7-Zip\7z.exe"
+          set INNOSETUP_PATH="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          set X_BUILD_NAME=die
+          set X_BUILD_PREFIX=win64
+          set X_SOURCE_PATH=${{ env.SRC_PATH_WIN }}
+          for /f "delims=" %%x in ('type "%X_SOURCE_PATH%\release_version.txt"') do set X_RELEASE_VERSION=%%x
+          echo on
+          call "%X_SOURCE_PATH%\build_win_generic_check.cmd"
+          dir "%X_SOURCE_PATH%\release\*.zip" >nul 2>&1
+          if %ERRORLEVEL% neq 0 (
+            echo "ZIP file does not exist"
+            exit /b 1
+          )
+      - name: Upload Release as Artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows64-artifact
+          path: |
+            ${{ env.RELEASE_PATH }}/*.zip
+      - name: Upload Release as Download
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          tag_name: Beta
+          release_name: Beta
+          draft: false
+          prerelease: true
+          files: |
+            ${{ env.RELEASE_PATH }}/*.zip
+# build-osx:
+#   runs-on: macos-latest
+#   steps:
+#     - uses: actions/checkout@v4
+#       with:
+#        submodules: 'recursive'
+#        path: ${{ env.SRC_PATH }}
+
+#     - name: Install Qt
+#       uses: jurplel/install-qt-action@v4
+#       with:
+#         version: '5.15.2'
+#         host: 'mac'
+#         target: 'desktop'
+#         arch: 'clang_64'
+#         # I make it match what build_mac.sh expects. Although I could also use Qt5_DIR
+#         #dir: ${{ env.HOME }}
+#         dir: /Users/runner
+#         modules: qtscript
+
+#     - name: Build
+#       working-directory: ${{ env.SRC_PATH }}
+#       run: |
+#         bash -x build_mac.sh
