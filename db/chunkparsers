@@ -1,0 +1,55 @@
+// Various systems' DOS chunk format parser functions.
+// They return info or the number -1 if it's not the right format.
+// Author: Kaens (TG @kaens)
+/* beautify ignore:start */
+
+includeScript("read");
+
+/**
+ * If it's an Amiga hunk file, parses it and tries to be strict in case of garbage past EoF.
+ * @returns {Array} [nTotalSize,aBlockInfo,c] where:
+ *  - nTotalSize: -1 if the file is not an Atari DOS "binary save", otherwise the total expected size;
+ *  - aBlockInfo: an Array with separate block types, offsets, and sizes, its length reflecting the number of hunks
+ */
+function parseAmigaHunks() {
+	//TODO check types, check reslibs, break off if invalid
+	if(!X.c("000003F3")) return [-1, []]; //is it an Amiga hunk file?
+	var p = 4, x = sz = i = reslibs = 0, info = [], load = true;
+	//library strings:
+	while(p < X.Sz()) {
+		x = X.U32(4,_BE); p += 4; if(!reslibs && x) load = false; if(x) reslibs++; else break; p += 4*x
+	}
+	var hunks = X.U32(p+8,_BE) - X.U32(p+4,_BE) + 1; p += 12;
+//sOption(hunks+' hunks')
+	for(i=0; i < hunks && p < X.Sz(); i++,p+=4) {
+	//traverse hunks:
+		var t = X.U32(p,_BE), add = (t>>30) == 3? 4: 0; t &= 0x3FFFFFFF; t <<= 2; t += add;
+//_log('@'+Hex(p)+' hunk#'+i+' = '+Hex(t));
+		info.push([0/*TODO*/,sz,t]); sz += t
+	}
+	sz += p;
+	if(!info.length) return [-1,[]];  else return [sz,info]
+}
+
+/**
+ * If it's an Atari DOS block file, parses it and tries to be strict in case of garbage past EoF.
+ * @returns {Array} [nTotalSize,aBlockInfo] where:
+ *  - nTotalSize: -1 if the file is not an Atari DOS "binary save", otherwise the total expected size;
+ *  - aBlockInfo: an Array of arrays with each block's offsets and sizes, its length reflecting the number of blocks
+*/
+function parseAtariBinary() {
+	if(!X.c("FFFF") || X.Sz() < 6) return [-1, []];
+	var hksz = 0,
+		RAM = [],
+		hkinfo = [],
+		p = 2;
+	while(p+4 <= X.Sz() && p < 65520) {
+		var ptr = X.U16(p);
+		if(!hkinfo.length && ptr == 0xFFFF) { p += 2; ptr = X.U16(p) } // the subsequent blocks don't have to have a sig
+		var eptr = X.U16(p+2); if(eptr < ptr || (ptr <= 0xD7FF && eptr >= 0xD000)) break;
+		hksz = eptr+1-ptr; if(p + hksz > X.Sz()) if(!n) break;
+		RAM.push(ptr,hksz); if(findIntersections(RAM,true).length) break;
+		p += 4; hkinfo.push([p,hksz]); p += hksz
+	}
+	if(!hkinfo.length) return [-1, []];  else return [p, hkinfo]
+}

@@ -426,7 +426,7 @@ function detect() {
 		/*9*/'ZX128ksnap','Opentype','ZXexec','UNI-DOSdir','UNI-DOScreate','14?','15?','SAMBASIC','SAMnum.array',
 		/*18*/'SAMstr.array','SAMcode','SAMscr','MasterDOSdir','SAMDriverapp','SAMDriverbootstrap','EDOSNOMEN',
 			'EDOSsys','EDOSovl','27?','HDOSHdos','HDOSHdir','HDOSHdisk','HDOSHfree/Htmp'];
-		if((X.U8(0) & 0x3F) != 19 && charStat(X.readBytes(0xD2,10),1).indexOf('allasc') >= 0) {
+		if((X.U8(0) & 0x3F) != 19 && charStat(readU8Array(0xD2,10),1).indexOf('allasc') >= 0) {
 			sam[0] += 10; label = X.SA(0xD2,10).trim() }
 //if(xroot) _l2r('mgt',0xFF,xroot+' xroot found!'); if(samboot) _l2r('mgt',0x100,'SAM BOOT found!')
 		for(p=_sec=_side=_trk=0,end=false; _trk < 4+xroot && p < X.Sz(); ) {
@@ -435,7 +435,7 @@ function detect() {
 //_l2r('mgt',p,'looking at rec #'+files+'"'+X.SA(p+1,10)+'": T'+_trk+'S'+_side+'s'+_sec+' type '+X.U8(p))
 				if(!X.U8(p+1)) {end = true; continue }
 				if(end) sus++; files++;
-				var fname1 = X.readBytes(p+2,9); if(charStat(fname1,1).indexOf('allasc') < 0) return false; //space-padded
+				var fname1 = readU8Array(p+2,9); if(charStat(fname1,1).indexOf('allasc') < 0) return false; //space-padded
 				var ft = (X.U8(p)&0x3F); if(ft > 0x1F) return false; //file type
 				if(!ft) erased++; else if(isWithin(ft,1,11)) zx[0]++; else if(isWithin(ft,12,13)) dd[0]++;
 				else if(isWithin(ft,16,23)) sam[0]++; else hd[0]++;
@@ -732,7 +732,7 @@ function detect() {
 		}
 	}
 
-	else if(X.c("'ZXST'") && charStat(X.readBytes(0x10+X.U32(0xC),4),1).indexOf('allxsc') >= 0
+	else if(X.c("'ZXST'") && charStat(readU8Array(0x10+X.U32(0xC),4),1).indexOf('allxsc') >= 0
 		&& X.fSig(8,0x200,"'Z80R'") > 0 && X.fSig(0x20,0x200,"'SPCR'") > 0
 		&& isWithin(V=X.U8(4),1,1) && (v=X.U8(5)) <= 5 && (hw=X.U8(6)) <= 16 && (fl=X.U8(7)) <= 1) {
 		//ref https://sinclair.wiki.zxnet.co.uk/wiki/ZX-State_format
@@ -754,7 +754,7 @@ function detect() {
 			var p = 8;
 			while(p < X.Sz()) {
 				var hkhd = X.SA(p,4), hksz = X.U32(p+4);
-				if(!hksz || hksz+p > X.Sz() || charStat(X.readBytes(p,4),1).indexOf('allxsc') < 0
+				if(!hksz || hksz+p > X.Sz() || charStat(readU8Array(p,4),1).indexOf('allxsc') < 0
 					|| hkhd.length < 2 || hkhd.toUpperCase() != hkhd) break;
 				p += 8;
 				switch(hkhd) {
@@ -802,7 +802,7 @@ function detect() {
 			switch(X.U8(p++)) {
 			case 0x10:
 				if(!X.U8(p+4)) { //loading flag(?)
-					if(charStat(t=X.readBytes(p+6,10), 1).indexOf('allasc') < 0) bad = bad.addIfNone('!nonASCIIfn');
+					if(charStat(t=readU8Array(p+6,10), 1).indexOf('allasc') < 0) bad = bad.addIfNone('!nonASCIIfn');
 					t = decEncoding(t,CPSpeccy).trim(); tp = X.U8(p+5);
 					if(!t && tp < 3) bad = bad.addIfNone('!emptyfn');
 					fnames = fnames.appendS(t+'.'+types[tp], ',')
@@ -1148,7 +1148,7 @@ function detect() {
 		for(; i < maxlump; i++, p += 0x10) {
 			if(p+0x10 > X.Sz()) return false;
 			var ofs = X.I32(p,en), sz = X.I32(p+4,en); if(ofs < 0 || sz < 0 || !isWithin(ofs,12,X.Sz())) return false;
-			if(X.c("'ENDOFWAD'",p+8)) susBE++; lumps.push([ofs,sz,X.readBytes(p+8,8)]);
+			if(X.c("'ENDOFWAD'",p+8)) susBE++; lumps.push([ofs,sz,readU8Array(p+8,8)]);
 		}
 		lumps = lumps.sort(function(a,b){return a[0]-b[0]});
 		for(i=0; i < maxlump; i++) {
@@ -1336,7 +1336,10 @@ if(!bDetected && X.isHeuristicScan()) {
 				for(i=p; i < p+hksz-1; i++) c ^= X.U8(i);  if(c != X.U8(i)) return false;
 			}
 			if(tp == 0) {
-				if(charStat(t=X.readBytes(p+2,10), 1).indexOf('allasc') < 0) { sus++; bad = bad.addIfNone('!nonASCII:'+decEncoding(t,CPSpeccy)) }
+//_l2r('tap',p+2,readU8Array(p+2,10)+':'
+//	+outArray(readU8Array(p+2,10),16)
+//	+' -> '+decEncoding(readU8Array(p+2,10),CPSpeccy))
+				if(charStat(t=readU8Array(p+2,10), 1).indexOf('allasc') < 0) { sus++; bad = bad.addIfNone('!nonASCII:'+decEncoding(t,CPSpeccy)) }
 				t = decEncoding(t,CPSpeccy).trim();
 				if(!t) if(X.U8(p+1) < 3) return false; else { sus++; bad = bad.addIfNone('!emptyname') }
 				fnames = fnames.appendS(t+'.'+types[X.U8(p+1)], ',') }
@@ -1346,7 +1349,7 @@ if(!bDetected && X.isHeuristicScan()) {
 		if(!fnames.length && blk) { sus++; bad = bad.addIfNone('!nonameblk0') }
 		if(blk < 2 && bad.indexOf('!nonASCII')) sus++;
 		//if(X.Sz() != p) sus++;
-		if(sus > 2 || !blk || !fnames.length) { delete bad; return false }
+		if(sus > 2 || !blk || !fnames.length || p < 17) { delete bad; return false }
 		return true
 	}
 	if(isTAP()) {

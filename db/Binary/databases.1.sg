@@ -9,10 +9,6 @@ function detect() {
     if (Binary.compare("00010000'Standard Jet DB'00")) {
         sName = "Microsoft Access database (.MDB)";
         bDetected = true;
-    } else if (Binary.compare("00010000'Standard ACE DB'00")) {
-        sName = "Microsoft Access database (.MDB)";
-        sVersion = "2010";
-        bDetected = true;
     }
 
     function isDBF() {
@@ -53,7 +49,7 @@ function detect() {
                 upd = y+'-'+m.padStart(2,'0')+d.padStart(2,'0') }
             recc = X.U32(4); if(!recc) return false;
             hdrsz = X.U16(8); recsz = X.U16(0xA); if(hdrsz < 0x20 || !recsz) return false;
-            res0 = X.U24(0xC); res1 = X.readBytes(0xF,13); res2 = X.U32(0x1C);
+            res0 = X.U24(0xC); res1 = readU8Array(0xF,13); res2 = X.U32(0x1C);
             if([4,0x8C].indexOf(nv) >= 0) {
                 rectp = 0x44; enc = 'CP'+X.SA(0x22,3); if(isWithin((t=X.SA(0x25,1)),'0','9')) enc += t;
                 if(enc == 'CPKOI8') enc += X.SA(0x26,1);  v5 = true
@@ -85,7 +81,7 @@ function detect() {
         validC = ['C','N','L','D','M','F','B','G','P','Y','T','I','V','X','@','O','+','0'];
         fldc = 0; totalfldsz = 1 /* we begin with a deletion flag */; p = rectp; old = [0,1];
         while(X.U8(p) != 0xD && p < hdrsz) {
-            name = X.readBytes(p,v5? 0x1F: 11); ns = charStat(name,1);
+            name = readU8Array(p,v5? 0x1F: 11); ns = charStat(name,1);
 //_log('fld#'+fldc+' @'+Hex(p)+': '+decEncoding(name,CP866)+' (ns=['+ns+'])')
             if(!name[0] || (ns.indexOf('allxsc') < 0 && ns.indexOf('allforeign') < 0)) return false;
             tp = X.SA(v5? p+0x20: p+0xB,1); if(validC.indexOf(tp) < 0) return false;
