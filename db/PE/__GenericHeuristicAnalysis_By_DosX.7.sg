@@ -3166,80 +3166,78 @@ function scanForLanguages_NET_and_Native() {
     }
 
 
-    if (!_getNumberOfResults("protector") &&
-        !_getNumberOfResults("cryptor") &&
-        !_getNumberOfResults("~cryptor")
-    ) {
 
-        var isPpLibraryPresent = false,
-            isCLibraryPresent = false;
+    var isPpLibraryPresent = false,
+        isCLibraryPresent = false;
 
-        for (var i = 0; i < PE.getNumberOfImports(); i++) {
-            const libraryName = PE.getImportLibraryName(i).toLowerCase();
+    for (var i = 0; i < PE.getNumberOfImports(); i++) {
+        const libraryName = PE.getImportLibraryName(i).toLowerCase();
 
-            // Detect mangler
-            for (var k = 0; k < PE.getNumberOfImportThunks(i); k++) {
-                const functionName = PE.getImportFunctionName(i, k); // import, thunk
+        // Detect mangler
+        for (var k = 0; k < PE.getNumberOfImportThunks(i); k++) {
+            const functionName = PE.getImportFunctionName(i, k); // import, thunk
 
-                if (!isPpLibraryPresent && isFunctionMangled(functionName)) {
-                    log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledFunction(functionName) + "\"");
+            if (!isPpLibraryPresent && isFunctionMangled(functionName)) {
+                log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledFunction(functionName) + "\"");
 
 
-                    if (!_getNumberOfResults("compiler") && !_getNumberOfResults("~compiler")) {
-                        if (functionName[0] == '_') {
-                            _setResult("~compiler", "MinGW", String(), String());
-                        } else if (functionName[0] == '?') {
-                            _setResult("~compiler", "Microsoft Visual C/C++", String(), String());
-                        }
+                if (!_getNumberOfResults("compiler") && !_getNumberOfResults("~compiler")) {
+                    if (functionName[0] == '_') {
+                        _setResult("~compiler", "MinGW", String(), String());
+                    } else if (functionName[0] == '?') {
+                        _setResult("~compiler", "Microsoft Visual C/C++", String(), String());
                     }
-
-                    // if (!_isLangDetected()) 
-                    isPpLibraryPresent = true; // if language is unknown
                 }
-            }
 
-
-
-            if (libraryName.indexOf("msvcr") !== -1) {
-                log(logType.any, "C library present -> \"" + libraryName + "\"");
-                isCLibraryPresent = true;
-            }
-
-            if (
-                libraryName.indexOf("++") !== -1 ||
-                libraryName.indexOf("cpp") !== -1 ||
-                libraryName.indexOf("msvcp") !== -1
-            ) {
-                log(logType.any, "C++ library present -> \"" + libraryName + "\"");
-                isPpLibraryPresent = true;
+                // if (!_isLangDetected()) 
+                isPpLibraryPresent = true; // if language is unknown
             }
         }
 
 
 
-
-        const rdataSection = PE.section[".rdata"];
-
-        if (rdataSection) {
-            if (c_cpp && // if C/C++ detected by DIE
-                PE.isSignaturePresent(
-                    rdataSection.FileOffset,
-                    rdataSection.FileSize,
-                    generateUnicodeSignatureMask("Visual C++"))) {
-
-                log(logType.any, "Embedded Visual C++ Runtime detected.");
-                isPpLibraryPresent = true; // Visual C++ Runtime library in resources
-            }
+        if (libraryName.indexOf("msvcr") !== -1) {
+            log(logType.any, "C library present -> \"" + libraryName + "\"");
+            isCLibraryPresent = true;
         }
 
+        if (
+            libraryName.indexOf("++") !== -1 ||
+            libraryName.indexOf("cpp") !== -1 ||
+            libraryName.indexOf("msvcp") !== -1
+        ) {
+            log(logType.any, "C++ library present -> \"" + libraryName + "\"");
+            isPpLibraryPresent = true;
+        }
+    }
 
-        if (isPpLibraryPresent || (c_cpp && PE.isSignaturePresent(0x00, PE.getSize() - PE.getOverlaySize(), "' C++ '"))) {
-            _setLangByHeur("C++");
-        } else if (!_isLangPresent("C++") && isCLibraryPresent && (PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
-            _setLangByHeur("C");
-        } else if (PE.isLibraryPresentExp(/^api-ms-win-crt*/i) || PE.section[".msvcjmc"]) {
-            _setLangByHeur("C/C++");
-        } else if (!_isLangDetected() && !_getNumberOfResults("compiler") && !PE.isNET()) {
+
+
+
+    const rdataSection = PE.section[".rdata"];
+
+    if (rdataSection) {
+        if (c_cpp && // if C/C++ detected by DIE
+            PE.isSignaturePresent(
+                rdataSection.FileOffset,
+                rdataSection.FileSize,
+                generateUnicodeSignatureMask("Visual C++"))) {
+
+            log(logType.any, "Embedded Visual C++ Runtime detected.");
+            isPpLibraryPresent = true; // Visual C++ Runtime library in resources
+        }
+    }
+
+    if (isPpLibraryPresent || (c_cpp && PE.isSignaturePresent(0x00, PE.getSize() - PE.getOverlaySize(), "' C++ '"))) {
+        _setLangByHeur("C++");
+    } else if (!_isLangPresent("C++") && isCLibraryPresent && (PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
+        _setLangByHeur("C");
+    } else if (PE.isLibraryPresentExp(/^api-ms-win-crt*/i) || PE.section[".msvcjmc"]) {
+        _setLangByHeur("C/C++");
+    } else if (!_isLangDetected() && !_getNumberOfResults("compiler") && !PE.isNET()) {
+        if (!_getNumberOfResults("protector") &&
+            !_getNumberOfResults("cryptor") && !_getNumberOfResults("~cryptor") &&
+            !_getNumberOfResults("packer") && !_getNumberOfResults("~packer")) {
             _setLangByHeur("ASMx" + (PE.is64() ? "64" : "86"));
         }
     }
