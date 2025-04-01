@@ -1,0 +1,59 @@
+function _forceCaching(fn) {
+    var cacheStore = {};
+
+    return function() {
+        var args = Array.prototype.slice.call(arguments),
+            key = JSON.stringify(args);
+
+        if (cacheStore.hasOwnProperty(key)) {
+            return cacheStore[key];
+        }
+
+        return cacheStore[key] = fn.apply(this, arguments);
+    };
+}
+
+
+var useBetaDieEngineCachingTechology = true;
+
+if (useBetaDieEngineCachingTechology) {
+    var classNames = [
+        "Amiga", "APK", "Archive", "Binary", "COM", "DEX", "DOS4G", "DOS16M",
+        "ELF", "IPA", "JAR", "LE", "LX", "MACH", "MACHOFAT", "MSDOS", "NE", "NPM", "PDF", "PE", "ZIP"
+    ];
+
+    var methodsToWrap = [
+        "isSignaturePresent",
+        "isSignatureInSectionPresent",
+        "findSignature",
+        "compare",
+        "findString"
+    ];
+
+    for (var i = 0; i < classNames.length; i++) {
+        var className = classNames[i];
+
+        try {
+            if (typeof this[className] === "object" || typeof this[className] === "function") {
+                var cls = this[className];
+
+                for (var j = 0; j < methodsToWrap.length; j++) {
+                    var methodName = methodsToWrap[j];
+                    if (typeof cls[methodName] === "function") {
+                        cls[methodName] = _forceCaching(cls[methodName]);
+                    }
+                }
+            }
+        } catch (e) {
+            _error(e.message);
+        }
+    }
+
+    try {
+        if (typeof this.PE !== "undefined" && typeof this.PE.isNetObjectPresent === "function") {
+            this.PE.isNetObjectPresent = _forceCaching(this.PE.isNetObjectPresent);
+        }
+    } catch (e) {
+        _error(e.message);
+    }
+}
