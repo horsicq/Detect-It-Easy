@@ -7,9 +7,9 @@ includeScript("read");
 
 function detect() {
     //ref https://www.fileformat.info/format/pcx/spec/a10e75307b3a4cc49c3bbe6db4c41fa2/view.htm
-    if (File.getSize() >= 0x50) {
-        if (File.compare("0a") && !File.read_uint8(0x40)) {
-            switch (nv = File.read_uint8(0x01)) {
+    if (X.Sz() >= 0x50) {
+        if (X.U8(0) === 10) {
+            switch (nv = X.U8(0x01)) {
                 case 0:
                     sVersion = "v2.5 using a fixed EGA palette";
                     break;
@@ -29,41 +29,43 @@ function detect() {
                     return;
             }
             var sus = '', inv = 0; // strictly-speaking-invalid or highly unlikely parameter counter
-            var rle = File.read_uint8(0x02);
+            var rle = X.U8(0x02);
             if (rle > 1) return;
             if (!rle) { inv++; sus += '!uncompressed' }
-            var w = File.read_uint16(0x08) - File.read_uint16(0x04) + 1,
-                h = File.read_uint16(0x0A) - File.read_uint16(0x06) + 1;
+            var w = X.U16(0x08) - X.U16(0x04) + 1,
+                h = X.U16(0x0A) - X.U16(0x06) + 1;
             if (w <= 0 || h <= 0) return;
-            var bpplane = File.read_uint8(0x03),
-                nplanes = File.read_uint8(0x41),
+            var xdpi = X.U16(0xC),
+                ydpi = X.U16(0xE);
+            if(xdpi && !isWithin(xdpi,32,600)) { inv++; sus += '!susXdpi' };
+            if(ydpi && !isWithin(ydpi,32,600)) { inv++; sus += '!susYdpi' };
+            var bpplane = X.U8(0x03),
+                nplanes = X.U8(0x41),
                 bpx = bpplane * nplanes,
-                pal = false;
+                pal = ext = false;
             if ([1, 2, 4, 8, 24].indexOf(bpplane) < 0) return;
             if (!nplanes || nplanes > 4) return;
-            if (!X.c("00",0x40)) { inv++; sus += '!resnon0' }
+            if (X.U8(0x40)) { inv += 2; sus += '!resnon0' }
             if (!isAllZeroes(0x4A, 0x36)) ext = true;
             if (pal && ([0, 3].indexOf(nv) < 0 || bpx > 4)) { inv++; sus += '!badpalette' }
-            var bpline = File.read_uint16(0x42); if (bpline % 2) return;
+            var bpline = X.U16(0x42); if (bpline % 2) return;
             if (bpline < w*bpx >> 3) { inv++; sus += '!bpline'+bpline+'<w'+(w*bpx/8) }
-            if (inv > 2) return;
-            if (inv) sVersion = sVersion.appendS('sus'+sus,'/')
-            if (File.isVerbose()) {
+            if (inv > 3) return;
+            if (inv && sus != "!uncompressed") sVersion = sVersion.appendS('sus'+sus,'/')
+            if (X.isVerbose()) {
                 sOption(w + "x" + h);
                 if (rle) sOption("RLE");
                 if (ext) sOption("extra_block");
                 sOption(bpx, "bit/pixel:");
                 sOption(bpplane, "bit/plane:");
                 if(bpline < w*bpx >> 3) sOption(bpline, "scanline:");
-                sOption(File.read_uint16(0x0C) + "x" + File.read_uint16(0x0E), "res:", " dpi");
-                var scrw = File.read_uint16(0x46),
-                    scrh = File.read_uint16(0x48);
-                if (scrw * scrh) sOption(scrw + "x" + scrh, "screen:");
-                if (!rle) sOption(0x80 + (w * h * bpx >> 3), "sz:") //but it's never not RLE, sorry
+                sOption(xdpi + "x" + ydpi, "res:", " dpi");
+                if (X.U16(0x46) * X.U16(0x48)) sOption(X.U16(0x46) + "x" + X.U16(0x48), "screen:");
+                if (!rle) sOption(0x80 + (w * h * bpx >> 3), "sz:")
             }
-            bDetected = true;
+            bDetected = true
         }
     }
 
-    return result();
+    return result()
 }
