@@ -9,6 +9,11 @@ includeScript("read");
 function detect() {
 	//ref https://jichu4n.github.io/palm-pdb/assets/Palm%20File%20Format%20Specification.pdf
 	// & https://github.com/jichu4n/palm-os-sdk/blob/master/sdk-3.1/include/Core/System/DataPrv.h
+	if(/S98[0-3]/.test(X.SA(0,4)) && X.U32(4) <= 0x20 && !X.U32(0xC)
+	  && (!X.U32(0x10) || isWithin(X.U32(0x10),0x20,0x800000))
+	  && X.U32(0x14) < 0x20000
+	  && (!X.U32(0x18) || isWithin(X.U32(0x18),X.U32(0x14),0x800000))
+	  && X.U32(0x1C) <= 0x40) return //too many FPs with the S98 chiptunes
 	var bad = '', sus = 0;
 
 	function palmDateToStr(dt,desc) {
@@ -22,7 +27,7 @@ function detect() {
 		if(!isWithin(date.getFullYear(), 1996, 2040) && date.getFullYear() != 1907)
 			if(isWithin(dt, 1996, 2040))
 				return 'y'+dt // some don't even realise it has a format and think it's just the year. (ZioGolf's zgrsc.pdb :D)
-			else return ''; //thankfully even with the special snowflakes it's' tight enough for detection
+			else return ''; //thankfully even with the special snowflakes it's tight enough for detection
 		var r = date.toISOString().slice(0, 19);
 		return r.slice(0, 4) == '1907'? '2001'+r.slice(4, 19): r
 	}
@@ -35,15 +40,19 @@ function detect() {
 		sortinfo = X.U32(0x38,_BE), tp = 'PDB', tp_ = X.SA(0x3C,4), by = X.SA(0x40,4);
 	var idseed = X.U32(0x44,_BE), nextrec = X.U16(0x48,_BE), numrec = X.U16(0x4C,_BE),
 		p = numrec? 0x4E: 0x50;
-	if(nextrec) bad = bad.addIfNone('!baddbdir'); //Palm specs say reject this db (artefacts of pre-v4 OSes)
+	if(!numrec) sus += 3; //useless pdb, or, more realistically, a FP
+	if(numrec > 0x7FFF) sus += 2; //haven't seen this many yet...
+	if(modnum > 0xFFF) sus += 2; //can't be that many versions, right?
+	if(nextrec) {sus++; bad = bad.addIfNone('!baddbdir') } //Palm specs say reject this db (artefacts of pre-v4 OSes)
+	if(idseed > 0xFFFFFF) sus++;
 	if(!/\w{3,}/.test(by)) return;
 	switch(tp_) { case 'appl': tp = 'PRC'; break;
 		case 'pqa ': if(by == 'clpr') tp = 'PQA'; else return;
 		default:
 			if(charStat(readU8Array(p,4),true).indexOf('allasc') >= 0) {
-				tp = 'PRC'; bad = bad.addIfNone('!badtype')} }
+				tp = 'PRC'; bad = bad.addIfNone('!badtype'+X.SA(p,4))} }
 	var dt = palmDateToStr(dtMod,'mod'),endp,reclen=8,m=i=0,mhk='',uniq=[];
-	if(dtMod && dt === '') sus += 2;
+	if(dtMod && dt === '') { sus += 2; bad = bad.addIfNone('!nodate') }
 	if(dtCre && palmDateToStr(dtCre,'cre') === '') sus++;
 	if(dtBak && palmDateToStr(dtBak,'bak') === '') sus++;
 
@@ -93,9 +102,11 @@ function detect() {
 		sz = Math.max(m,p)+'+'+mhk;
 
 	sName = "Palm OS file (."+tp+")"; bDetected = true;
+	if(sus) bad += '!sus×'+sus;
 	if(bad != '') sVersion = sVersion.appendS('malformed'+bad,'/');
 	if(X.isVerbose()) {
 		sOption(name); sOption(by,'by:'); sOption(dt,'lastmod'+(modnum > 1? ' (×'+modnum+')':'')+':');
+		sOption(Hex(idseed),"idseed:")
 		if(appinfo) sOption('appinfo');  if(sortinfo) sOption('sortinfo');  sOption(numrec,'res:'); sOption(sz,'sz:')
 	}
 
