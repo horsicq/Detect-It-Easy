@@ -9,11 +9,20 @@
 init("protector", "javascript-obfuscator");
 
 function detect() {
+    // Is JS file?
     if (isSignatureInBeginAndEndPresent("'function'") &&
-        isSignatureInBeginAndEndPresent("'var '")) {
+        (
+            isSignatureInBeginAndEndPresent("'var '") ||
+            isSignatureInBeginAndEndPresent("'const '") ||
+            isSignatureInBeginAndEndPresent("')();'")
+        )) {
 
-        if (isSignatureInBeginAndEndPresent("' _0x'")) {
-            bDetected = true;
+        if (isSignatureInBeginAndEndPresent("'_0x'")) {
+            if (isSignatureInBeginAndEndPresent("'_0x' .. .. .. .. '('") ||
+                isSignatureInBeginAndEndPresent("'_0x' .. .. .. .. .. '('") ||
+                isSignatureInBeginAndEndPresent("'_0x' .. .. .. .. .. .. '('")) {
+                bDetected = true;
+            }
         }
 
         if (isSignatureInBeginAndEndPresent("'parseInt(' .. '('")) {
@@ -31,8 +40,14 @@ function detect() {
 }
 
 function isSignatureInBeginAndEndPresent(signature) {
-    return (
-        Binary.isSignaturePresent(0, 1024, signature) ||
-        Binary.isSignaturePresent(Binary.getSize() - 1024, 1024, signature)
-    );
+    var chunkToAnalyze = 1024 * 10;
+
+    if (chunkToAnalyze > Binary.getSize())
+        chunkToAnalyze = Binary.getSize();
+
+    if (Binary.isSignaturePresent(0, chunkToAnalyze, signature)) {
+        return true;
+    } else if (chunkToAnalyze != Binary.getSize()) {
+        return Binary.isSignaturePresent(Binary.getSize() - chunkToAnalyze, chunkToAnalyze, signature);
+    }
 }
