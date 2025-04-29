@@ -1,12 +1,21 @@
 // Detect It Easy: detection rule file
 // Author: BJNFNE <bjnfne@web.de>
-// This Script supports following formats: MDS
 
-init("format", "MDS");
+init("format", "Alcohol 120% Media Descriptor Sidecar file (.MDS)");
 
 function detect() {
-    if (Binary.compare("'MEDIA DESCRIPTOR'")) {
-        sVersion = "Media Descriptor Sheet"
+    if (X.c("'MEDIA DESCRIPTOR'01")) //always v1.xx, as per libMirage parser.c
+    {
+        var cdt = '';
+        switch(X.U16(0x12,_LE)) { //an additional test, too
+        case 0: cdt = 'CD'; break;
+        case 1: cdt = 'CD-R'; break;
+        case 2: cdt = 'CD-RW'; break;
+        case 0x10: cdt = 'DVD'; break;
+        case 0x12: cdt = 'DVD-R'; break;
+        default: return;
+        }
+        sVersion = 'v1-'+X.U8(0x11)+'/'+cdt; // not '.' until this is zero-padded
         bDetected = true;
     }
 
