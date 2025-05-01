@@ -24,10 +24,8 @@ def count_signatures(base_path='../db'):
         signature_count[relative_path] = count
     
     # Generate Markdown table
-    print("| Subfolder | Signature Count |")
-    print("|-----------|-----------------|")
     for subfolder, count in signature_count.items():
-        print(f"| {subfolder} | {count} |")
+        print(f"{subfolder} : {count}")
 
 if __name__ == "__main__":
     # Get base path from command-line argument or use default
