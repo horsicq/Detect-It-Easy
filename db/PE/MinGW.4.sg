@@ -1,4 +1,5 @@
 // Detect It Easy: detection rule file
+// improved by fernandom - menteb.in - 2025.05
 
 init("compiler", "MinGW");
 
@@ -46,8 +47,10 @@ function detect() {
     else */
 
     if (PE.getMajorLinkerVersion() == 2) {
-        if (!bFPC && (PE.getMinorLinkerVersion() <= 30 || PE.getMinorLinkerVersion() == 36 || PE.getMinorLinkerVersion() == 56)) {
-            if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'0000000000000'PE'0000")) {
+        var minor = PE.getMinorLinkerVersion();
+
+        if(!bFPC && (minor <= 30 || minor == 36 || minor == 41 || minor == 44 || minor == 56)) {
+            if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000000000'PE'0000")) {
                 if (!PE.section[".rsrc"]) {
                     bDetected = true;
                 } else {
@@ -70,6 +73,10 @@ function detect() {
         if (buildidSection && rdataSection) {
             bDetected = PE.isSignaturePresent(rdataSection.FileOffset, rdataSection.FileSize, "'Mingw'");
         }
+    }
+
+    if (bDetected && !PE.isOverlayPresent()) {
+        sOptions = "stripped";
     }
 
     _setLang("C/C++", bDetected);
