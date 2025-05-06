@@ -42,7 +42,6 @@ if (visualDieOutputFix) {
 }
 
 
-
 /**
  * Processes the detection result and resets the detection variables.
  * 
@@ -60,9 +59,7 @@ function result() {
         bDetected = false;
     }
 
-    sName = String();
-    sVersion = String();
-    sOptions = String();
+    sName = sVersion =  sOptions = '';
 
     var resultValue = bDetected;
 
@@ -71,21 +68,23 @@ function result() {
     return resultValue;
 }
 
+
 /**
- * Gets the primitive value of the current object.
- * @type {string}
+ * Attaches new strings to `this`, separating everything with a comma and no space.
+ * @param {String...} the open list of strings to append.
  */
 String.prototype.append = function () {
     var s = this.valueOf(),
         sep = ",";
 
     if (arguments.length) {
-        if (s) s += sep;
+        if (s.length) s += sep;
         s += Array.prototype.join.call(arguments, sep);
     }
 
     return s;
 }
+
 
 /**
  * Append a string with a custom separator.
@@ -94,19 +93,20 @@ String.prototype.append = function () {
  * @returns {String} The new string.
  * @global
  * @example
- * sOptions=sOptions.appendS("debug","::");
+ * sOptions = sOptions.appendS("debug","::");
  */
 String.prototype.appendS = function (sString, sSep) {
     var s = this.valueOf(),
         sep = sSep || ",";
 
     if (sString) {
-        if (s) s += sep;
+        if (s.length) s += sep;
         s += sString;
     }
 
     return s;
 }
+
 
 String.prototype.addIfNone = function (substring) {
     var s = this.valueOf();
@@ -117,9 +117,33 @@ String.prototype.addIfNone = function (substring) {
     return s;
 }
 
+
+// Some ECMA6 functions that should be removed if DIE transitions to it
+String.prototype.beginsWith = function (s, min) { //the default case-sensitive version of beginsWith
+    var m = (typeof min == "number")? Math.min(s.length, min): 0;
+    if(s.length > this.length-m) return false; else return this.slice(m, s.length) == s
+}
+
+String.prototype.beginsWithCI = function (s, min) { //case-insensitive version of beginsWith
+    return this.toLowerCase().beginsWith(s.toLowerCase(), min)
+}
+
+String.prototype.endsWith = function (s, max) { //the default case-sensitive version of endsWith
+    var m = (typeof max == "number")? Math.min(this.length, max): this.length;
+    if(s.length > m) return false; else return this.slice(m-s.length, m) == s
+}
+
+String.prototype.endsWithCI = function (s, max) { //the case-insensitive version of endsWith
+    return this.toLowerCase().endsWith(s.toLowerCase(), max)
+}
+
+String.prototype.repeat = function (num) {
+    if(typeof num !== "number") return this;
+    var s = this; for(var i=1; i < num; i++) s += this; return s
+}
+
 /**
  * Pad the start of a line with spaces or the character given.
- * This reimplements missing functionality of the more modern ECMAScript.
  * @param {String or Number} The width desired.
  * @param {Number} [nPad=" "] The padding string. Loops.
  * @returns {String} The new string.
@@ -130,16 +154,17 @@ String.prototype.addIfNone = function (substring) {
 String.prototype.padStart = function (targetLength, padString) {
     var s = this.valueOf();
 
-    targetLength = targetLength >> 0; // truncate if number or convert non-number to 0;
+    targetLength >>= 0; // truncate if number or convert non-number to 0;
     padString = String(padString || ' ');
 
     if (s.length >= targetLength) {
         return String(s);
     }
 
-    targetLength = targetLength - s.length;
+    targetLength -= s.length;
     if (targetLength > padString.length) {
-        padString += padString.repeat(targetLength / padString.length); // append to original to ensure we are longer than needed
+        padString += padString.repeat(Math.ceil(targetLength / padString.length));
+        // append to original to ensure we are longer than needed
     }
 
     return padString.slice(0, targetLength) + String(s);
@@ -148,20 +173,18 @@ String.prototype.padStart = function (targetLength, padString) {
 Number.prototype.padStart = function (targetLength, padString) {
     var s = this.valueOf().toString();
 
-    targetLength = targetLength >> 0; // truncate if number or convert non-number to 0;
+    targetLength >>= 0; // truncate if number or convert non-number to 0;
     padString = String(padString || ' ');
 
-    if (s.length >= targetLength) {
-        return s;
-    }
+    if (s.length >= targetLength) return s;
 
-    targetLength = targetLength - s.length;
+    targetLength -= s.length;
     if (targetLength > padString.length) {
-        padString += padString.repeat(Math.ceil(targetLength / padString.length)); // append to original to ensure we are longer than needed
+        padString += padString.repeat(Math.ceil(targetLength / padString.length));
+        // append to original to ensure we are longer than needed
     }
 
     return padString.slice(0, targetLength) + s;
 }
 
 includeScript("language");
-includeScript("_db_caching");
