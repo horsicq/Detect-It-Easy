@@ -1,0 +1,82 @@
+// Detect It Easy: detection rule file
+// Author:
+//     Kaens TG@kaens
+
+init("format","Amiga Icon Format (.INFO)");
+
+function detect(bShowType,bShowVersion,bShowOptions) {
+
+    if(Binary.compare("E310 0001")) {
+        //http://www.evillabs.net/wiki/index.php/Amiga_Icon_Formats
+        bDetected = 1;
+        ic_Type = File.read_uint8(0x30);
+        switch(ic_Type) {
+            case 1: sVersion = "DISK"; break;
+            case 2: sVersion = "DRAWER"; break;
+            case 3: sVersion = "TOOL"; break;
+            case 4: sVersion = "PROJECT"; break;
+            case 5: sVersion = "GARBAGE"; break;
+            case 6: sVersion = "malformed:DEVICE"; break;
+            case 7: sVersion = "KICK"; break;
+            case 8: sVersion = "malformed:APPICON"; break;
+            default: sVersion = "malformed"
+        }
+        if(Binary.isVerbose()) {
+            ic_DefaultTool = File.read_uint8(0x32)!=0;
+            ic_ToolTypes = File.read_uint8(0x36)!=0;
+            ic_CurrentX = File.read_int32(0x3A,_BE);
+            ic_CurrentY = File.read_int32(0x3E,_BE);
+            ic_DrawerData = File.read_uint8(0x42)!=0;
+            ic_ToolWindow = File.read_uint8(0x46)!=0;
+            p = 4; //struct Gadget
+            ga_Width = File.read_int16(p+0x08,_BE);
+            ga_Height = File.read_int16(p+0x0A,_BE);
+            ga_SelectRender = File.read_uint8(p+0x16)!=0;
+            p = 0x4E;
+            if(ic_DrawerData) { p+=0x38; sOption("Drawer data present") }
+            //struct Image #1
+            im_Width = File.read_int16(p+4,_BE);
+            if(im_Width%2==1) im_Width++;
+            im_Height = File.read_uint16(p+6,_BE);
+            im_Depth = File.read_uint16(p+8,_BE);
+            icoinfo = "icon: "+im_Width+"×"+im_Height+"@"+im_Depth+" at ["+Hex(p+0x14)+"..";
+            p+=0x14+im_Width*im_Height*im_Depth/8;
+            icoinfo += Hex(p)+")"; //round par intended!
+            sOption(icoinfo);
+            if(ga_SelectRender) { //struct Image #1
+                im_Width = File.read_int16(p+4,_BE);
+                if(im_Width%2==1) im1_Width++;
+                im_Height = File.read_int16(p+6,_BE);
+                im_Depth = File.read_int16(p+8,_BE);
+                info = "sel.icon: "+im_Width+"×"+im_Height+"@"+im_Depth+" at ["+Hex(p+0x14)+"..";
+                p+=0x14+im_Width*im_Height*im_Depth/8;
+                icoinfo += Hex(p)+")"; //round par intended!
+                sOption(icoinfo);
+            }
+//_log("p="+Hex(p));
+            if(File.getFileBaseName().toLowerCase()=="pn") {//POKEYNoise info
+                p = File.findSignature(6,File.getSize()-20,"'SONGS='")-1; //TODO do it actually smart
+                if(p>0) {
+                    tp=""; x=""; t=""; c=""; cp=""; pn=false;
+                    tagsz=File.getSize()-p; tagl=[]; tagr=[];
+                    while(p<File.getSize()) {
+                        lr = File.read_ucsdString(p);
+                        tagl.push(lr.split("=")[0]);  tagr.push(lr.split("=")[1]);
+                        p += lr.length+5
+                    }
+                    for(i=0;i<tagl.length;i++)
+                        switch(tagl[i]) {
+                            case "SONGS": x=tagr[i]; break;
+                            case "TYPE": if(tagr[i]=="POKEY") pn=true; break;
+                            case "NAME": t=tagr[i]; break;
+                            case "CREATOR": c=tagr[i]; break;
+                            case "COPYRIGHT": cp=tagr[i]; break;
+                        }
+                    if(pn) { sOption("POKEYNoise info found");
+                        sOption(t); if(x>"1") sOption(x,"x"); sOption(c,"by ");  sOption(cp,"(c) ") }
+                }
+            }
+        }
+    }
+    return result(bShowType,bShowVersion,bShowOptions)
+}

@@ -1,26 +1,141 @@
 // Detect It Easy: detection rule file
-// Author: Tembo (http://tembolab.pl/products/executable-image-viewer.html)
+// WIP
+// Authors:
+//    Tembo (http://tembolab.pl/products/executable-image-viewer.html)
+//    Kaens TG@kaens
 
-init("format", "Guitar Pro");
+init("format", "Arobas Music Guitar Pro");
 
+/* beautify ignore:start */
 function detect() {
-    if (Binary.getSize() > 31) {
-        if (Binary.compare("'BCFZ'") || Binary.compare("'BCFS'")) {
-            sVersion = "6.x";
-            sName += " Tablature";
-            bDetected = true;
-        } else if (Binary.compare("'GPAR'")) {
-            sVersion = "6.x";
-            sName += " Soundbank";
-            bDetected = true;
-        } else if (Binary.compare("18'FICHIER GUITAR PRO'20")) {
-            sVersion = Binary.getString(0x14, 5);
-            if (sVersion) {
-                sName += " Tablature";
-                bDetected = true;
-            }
-        }
-    }
+	if (Binary.getSize() > 31) {
+		if (Binary.compare("'BCFZ'") || Binary.compare("'BCFS'")) {
+			sVersion = "6.x";
+			sName += " Tablature";
+			bDetected = true;
+		} else if (Binary.compare("'GPAR'")) {
+			sVersion = "6.x";
+			sName += " Soundbank";
+			bDetected = true;
+		} else if ((X.c("18") || X.c("19")) && X.c("'FICHIER GUITAR PRO'20",1)) { //
+			sV = /v(\d*)\.(\d*)/.exec(X.SA(X.U8(0)-4,6));
+			if (sV[0]) {
+				sName += " Tablature"; bDetected = true; sVersion = sV[0]; nV = Number(sV[1]+sV[2]);
+				enc = 'CP1251'; tempo = ''; p = 0x1F;
+				// ref https://github.com/CoderLine/alphaTab/blob/develop/src/importer/Gp3To5Importer.ts → readScore()
+				title = X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p);
+				subtitle = X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p);
+				artist = X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p);
+				album = X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p);
+				words = X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p);
+				if(nV >= 500) { music = X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p) } else music = words;
+				cr = X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p);
+				tab = X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p);
+				instructions = X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p);
+				var notice = '', noticeLines = X.U32(p); p += 4;
+				for (i = 0; i < noticeLines && p < X.Sz(); i++) {
+					if (i > 0) notice += '\r\n';
+					notice += X.SC(p+5,X.U8(p+4),enc); p += 4+X.U32(p);
+				}
+				if(nV < 500) p++; //triplet feel before gp5
+				if(nV >= 400) for(p+=4,i=0; i < 5 && p < X.Sz(); i++) p += 8+X.U32(p+4); // beat lyrics
+				if(nV >= 510) p += 19; //rse master settings
+				if(nV >= 500) {
+					for(p+=30,i=0; i < 10 && p < X.Sz(); i++) p += 4+X.U32(p); //page setup and text field stencils
+					tempo = X.SC(p+5,X.U8(p+4),enc).trim(); p += 4+X.U32(p)
+				}
+				if(t=X.U32(p)) tempo = tempo.appendS(t+'bpm',':');
+				p += 4; if(nV >= 510) p++; //hide tempo?
+				p += 4; if(nV >= 400) p++; //key & octave
+				p += 64*12; //playback info
+				if(nV >= 500) p += 2*19+4; //direction signs & ...4 bytes
+				bars = X.U32(p); trk = X.U32(p+4); p += 8;
+				for(i=0; i < bars && p < X.Sz(); i++) { //read master bars
+					var f = X.U8(p++);
+					if(f&1) p++; if(f&2) p++; if(f&8) p++; if((f&0x10) && nV < 500) p++;
+					if(f&0x20) p += 8+X.U32(p); //annotated bar
+					if(f&0x40) p += 2;
+					if(nV >= 500) { p += 3; if(f&3) p += 4 }
+				}
+				for(i=0,trks=[]; i < trk && p < X.Sz(); i++) { //read track data
+//_l2r('gpx',p,'track '+i+' data')
+					var f = X.U8(p++); if((t=X.SC(p+1,X.U8(p),enc).trim()) != '') trks.push(t); p += 41;
+					var strings = X.U32(p); p += 32; //strings & tunings
+					var frets = X.U32(p+12), capo = X.U32(p+16);  p += 24; //port,index,fxch,frets,capo,colour
+//_l2r('gpx',p,j+': strings:'+strings+' frets:'+frets+' capo|'+capo)
+					if(nV >= 500) p += 45;
+					if(nV >= 510) { p += 8+X.U32(p); p += 4+X.U32(p) }
+				}
+/*// This block has bugs to find (there's just a couple at most; add checkpoints to alphaTab, compare)
+// AND it's gonna be rather sluggish even if all is right. TODO
+				for(i=0; i < bars && p < X.Sz(); i++) for(j=0; j < trk && p < X.Sz(); j++) { //read bars → voices → beats
+					if(nV >= 500) { p++; voc = 2 } else voc = 1;
+					for(v=0; v < voc; v++) {
+						var beatnum = X.U32(p); p += 4;
+						for(k=0; k < beatnum && p < X.Sz(); k++) {
+//_l2r('gpx',p,'bar:'+i+' voc:'+v+' beat:'+k)
+							f = X.U8(p++); if(f&0x40) p++;  p++; if(f&0x20) p += 4;
+							if(f&2) { //read chord info
+								if(nV >= 500) { p += 17+22+4+4+28; p += 1+X.U8(p); p += 26 }
+								else
+									if(X.U8(p++))
+										if(nV >= 400) { p += 16+22+4+4+28; p += 1+X.U8(p); p += 26 }
+										else { p += 25+35+4+24+36 }
+									else
+										p += 4+X.U32(p)+4+4*(nV >= 406? 7: 6);
+							}
+							if(f&4) { text = X.SC(p+5,X.U8(p+4),enc); p += X.U32(p) } // could be more lyrics inside beat text
+							if(f&8) { //read beat fx
+								fs = X.U8(p++); f2 = 0; if(nV >= 400) f2 = X.U8(p++);
+								if((fs&0x20)) { p++; if(nV < 400) p += 4 } //slapPop
+								if(f2&4) { //read tremolo bar effect (beat)
+									p += 5; var pts = X.U32(p); p += 4+pts*9
+								}
+								if(fs&0x40) p += 2; //stroke
+								if(f2&2) p++; //pickstroke
+							}
+							if(f&0x10) { //read mix table change
+								p++; if(nV >= 500) p += 16;
+								var a = []; for(z=0; z < 6 && p < X.Sz(); z++) a.push(X.U8(p++));
+								if(nV >= 500) p += 4+X.U32(p);
+								a.push(X.U32(p)); p += 4;
+								for(z=0; z < 6 && p < X.Sz(); z++) if(a[z]) p++; if(a[7]) { p++; if(nV >= 510) p++ }
+								if(nV >= 400) p++; //mixtableflags
+								if(nV >= 500) p++; //wahtype
+								if(nV >= 510) { p += 4+X.U32(p); p += 4+X.U32(p)  }
+							}
+							f = X.U8(p++); //stringflags???
+							for(l=6; l >= 0 && p < X.Sz(); l--) if((f&(1<<i)) && 6-i < bar_staff_tuning_length) {
+								//readnote(track,bar,voice,newbeat,6-i);
+								var f2 = X.U8(p++); if(nV < 500 && (f2&1)) p += 2; if(f2&0x10) p++;
+								if(f2&0x20) p++; if(f2&0x80) p += 2; if(nV >= 500) { if(f2&1) p += 8; p++ }
+								if(f2&8) {
+									var xf = X.U8(p++), xf2 =  nV >= 400? X.U8(p++): 0;
+									if(xf&1) { p += 5; pts = X.U32(p); p += 4+pts*9 } //read bend
+									if(xf&0x10) p += 4+(nV >= 500? 1: 0); //read grace
+									if(xf2&4) p++; if(xf2&8) p++;
+									if(xf2&0x10) { t = X.U8(p++); if(nV >= 500) if(t == 2) p += 3; else if(t == 3) p++ } //read AH
+									if(f&0x20) p += 2;
+								} 
+							}
+							if(nV >= 500) {
+								f = X.U16(p); p += 2; if(f&0x800) p++;
+							}
+						}
+					}
+				}
+				sz = p;*/
+//_l2r('gpx',p,outArray(trks))
+				if(X.isVerbose()) {
+					sOptionT(title,' title:"','"'); sOptionT(subtitle,'～','～');
+					sOptionT(artist,'artist:"','"'); sOptionT(album,'album:"','"'); sOptionT(cr,'©'); sOptionT(tab,'tab:');
+					sOptionT(instructions,'instructions:'); sOptionT(notice,'notice:');
+					sOption(tempo,'tempo:'); sOption(trk,'tracks:'); sOption(bars,'bars:');
+				}
+			}
+		}
+	}
 
-    return result();
+	return result()
 }
+/* beautify ignore:end */
