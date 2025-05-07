@@ -1,13 +1,20 @@
 // Detect It Easy: detection rule file
-// Author: BJNFNE <bjnfne@web.de>
-// This Script supports following formats: BCSAR
+// Author: Kae <TG@kaens>
 
-init("archive", "CTR Sound Archive");
+init("archive", "Nintendo Binary CTR Sound ARchive (.BCSAR)");
 
 function detect() {
-    if (Binary.compare("'CSAR'")) {
-        bDetected = true;
-    }
+  //ref https://www.3dbrew.org/wiki/BCSAR
+  if ((!X.c("'CSAR'FE") && !X.c("'CSAR'FF")) || X.U8(5) < 0xFE) return false;
+  var e = X.U8(5) == 0xFE? _LE: _BE;
+  if (X.U32(0x14,e) != 0x2000 || X.U32(0x20,e) != 0x2001 || X.U32(0x2C,e) != 0x2002) return false;
+  if (!X.c("'STRG'",sp=X.U32(0x18,e)) || !X.c("'INFO'",ip=X.U32(0x24,e)) || !X.c("'FILE'",fp=X.U32(0x30,e))) return false;
+  bDetected = true;
+  sVersion = 'v'+X.U32(8,e).toString(16)+'_'+(e==0xFE? 'le': 'be');
 
-    return result();
+  if (X.isVerbose()) {
+    sOption('filenames:'+X.U32(sp+0x18,e)+' sz:'+outSz(X.U32(0xC,e)))
+  }
+
+  return result();
 }
