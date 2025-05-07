@@ -1,13 +1,22 @@
 // Detect It Easy: detection rule file
-// Author: BJNFNE <bjnfne@web.de>
-// This Script supports following formats: BCSTM
+// Author: Kae <TG@kaens>
 
-init("audio", "BCSTM Audio Stream");
+init("audio", "Nintendo CTR Stream (.BCSTM)");
 
 function detect() {
-    if (Binary.compare("'CSTM'")) {
-        sVersion = "BCSTM";
-        bDetected = true;
+    //ref https://www.3dbrew.org/wiki/BCSTM
+    if (!X.c("'CSTM'FF")) return false;
+    if(X.U8(5) < 0xFE) return false;
+    var e = X.U8(5) == 0xFE? _LE: _BE;
+    if(!X.c("'INFO'", ip=X.U32(0x18,e))) return false;  ip += 0x20; //stream info ofs
+    if(!X.c("'SEEK'", t=0x40+X.U32(0x44,e)) || t != X.U32(0x24,e)) return false;
+    if(!X.c("'DATA'", t=t+X.U32(t+4,e)) || t != X.U32(0x30,e)) return false;
+    bDetected = true;
+    sVersion = 'v'+X.U32(8,e).toString(16)+'_'+(e==0xFE?'le':'be');
+    if(X.isVerbose()) {
+        var enc = X.U8(ip), senc = ['PCM8', 'PCM16', 'DSP ADPCM', 'IMA ADPCM'][enc],
+            lp = X.U8(ip+1), ch = X.U8(ip+2), sr = X.U32(ip+4,e);
+        sOption(senc+' '+ch+'ch '+sr+'Hz'+(lp?' looped':'')+' sz:'+outSz(X.U32(0xC,e)));
     }
 
     return result();
