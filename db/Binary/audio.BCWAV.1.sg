@@ -1,0 +1,27 @@
+// Detect It Easy: detection rule file
+// Author: Kae <TG@kaens>
+
+init("audio", "Nintendo Binary CTR Wave (.BCWAV)");
+
+function detect() {
+    //ref https://www.3dbrew.org/wiki/BCWAV
+    if (!X.c("'CWAV'FF") && !X.c("'CWAV'FE") || X.U8(5) < 0xFE) return false;
+    var e = X.U8(5) == 0xFE? _LE: _BE;
+    if(!X.c("'INFO'", ip=X.U32(0x18,e)) || !X.c("'DATA'", X.U32(0x24,e)) || ip+X.U32(ip+4,e) != X.U32(0x24,e)) return false;
+    bDetected = true;
+    sVersion = 'v'+X.U32(8,e).toString(16)+'_'+(e==0xFE?'le':'be');
+    if(X.isVerbose()) {
+        var enc = X.U8(ip+8), senc = ['PCM8', 'PCM16', 'DSP ADPCM', 'IMA ADPCM'][enc],
+            lp = X.U8(ip+9), sr = X.U32(ip+0xC,e), ch = X.U8(ip+0x1C);
+        var dsz = X.U32(X.U32(0x24,e)+4,e)-8, len = '';
+        switch(enc) {
+        case 0: len = (dsz/sr/ch).toFixed(1).toString(); break;
+        case 1: len = (dsz/sr/2/ch).toFixed(1).toString(); break;
+        case 3: len = (dsz*2/sr/ch).toFixed(1).toString();
+        }
+        sOption(senc+' '+ch+'ch '+sr+'Hz'+(lp?' looped':'')
+            +(len.length?' len '+secondsToTimeStr(len):'')+' sz:'+outSz(X.U32(0xC,e)));
+    }
+
+    return result();
+}

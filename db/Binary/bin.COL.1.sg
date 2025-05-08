@@ -1,12 +1,28 @@
 // Detect It Easy: detection rule file
-// Author: BJNFNE <bjnfne@web.de>
-// This Script supports following formats: COL
-// Used by Grand Theft Auto San Andreas
+// Author: Kae <TG@kaens>
 
-init("format", "Collision Data");
+init("format", "Criterion Software/Rockstar Games' RenderWare collision data (.COL)");
 
 function detect() {
-    bDetected = Binary.compare("'COL'");
+    var hksz = 0, lst = [], c = 0, bad = '';
+    for (p = 0; p < X.Sz(); c++,p += hksz) {
+        if (!X.c("'COLL'",p) || X.U8(p-1) || p+8 > X.Sz())
+            if(!X.c("'COLL'",--p)) break; else bad = bad.addIfNone('!badchunk'/*+'@'+Hex(p+1-hksz)*/);
+            // In GTA:SA, peds.col has 3 chunks that are 1 byte shorter than declared!
+            // They seem to be linked to the unusual entity name length.
+        hksz = 8+X.U32(p+4,_LE);
+        if (p+hksz > X.Sz()) return;
+//_l2r('col',p,X.SA(p+8,8)+':'+charStat(X.readBytes(p+8,8,true)));
+        if(charStat(X.readBytes(p+8,7,true),1).indexOf('allasc') < 0) return;
+        lst.push(X.SA(p+8,8))
+    }
+    if(!c) return;
+    if(bad.length) sVersion = sVersion.appendS('malformed'+bad,'/');
+    if(X.isVerbose()) {
+        sOption(addEllipsis(lst.join(',')));
+        sOption(outSz(p),'sz:');
+    }
+    bDetected = true;
 
     return result();
 }
