@@ -1,0 +1,89 @@
+// Detect It Easy: detection rule file
+// Author: Kaens (TG@kaens)
+
+init("audio","Electronic Arts' EA-XA stream (.EXA)");
+
+function detect() {
+    // This one is built with sx.exe -sndstream %s.wav -=%s.exa
+    //ref https://github.com/vgmstream/vgmstream/blob/master/src/meta/ea_schl.c
+    if (X.Sz() < 0x20 || !X.c("'SC'")) return false;
+    var cfg = X.U16(2,_BE) << 16,
+      bps = sc = sr = ch = nv = pf = cd1 = cd2 = -1,
+      blke = _LE, e = X.U16(4)? _LE: _BE;
+    for (p = hksz = c = eof = 0; p < X.Sz() && !eof; ) {
+        var hkhd = X.SA(p,4), hksz = X.U32(p+4, e);
+        if(X.c("'SC'",p)) c++;
+        switch (hkhd) {
+        case 'SCHl':
+            c++; q = p+8; pfid = X.SA(q,4);
+            if (pfid !== 'GSTR' &&  pfid.slice(0,2) !== 'PT') { q += 4; pfid = X.SA(q,4) } //patching "nbapsstream"
+            if(pfid === 'GSTR') { pf = 8/*generic*/; q += 4 }
+            else if(pfid.slice(0,2) === 'PT') pf = X.U16(q+2,_LE);
+            else return false;
+            q += 4;
+            function rd() { // bytecount being FF means custom data, > 4 we just skip here
+                var r = 0, c = X.U8(q++); if (c == 0xFF) { q += 4+X.U32(q,_BE); return 0 } 
+                if (c > 4) { q += c; return 0 }
+                for(; c > 0; c--) r = Util.shlu64(r,8) + X.U8(q++);
+                return r
+            }
+            hdend = 0;
+            while(!hdend && q < p+hksz && q < X.Sz()) {
+                var tp = X.U8(q++);
+/* beautify ignore:start */
+                switch (tp) {
+                case 0: if(!hdend) rd(); break;
+                case 3: case 4: case 5: case 6: case 7: case 8: case 9: case 0xA: case 0xB: case 0xC: case 0xD: case 0xE: case 0xF:
+                case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x19: case 0x1B: case 0x1C: case 0x1D:
+                case 0x1E: case 0x1F: case 0x20: case 0x21: case 0x22: case 0x23: case 0x24: case 0x25: rd(); break;
+                case 0xFC: case 0xFD: break;  case 0x83: cd1 = rd(); break;  case 0xA0: cd2 = rd(); break;
+                case 0x80: nv = rd(); break;  case 0x81: bps = rd(); break;  case 0x82: ch = rd(); if (ch > 6) return false; break;
+                case 0x84: sr = rd(); break;  case 0x85: sc = rd(); break;
+                case 0x86: case 0x87: /*lpst, lped(add 1)*/
+                case 0x88: case 0x89: case 0x94: case 0x95: case 0xA2: case 0xA3: /*ch ofs*/
+                case 0x8F: case 0x90: case 0x91: case 0xAB: case 0xAC: case 0xAD: /*dsp/n64blk coefs */
+                case 0x1A: case 0x26: case 0x27: case 0x28: case 0x29: case 0x2A: /* rel lp ofs */
+                case 0x8C: /* play flags */ case 0x8A: case 0x8B: case 0x8D: case 0x8E: case 0x92: case 0x93: case 0x98:
+                case 0x99: case 0x9C: case 0x9D: case 0x9E: case 0x9F: case 0xA6: case 0xA7: case 0xA1:
+                    rd(); break;
+                case 0xFF: case 0xFE:
+                    hdend = 1; break;
+                default: return false
+                }
+/* beautify ignore:end */
+            }
+            break;
+        case 'SCCl': c++; break;
+        case 'SCDl': c++; break;
+        case 'SCEl': c++; /*→*/ case '': case '\xFF\xFF\xFF\xFF': eof = true; break;
+        }
+        p += hksz || 1; //avoids accidental ∞loops
+    }
+//_l2r('exa',c,' ')
+    if (eof || c > 3) {
+        bDetected = true;
+        if ([2,3,4,6,8,9,0xE,0x10].indexOf(pf) >= 0) blke = _BE;
+            if (ch <= 0) ch = 1;
+            if(nv == -1)
+                if (pf <= 4) nv = 0; else  if (pf <= 5) nv = 1; else  if (pf <= 8) nv = 2; else if (pf <= 0x14) nv = 3;
+        sVersion = 'v'+nv; 
+        if(!isWithin(pf,0,0x14)) sVersion += '#unk.platform';
+        else sVersion += '#'+['PC', 'PSX', 'N64', 'MAC', 'SAT', 'PS2', 'GC/Wii', 'Xbox', 'generic', 'X360', 'PSP',
+            'pc-eaac', 'x360-eaac', 'psp-eaac', 'PS3', 'ps3-eaac', 'Wii', 'wii-eaac', 'pc64-eaac', 'mobile-eaac', '3DS'][pf];
+        // small letters mean unused, you don't expect to see those
+        sVersion += blke == _LE? '_le': '_be'; if(blke != e) sVersion += '/file'+(e == _LE? '_le': '_be');
+        var codecs1 = ['PCM','ima',,,,'N64','VAG','EA-XA',,'MT10'],
+            codecs2 = ['S16LE_INT','S16BE_INT','S8_INT','EA-XA_INT','MT10','VAG','N64','S16BE','S16LE','S8','EA-XA',
+                'u8_int','cdxa','ima_int','layer1','Layer2','Layer3',,'GCADPCM','s24le_int','XboxADPCM','s24be_int','MT5',
+                'EALayer3','xas0_int','ealayer3_int','ATRAC3','ATRAC3+'],
+            scd1 = isWithin(cd1,0,9)? codecs1[cd1]: cd1<0? '': 'unk',
+            scd2 = isWithin(cd2,0,0x1B)? codecs2[cd2]: cd2<0? '': 'SND10';
+        var senc = (scd1.length? '1:'+scd1: ''); senc = senc.appendS(scd2.length? '2:'+scd2: '', ',');
+        if (X.isVerbose()) {
+            sOption((senc.length?'codecs:'+senc+' ':'')+ch+'ch '+sr+'Hz'+(bps>0?' '+bps+'bit':'')
+                +' len '+secondsToTimeStr((sc/sr).toFixed(1))+' sz:'+outSz(p));
+        }
+    }
+
+    return result();
+}
