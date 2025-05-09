@@ -7,9 +7,7 @@ function detect() {
     // This one is built with sx.exe -sndstream %s.wav -=%s.exa
     //ref https://github.com/vgmstream/vgmstream/blob/master/src/meta/ea_schl.c
     if (X.Sz() < 0x20 || !X.c("'SC'")) return false;
-    var cfg = X.U16(2,_BE) << 16,
-      bps = sc = sr = ch = nv = pf = cd1 = cd2 = -1,
-      blke = _LE, e = X.U16(4)? _LE: _BE;
+    var cfg = X.U16(2,_BE) << 16,  sc = sr = ch = nv = pf = cd1 = cd2 = -1,  bps = 16,  blke = _LE,  e = X.U16(4)? _LE: _BE;
     for (p = hksz = c = eof = 0; p < X.Sz() && !eof; ) {
         var hkhd = X.SA(p,4), hksz = X.U32(p+4, e);
         if(X.c("'SC'",p)) c++;
@@ -50,7 +48,6 @@ function detect() {
                     hdend = 1; break;
                 default: return false
                 }
-/* beautify ignore:end */
             }
             break;
         case 'SCCl': c++; break;
@@ -63,25 +60,55 @@ function detect() {
     if (eof || c > 3) {
         bDetected = true;
         if ([2,3,4,6,8,9,0xE,0x10].indexOf(pf) >= 0) blke = _BE;
-            if (ch <= 0) ch = 1;
-            if(nv == -1)
-                if (pf <= 4) nv = 0; else  if (pf <= 5) nv = 1; else  if (pf <= 8) nv = 2; else if (pf <= 0x14) nv = 3;
+        if (ch <= 0) ch = 1;
+        if (nv == -1)
+            if (pf <= 4) nv = 0; else  if (pf <= 5) nv = 1; else  if (pf <= 8) nv = 2; else if (pf <= 0x14) nv = 3;
         sVersion = 'v'+nv; 
+        if (cd1 < 0 && nv == 0) switch (pf) { // checks from Ctrl+F "codec1 defaults"
+        case 0: case 3: case 4: cd1 = 0; break; // PC, MAC, SAT? PCM
+        case 1: cd1 = 6; break; // PSX? VAG
+        case 2: cd1 = 5; break; // N64? N64 :)
+        default: bad = bad.addIfNone('!badcodec1');
+        }
+        if (cd1 >= 0 && cd2 < 0) switch (cd1) { //converts from Ctrl+F "codec1 to codec2"
+        case 0:
+            if(pf == 0) cd2 = bps == 8? 2: (blke == _BE? 1: 0);
+            else cd2 = bps == 8? 9: (blke == _BE? 7: 8);
+            break;
+        case 5: cd2 = 6; break;  case 6: cd2 = 5; break;
+        case 7: if(pf == 0 || pf == 3) cd2 = 3; else cd2 = 0xA; break;
+        case 9: cd2 = 4; break;
+        default: bad = bad.addIfNone('!badcodec1');
+        }
+        if(cd2 < 0) switch(pf) { //plaform-wise codec defaults
+        case 0: case 3: case 8: case 9: case 0xA: case 0xE: cd2 = 0xA; break;
+        case 1: case 5: cd2 = 5; break;  case 6: cd2 = 7; break;  case 7: cd2 = 8; break;
+        case 0x10: case 0x14: cd2 = 0x12; break;
+        default: bad = bad.addIfNone('!badcodec2');
+        }
+        if(sr < 0) switch(pf) {//platform-wise sample rate defaults
+        case 0: case 1: case 2: case 3: case 4: case 5: case 0xA: sr = 22050; break;
+        case 6: case 7: sr = 24000; break;
+        case 0x10: case 0x14: sr = 32000; break;
+        case 9: case 0xE: sr = 44100; break;
+        case 8: sr = 48000; break;
+        default: bad = bad.addIfNone('!badsmprate');
+        }
+/* beautify ignore:end */
         if(!isWithin(pf,0,0x14)) sVersion += '#unk.platform';
-        else sVersion += '#'+['PC', 'PSX', 'N64', 'MAC', 'SAT', 'PS2', 'GC/Wii', 'Xbox', 'generic', 'X360', 'PSP',
-            'pc-eaac', 'x360-eaac', 'psp-eaac', 'PS3', 'ps3-eaac', 'Wii', 'wii-eaac', 'pc64-eaac', 'mobile-eaac', '3DS'][pf];
+        else sVersion += '#'+['PC', 'Sony Playstation', 'Nintendo 64', 'MAC', 'Sega Saturn', 'Sony Playstation 2',
+            'Nintendo Gamecube/Wii', 'Microsoft Xbox', 'Generic', 'Microsoft X360', 'Sony PSP',
+            'pc-eaac', 'x360-eaac', 'psp-eaac', 'Sony Playstation 3', 'ps3-eaac', 'Nintendo Wii', 'wii-eaac', 'pc64-eaac',
+            'mobile-eaac', 'Nintendo 3DS'][pf];
         // small letters mean unused, you don't expect to see those
-        sVersion += blke == _LE? '_le': '_be'; if(blke != e) sVersion += '/file'+(e == _LE? '_le': '_be');
-        var codecs1 = ['PCM','ima',,,,'N64','VAG','EA-XA',,'MT10'],
-            codecs2 = ['S16LE_INT','S16BE_INT','S8_INT','EA-XA_INT','MT10','VAG','N64','S16BE','S16LE','S8','EA-XA',
+        sVersion += blke == _LE? '/le': '/be'; if(blke != e) sVersion += '/file'+(e == _LE? '_le': '_be');
+        var codecs2 = ['S16LE_INT','S16BE_INT','S8_INT','EA-XA_INT','MT10','VAG','N64','S16BE','S16LE','S8','EA-XA',
                 'u8_int','cdxa','ima_int','layer1','Layer2','Layer3',,'GCADPCM','s24le_int','XboxADPCM','s24be_int','MT5',
                 'EALayer3','xas0_int','ealayer3_int','ATRAC3','ATRAC3+'],
-            scd1 = isWithin(cd1,0,9)? codecs1[cd1]: cd1<0? '': 'unk',
-            scd2 = isWithin(cd2,0,0x1B)? codecs2[cd2]: cd2<0? '': 'SND10';
-        var senc = (scd1.length? '1:'+scd1: ''); senc = senc.appendS(scd2.length? '2:'+scd2: '', ',');
+            senc = isWithin(cd2,0,0x1B)? codecs2[cd2]: cd2<0? '': 'SND10';
         if (X.isVerbose()) {
-            sOption((senc.length?'codecs:'+senc+' ':'')+ch+'ch '+sr+'Hz'+(bps>0?' '+bps+'bit':'')
-                +' len '+secondsToTimeStr((sc/sr).toFixed(1))+' sz:'+outSz(p));
+            sOption((senc.length?'codec:'+senc+' ':'')+ch+'ch '+sr+'Hz'+(bps>0?' '+bps+'bit':'')
+                +' len '+secondsToTimeStr((sc/sr).toFixed(0))+' sz:'+outSz(p));
         }
     }
 
