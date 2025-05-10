@@ -6,7 +6,9 @@ cd DIE-engine
 sudo docker build . -t horsicq:diec
 ```
 
-# How to build on Linux based on Debian
+# How to build on Linux based on Debian 
+
+You can also watch tutorial on [YouTube](https://www.youtube.com/watch?v=hODcbA_1Tns)
 
 #### Install packages:
 
