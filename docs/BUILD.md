@@ -165,3 +165,28 @@ chmod a+x configure
 ./configure
 make -j4
 ```
+
+# How to build with MinGW/MSYS2
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+### Install libaries
+
+```bash
+pacman -S mingw-w64-x86_64-qt5-base
+pacman -S mingw-w64-x86_64-qt5-tools
+pacman -S mingw-w64-x86_64-qt5-script
+```
+
+#### Build
+
+```bash
+chmod a+x configure
+./configure
+make -j4
+```
