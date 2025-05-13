@@ -1,3 +1,4 @@
+
 # This is a basic workflow to help you get started with Actions
 
 name: CI
@@ -20,9 +21,10 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
       # Set git to use CRLF line endings
       - name: Configure git CRLF
         run: |
@@ -41,7 +43,6 @@ jobs:
           zip -r ../db_extra.zip db_extra
           cd ..
           ls -la *.zip  # Verify the zip files were created
-
       # Calculate MD5 checksums
       - name: Calculate MD5 checksums
         id: md5
@@ -51,21 +52,31 @@ jobs:
           echo "DB_MD5=$DB_MD5" >> $GITHUB_OUTPUT
           echo "DB_EXTRA_MD5=$DB_EXTRA_MD5" >> $GITHUB_OUTPUT
           
-      - name: Get signatures count
-        id: scount
+      - name: Generate DB Stats
         run: |
+          cd DIE
           cd scripts
-          SCOUNT_DB=$(python db.py '../db')
-          SCOUNT_DB_EXTRA=$(python db.py '../db_extra')
-          escaped_value_DB=$(echo "$SCOUNT_DB" | sed 's/|/\\|/g')
-          escaped_value_DB_EXTRA=$(echo "$SCOUNT_DB_EXTRA" | sed 's/|/\\|/g')
-          echo "SCOUNT_DB=$escaped_value_DB" >> $GITHUB_ENV
-          echo "SCOUNT_DB_EXTRA=$escaped_value_DB_EXTRA" >> $GITHUB_ENV
+          python --version
+          python db.py '../db' > '../../db_stat.txt'
+          python db.py '../db_extra' > '../../db_extra_stat.txt'
           
       # Get the current date for the update message
       - name: Get current date
         id: date
         run: echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      # Read database stats
+      - name: Read database stats
+        id: dbstats
+        run: |
+          DB_STATS=$(cat db_stat.txt)
+          DB_EXTRA_STATS=$(cat db_extra_stat.txt)
+          echo "DB_STATS<<EOF" >> $GITHUB_OUTPUT
+          echo "$DB_STATS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "DB_EXTRA_STATS<<EOF" >> $GITHUB_OUTPUT
+          echo "$DB_EXTRA_STATS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
       # Update the "Current database" pre-release
       - name: Update Database Release
@@ -77,22 +88,19 @@ jobs:
           name: "Current database"
           tag_name: current-database
           body: |
-            # Detect-It-Easy Database Files
+            - db.zip: `${{ steps.md5.outputs.DB_MD5 }}`
+            - db_extra.zip: `${{ steps.md5.outputs.DB_EXTRA_MD5 }}`
             
             Last updated: ${{ steps.date.outputs.DATE }}
             
             This pre-release contains the latest database files from Detect-It-Easy:
             - db.zip: Contains main database files
             
-            `${{ env.SCOUNT_DB }}`
+            ${{ steps.dbstats.outputs.DB_STATS }}
             
             - db_extra.zip: Contains extra database files
             
-            `${{ env.SCOUNT_DB_EXTRA }}`
-
-            ### MD5 Checksums
-            - db.zip: `${{ steps.md5.outputs.DB_MD5 }}`
-            - db_extra.zip: `${{ steps.md5.outputs.DB_EXTRA_MD5 }}`
+            ${{ steps.dbstats.outputs.DB_EXTRA_STATS }}
           draft: false
           prerelease: true
         env:
