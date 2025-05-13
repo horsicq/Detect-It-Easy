@@ -137,3 +137,29 @@ make -j4
 # To use it as a command, uncomment the following line:
 # sudo make install -j4
 ```
+
+# How to build with MinGW/MSYS2
+
+Install MSYS2: https://www.msys2.org/
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+### Install libaries
+
+```bash
+pacman -S mingw-w64-ucrt-x86_64-gcc
+pacman -S mingw-w64-x86_64-qt5-tools
+```
+
+#### Build
+
+```bash
+chmod a+x configure
+./configure
+make -j4
+```
