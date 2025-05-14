@@ -1,0 +1,36 @@
+// Detect It Easy: detection rule file
+// Author: Kaens (TG@kaens)
+
+init("audio", "CRI Middleware's ADX 4-bit ADPCM stream (.ADX,.ADP)");
+
+function detect() {
+    //from https://wiki.multimedia.cx/index.php/CRI_ADX_file
+    // & https://github.com/vgmstream/vgmstream/blob/master/src/meta/adx.c
+    if (!X.c("8000")) return false;
+    if (!isWithin(p=X.U16(2,_BE)+4, 0x14, X.Sz())) return false;
+    if (!X.c("'(c)CRI'",p-6)) return false;
+    fmt = X.U8(4);
+    if ([2,3,4].indexOf(fmt) < 0) return false;
+    if (X.U8(5)%0x12 || X.U8(6) != 4) return false; //frame size 12h (rarely a multiple thereof), 4 bit per sample only
+    if ((ch=X.U8(7)) > 8) return false;
+    nV = X.U8(0x12);
+//    if ([3,4,5].indexOf(nV) < 0) return false;
+    bDetected = 1;
+    sVersion = "";
+    switch(nV) {
+        case 3: sVersion = "v3"; break;
+        case 4: sVersion = "v4"; break;
+        case 5: sVersion = "v4NL"
+    }
+    switch(fmt) {
+        case 2: sVersion += " fixed-coefficient"; break;
+        case 4: sVersion += " exponential-scale";
+    }
+    if(X.U8(0x13) > 0) sVersion += " encrypted";
+    if(X.isVerbose()) {
+        sOption(X.U8(7)+'ch '+(sr=X.U32(8,_BE))+'Hz len '
+            +secondsToTimeStr(((smp=X.U32(0x0C,_BE))/sr/ch).toFixed(0)));
+    }
+
+    return result();
+}

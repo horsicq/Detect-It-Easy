@@ -4091,15 +4091,15 @@ function detect() {
 		sName = "The 0ok Amazing Synth Tracker module (.T0AST)"; bDetected = 1;
 		if(X.c("'0OK'",5)) { nV = 1; sVersion = "v1"; } else
 		if(X.c("010001",5)) { nV = 2; sVersion = "v2"; } else
-		{ nV = -1; sVersion = "v.unk"; }
-		if(X.isVerbose() && nV != -1) {
+			{ nV = -1; sVersion = "v.unk"; }
+		function info() {
 			if(nV == 1) p = 0x1DA;
 			else if(nV == 2) p = 0x34A;
-			else break;
+			else return;
 			drummode = X.U8(p++);
 			chipmode = X.U8(p++);
 			chs = X.U8(p++); ch = 0;
-			if(chs > 16) { sVersion += "/malformed"; break; }
+			if(chs > 16) { sVersion += "/malformed"; return; }
 			for(i=0; i<16; i++)
 				if(X.U8(p++)) { ch++; p += 3; }
 			ins = 0;
@@ -4146,6 +4146,7 @@ function detect() {
 			sOption(addEllipsis(c,0x100),'msg:"','"');
 			sOption("ch:"+ch+" ins:"+ins+" ord:"+ord+" ptn:"+ptn+" notes:"+notes+" loop:"+loop+" sz:"+outSz(p));
 		}
+		if(X.isVerbose() && nV != -1) info();
 	}
 	else if(X.c("'T0ASTINS'")) {
 		sName = "The 0ok Amazing Synth Tracker instrument file"; bDetected = 1;
@@ -6932,13 +6933,14 @@ function isProTracker2() {
 	// & https://bulba.untergrund.net/Ay_Emul29.src.7z /Players.pas & /Help/html/ay_ru_fmt_pt2.htm
 	if(X.Sz() < 132) return false; //the smallest pt2 in all actual collections is 521 bytes long
 	tmp = X.U8(0); if(!isWithin(tmp,2,15)) return false;
-	ord = X.U8(1); lp = X.U8(2); if(!ord || lp > ord || 0x83+ord > X.Sz()-2) return false;
-	smp0 = X.U16(3); orn0 = X.U16(0x43); if(orn0-smp0 > X.Sz()+2 || orn0 < smp0) return false;
+	const maxsz = X.Sz()+X.isHeuristicScan()*0x200;
+	ord = X.U8(1); lp = X.U8(2); if(!ord || lp > ord || 0x83+ord > maxsz-2) return false;
+	smp0 = X.U16(3); orn0 = X.U16(0x43); if(orn0-smp0 > maxsz+2 || orn0 < smp0) return false;
 	ptnp = X.U16(0x63); if(!isWithin(ptnp,0x65,orn0)) return false; smp = orn = 0;
 	for(i=mps=0,p=3; i < 0x20; i++,p+=2) { t = X.U16(p);
-		if(t) { smp++; if(!isWithin(t,0x65,X.Sz()-2)) return false } if(t > mps) mps = t }
+		if(t) { smp++; if(!isWithin(t,0x65,maxsz-2)) return false } if(t > mps) mps = t }
 	for(mp=0; i < 0x30; i++,p+=2) { t = X.U16(p); if(t > mp) mp = t;
-		if(t) { orn++; if(orn <= 2 && !isWithin(t,Math.max(mps,orn0),X.Sz())) return false }
+		if(t) { orn++; if(orn <= 2 && !isWithin(t,Math.max(mps,orn0),maxsz)) return false }
 		//just check the first two orns. Ornament records seem to be optional, and,
 		//despite the pointers being present, some modules are just cut off early 
 	}
@@ -6964,7 +6966,7 @@ if(!bDetected && isProTracker2()) {
 function isProTracker3() { //PT3's detection but sanity checks because SOME people -_-
 	//ref https://bitbucket.org/zxtune/zxtune/src/develop/src/formats/chiptune/aym/protracker3_compiled.cpp
 	// & https://bulba.untergrund.net/Ay_Emul29.src.7z /Help/html/ay_ru_fmt_pt3.htm
-	if(X.Sz() < 0xCA) return false; p = 0; var maxsz = Math.min(65535,X.Sz());
+	if(X.Sz() < 0xCA) return false; p = 0; var maxsz = Math.min(65535,X.Sz()+X.isHeuristicScan()*0x200);
 	function rf(msg) { if(debug>1)_l2r('pt3',p,msg); return false }
 	ttn = X.U8(0x63); if(ttn > 4) if(X.isHeuristicScan()) bad = bad.addIfNone('!badtuning'); else return rf('badtuning');
 	tmp = X.U8(0x64); if(!tmp) return false;
@@ -7374,46 +7376,6 @@ if(!bDetected && isSidMon2()) {
 		sOptionT(X.SA(0x27,0x20),"in: ");
 		sOptionT(addEllipsis(smps.join(','),0x100),'smp/msg:"','"');
 		sOption("trk:"+trk+" ord:"+ord+" smp:"+smp+" sz:"+outSz(sz))
-	}
-}
-
-
-function isADXAHX() { //non-module! sanity check a bit because 8000 is too broad
-	if(!X.c("8000")) return false;
-	fmt = X.U8(4);
-	if([2,3,4,0x10,0x11].indexOf(fmt)<0) return false;
-	if(X.U8(6)!=4) return false; //4 bit per sample only
-	if([1,2].indexOf(X.U8(7))<0) return false; //1/2 ch only
-	nV = X.U8(0x12);
-	if([3,4,5].indexOf(nV)<0) return false;
-	return true;
-}
-if(!bDetected && X.isHeuristicScan() && isADXAHX()) {
-	//from https://wiki.multimedia.cx/index.php/CRI_ADX_file
-	bDetected = 1;
-	sVersion = "";
-	if([2,3,4].indexOf(fmt) >= 0)
-		sName = "CRI ADX 4-bit ADPCM audio (.ADX)";
-	else if([0x10,0x11].indexOf(fmt) >= 0)
-		sName = "CRI AHX 4-bit ADPCM audio (.AHX)";
-	switch(nV) {
-		case 3: sVersion = "v3"; break;
-		case 4: sVersion = "v4"; break;
-		case 5: sVersion = "v4NL"
-	}
-	switch(fmt) {
-		case 2: sVersion+=" PPC"; break;
-		case 3: sVersion+=" std"; break;
-		case 4: sVersion+=" exSc"; break;
-		case 0x11: sVersion+=" AHX" }
-	if(X.U8(0x13) > 0) sVersion += " encrypted";
-	if(X.isVerbose()) {
-		sOption(X.SA(pcprt,6));
-		pcprt = X.U16(2,_BE)-2;
-		sOption("blk: "+X.U8(5));
-		sOption("ch: "+X.U8(7));
-		sOption("sr: "+X.U32(8,_BE)+"Hz");
-		sOption("smp: "+X.U32(0x0C,_BE));
 	}
 }
 
@@ -10753,6 +10715,7 @@ function cmdStr(ch,o) { //useful for logging music too
 			case 0xE7: if(X.U8(q) != 1) { bad = bad.addIfNone('!E7@'+Hex(q-1)); sus++ } q += 2; break //fadeout: 01, spd ($FO)
 			default: stop = true; bad = bad.addIfNone('!unk'+Hex(c)); sus++ //unknown commands do stop-play
 			}
+			if(q > mp) mp = q;
 		} // /if isDeepScan scan the channel
 		if(chn-oldchn < 3 || !cnotes) emptych++;
 //re(oldchn,'ch'+(k-1)+' stopped @'+Hex(q)+', has '+Hex(chn-oldchn)+' data ...'+Hex(X.U24(chn-3,_BE))+']')

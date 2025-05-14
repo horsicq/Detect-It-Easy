@@ -10,6 +10,7 @@ var _BE = true, _LE = false; //endianness for read_int16+
 //big-endian = direct notation (TCP/IP, Motorola, Amiga)
 //For the BitReader Object, BE is MSB and LE is LSB (intuitively)
 var CS_ALL = true, CS_BEST = false; //charStat needall 
+var FINT_QUICK = FINT_FAST = FINT_1 = true; //findIntersections: find just one for speed's sake
 var TOEOF = -1; //use for the size parameter in findSignature
 
 // ---------- START OF PRE-v3.06 CODE --------------------
@@ -135,15 +136,20 @@ var CP437 = "⌂"+
 
 
 /**
- * Decode a 1-byte encoding from a byte array using the 128-byte-long table given,
+ * Decode a 1-byte-per-character encoding from a byte array using the 129-byte-long table given,
  * as well as a table to display the first 32 characters.
  * @param {[uint8]} ansi - an array of uint8 (returned by readBytes).
  * @param {String[0x81]} dectbl - a decoding table; just make a const here in db/read for that
- * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
- * @param {Array} tbl01F (optional, default=Chars0to1FCRLF) - which table to use for the first 32 characters
- * @returns {String} a string value usable with js.
+ * @param {bool} [zstop =true] - whether to stop reading on 0 (ASCIIZ behaviour)
+ * @param {Array} [tbl01F=Chars0to1FCRLF] - which table to use for the first 32 characters
+ * @returns {String} a string value usable with js, or an empty line if the decoding table wasn't found.
+ * @example
+ * 𝑓([7, 0x7F, 0, 0x32], true, Chars0to1FSpeccy, CPSpeccy]) === "📝©"
+ * @example
+ * 𝑓("\x07\x7F\x00\x32", false, Chars0to1FSpeccy, CPSpeccy]) === "📝© 2"
  */
 function decEncoding(ansi, dectbl, zstop, tbl01F) {
+	if(typeof dectbl === 'undefined') return '';
 	if(typeof zstop === 'undefined') zstop = true;
 	if(typeof tbl01F === 'undefined')
 		if(dectbl == CPSpeccy) tbl01F = Chars0to1FSpeccy;
@@ -180,13 +186,14 @@ function decEncoding(ansi, dectbl, zstop, tbl01F) {
 
 
 /**
- * Decode a 1-byte encoding from file using the 128-byte-long table given.
+ * Decode a 1-byte encoding from file using the 129-byte-long table given, as well as a table to display
+ * the first 32 characters. Analogous to decEncoding but reads the file directly.
  * @param {UInt} ofs - the offset to start from.
  * @param {UInt} len - the amount of bytes to read.
  * @param {String[0x81]} dectbl - a decoding table; just make a const here in db/read for that
  * @param {bool} zstop (optional, default=true) - whether to stop reading on 0 (ASCIIZ behaviour)
  * @param {Array} tbl01F (optional, default=Chars0to1FCRLF) - which table to use for the first 32 characters
- * @returns {String} a string value usable with js.
+ * @returns {String} a string value usable with js, or an empty line if the decoding table wasn't found.
  */
 function decAnsi(ofs, len, dectbl, zstop, tbl01F) {
 	return(decEncoding(X.readBytes(ofs,len), dectbl, zstop, tbl01F))
@@ -199,6 +206,8 @@ function decAnsi(ofs, len, dectbl, zstop, tbl01F) {
  * @param {Number} mina
  * @param {Number} maxa
  * @returns {Bool}
+ * @example
+ * 𝑓(20, 10, 40) === true; 𝑓(20,10,20) === true
  */
 function isWithin(a, mina, maxa) {
 	return mina <= a && a <= maxa
@@ -210,6 +219,8 @@ function isWithin(a, mina, maxa) {
  * @param {Number} mina
  * @param {Number} maxa
  * @returns {Bool}
+ * @example
+ * 𝑓(20.1, 10.0, 40.0) === true; 𝑓(20.1, 10.0, 20.0) === false
  */
 function isInside(a, mina, maxa) {
 	return mina < a && a < maxa
@@ -219,7 +230,7 @@ function isInside(a, mina, maxa) {
 /**
  * Derive a string hexadecimal value, zero-padded.
  * @param {Int} a - the numerical value.
- * @param {UInt} padz (optional,default=2) - how many characters to zero-pad.
+ * @param {UInt} [padz=2] - how many characters to zero-pad to.
  * @returns {String} The hex value, capital letters A~F, ending with "h".
  */
 function Hex(a, padz) {
@@ -232,6 +243,12 @@ function Hex(a, padz) {
 }
 
 
+/**
+ * Derive a string binary value, zero-padded.
+ * @param {Int} a - the numerical value.
+ * @param {UInt} [padz=4] - how many characters to zero-pad to.
+ * @returns {String} The bin value, characters '0' or '1', ending with "b".
+ */
 function Bin(a, padz) {
 	if(typeof a === 'undefined') return "!Bin("+a+")";
 	if(typeof padz === 'undefined') padz = 4;
@@ -242,6 +259,12 @@ function Bin(a, padz) {
 }
 
 
+/**
+ * Derive a string octal value, zero-padded.
+ * @param {Int} a - the numerical value.
+ * @param {UInt} [padz=3] - how many characters to zero-pad to.
+ * @returns {String} The octal value, characters 0~7, ending with "o".
+ */
 function Oct(a, padz) {
 	if(typeof a === 'undefined') return "!Oct("+a+")";
 	if(typeof padz === 'undefined') padz = 3;
@@ -256,15 +279,16 @@ function Oct(a, padz) {
  * Read a variable-length quantity, an unsigned integer like in MIDI files, from the file.
  * @param {UInt} ofs - the offset to start from.
  * @returns {List} [length,value] - if length (in physical bytes) = 0, the value had a problem.
+ * @example
+ * //For file containing '81 80 01  81 83 7F':
+ * 𝑓(0) === 0x4001; 𝑓(3) === 0x41FF
 **/
 function readVarUInt(ofs) {
 	if(ofs < 0 || ofs >= File.getSize()) return [0,0];
 	var t = 0, wb = 1, r = 1, o = ofs;
-	var b = File.read_uint8(o++); t = (t << 7) | (b&0x7F);
+	var b = X.U8(o++); t = (t << 7) | (b&0x7F);
 	var b_ = b; while(b_) { b_ >>= 1; wb++ }
-	while(r < 16 && (b&0x80)) {
-		b = File.read_uint8(o++); t = (t << 7) | (b&0x7F); r++
-	}
+	for(; r < 16 && (b&0x80); r++) { b = X.U8(o++); t = (t << 7) | (b&0x7F) }
 	if(wb > 64) return [0,0xFFFFFFFFFFFFFFFF]; // sizeof(target) in bits. A 64bit value should be enough, right?
 	else if(b&0x80) return [0,-1]; //EOF
 	else return [r,t]
@@ -334,7 +358,8 @@ function BitReader(nOffset, nEndian) {
  * @param {[Array(UInt)] | UInt} bl = [0] - the list of possible u_int8 codes, or just one u_int8. 0 by default.
  * @returns {UInt} - offset if a byte in the slice doesn't belong to the list. If you go beyond EoF or all good, -1.
  * @example
- * For '00 01 02 01' at offset 6, firstNotOf (6, 4, [0,1]) === 8, and firstNotOf(6, 4, 1) === 6
+ * //For '00 01 02 01' at offset 6 in the file:
+ * firstNotOf (6, 4, [0,1]) === 8; firstNotOf(6, 4, 1) === 6
  */
 function firstNotOf(ofs, len, bl) {
 	if(ofs+len > X.Sz()) return -1; var c = i = 0;
@@ -355,12 +380,24 @@ function isAllZeroes(ofs, len) { return firstNotOf(ofs, len, 0) < 0 } //a subcas
 /**
  * If the string was too long and has been read incompletely, adds an ellipsis after the last
  * complete word, to avoid cut-off words. If `space characters' are not detected,
- * replaces the last character with an ellipsis. Does NOT do the trim().
+ * replaces the last character with an ellipsis. Does NOT do the trim() unless the whole string fits the limit.
  * Mostly usable for lengthy multiline comments/messages.
  * @param {String} a - the original incomplete string.
  * @param {Number} trim - the buffer size; if a.length == trim, we decide it was cropped.
  * @param {Number} [mintrim = 78] - don't try searching for spaces below this point.
  * @returns {String} - the resulting string.
+ * @example
+ * // Full string fits the limits, no need to search for a good cut-off place, and it's trimmed for pretty:
+ * 𝑓(" 12345 7890, 34 678. 1 3'56789", 35, 15) === "12345 7890, 34 678. 1 3'56789"
+ * @example
+ * // The length is a full match but it might be trimmed right along that length, so a good cut-off place is found:
+ * 𝑓(" 12345 7890, 34 678. 1 3'56789", 30, 15) === " 12345 7890, 34 678. 1 3…"
+ * @example
+ * // The length is a full match and last 5 characters don't have spaces, so it's treated as trimmed but it's not cut:
+ * 𝑓(" 12345 7890, 34 678. 1 3'56789", 30, 25) === " 12345 7890, 34 678. 1 3'56789…"
+ * @example
+ * // Just another example of a well-trimmed line, in which you need a lot less info that it has to offer:
+ * 𝑓(" 12345 7890, 34 678. 1 3'56789", 16, 10).trim() === "12345 7890, 34…"
  */
 function addEllipsis(a, trim, mintrim) {
 	if(!trim) trim = 0xA0;
@@ -380,37 +417,49 @@ function addEllipsis(a, trim, mintrim) {
 
 
 /**
- * sOptions.append a string (optionally prefixed) if the space-trimmed string is not empty.
+ * sOptions.appendS a string (optionally prefixed) if the space-trimmed string is not empty.
  * @param {variant} a - the string to output (safe to accidentally drop a non-string in)
- * @param {String} prefix (optional) - what to put in front of the output string
- * @param {String} suffix (optional) - what to put after the output string
+ * @param {String} [prefix=''] - what to put in front of the output string
+ * @param {String} [suffix=''] - what to put after the output string
+ * @param {String} [sep=','] - what to put between the previous string and this addition
+ * @example
+ * //for sOptions === '  ch:2':
+ * 𝑓('hello world  ', 'msg:"', '"', ', '); //sOptions === 'ch:2, msg:"hello world\"'
  */
-function sOptionT(a, prefix, suffix) {
+function sOptionT(a, prefix, suffix, sep) {
   if (typeof prefix === 'undefined') prefix = ""; if (typeof suffix === 'undefined') suffix = "";
-  if ((""+a).trim() != "") sOptions = sOptions.append(prefix+(""+a).trim()+suffix)
+  if (typeof sep === 'undefined') sep = ',';
+  if ((""+a).trim() != "") sOptions = sOptions.appendS(prefix+(""+a).trim()+suffix, sep)
 }
 
 
 /**
- * sOptions.append a string (optionally prefixed) if the string is not empty.
+ * sOptions.appendS a string (optionally prefixed) if the string is not empty.
  * @param {variant} a - the string to output (safe to accidentally drop a non-string in)
- * @param {String} prefix (optional) - what to put in front of the output string
- * @param {String} suffix (optional) - what to put after the output string
+ * @param {String} [prefix=''] - what to put in front of the output string
+ * @param {String} [suffix=''] - what to put after the output string
+ * @param {String} [sep=','] - what to put between the previous string and this addition
+ * @example
+ * //for sOptions === '  ch:2':
+ * 𝑓('hello world  ', 'msg:"', '"', ', '); //sOptions === 'ch:2, msg:"hello world\"'
  */
 function sOption(a, prefix, suffix) {
   if (typeof prefix === 'undefined') prefix = ""; if (typeof suffix === 'undefined') suffix = "";
-  if ((""+a).trim() != "") sOptions = sOptions.append(prefix+(""+a).trim()+suffix)
+  if (typeof sep === 'undefined') sep = ',';
+  if ((""+a) != "") sOptions = sOptions.appendS(prefix+(""+a)+suffix, sep)
 }
 
 
 /**
- * A more verbose (but still concise) way of outputting the calculated size(s, derived using different algorithms),
+ * A more verbose (but still concise) way of outputting the calculated size(s), derived using different algorithms,
  * taking into account and visualising the difference from the actual file size.
- * @param {...Number} sizes - numerical values
- * For example, if a file is 100 bytes long, outSz(90,100,105) will yield "90(+10)/100/105(-5!)"
- * The "!)" thus indicates the file is too short compared to the algorithmic estimation.
  * If some of the reported sizes match, the value will only be displayed once.
  * It's still a good idea to add "/malformed!short" to the version string — it's visible without isVerbose.
+ * @param {...Number} sizes - numerical values
+ * @example
+ * // If a file is 100 bytes long:
+ * outSz(90,100,105) === "90(+10)/100/105(-5!)"
+ * // The "!)" thus indicates the file is too short compared to the algorithmic estimation.
  */
 function outSz() { if(!arguments.length || typeof arguments[0] === 'undefined') return "?";
 	var sizes = [], origs = [];
@@ -433,9 +482,10 @@ function outSz() { if(!arguments.length || typeof arguments[0] === 'undefined') 
  * @param {Int} [base = 10] - If an integer value is found, in which base to display it
  * @param {Int} [zeropad] - If an integer value is found, how many zeroes to pad it with (smart by default)
  * @returns {String} A beautiful output!
- * Ex. 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 2) = "[0001, [0101, [1010, 11110]], [[10111], "test"]]"
- * Ex. 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 2,8) = "[00000001, [00000101, [00001010, 00011110]], [[00010111], "test"]]"
- * Ex. 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 16) = "[01, [05, [0A, 1E]], [[17], "test"]]"
+ * @example
+ * 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 2) == "[0001, [0101, [1010, 11110]], [[10111], "test"]]"
+ * 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 2, 8) == "[00000001, [00000101, [00001010, 00011110]], [[00010111], "test"]]"
+ * 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 16) == "[01, [05, [0A, 1E]], [[17], "test"]]"
  */
 function outArray(a,base,pad) {
 	if(!Array.isArray(a)) return a;
@@ -454,7 +504,8 @@ function outArray(a,base,pad) {
 
 
 /**
- * A shorthand for the situation where you compare the file suffix to what you'd expect. Use as the option to isHeuristicScan being true.
+ * A shorthand for the situation where you compare the file suffix to what you'd expect.
+ * Use as the option to Binary.isHeuristicScan().
  * @param {String} a - the expected file suffix, case-insensitive, no heading period unlike Python
  * @returns {bool} if a match is reached
  */
@@ -462,7 +513,8 @@ function extIs(a) { return File.getFileSuffix().toLowerCase() == a.toLowerCase()
 
 
 /**
- * slashTag formats a string in a way that's useful when a tag has two versions (for ex. in different languages). It will either show both with "/" in between, or one of them if the other one's an empty string, or an empty string if both are empty.
+ * slashTag formats a string in a way that's useful when a tag has two versions (for ex. in different languages).
+ * It will either show both with "/" in between, or one of them if the other one's an empty string, or an empty string if both are empty.
  * @param {String} a - the first of the two
  * @param {String} b - the second of the two
  * @returns {String}
@@ -486,7 +538,6 @@ function slashTag(a, b) {
  * @param {BitReader} br - a BitReader object pointing somewhere at the right position for this. The provided BitReader WILL change state.
  * @returns {Array or false}
 */
-// createOrderlyHuffmanTable is just for detections but it does return the table for further checks. Or it returns false.
 function createOrderlyHuffmanTable(lent, btl, br) {
 	var md = 32, Md = reall = code = 0; var _t = [], fi = [], li = [], ni = [];
 	for(i = 0; i < 33; i++) fi[i] = 0xFFFF;
@@ -515,10 +566,11 @@ function createOrderlyHuffmanTable(lent, btl, br) {
 
 /**
  * Outputs time in seconds as short human-readable, with a "h:mm:ss" alternative when < 1 day.
- * Millenia, centuries and years a sidereal years, a "month" duration is 1/12 of such year.
+ * Millenia, centuries and years as sidereal years, a "month" duration is 1/12 of such year.
  * @param {Number} seconds
  * @returns {String}
- * Ex. 𝑓(123456789) = "31Y10M4w21h33m9s"; 𝑓(1234567) = "2w6h56m7s"; 𝑓(12345) = "3:25:45"
+ * @example
+ * 𝑓(123456789) === "31Y10M4w21h33m9s"; 𝑓(1234567) === "2w6h56m7s"; 𝑓(12345) === "3:25:45"
  */
 function secondsToTimeStr(s) {
 	const mul = [/*millenia*/315581497635,/*centuries*/3155814976,/*yrs*/31558150,/*mns*/2629846,/*wks*/604800,86400,3600,60];
@@ -533,14 +585,15 @@ function secondsToTimeStr(s) {
 
 /**
  * Examines a sequence and gives a generalised idea of what sort of characters a string is (mostly) made of.
+ * Parse the result using indexOf.
  * Could be useful for validating structured files with human-filled fields.
  * @param {String/Number[]} s - your string in question, or a List of charcodes.
- * @param {Boolean=false} needall - if true, you have "allascallt allnum" for a line of spaces, else just "allt ".
- * @returns {String} - at least one or a combo of these, optional prefix "all" (otherwise "mostly"):
+ * @param {Boolean} [needall=CS_BEST] - if true, you have "allascallt allnum" for a line of spaces, else just "allt ".
+ * @returns {String} - at least one or a combo of these, optional prefix "all" (otherwise treat as "mostly"):
  *  '?': wrong type; 'empty': 0 length; '00': zeroes; 't ': tabs/spaces; 'ctl': 0-1Fh & 7Fh; 'num': numerical;
  *  'asc': 20h-7Eh; 'xsc': zeroes+tabs+♫+FFh+crlf+ascii; 'foreign': 00,t, ,crlf, 80h+; 'any': decision cannot be made.
- * Parse the result using indexOf.
- * Ex. 𝑓("-123 456.789") = "allnum", 𝑓("-123 456.789",1) = "allnumallascallxscallforeign"
+ * @example
+ * 𝑓("-123 456.789") === "allnum"; 𝑓("-123 456.789", CS_ALL) === "allnumallascallxscallforeign"
  */
 /* beautify preserve:start */
 function charStat() {
@@ -588,6 +641,7 @@ function charStat() {
 
 
 // PATCHING FUNCTIONALITY; promised to become native
+// May be useful in some ugly cases for quickly pre-processing the file contents which are then detected.
 var patcheddata = [];
 function rpU8(adr) { //read patched data or passthrough, U8
 	for(var i=0; i < patcheddata.length; i++) if(patcheddata[i][0] == adr) return patcheddata[i][1];
@@ -616,11 +670,14 @@ function patchClear() { patcheddata = [] }
 
 
 /**
- * Discovers gaps in an array of pairs of numbers, with a minimum-to-report gap as optional parameter.
- * @param {Array of arrays[2]} lst - List to process consisting of ranges defined as [offset,length]
- * @param {UInt = 1} mingap - Minimum gap, default to at least 1 byte between the ranges
+ * Discovers gaps in an unsorted array of pairs of [offset, length], with a minimum-to-report gap as optional parameter.
+ * Useful for extra checks in file resource formats, without signatures but not sparse, so you can tell whether the resource blocks have no spaces in-between and don't overlap, using this and findIntersections.
+ * @param {Array of arrays[2]} lst - List to process consisting of ranges
+ * @param {UInt} [mingap=1] - Minimum gap, default to at least 1 byte between the ranges. Change for aligned data
  * @returns {Array of arrays[2]} Sorted list of gap ranges in the same format
- * Ex. 𝑓([ [10,10], [25,5], [40,10] ]) = [[20,5], [30,10]] 
+  * @example
+  * // We have data defined in 10..20, 25..30, 40..50:
+  * 𝑓([ [10,10], [25,5], [40,10] ]) === [ [20,5], [30,10] ] 
  */
 function findGaps(lst, mingap) {
 	var i, r = []; /* tests for input typing follow */ if(!Array.isArray(lst) || lst.length < 2) return r;
@@ -636,12 +693,14 @@ function findGaps(lst, mingap) {
 
 
 /**
- * Discovers intersections in an array of pairs of numbers, considering all possible pairs.
+ * Discovers intersections in an unsorted array of pairs of [offset, length], considering all possible pairs.
+ * Useful for extra checks in file resource formats, without signatures but not sparse, so you can tell whether the resource blocks don't overlap and have no spaces in-between, using this and findGaps.
  * @param {Array of arrays[2]} lst - List to process consisting of ranges defined as [offset,length]
- * @param {Boolean = false} detectone - Stop searching after finding even one intersection
+ * @param {Boolean} [detectone=false] - Stop searching after finding even one intersection
  * @returns {Array of arrays[2]} Sorted list of intersection ranges in the same format; if length > 0, intersection present
- * Ex. 𝑓([ [10,20], [15,10], [23,30] ]) = [[15,10], [23,2], [23,7]]
- * Ex. 𝑓([ [10,20], [15,10], [23,30] ], true) = [[15,10]]
+ * @example
+ * 𝑓([ [10,20], [15,10], [23,30] ]) = [[15,10], [23,2], [23,7]]
+ * 𝑓([ [10,20], [15,10], [23,30] ], true) = [[15,10]]
  */
 function findIntersections(lst,detectone) {
 	var i, t, r = []; /* tests for input typing follow */ if(!Array.isArray(lst) || lst.length < 2) return r;

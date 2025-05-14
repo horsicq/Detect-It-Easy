@@ -1,0 +1,29 @@
+// Detect It Easy: detection rule file
+// Author: Kaens (TG@kaens)
+
+init("audio", "CRI Middleware's AHX ADPCM stream (.AHX)");
+
+function detect() {
+    //from https://github.com/vgmstream/vgmstream/blob/master/src/meta/ahx.c
+    if (!X.c("8000")) return false;
+    if (!isWithin(p=X.U16(2,_BE)+4, 0x14, X.Sz())) return false;
+    if (!X.c("'(c)CRI'",p-6)) return false;
+    fmt = X.U8(4);
+    if ([0x10,0x11].indexOf(fmt) < 0) return false;
+    if (X.U8(5) || X.U8(6)) return false; //frames and bit per sample are 0 in AHX
+    if (X.U8(7) != 1) return false; //1 ch only
+    if (X.U8(0x12) != 6) return false;
+    bDetected = 1;
+    sVersion = "";
+    switch(fmt) {
+        case 0x10: sVersion += "+bigger frames";
+    }
+    if(X.U8(0x13) > 0) sVersion += " encrypted";
+    if(X.isVerbose()) {
+        sz = X.fSig(p,TOEOF,"'AHXE(c)CRI'"); if(sz > 0) sz += 10;
+        sOption('1ch '+(sr=X.U32(8,_BE))+'Hz len '
+            +secondsToTimeStr(((smp=X.U32(0x0C,_BE))/sr).toFixed(0))+' sz:'+outSz(sz))
+    }
+
+    return result();
+}
