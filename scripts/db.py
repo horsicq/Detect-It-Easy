@@ -16,7 +16,7 @@ def count_signatures(base_path='../db'):
         relative_path = os.path.relpath(root, base_path)
         
         # Skip the root path itself
-        if relative_path == ".":
+        if relative_path == "." or ".vscode" in relative_path:
             continue
         
         # Count .sg files in the current directory
