@@ -23,7 +23,7 @@ sudo apt-get install qtbase5-dev qtscript5-dev qttools5-dev-tools libqt5svg5-dev
 sudo apt-get install qt5-default -y
 ```
 
-- Ubuntu 21.04-22.04
+- Ubuntu 21.04-25.04
 
 ```bash
 sudo apt-get install qtchooser qt5-qmake -y
