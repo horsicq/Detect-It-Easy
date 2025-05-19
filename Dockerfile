@@ -1,11 +1,13 @@
-FROM debian:bookworm-slim
+FROM ubuntu:focal
 
-RUN apt update -qq && apt upgrade -y && apt install -y wget tar libglib2.0-0 && \
-    wget https://github.com/horsicq/DIE-engine/releases/download/3.01/die_lin64_portable_3.01.tar.gz && \
-    tar -xzf die_lin64_portable_3.01.tar.gz
+RUN apt update -qq && apt upgrade -y && apt install -y wget tar libglib2.0-0
+RUN apt install -y libpcre2-posix2 libpcre2-dev
+RUN apt install -y libdouble-conversion3
+RUN wget https://github.com/horsicq/DIE-engine/releases/download/3.10/die_3.10_portable_Ubuntu_20.04_amd64.tar.gz && \
+    tar -xzf die_3.10_portable_Ubuntu_20.04_amd64.tar.gz
 
 # db update
-RUN rm -rf /die_lin64_portable/base/db
+RUN rm -rf /die_linu_portable/base/db
 COPY ./db /die_lin64_portable/base/db
 
-ENTRYPOINT ["/die_lin64_portable/diec.sh"]
+ENTRYPOINT ["/die_linux_portable/diec.sh"]
