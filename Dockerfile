@@ -7,7 +7,7 @@ RUN wget https://github.com/horsicq/DIE-engine/releases/download/3.10/die_3.10_p
     tar -xzf die_3.10_portable_Ubuntu_20.04_amd64.tar.gz
 
 # db update
-RUN rm -rf /die_linu_portable/base/db
-COPY ./db /die_lin64_portable/base/db
+RUN rm -rf /die_linux_portable/base/db
+COPY ./db /die_linux_portable/base/db
 
 ENTRYPOINT ["/die_linux_portable/diec.sh"]
