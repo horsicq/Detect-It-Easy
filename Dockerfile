@@ -1,11 +1,12 @@
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
 
-RUN apt update -qq && apt upgrade -y && apt install -y wget tar libglib2.0-0 && \
-    wget https://github.com/horsicq/DIE-engine/releases/download/3.01/die_lin64_portable_3.01.tar.gz && \
-    tar -xzf die_lin64_portable_3.01.tar.gz
+RUN apt update -qq && apt upgrade -y  && apt install -y wget && \
+    # Beta version needed to support recent signatures
+    wget https://github.com/horsicq/DIE-engine/releases/download/Beta/die_3.10_Ubuntu_24.04_amd64.deb  && \
+    apt install -y ./die_3.10_Ubuntu_24.04_amd64.deb && \
+    rm die_3.10_Ubuntu_24.04_amd64.deb && rm -rf /usr/lib/die/db
 
 # db update
-RUN rm -rf /die_lin64_portable/base/db
-COPY ./db /die_lin64_portable/base/db
+COPY ./db /usr/lib/die/db
 
-ENTRYPOINT ["/die_lin64_portable/diec.sh"]
+ENTRYPOINT ["/usr/bin/diec"]
