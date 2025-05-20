@@ -1,13 +1,12 @@
-FROM ubuntu:focal
+FROM ubuntu:24.04
 
-RUN apt update -qq && apt upgrade -y && apt install -y wget tar libglib2.0-0
-RUN apt install -y libpcre2-posix2 libpcre2-dev
-RUN apt install -y libdouble-conversion3
-RUN wget https://github.com/horsicq/DIE-engine/releases/download/3.10/die_3.10_portable_Ubuntu_20.04_amd64.tar.gz && \
-    tar -xzf die_3.10_portable_Ubuntu_20.04_amd64.tar.gz
+RUN apt update -qq && apt upgrade -y  && apt install -y wget && \
+    # Beta version needed to support recent signatures
+    wget https://github.com/horsicq/DIE-engine/releases/download/Beta/die_3.10_Ubuntu_24.04_amd64.deb  && \
+    apt install -y ./die_3.10_Ubuntu_24.04_amd64.deb && \
+    rm die_3.10_Ubuntu_24.04_amd64.deb && rm -rf /usr/lib/die/db
 
 # db update
-RUN rm -rf /die_linux_portable/base/db
-COPY ./db /die_linux_portable/base/db
+COPY ./db /usr/lib/die/db
 
-ENTRYPOINT ["/die_linux_portable/diec.sh"]
+ENTRYPOINT ["/usr/bin/diec"]
