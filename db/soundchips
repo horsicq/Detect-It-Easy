@@ -1,0 +1,116 @@
+//Detect-It-Easy signature file
+//Author: Kae <TG@kaens>
+// Provides user-readable lists, feature processors, aid for logging,
+// info useful for statistical/sanity-based detection I guess?
+
+// The following is a list of popular sound chips and their aliases in single strings separated by ", "
+SoundChips = [
+  'AY-3-8910, AY8910, PSG' ,
+  'AY8930',
+  'AY-3-8912',
+  'AY-3-8913',
+  'YM2149, SSG',
+  'YM2203, OPN',
+  'YM6630, Sunsoft 5B',
+  'YM3439, SSGC',
+  'YMZ284, SSGL',
+  'YMZ294, SSGLP',
+  'YMZ705, SSGS',
+  'YM2151, OPM, IC101, #IT-21-51-00', //FM-chip
+  'YM3012, IC102, #IT-30-12-00', //stereo DAC
+  'YM2148, IC103, #IT-21-46-00', //MIDI handling
+  'YM22702, IC104, #IT-22-70-20', //ROM
+  'SN76489, DCSG',
+  'SN76489A',
+  'SN76496'
+];
+
+// -= Yamaha YM2151 FM Operator Type-M (OPM) related things =-
+
+//The OPM doesn't use these registers:
+badYM2151Reg = [0,2,3,4,5,6,7,9,0xA,0xB,0xC,0xD,0xE,0x10,0x13,0x15,0x16,0x17,0x1A,0x1C,0x1D,0x1E,0x1F];
+
+function YM2151RegStr(a,b) {
+  //from https://retrocdn.net/images/9/9c/YM2151_Application_Manual.pdf
+  // & https://cx5m.file-hunter.com/fmunit.htm - this one contains errors!
+  if(badYM2151Reg.indexOf(a) >= 0) return '!bad#'+Hex(a);
+  if(a == 1) if((b&2) == b) return 'LFOR'; else return 'TEST'+Bin(b);
+  if(a == 8) return 'keyon ch'+(b&7)+' slot'+Bin((b>>3)&0xF);
+  if(a == 0xF) return 'noise'+['off','on'][b>>7]+' freq'+Hex(b>>0x1F);
+  if(a == 0x11) return 'CLKA MSB freq'+Hex(b);
+  if(a == 0x12) return 'CLKA LSB freq'+Hex(b&3);
+  if(a == 0x13) return 'CLKB freq'+Hex(b);
+  if(a == 0x14) return 'Clk CSM'+(b>>7)+' FResetBA'+Bin((b>>4)&3,2)
+    +' IRQEnBA'+Bin((b>>2)&3,2)+' LoadBA'+Bin(b&3,2); //
+  if(a == 0x18) return 'LowOscFreq '+Hex(b);
+  if(a == 0x19) return ['Amp','Phase'][b>>7]+'Mod depth'+Hex(b&0x7F);
+  if(a == 0x1B) return 'LFOWave ctl'+(b>>6)+' '+['saw','sqr','tri','noise'][b&3];
+  if(a <= 0x27) return 'Ch '+(a&0x7)+' ctl '+(b&0x80?'R':'')+(b&0x40?'L':'')+' FB'+((b>>3)&7)+' con'+(b&7);
+  if(a <= 0x2F) { o = ((b>>4)&7);
+    return 'KC/prep note-on ch'+(a&0x7)+' '+(o? ['C#','D','D#','E','F','F#','G','G#','A','A#','B',"C'"][b&0xF]+o : '--') }
+  if(a <= 0x37) return 'KF/prep p.bend ch'+(a&0x7)+' kf'+(b>>2);
+  if(a <= 0x3F) return 'ModSensy. ch'+(a&0x7)+' phase'+((b>>4)&7)+' amp'+(b&3);
+  if(a <= 0x47) return 'OP1 ch'+(a&0x7)+' dt1:'+((b>>4)&7)+' mul'+(b&0xF);
+  if(a <= 0x4F) return 'OP3 ch'+(a&0x7)+' dt1:'+((b>>4)&7)+' mul'+(b&0xF);
+  if(a <= 0x57) return 'OP2 ch'+(a&0x7)+' dt1:'+((b>>4)&7)+' mul'+(b&0xF);
+  if(a <= 0x5F) return 'OP4 ch'+(a&0x7)+' dt1:'+((b>>4)&7)+' mul'+(b&0xF);
+  if(a <= 0x67) return 'OP1 ch'+(a&0x7)+' TL'+(b&0x7F);
+  if(a <= 0x6F) return 'OP3 ch'+(a&0x7)+' TL'+(b&0x7F);
+  if(a <= 0x77) return 'OP2 ch'+(a&0x7)+' TL'+(b&0x7F);
+  if(a <= 0x7F) return 'OP4 ch'+(a&0x7)+' TL'+(b&0x7F);
+  if(a <= 0x87) return 'OP1 ch'+(a&0x7)+' KeyScl'+(b>>6)+' atk'+(b&0x1F);
+  if(a <= 0x8F) return 'OP3 ch'+(a&0x7)+' KeyScl'+(b>>6)+' atk'+(b&0x1F);
+  if(a <= 0x97) return 'OP2 ch'+(a&0x7)+' KeyScl'+(b>>6)+' atk'+(b&0x1F);
+  if(a <= 0x9F) return 'OP4 ch'+(a&0x7)+' KeyScl'+(b>>6)+' atk'+(b&0x1F);
+  if(a <= 0xA7) return 'OP1 ch'+(a&0x7)+' AMS'+['off','on'][b>>7]+' dcy1R:'+(b&0x1F);
+  if(a <= 0xAF) return 'OP3 ch'+(a&0x7)+' AMS'+['off','on'][b>>7]+' dcy1R:'+(b&0x1F);
+  if(a <= 0xB7) return 'OP2 ch'+(a&0x7)+' AMS'+['off','on'][b>>7]+' dcy1R:'+(b&0x1F);
+  if(a <= 0xBF) return 'OP4 ch'+(a&0x7)+' AMS'+['off','on'][b>>7]+' dcy1R:'+(b&0x1F);
+  if(a <= 0xC7) return 'OP1 ch'+(a&0x7)+' dt2:'+(b>>6)+' dcy2R:'+(b&0x1F);
+  if(a <= 0xCF) return 'OP3 ch'+(a&0x7)+' dt2:'+(b>>6)+' dcy2R:'+(b&0x1F);
+  if(a <= 0xD7) return 'OP2 ch'+(a&0x7)+' dt2:'+(b>>6)+' dcy2R:'+(b&0x1F);
+  if(a <= 0xDF) return 'OP4 ch'+(a&0x7)+' dt2:'+(b>>6)+' dcy2R:'+(b&0x1F);
+  if(a <= 0xE7) return 'OP1 ch'+(a&0x7)+' dcy2L:'+(b>>4)+' rel:'+(b&0xF);
+  if(a <= 0xEF) return 'OP3 ch'+(a&0x7)+' dcy2L:'+(b>>4)+' rel:'+(b&0xF);
+  if(a <= 0xF7) return 'OP2 ch'+(a&0x7)+' dcy2L:'+(b>>4)+' rel:'+(b&0xF);
+  return 'OP4 ch'+(a&0x7)+' dcy2L:'+(b>>4)+' rel:'+(b&0xF);
+}
+
+
+// -= MDX/MXDRV command parser, useful for loggers
+function MDXCmdStr(ch,o) {
+  const C = ['A','B','C','D','E','F','G','H', 'P', 'Q','R','S','T','U','V','W'];
+  const notes = ['D#','E','F','F#','G','G#','A','A#','B','B#','C','C#','D']; var c = X.U8(o);
+  if(c < 0x80) return C[ch]+': rest '+ (c+1);
+  else if(c <= 0xDF) { c -= 0x80;
+    if(ch > 8) return C[ch]+': smp#'+c;
+    else return C[ch]+': '+notes[c%12]+(Util.divu64(c,12))+' ~'+(X.U8(o+1)+1)
+  }
+  else switch(c) {
+  case 0xFF: return C[ch]+': bpm '+X.U8(o+1); case 0xFE: return C[ch]+': R '+YM2151RegStr(X.U8(o+1),X.U8(o+2));
+  case 0xFD: return C[ch]+': voicedata '+X.U8(o+1); case 0xFC: return C[ch]+': pan '+X.U8(o+1);
+  case 0xFB: if(X.U8(o+1) & 0x80) return C[ch]+': @vol '+(X.U8(o+1)&0x7F); else return C[ch]+': vol '+X.U8(o+1);
+  case 0xFA: return C[ch]+': vol-'; case 0xF9: return C[ch]+': vol+';
+  case 0xF8: return C[ch]+': staccato '+X.U8(o+1); case 0xF7: return C[ch]+': legato';
+  case 0xF6: return C[ch]+': rep.'+X.U8(o+1)+' ['+(X.U8(o+2)?'/'+X.U8(o+2):'')+'...';
+  case 0xF5: return C[ch]+': ...]rep.,ret→'+Hex(o+X.I16(o+1,_BE));
+  case 0xF4: return C[ch]+': .../rep.esc→'+Hex(o+X.I16(o+1,_BE));
+  case 0xF3: return C[ch]+': detune '+X.I16(o+1,_BE)/0x40;
+  case 0xF2: return C[ch]+': portamento '+X.I16(o+1,_BE)/0x4000+' ↓';
+  case 0xF1: if(X.U8(o+1)) return C[ch]+': loop from '+Hex(o+3+X.I16(o+1,_BE))+'.'; else return C[ch]+' ends.';
+  case 0xF0: return C[ch]+': delay key-on '+X.U8(o+1); case 0xEF: return C[ch]+': sync send on ch'+X.U8(o+1);
+  case 0xEE: return C[ch]+': sync wait on ch'+X.U8(o+1); case 0xED: return C[ch]+': noise/smp freq '+X.U8(o+1);
+  case 0xEC: if(X.U8(o+1) == 0x80) return C[ch]+': pitch LFO off';
+    else if(X.U8(o+1) == 0x81) return C[ch]+': pitch LFO on';
+    else return C[ch]+': LFO pitch wf '+X.U8(o+1)+' freq '+X.U16(o+2,_BE)+' amp '+X.U16(o+4,_BE);
+  case 0xEB: if(X.U8(o+1) == 0x80) return C[ch]+': vol LFO off';
+    else if(X.U8(o+1) == 0x81) return C[ch]+': vol LFO on';
+    else return C[ch]+': LFO vol wf '+X.U8(o+1)+' freq '+X.U16(o+2,_BE)+' amp '+X.U16(o+4,_BE);
+  case 0xEA: if(X.U8(o+1) == 0x80) return C[ch]+': OPM LFO off';
+    else if(X.U8(o+1) == 0x81) return C[ch]+': OPM LFO on';
+    else return C[ch]+': LFO OPM syn/wf '+X.U8(o+1)+' lfrq '+X.U8(o+2)+' PMD '+X.U8(o+3)+' AMD '+X.U8(o+4)+' P/AMS '+X.U8(o+5);
+  case 0xE9: return C[ch]+': LFO key-on dly '+X.U8(o+1); case 0xE8: return C[ch]+': PCM8 on';
+  case 0xE7: return C[ch]+': Fadeout'+(X.U8(o+1)==1?'':Hex(X.U8(o+1)))+' spd '+X.U8(o+2);
+  default: return C[ch]+': unknown command '+Hex(X.U8(o))
+  }
+}
