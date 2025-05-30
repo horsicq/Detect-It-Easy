@@ -9,7 +9,8 @@
 init("audio", "");
 includeScript("chunkparsers");
 includeScript("soundchips");
-debug = 0; //verbosity up to 3, where every note/command is shown. Overrides the debug() function; use _l2r()
+includeScript("bytecodeparsers");
+const debug = 0; //verbosity up to 3, where every note/command is shown. Overrides the debug() function; use _l2r()
 
 function detect() {
 
@@ -2421,6 +2422,10 @@ function detect() {
 		// if(v!=null) sVersion = "v"+v;
 		// if(X.isVerbose())
 		//     sOptionT(X.SA(0x2A,0x40))
+	}
+	else if(X.c("3C4F3123 20391E00 1FdF1F9F 0C020C05 04040407 1AF60627")) {
+		sName = "Packen/ぱっくん Software MUAP98/みゅあっぷ tone data (TONES.DTA)"; bDetected = 1;
+		if(X.isVerbose()) sOption('6400','sz:')
 	}
 	else if(X.c("'MVSM1'")) {
 		sName = "MVS Tracker module (.MUS)"; bDetected = 1
@@ -7418,7 +7423,9 @@ function isPMD() {
 	// ref https://raw.githubusercontent.com/ValleyBell/MidiConverters/master/pmd_SeqFormat.txt
 	// & https://web.archive.org/web/20220928062748/https://lithcore.cn/2318/
 	// & https://github.com/mistydemeo/pmdmini/blob/master/src/pmdmini.c
-	if(X.Sz() < 37 || !isWithin(nV=X.I8(0), -1,0xF)) return false;
+	// & https://gitlab.com/bunnylin/supersakura/blob/dev/doc/mus/pmd.md
+	// & https://github.com/stuerp/foo_input_pmd/blob/master/PMD/PMD.cpp
+	if(X.Sz() < 37 || !isWithin(nV=X.I8(0), -1,2/*0xF*/)) return false;
 	if(X.U16(1) == 0x1A) var nptr = 13; else if(X.U16(1) == 0x18) var nptr = 12; else return false;
 	function re(p,t) { if(debug>1)_l2r('pmd',p,t); return false }
 	function trktxt(n) {
@@ -7431,24 +7438,39 @@ function isPMD() {
 		else if(n === 12) return  'FM insts';
 		else return '??'
 	}
-//var trkpt = []; //debug
+var trkpt = []; //debug
 	for(i=0,oldchn=X.U16(1); i < nptr; i++) { //ptrs to the 11 tracks, rhythm funcs, (maybe optionally?) FM insts
 		p = X.U16(1+i*2); if(/*p &&*/ !isWithin(p, 0x1A,X.Sz()-1)) return re(p,'!badtrkp');
-//trkpt.push(Hex(p+1)+': '+trktxt(i)); //debug
+trkpt.push(Hex(p+1)+': '+trktxt(i)); //debug
 		if(isWithin(i, 1,11) && X.U8(p) != 0x80) return re(p,'!badtrkend'+X.U8(p)); //data blocks end in 80h
 		if(isWithin(i, 1,10) && p <= oldchn) return re(p,'!badtrkp'); // not sorted right
+		if(!i && X.U8(p) == 0xC6) for(j=p+1; j < p+9; j+=2)
+			if((t=X.U16(j)) && !isWithin(t, p,X.Sz()-1)) return re(p,'!badC6trkp');
 		oldchn = p;
 	}
 //_l2r('pmd','',trkpt.join(' || ')); //debug
-	//rhy = (X.U16(0x19)-X.U16(0x17)) >> 1;
-	fe = X.U8(p) == 0xFE;
-	bad = ''; ttype = ''; extra = -1;
-	if(fe) {
+	rhosz = (X.U16(0x17)-X.U16(0x15)-1); rhysz = (X.U16(0x19)-X.U16(0x17)-2) >> 1;
+	rho = rhy = 0;
+	var rhy1 = oldrhy = 0, rhy0 = 0xFFFFFF;
+	if(rhosz > 0) for(q=X.U16(0x15)+1; q < X.U16(0x17)+1; q++) {
+		//rhythm subroutine orderlist, most likely? the first byte seems to be the number of loops
+		t = X.U8(q);
+//_l2r('rho',q,'#'+Hex(t))
+		if(t == 0x80) break; if(t >= rhy && t < 0x80) rhy = t+1; //just sometimes, rhy-orderlist items like F6 happen
+		rho++
+	}
+	if(rhysz > 0 && rhosz > 0) for(q=X.U16(0x17)+1; q < rhy0 && q < X.U16(0x19)-1 && rhy1 < rhy; q+=2) {
+		//rhythm subroutine pointers; the last 2 bytes are probably about the version
+		t = X.U16(q)+1;
+//_l2r('rhy',q,'*'+Hex(t))
+		if(!isWithin(t, q,X.Sz())) break;//_l2r('rhy',q,'OOBrhyptr '+Hex(t));
+		if(!rhy1) rhy0 = t;
+		if(t >= 0xFE00 || X.U16(0x19)-q < 2) break;
+		rhy1++; oldrhy = t;
+	}
+	bad = ''; ttype = ''; extra = -1; sV = '';
+	if(rhysz >= 4) {
 		extrap = p-3; extra_type = X.U8(extrap+2);
-		// The following breaks at, for example, Curse/logo.m; might have to parse callees to know the real number
-		for(q=X.U16(0x17)+1; q < X.U16(0x19)+1; q+=2) { //rhythm subroutine pointers
-//_l2r('rhy',q,'*'+Hex(X.U16(q)+1))
-		}
 		if(!isWithin(extra_type, 0x40,0x4F)) bad = bad.addIfNone('!badxtype'+Hex(extra_type));
 		if(extra_type < 0x42) ttype = "PCP/P86";
 		else if(extra_type < 0x48) ttype = "PPS";
@@ -7456,18 +7478,18 @@ function isPMD() {
 		extra = X.U16(extrap,_LE)+1;
 		if(!isWithin(extra, 1,X.Sz()))
 			bad = bad.addIfNone('!'+Hex(extra)+' out of '+Hex(extrap-1));
-		for(i=0; i < 4; i++) {
+		else for(i=0; i < 4; i++) {
 			p = X.U16(extra+i*2,_LE);
 			if(p < 27 || p+1 > X.Sz()) bad = bad.addIfNone('!extrapOOB'+Hex(extra))
 		}
 	}
-	//if(oldchn >= ch) return false;
+//else _l2r('fe',p-1,'version?'+Hex(X.U8(p-1)));
 	return true
 }
 if(!bDetected && isPMD() ) {
 	bDetected = 1;
-	sName = "Professional Music Driver module (.M,.M2)";
-	sVersion = nV >= 0? 'v'+nV: '';
+	sName = "Masahiro 'Kajapon' Kajihara's Professional Music Driver module (.M,.M2)";
+	sVersion = nV >= 0? 'v'+nV+'/'+['OPN/OPNA','OPM','OPL2',,,,,,,,,,,,,,][nV]: '';
 	sVersion = sVersion.appendS(/*'t'+Hex(extra_type).substr(0,2)+":"+*/ttype/*+" tagptrs:"+Hex(extra)*/,' ');
 	if(bad.length) sVersion = sVersion.appendS('malformed'+bad,'/');
 	if(X.isVerbose()) {
@@ -7495,8 +7517,38 @@ if(!bDetected && isPMD() ) {
 			sOption(artist,"by: ");
 			sOption(arenji,"mixed by: ");
 			sOption(rem);
-			sOption(fnames.join(", "),"fn: ")
+			sOption(fnames.join(", "),"fn: ");
 		}
+		t = X.U8(X.U16(0x15)+1);
+		sOption('rhyord:'+rho+(rho?(t?'×'+t:'')+' rhy:'+rhy:''))
+	}
+}
+
+
+function isMUAP98() {
+	//ref http://ohta.music.coocan.jp/packen/data/muap641s.lzh / NAX.ASM & PLAY4.ASM
+	function re(p,t) { if(debug>-1)_l2r('muap',p,t);return false }
+	if(X.Sz() < Math.max(X.U16(0x20),0x26) ) return false;
+	ch = notes = sz = 0; msg = ''; var t;
+	for(i=oldp=0; i < 0x11; i++) {
+		t = X.U16(i*2);
+		if(!isWithin(t, Math.max(0x18,oldp),X.Sz()))
+			return re(i*2,'!ptr#'+i+'OOB '+outArray([t,oldp,X.Sz()],16));
+		if(i && X.U8(t-1) != 0xFC) return re(t-1,'!FC@');
+		if(X.U8(t) != 0xFC) {
+			var r = parseMUAP98(t, X.isDeepScan()?BCParseToEoF:BCParseToReasonable, i);
+			if(r[0] == BCInvalidFormat) return false;
+			notes += r[0]; msg = msg.appendS(r[3],'\n'); ch++; if(sz < r[4]) sz = r[4]
+		} else if(sz < t+1) sz = t+1;
+		oldp = t
+	}
+	return true
+}
+if(!bDetected && isMUAP98()) {
+	sName = "Packen/ぱっくん Software MUAP98/みゅあっぷ Object chiptune (.O,.OX+TONES.DTA)"; bDetected = 1;
+	if(X.isVerbose()) {
+		sOptionT(msg); //actually meant to display lyrics
+		sOption('ch:'+ch+(X.isDeepScan()?' notes:'+notes+' sz:'+outSz(sz):''));
 	}
 }
 
@@ -10016,14 +10068,16 @@ if(!bDetected && isROL()) {
 }
 
 
-function isGYM() {
+function isGYMX() {
 	if(X.Sz() < 0x1AC || !X.c("'GYMX'")) return false;
-	var t = X.readBytes(4,0x1A8); for(i=0; i < t.length; i++) if(isWithin(t[i],1,0xA) || isWithin(t[i],0xE,0x1F)) return false;
+	for(i=4; i < 0x1A8; i++) if(isWithin(X.U8(i), 1,0xA) || isWithin(X.U8(i),0xE,0x1F)) return false;
+	unpsz = X.U32(0x1A8);
+	if(unpsz <= 2) if(parseMDGYM(0x1AC) <= 0) return false;
 	return true
 }
-if(!bDetected && isGYM()) {
+if(!bDetected && isGYMX()) {
 	sName = "Sega Genesis/Mega Drive YM2612 chiptune (.GYM)"; bDetected = 1;
-	if((unpsz=X.U32(0x1A8)) < 2) sVersion = sVersion.append('unpacked');
+	if(unpsz <= 2) sVersion = sVersion.append('unpacked');
 	if(X.isVerbose()) {
 		sOptionT(X.SC(0x4,0x20,'CP1252'));
 		sOptionT(X.SC(0x24,0x20,'CP1252'),'for: ');
@@ -10641,8 +10695,7 @@ function re(p,t) { if(debug>-1)_l2r('mdx',p,t); return false }
 	var chn0 = chn = oldchn = X.U16(p,_BE)+ofs; //we begin with mml data 0 ptr, stored as offset from post-info point 
 	if(!isWithin(chn,p,m)) return re(chn,'!chn'+Hex(p)+'-'+Hex(m)); // it shouldn't point at EoF-ish nor to 0 or 1
 	ch = (chn-ofs-2)/2; //0x14 or 0x22, ie. either 9 or 16
-	usedch = [false, false, false, false, false, false, false, false, false,  false, false, false, false, false, false];
-	notes = vdn = mp = 0; vds = []; bpm0 = -1;
+	usedch = [0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0]; notes = vdn = mp = 0; vds = []; bpm0 = -1;
 	var q = -1, lp = [], v = [0,1]; // v is for registering the presence of expected commands across the file; all must be 1
 	if(X.isDeepScan()) { visited = []; for(i=0; i < m; i++) visited[i] = 0 } // to keep looping in check
 
@@ -12390,6 +12443,27 @@ if(X.isHeuristicScan()) { //parallel block
 		_setResult("~audio","Hannes Seifert's HSC Adlib Composer/ECR HSC-Tracker module (.HSC)",'',soption)
 	}
 
+
+	function isGYM() { // the headerless one's nooooot easy to check
+		if(X.Sz() < 4) return false;
+		if(parseMDGYM() < 0) return false;
+		return true
+	}
+	if(isGYM()) _setResult("~audio","Sega Genesis/Mega Drive YM2612 chiptune (.GYM)","headerless",'');
+
+
+	function isFMX() {
+		if(X.Sz() < Math.max(X.U16(0x1E),0x30)) return false;
+		ch = 0; var t;
+		for(i=oldp=0; i < 0x10; i++) {
+			if(!isWithin(t = X.U16(i*2), Math.max(0x30,oldp),X.Sz())) return false;
+			if(i && X.U8(t-1) != 0x80) return false;
+			if(X.U8(t) != 0x80) ch++;
+			oldp = t
+		}
+		return true
+	}
+	if(isFMX()) _setResult("~audio","K.Ohshima's FMX chiptune (.FMX)",'',X.isVerbose?'ch:'+ch:'');
 
 
 } //isHeuristicScan parallel block
