@@ -230,7 +230,7 @@ function parseMUAP98(p, len, ch) { //always ToEndMarker
 	var cht = (ch == 9) ? 'rhy': ch == 10? 'pcm' : 3 <= ch && ch <= 5? 'ssg': 'fm',
 		c, notes = 0, stop = false, cmtlen = -1, cmt = "", /*stack depths:*/ lpd = 1, calld = ifd = mp = 0;
 	var visited = []; for(i=p0; i < max; i++) visited[i] = false;
-	function re(p,t) { if(debug>-10)_l2r('muap98',p,'ch'+ch+': '+t); delete visited; return [BCInvalidFormat] }
+	function re(p,t) { if(debug>2)_l2r('muap98',p,'ch'+ch+': '+t); delete visited; return [BCInvalidFormat] }
 	while(p0 <= p && p < max && !stop) {
 		visited[p] = true; if(p > mp) mp = p;
 //_log(Hex(p,4)+': '+MUAP98CmdStr(ch,p));
@@ -251,7 +251,8 @@ function parseMUAP98(p, len, ch) { //always ToEndMarker
 		case 0xF8: p += 4; break; //add frequency
 		case 0xF7: t = p-X.I16(p+1); if(!isWithin(t, p0,max)) return re(p,'loop@'+Hex(t)); p += 4; break; //loop N times
 		case 0xF6: p += 2; break; //pan
-		case 0xF5: if(!isWithin(X.U16(p+1), 16,3096)) return re(p,'!badtempo'); p += 3; break; //Timer-A tempo
+		case 0xF5: if(!isWithin(X.U16(p+1), 0x10,0xCFF/*dox: C18 max*/)) return re(p,'!badtempo'); //Timer-A tempo
+			p += 3; break;
 		case 0xF4: p += 3; break; //length/ratio change
 		case 0xF3: p++; break; //wait all channels: 小節位置を調整する。演奏しているチャネル全てにこのデータが来るまで待機する。
 		case 0xF2: p += 4; break; //RHY/PCM: DSP mode, level, delay; FM/SSG: a 4-byte nop
@@ -267,16 +268,16 @@ function parseMUAP98(p, len, ch) { //always ToEndMarker
 		case 0xEC: p += 2; break; //key display mask on/off & colour
 		case 0xEB: p += 2; break; //tone number change
 		case 0xEA: //@jump, @call
-			t = p+X.I16(p+1); if(!isWithin(t, 0x18,max)) return re(p,'!'+MUAP98CmdStr(ch,p));
+			t = p+X.I16(p+1); if(!isWithin(t, p0,max)) return re(p,'!'+MUAP98CmdStr(ch,p));
 			if(visited[t]) stop = true; p = t; break;
 		case 0xE9:
-			t = p+X.I16(p+1); if(!isWithin(t, 0x18,max)) return re(p,'!'+MUAP98CmdStr(ch,p)); calld++; break;
+			t = p+X.I16(p+1); if(!isWithin(t, p0,max)) return re(p,'!'+MUAP98CmdStr(ch,p)); calld++; p += 3; break;
 		case 0xE8: calld--; if(calld < 0) return re(p,'!RetW/oSub'); p++; break; //@ret
 		case 0xE7: p += 3; break; //Source Line symbolic information
 		case 0xE6: p += 27; break; //FM: set USR Tone parameter; SSG, RHY, PCM: a 27-byte nop
 		case 0xE5: p++; break; //Play Stack init
 		case 0xE4: case 0xE3: //if @jump, if @call
-			t = p+X.I16(p+3); if(!isWithin(t, 0x18,max) || (X.U8(p+1)>>4) > 3) return re(p,'!'+MUAP98CmdStr(ch,p));
+			t = p+2+X.I16(p+3); if(!isWithin(t, p0,max) || (X.U8(p+1)>>4) > 3) return re(p,'!'+MUAP98CmdStr(ch,p));
 			if(c == 0xE3) ifd++; p += 5; break;
 		case 0xE2: p += 2; break; //change vol data
 		case 0xE1: p++; break; //tie
