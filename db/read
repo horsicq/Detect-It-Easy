@@ -351,6 +351,10 @@ function BitReader(nOffset, nEndian) {
 }
 
 
+function bitCount(n) {
+	var c = 0; n = !!n; while(n) { if((n&1)) c++; n >>= 1 } return c
+}
+
 /**
  * Check a file slice for being all one of a lineup of specified characters.
  * @param {UInt} ofs - the offset to start from.
@@ -717,6 +721,30 @@ function findIntersections(lst,detectone) {
 	return r.sort(sf);
 }
 
+
+/**
+ * Finds several signatures one after the other, using an array of pairs of [signature, range] and starting from a specified offset. The range to search across is in the 0-th element of aList.
+ * Maxlength is to be interpreted the same as in findSignature. (It has to be at least the length of the signature.)
+ * @param {UInt} nOffset - Where to start searching from (or 0 if bad data).
+ * @param {Array of arrays[2]} aList - List to process consisting of pairs of [signature, range].
+ * @param {UInt} [nStep=1] - In case subsequent searches fail, skip this many bytes before searching for more (this handles alignments too). If 0, stop if not found immediately.
+ * @returns -1 if not found, offset otherwise.
+ * @example
+ * //on your common Windows EXE file:
+ * 𝑓(0, 0x400, [ ["'MZ'",0], ["'PE'0000",0x200] ])
+ */
+function findMultiple(nOffset, nLength, aList, nStep) {
+	var r, lst = aList || [], ofs = ofs0 = nOffset || 0, max = Math.min(X.Sz(), ofs+(nLength||0)), st = nStep || 1;
+	if(!lst.length) return -1;
+	for(i = 0; i < lst.length && ofs <= max; i++) {
+		if(ofs >= max) return -1;
+		r = X.fSig(ofs, lst[i][1], lst[i][0]);
+//_l2r('FMP',ofs,'['+i+'] st:'+st+' max:'+Hex(max)+'    r '+lst[i][0]+' ~ '+Hex(lst[i][1])+' = '+Hex(r));
+		if(r < 0) { if(!st) return -1; ofs0 += st; ofs = ofs0; i = -1; }
+		else { ofs = r+lst[i][1]; if(!i) ofs0 = r; }
+	}
+	return ofs0
+}
 
 // Heuristic considerations for whether the sample name will be interesting enough to an average user.
 //
