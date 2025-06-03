@@ -1863,18 +1863,6 @@ function detect() {
 			sOption('from:'+startsong+' sz:'+outSz(dtaddr+dtsz))
 		}
 	}
-	else if(X.c("'IM10'",0x3C) && X.U8(0x30)
-		&& X.U8(0x31) >= 0x20 && X.U8(0x32) <= 0x40
-		&& X.U8(0x33) >= 4 && X.U8(0x33) < 0x80) {
-		//ref https://sourceforge.net/p/xmp/libxmp/ci/master/tree/src/loaders/imf_load.c
-		sName = "Imago Orpheus module (.IMF)"; bDetected = 1;
-		if(X.isVerbose()) {
-			sOptionT(X.SA(0,0x20));
-			sOption("tempo0:"+X.U8(0x30)+" bpm0:"+X.U8(0x31)
-				+" ord:"+X.U16(0x20,_LE)+" ptn:"+X.U16(0x22,_LE)
-				+" ins:"+X.U16(0x24,_LE));
-		}
-	}
 	else if(X.c("'GTI5'")) {
 		sName = "GoatTracker 2 Instrument (.INS)"; bDetected = 1
 	}
@@ -7417,6 +7405,59 @@ if(!bDetected && isDigiIllu()) {
 		sOption('ord:'+(ptndp-ordp-1)+' ptn:'+ptn+' smp:'+smp+' sz:'+outSz(sz));
 	}
 }
+
+
+function isImagoOrpheus() {
+	//ref https://sourceforge.net/p/xmp/libxmp/ci/master/tree/src/loaders/imf_load.c
+	if(!X.c("'IM10'",0x3C)) return false;
+	if(X.U16(0x20) > 0x100 || X.U16(0x22) > 0x100 || X.U16(0x24) > 0xFF
+	  || !X.U8(0x30) || X.U8(0x31) < 0x20 || X.U8(0x32) > 0x40 || X.I8(0x33) < 4) return false;
+	ord = X.U16(0x20); ptn = X.U16(0x22); ins = X.U16(0x24); spd = X.U8(0x30); bpm = X.U8(0x31);
+	ch = chon = 0; chns = [];
+	var t,rs,r,psz,b,nsmp;
+	for(p=0x40; p < 0x240; i++,p+=0x10) { // name[12]+chorus+rev+pan+status
+		if(X.isVerbose()) { t = X.SC(p,12,'CP437').trim(); if(t.length) chns.push(t) }
+		if(X.U8(p+15) <= 1) ch++; if(!X.U8(p+15)) chon++;
+	}
+	if(!ch) return false;
+	for(notes=i=0,p=0x340; i < ptn && p < X.Sz(); i++) {
+		psz = X.U16(p)-4; rs = X.U16(p+2); if(rs > 0x100) return false; p += 4;
+		if(X.isDeepScan()) while(--psz >= 0 && p < X.Sz()) {
+			b = X.U8(p++); if(b == 0) { r++; if(r >= rs) return false; continue }
+			if(b&0x20) { if([0xA0,0xFF].indexOf(X.U8(p++)) < 0) notes++; p++; psz -= 2 }
+			if(b&0x80) { p += 2; psz -= 2 }  if(b&0x40) { p += 2; psz -= 2 }
+		} else p += psz;
+	}
+	if(p > X.Sz()) return false;
+	inss = []; smps = [];
+	for(smp=i=0; i < ins; i++) {
+		if(X.isVerbose()) { t = X.SC(p,32,'CP437').trim(); if(t.length) inss.push(t) }
+		p += 0x180; //skip name,map, reserved, all the envelopes, sample flags, fadeout
+		if((nsmp=X.U16(p-6)) > 0xFF) return false;
+		if(!X.c("'II10'",p-4) && X.U32(p-4)) return false;
+		for(j=0; j < nsmp; j++,smp++) {
+			if(X.isVerbose()) { t = X.SC(p,13,'CP437').trim(); if(funSampleName(t)) smps.push(t) }
+			var ssz = X.U32(p+0x10), lps = X.U32(p+0x14), lpe = X.U32(p+0x18), f = X.U8(0x30);
+			if(ssz > 0x100000 || lps > 0x100000 || lpe > 0x100000) return false;
+			if(X.U8(p+0x24) > 0x40/*vol*/) return false;
+			p += 0x40;
+			if(!X.c("'IS10'",p-4) && !X.c("'IW10'",p-4)) return false;
+			p += ssz
+		}
+	}
+	return true
+}
+if(!bDetected && isImagoOrpheus()) {
+	sName = "Imago Orpheus module (.IMF)"; bDetected = 1;
+	if(X.isVerbose()) {
+		sOptionT(X.SC(0,0x20,'CP437'));
+		sOptionT(addEllipsis(inss.join(' ')),'insts/msg:"','"');
+		sOptionT(addEllipsis(smps.join(' ')),'smps/msg:"','"');
+		sOption('spd0:'+spd+' bpm0:'+bpm+' ch:'+chon+(ch==chon?'':ch)
+			+' ord:'+ord+' ptn:'+ptn+' ins:'+ins+' smp:'+smp+(notes?' notes:'+notes:'')+' sz:'+outSz(p));
+	}
+}
+
 
 
 function isPMD() {
