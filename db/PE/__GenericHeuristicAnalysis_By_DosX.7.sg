@@ -309,7 +309,7 @@ function scanForObfuscations_NET() {
 
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
 
-    if (PE.getNumberOfSections() > (!isClrNET() ? 6 : 10) || !PE.isSectionNamePresent(".text")) { strangeSections = true; } else {
+    if (PE.getNumberOfSections() > (!isClrNET() ? 6 : 10) || !PE.section[".text"]) { strangeSections = true; } else {
         // Iterate through each section
         for (var i = 0; i < PE.getNumberOfSections() && !strangeSections; i++) {
             const sectionName = PE.getSectionName(i);
@@ -1509,7 +1509,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 "8A48014033D23ACA740A3ACB74068A4801" // samples by: WinZip
             ]
 
-            if (PE.isSectionNamePresent("_winzip_")) {
+            if (PE.section["_winzip_"]) {
                 isSfx = true;
             }
 
@@ -1957,7 +1957,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var isHighEntropy = false;
 
     // Checks for high entropy (ignore overlay)
-    if (!(PE.isDll() && (PE.isSectionNamePresent(".rdata") || PE.isSectionNamePresent(".rsrc"))) && // .dll with resources
+    if (!(PE.isDll() && (PE.section[".rdata"] || PE.section[".rsrc"])) && // .dll with resources
         PE.calculateEntropy(0x00, PE.getSize() - PE.getOverlaySize()) > 7.3) {
         isHighEntropy = true;
     }
@@ -1999,6 +1999,37 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     if (recurringImports) options += (options.length != 0 ? " + " : String()) + "Recurring import names";
+
+
+
+
+    var isRwxSectionPresent = false;
+
+    var rwxSectionNumber = 0;
+
+    const
+        SECTION_FLAGS_EXECUTE = 0x20000000, // IMAGE_SCN_MEM_EXECUTE
+        SECTION_FLAGS_READ = 0x40000000, // IMAGE_SCN_MEM_READ
+        SECTION_FLAGS_WRITE = 0x80000000, // IMAGE_SCN_MEM_WRITE
+        SECTION_FLAGS_CODE = 0x00000020; // IMAGE_SCN_CNT_CODE
+
+    const
+        RWX_MASK = SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ | SECTION_FLAGS_WRITE,
+        RWX_CODE_MASK = RWX_MASK | SECTION_FLAGS_CODE;
+
+
+    for (var i = 0; i < PE.getNumberOfSections() && !isRwxSectionPresent; i++) {
+        var currentSectionCharacteristics = PE.section[i].Characteristics;
+
+        if ((currentSectionCharacteristics & RWX_MASK) === RWX_MASK ||
+            (currentSectionCharacteristics & RWX_CODE_MASK) === RWX_CODE_MASK) {
+            isRwxSectionPresent = true;
+            rwxSectionNumber = i;
+        }
+    }
+
+    if (isRwxSectionPresent) options += (options.length !== 0 ? " + " : String()) + "Section " + rwxSectionNumber + " (\"" + clearSectionName(PE.getSectionName(rwxSectionNumber)) + "\") has RWX";
+
 
 
 
@@ -2549,7 +2580,7 @@ function scanForObfuscations_Native() {
         var isIdioticMinGwSectionsPresent = false;
 
         if (_isResultPresent("linker", "GNU linker ld (GNU Binutils)")) {
-            if (PE.isSectionNamePresent(".build-id")) {
+            if (PE.section[".build-id"]) {
                 isIdioticMinGwSectionsPresent = true;
             } else {
                 for (var d = 1; d < 10 && !isIdioticMinGwSectionsPresent; d++) { // sections like "/5", "/2" etc
@@ -2827,7 +2858,7 @@ function scanForObfuscations_Native() {
 
     // ASM Guard fake signatures
 
-    if (PE.isSectionNamePresent(".asmg") || PE.isSectionNamePresent("ASMGUARD")) {
+    if (PE.section[".asmg"] || PE.section["ASMGUARD"]) {
         for (var f = 0; f < 3; f++)
             _removeResult("packer", ["UPX", "MPRESS", "EP:MPRESS"][f]);
     }
@@ -3107,7 +3138,7 @@ function validateSectionNames(dbCollection) {
             version = currentArrayPattern[1],
             sectionName = currentArrayPattern[2];
 
-        if (PE.isSectionNamePresent(sectionName)) {
+        if (PE.section[sectionName]) {
             return currentArrayPattern;
         }
     }
