@@ -6,6 +6,7 @@
 call :compact_it "db"
 call :compact_it "db_extra"
 call :compact_it "db_custom"
+call :compact_it "dbs_min"
 
 exit /b 0
 
