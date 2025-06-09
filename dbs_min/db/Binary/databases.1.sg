@@ -1,0 +1,132 @@
+init("format","")
+function detect(){if(Binary.compare("00010000'Standard Jet DB'00")){sName="Microsoft Access database (.MDB)"
+bDetected=true}function e(){nv=X.U8(0)
+v5=false
+switch(nv){case 2:sv="FoxBase 1.0"
+break
+case 3:sv="FoxBase 2.x / dBASE III, no memo file"
+break
+case 4:sv="dBASE IV, no memo file"
+break
+case 5:sv="dBASE V, no memo file"
+break
+case 7:sv="VISUAL OBJECTS v1.x for dBase III, no memo file"
+break
+case 48:sv="Visual FoxPro (possibly with DBC)"
+break
+case 49:sv="Visual FoxPro with auto increment"
+break
+case 50:sv="Visual FoxPro with varchar/varbinary"
+break
+case 67:sv="dBASE IV SQL Table, no memo file / Flagship .dbv memo var size"
+break
+case 100:sv="dBASE IV SQL System, no memo file"
+break
+case 131:sv="FoxBase 2.x / dBASE III+ with memo file"
+break
+case 135:sv="VisualObjects 1.x with memo file"
+break
+case 139:sv="dBASE IV with memo file"
+break
+case 140:sv="dBASE V with memo file"
+break
+case 142:sv="dBASE IV with SQL table"
+break
+case 179:sv=".dbv with memo table"
+break
+case 203:sv="dBASE IV SQL Table with memo file"
+break
+case 229:sv="Clipper SIX with memo file"
+break
+case 245:sv="FoxPro 2 with memo file"
+break
+case 251:sv="FoxPro 2, no memo file"
+break
+default:return false}if(nv==2){recc=X.U16(1)
+if(!recc)return false
+recsz=X.U16(6)
+if(!recsz)return false
+hdrsz=521
+rectp=8
+enc="IBM437"}else{y=X.U8(1)
+if(y<80)y+=2e3
+else y+=1900
+m=X.U8(2)
+d=X.U8(3)
+if(X.c("000000",1)){upd="never"}else{if(!isWithin(y,1970,2100)||!isWithin(m,1,12)||!isWithin(d,1,31))return false
+upd=y+"-"+m.padStart(2,"0")+d.padStart(2,"0")}recc=X.U32(4)
+if(!recc)return false
+hdrsz=X.U16(8)
+recsz=X.U16(10)
+if(hdrsz<32||!recsz)return false
+res0=X.U24(12)
+res1=X.readBytes(15,13)
+res2=X.U32(28)
+if([4,140].indexOf(nv)>=0){rectp=68
+enc="CP"+X.SA(34,3)
+if(isWithin(t=X.SA(37,1),"0","9"))enc+=t
+if(enc=="CPKOI8")enc+=X.SA(38,1)
+v5=true}else{rectp=32
+switch(X.U8(29)){case 2:enc="CP850"
+break
+case 3:enc="CP1252"
+break
+case 4:enc="CP10000"
+break
+case 100:enc="CP852"
+break
+case 101:enc="CP865"
+break
+case 102:enc="CP866"
+break
+case 103:enc="IBM861"
+break
+case 106:enc="IBM737"
+break
+case 107:enc="IBM857"
+break
+case 150:enc="CP10007"
+break
+case 151:enc="CP10029"
+break
+case 152:enc="CP10006"
+break
+case 200:enc="CP1250"
+break
+case 201:enc="CP1251"
+break
+case 202:enc="CP1254"
+break
+case 203:enc="CP1253"
+break
+case 1:default:enc="IBM437"}}}validC=["C","N","L","D","M","F","B","G","P","Y","T","I","V","X","@","O","+","0"]
+fldc=0
+totalfldsz=1
+p=rectp
+old=[0,1]
+while(X.U8(p)!=13&&p<hdrsz){name=X.readBytes(p,v5?31:11)
+ns=charStat(name,1)
+if(!name[0]||ns.indexOf("allxsc")<0&&ns.indexOf("allforeign")<0)return false
+tp=X.SA(v5?p+32:p+11,1)
+if(validC.indexOf(tp)<0)return false
+if(nv==2)fldst=X.U16(p+13)
+else if(v5)fldst=0
+else fldst=X.U32(p+12)
+fldsz=X.U8(nv==2?p+12:v5?p+33:p+16)
+if(!fldsz)return false
+if(old[0]&&fldst&&old[0]+old[1]!=fldst)return false
+old=[fldsz,fldst]
+totalfldsz+=fldsz
+decn=X.U8(nv==2?p+15:p+17)
+if(tp==="N"&&decn>fldsz)return false
+fldc++
+p+=nv==2?16:v5?48:32
+if(charStat(name.slice(0,name.indexOf(0)),1).indexOf("foreign")>=0&&enc=="IBM437")enc="CP1251"}if(totalfldsz-recsz!=0)return false
+del=0
+if(X.isDeepScan()){p=hdrsz
+for(i=0;i<recc;i++,p+=recc)if(X.U8(p)==42)del++}sz=hdrsz+recc*recsz
+if(X.U8(sz)==26)sz++
+return sz<=X.Sz()||X.isHeuristicScan()}if(!bDetected&&e()){sName="DBase Database (.DBF)"
+sVersion=sv
+bDetected=true
+if(X.isVerbose()){sOption("fld:"+fldc+" rec:"+recc+(del?"(* "+del+")":"")+" enc:"+enc+" sz:"+outSz(sz))}}return result()}
