@@ -116,4 +116,4 @@ Thanks to all contributors!
 
 Thanks to [PELock](https://www.pelock.com)
 
-![Mascot](mascots/logo.png)
+![Mascot](docs/logo.png)
