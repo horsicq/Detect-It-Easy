@@ -72,7 +72,7 @@ const logType = {
 
 var lastOffsetDetected = "0x00";
 
-const detect = main;
+function detect() { main(); }
 
 function main() {
     if (stubForWrongEnvironment()) return null; // 'PE' is undefined
@@ -1007,6 +1007,8 @@ function scanForObfuscations_NET() {
 function scanForAntiAnalysis_NET() {
     var options = String();
 
+    var isDetected = false;
+
 
     // Assumes the file can detect debugging protection
 
@@ -1176,7 +1178,10 @@ function scanForAntiAnalysis_NET() {
 
 
 
-    if (options.length != 0) {
+    if (options.length != 0) isDetected = true;
+
+
+    if (isDetected) {
         _setResult("~protection", "Anti analysis", String(), PE.isVerbose() ? options : String());
     }
 }
@@ -1904,7 +1909,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         // Check if the signature is valid using Unicode signature mask or the original signature
         if (
-            validateGlobalUnicodeString(trigger) || validateSignature("'" + trigger + "'")
+            validateGlobalUnicodeString(trigger) ||
+            validateSignature("'" + trigger + "'")
         ) {
             log(logType.nothing, "Encoded PE detected! (with Base64)");
             isCryptor = true;
@@ -1916,6 +1922,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+
+    // Check for 'MZ' signature in the overlay
 
     var isMzSignatureDetected = false;
 
@@ -1967,6 +1975,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    // Check for compressed sections using entropy
+
     var isCompressedSectionPresent = false;
 
     var sectionNumber = 0;
@@ -2003,6 +2013,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    // Check for sections with full RWX permissions (Read, Write, Execute)
+
     var isRwxSectionPresent = false;
 
     var rwxSectionNumber = 0;
@@ -2030,6 +2042,22 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     if (isRwxSectionPresent) options += (options.length !== 0 ? " + " : String()) + "Section " + rwxSectionNumber + " (\"" + clearSectionName(PE.getSectionName(rwxSectionNumber)) + "\") has RWX";
 
+
+
+
+    // Check for IAT directory presence
+
+    var iatMissing = false;
+
+    const
+        optHeaderOffset = PE.read_int32(0x3C) + 4 + 20, // Get offset of the optional header (0x3C is the e_lfanew field)
+        iatDirOffset = optHeaderOffset + (PE.is64() ? 0x70 : 0x60) + 12 * 8; // Get offset of the IAT directory (12 is the number of IMAGE_DIRECTORY_ENTRY_ entries, 8 is the size of each entry)
+
+    if (PE.read_int32(iatDirOffset) === 0) {
+        iatMissing = true;
+    }
+
+    if (iatMissing) options += (options.length != 0 ? " + " : String()) + "IAT directory empty";
 
 
 
@@ -2124,6 +2152,8 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+    // EP check
+
     var isEntryPointIncorrect = false;
 
     if (!PE.isEntryPointCorrect()) {
@@ -2134,6 +2164,8 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+
+    // Section alignment check
 
     var isSectionAlignmentIncorrect = false;
 
@@ -2146,6 +2178,8 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+    // File alignment check
+
     var isFileAlignmentIncorrect = false;
 
     if (!PE.isFileAlignmentCorrect()) {
@@ -2156,6 +2190,8 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+
+    // Check for correct header
 
     var isHeaderIncorrect = false;
 
@@ -2168,6 +2204,8 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+    // Check for correct section headers
+
     var isRelocsTableIncorrect = false;
 
     if (!PE.isRelocsTableCorrect()) {
@@ -2178,6 +2216,9 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+
+    // Check IAT (Import Address Table)
+    // Can be destroyed when the PE dumped from memory
 
     var isImportTableIncorrect = false;
 
@@ -2202,6 +2243,8 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+
+    // Check for resources table
 
     var isResourcesTableIncorrect = false;
 
@@ -2321,6 +2364,8 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
 
 
+
+    // Check for Costura.Fody embedded PDB. It is a .NET tool (library) that embeds DLL builds into the main assembly.
 
     var isCosturaEmbeddedDebugData = false;
 

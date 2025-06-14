@@ -1,0 +1,113 @@
+init("audio","FLAC waveform audio (.FLAC)")
+function detect(){if(!File.compare("'fLaC'"))return
+end=0
+p=4
+hk=hks=malformed=""
+ch=rate=bps=smp=smplen=sz=xa=xna=0
+seekt=-1
+while(!end&&p<File.getSize()){t=File.read_uint8(p)
+if(p==5&&t&255)return
+last=t&128
+mdbt=t&127
+mdsz=File.read_uint24(p+1,_BE)
+p+=4
+switch(mdbt){case 0:hk="STREAMINFO"
+minb=File.read_uint16(p,_BE),maxb=File.read_uint16(p+2,_BE),minf=File.read_uint24(p+4,_BE),maxf=File.read_uint24(p+7,_BE)
+if(minb<16||maxb>65535||minb>maxb)malformed+="!badblksz"
+br=new BitReader(p+10,_BE)
+rate=br.read(20)
+ch=1+br.read(3)
+bps=1+br.read(5)
+smp=br.read(36)
+smplen=smp/rate
+break
+case 1:hk="PADDING"
+break
+case 2:hk="APP"
+s=File.read_ansiString(p,4)
+switch(s){case"ATCH":hk+=":Flacfile"
+break
+case"BSOL":hk+=":beSolo"
+break
+case"BUGS":hk+=":Bugs Player"
+break
+case"Cues":hk+=":GoldWave"
+break
+case"Fica":hk+=":CUE Splitter"
+break
+case"Ftol":hk+=":flac-tools"
+break
+case"MOTB":hk+=":MOTB MetaCzar"
+break
+case"MPSE":hk+=":MP3 Stream Editor"
+break
+case"MuML":hk+=":MusicML"
+break
+case"RIFF":hk+=":Sound Devices RIFF c.s"
+break
+case"SFFL":hk+=":Sound Font FLAC"
+break
+case"SONY":hk+=":Sony Creative Software"
+break
+case"SQEZ":hk+=":flacsqueeze"
+break
+case"TtWv":hk+=":TwistedWave"
+break
+case"UITS":hk+=":UITS Embedding tools"
+break
+case"aiff":hk+=":FLAC AIFF c.s"
+break
+case"imag":hk+=":flac-image file"
+break
+case"peem":hk+=":Parseable Embedded Extensible Metadata"
+break
+case"qfst":hk+=":QFLAC Studio"
+break
+case"riff":hk+=":FLAC RIFF c.s (OpenMPT?)"
+break
+case"tune":hk+=":TagTuner"
+break
+case"w64 ":hk+=":FLAC Wave64 chunks"
+break
+case"xbat":hk+=":XBAT"
+break
+case"xbat":hk+=":xmcd"
+break
+default:hk+=":<"+s+">"}break
+case 3:hk="SEEKTABLE"
+seekt=p
+hk+="#"+Math.floor(mdsz,18)
+break
+case 4:hk="VORBIS_COMMENT"
+break
+case 5:hk="CUESHEET"
+xa=xna=0
+trkn=File.read_uint8(p+395)
+u=p+396
+for(i=0;i<trkn;i++){u+=21
+if(File.read_uint8(u++)&128)xna++
+else xa++
+u+=13
+u+=12*File.read_uint8(u++)}break
+case 6:hk="PICTURE"
+break
+case 127:end=1
+hk="frames"
+break
+default:hk="unknown"+Hex(mdbt)}if(hk!="frames")hks=hks.append("["+hk+"]")
+p+=mdsz
+if(last)end=1}if(sz<p)sz=p
+t=p+(smp*bps*ch>>3)
+if(sz<t)sz=t
+_log("t:"+t)
+if(seekt>=0)for(i=0;i<mdsz/18;i++){smpn=File.read_uint64(seekt+i*18,_BE)
+seek=p+File.read_uint64(seekt+8+i*18,_BE)
+st=seek+(File.read_uint16(seekt+16+i*18,_BE)*bps*ch>>3)
+if(sz<st)sz=st}end=0
+if(!smp&&File.isDeepScan())while(!end&&p<File.getSize()){end=1}if(malformed!="")sVersion+=malformed
+bDetected=1
+if(Binary.isVerbose()){sOption(Math.floor(smplen/60)+":"+(Math.floor(smplen)%60).padStart(2,"0"))
+if(xa>1||xna)sOption("x"+xa+"+"+xna)
+sOption(hks)
+sOption(rate+"Hz ch:"+ch+" bps:"+bps)
+if(minb===maxb)sOption("fixed-size stream")}return result()}

@@ -1,0 +1,1 @@
+@node autotools\dbcompiler\task.js

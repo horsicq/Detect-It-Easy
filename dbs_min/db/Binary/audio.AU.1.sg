@@ -1,0 +1,27 @@
+init("audio","NeXT/Sun Au waveform audio (.AU,.SND)")
+function detect(){if(X.c("'.snd'")){tp="BE"
+en=_BE}else if(X.c("'dns.'")){tp="LE"
+en=_LE}else if(X.c("00'ds.'")){tp="LE-ds.DEC"
+en=_LE}else if(X.c("'.sd'00")){tp="BE-ds."
+en=_BE}else return false
+if(!isWithin(dataofs=X.U32(4,en),24,X.Sz()))return false
+bad=""
+if(dataofs<28)bad=bad.addIfNone("!badofs"+Hex(dataofs))
+datasz=X.I32(8,en)
+ch=X.U32(20,en)
+if(!ch||ch>256)return false
+sr=X.U32(16,en)
+if(!sr)return false
+bDetected=true
+sVersion=tp
+fmt=X.U32(12,en)
+if(fmt>29)sVersion=sVersion.appendS("unknown format ("+Hex(fmt)+")","/")
+else sVersion=sVersion.appendS(["unspecified format","8-bit G.711 μ-law","8-bit linear PCM","16-bit linear PCM","24-bit linear PCM","32-bit linear PCM","32-bit IEEE floating point","64-bit IEEE floating point","Fragmented sample data","nested format","DSP program","DSP 8-bit fixed-point data","DSP 16-bit fixed-point data","DSP 24-bit fixed-point data","DSP 32-bit fixed-point data","unknown format (0Fh)","Sound Kit's visual data","μ-law squelch","16-bit linear w/emphasis","16-bit linear compressed","16-bit linear w/emphasis compressed","Music Kit DSP commands","Music Kit DSP commands: samples","ITU-T G.721 4-bit ADPCM","ITU-T G.722 4-bit SB-ADPCM","ITU-T G.723 3-bit SB-ADPCM","ITU-T G.723 5-bit SB-ADPCM","8-bit G.711 A-law","AES","8-bit Delta μ-law"][fmt],"/")
+if(bad.length)sVersion=sVersion.appendS("malformed"+bad,"/")
+if(X.isVerbose()){info=[]
+t=24
+while(t<dataofs&&t<X.Sz()){if((z=X.fSig(t,Math.min(X.Sz(),256,dataofs-t),"00"))<0)z=dataofs
+i=X.SC(t,z-t,"CP437").trim()
+if(i.length)info.push(i)
+t=z+1}sOption(addEllipsis(info.join("; "),192),'info:"','"')
+sOption("ch:"+ch+" s/r:"+(sr/1e3).toFixed(1)+"kHz"+(datasz>0?" sz:"+outSz(dataofs+datasz):""))}return result()}
