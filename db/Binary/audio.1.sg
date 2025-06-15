@@ -6838,14 +6838,16 @@ if(!bDetected && X.isDeepScan() && isGMC()) {
 function isMoonBlaster() {
 	//ref https://www.msx.org/wiki/Moonblaster_file_format
 	//TODO check for the sanity of more values passed to MSX-AUDIO, like instr/vol
+	if(X.Sz() < 0x179) return false;
 	ord = X.U8(0); ofs = unpsz = 0;
 	if(ord > 220 && ord < 255) return false; //not sure if the manual is right about 220 being the maximum
 	if(ord == 255) { ofs = 1; ord = 200 } //a subformat. Always 200 positions, 01-filled; all offsets are +1
 	else ord++;
 	for(i=0; i < 0x20; i++) if(X.U8(0xA3+ofs+i) > 0x16) { /*_log('MBM: instr/vol error');*/ return false }
 	tmp0 = X.U8(ofs+0xCD); if(!tmp0) { /*_log('MBM: tempo = 0 error');*/ return false }
-	p = ofs+0x178+ord; ptn = 0; for(i=ofs+0x178; i < p; i++) { t = X.U8(i); if(t > ptn) ptn = t }
+	p = ofs+0x178+ord; ptn = -1; for(i=ofs+0x178; i < p; i++) { t = X.U8(i); if(t > ptn) ptn = t }
 	// Start pattern number is 1, no need to ptn++. Funnily, the manual says patterns start from 0
+	if(ptn < 1) return false;
 	ptnp = p+ofs; ptn1 = oldp = X.U16(ptnp);
 	if(ptn1 > X.Sz()) { /*_log('MBM: ptn1 @'+Hex(ptn1)+">"+Hex(X.Sz()));*/ return false }
 	for(i=0; p < X.Sz() && i < ptn; i++) {
@@ -6863,7 +6865,7 @@ function isMoonBlaster() {
 	while(p < X.Sz()) { c = X.U8(p++);
 		if(!c) break; else if(c <= 0xF2) unpsz++; else /*decrunching 0's*/ unpsz += c-0xF2;
 	}
-	if(p > 0x3DC0) return false;
+	if(!isWithin(p, 0x178,0x3DC0)) return false;
 	sz = p;
 	return true
 }
@@ -11527,7 +11529,7 @@ function isImagesMusicSystem() { //goes before Soundtracker .STK for speed
 	if(ptn != mptn+1) return false;
 	smp = smpsz = 0; smps = []; bad = ""; smpns = [];
 	for(i = 0; i < 31; i++) {
-		if(X.isVerbose()) smpns.push(X.SC(0x14+i*30,0x16,'CP437')).trim();
+		if(X.isVerbose()) smpns.push(X.SC(0x14+i*30,0x16,'CP437').trim());
 		t = X.U16(0x14+i*30+0x16,_BE);
 		if(t) { smp++; smpsz += t<<1 }
 	}
