@@ -1679,6 +1679,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["XPack", "0.97-0.98", -1, 0x2ac44dd2],
         ["kkrunchy", null, -1, 0x29188619],
         ["ANDPakk2", "0.18", -1, 0x29188619],
+        ["EXECryptor", "1.4-1.5", -1, 0xd1de53b5],
         // protectors
         ["ASProtect", "1.XX-2.XX", 0, 0x1272f45b],
         ["SHRINKER", "3.2", 0, 0xb2a64858],
@@ -1782,6 +1783,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Alienyze", null, ".alien"],
         ["PECompact", null, "pec"],
         ["PECompact", null, "pec1"],
+        ["PECompact", null, "PEC2"],
+        ["PECompact", null, "PEC2MO"],
         ["RLP", null, ".rlp"],
         [".NET Reactor", null, ".reacto"],
         ["StarForce", "4.X-5.X", ".ps4"],
@@ -1791,6 +1794,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Krypton", null, "YADO"],
         ["NsPack", null, "nsp0"],
         ["NsPack", null, "nsp1"],
+        ["NsPack", null, ".nsp0"],
+        ["NsPack", null, ".nsp1"],
         ["nPack", null, ".nPack"],
         ["JDPack", null, ".jdpack"],
         ["SC Pack", null, ".scpack"],
@@ -1807,7 +1812,23 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["DYAMAR", "1.3.5", ".dyamarC"],
         ["hmimys", "1.3", "hmimys"],
         ["Morphnah", "1.0.X", ".nah"],
-        ["BoxedApp", null, ".bxpck"]
+        ["BoxedApp", null, ".bxpck"],
+        ["PE-PACK", "1.0", "PEPACK!!"],
+        ["yzPack", null, ".yzpack2"],
+        ["Crinkler", null, "lz32.dll"],
+        ["MaskPE", null, ".MaskPE"],
+        ["MEW", null, "MEW"],
+        ["Neolite", null, ".neolite"],
+        ["Shrinker", null, ".shrink1"],
+        ["WinUPack", null, ".Upack"],
+        ["WinUPack", null, ".ByDwing"],
+        ["Perplex", null, ".perplex"],
+        ["WWPack", null, ".WWPACK"],
+        ["WWPack32", null, ".WWP32"],
+        ["SVKP", null, ".svkp"],
+        ["PEBundle", null, "pebundle"],
+        ["PEBundle", null, "PEBundle"],
+        ["Epack", null, "!EPack"]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDictionary);
@@ -2009,55 +2030,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     if (recurringImports) options += (options.length != 0 ? " + " : String()) + "Recurring import names";
-
-
-
-
-    // Check for sections with full RWX permissions (Read, Write, Execute)
-
-    var isRwxSectionPresent = false;
-
-    var rwxSectionNumber = 0;
-
-    const
-        SECTION_FLAGS_EXECUTE = 0x20000000, // IMAGE_SCN_MEM_EXECUTE
-        SECTION_FLAGS_READ = 0x40000000, // IMAGE_SCN_MEM_READ
-        SECTION_FLAGS_WRITE = 0x80000000, // IMAGE_SCN_MEM_WRITE
-        SECTION_FLAGS_CODE = 0x00000020; // IMAGE_SCN_CNT_CODE
-
-    const
-        RWX_MASK = SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ | SECTION_FLAGS_WRITE,
-        RWX_CODE_MASK = RWX_MASK | SECTION_FLAGS_CODE;
-
-
-    for (var i = 0; i < PE.getNumberOfSections() && !isRwxSectionPresent; i++) {
-        var currentSectionCharacteristics = PE.section[i].Characteristics;
-
-        if ((currentSectionCharacteristics & RWX_MASK) === RWX_MASK ||
-            (currentSectionCharacteristics & RWX_CODE_MASK) === RWX_CODE_MASK) {
-            isRwxSectionPresent = true;
-            rwxSectionNumber = i;
-        }
-    }
-
-    if (isRwxSectionPresent) options += (options.length !== 0 ? " + " : String()) + "Section " + rwxSectionNumber + " (\"" + clearSectionName(PE.getSectionName(rwxSectionNumber)) + "\") has RWX";
-
-
-
-
-    // Check for IAT directory presence
-
-    var iatMissing = false;
-
-    const
-        optHeaderOffset = PE.read_int32(0x3C) + 4 + 20, // Get offset of the optional header (0x3C is the e_lfanew field)
-        iatDirOffset = optHeaderOffset + (PE.is64() ? 0x70 : 0x60) + 12 * 8; // Get offset of the IAT directory (12 is the number of IMAGE_DIRECTORY_ENTRY_ entries, 8 is the size of each entry)
-
-    if (PE.read_int32(iatDirOffset) === 0) {
-        iatMissing = true;
-    }
-
-    if (iatMissing) options += (options.length != 0 ? " + " : String()) + "IAT directory empty";
 
 
 
@@ -2839,12 +2811,17 @@ function scanForObfuscations_Native() {
 
 
 
-    // Check if the entry point starts with NOP
+    // Check if the entry point starts with NOP or a NOP-like instruction
 
     var isStartsWithNop = false;
 
-    // Condition to check if the first instruction is NOP
-    if (getFirstEpAsmInstruction() === "NOP") { // nop (90)
+    // 0x90                     -> nop
+    // 0x66 0x90                -> xchg ax, ax
+    // 0x0F 0x1F 0x00           -> nop dword ptr [eax/rax]
+    // 0x0F 0x1F 0x40 0x00      -> nop dword ptr [eax/rax+0x00]
+    // 0x0F 0x1F 0x44 0x00 0x00 -> nop dword ptr [eax/rax+0x0000]
+
+    if (getFirstEpAsmInstruction() === "NOP" || getFirstEpAsmInstruction() === "XCHG AX, AX") {
         isStartsWithNop = true;
     }
 
@@ -2897,6 +2874,60 @@ function scanForObfuscations_Native() {
     }
 
     if (isNopPaddingPresent) options += (options.length != 0 ? " + " : String()) + "Nop EP padding";
+
+
+
+
+    // Check for sections with full RWX permissions (Read, Write, Execute)
+
+    var isRwxSectionPresent = false;
+
+    var rwxSectionNumber = 0;
+
+    const
+        SECTION_FLAGS_EXECUTE = 0x20000000, // IMAGE_SCN_MEM_EXECUTE
+        SECTION_FLAGS_READ = 0x40000000, // IMAGE_SCN_MEM_READ
+        SECTION_FLAGS_WRITE = 0x80000000, // IMAGE_SCN_MEM_WRITE
+        SECTION_FLAGS_CODE = 0x00000020; // IMAGE_SCN_CNT_CODE
+
+    const
+        RWX_MASK = SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ | SECTION_FLAGS_WRITE,
+        RWX_CODE_MASK = RWX_MASK | SECTION_FLAGS_CODE;
+
+
+    for (var i = 0; i < PE.getNumberOfSections() && !isRwxSectionPresent; i++) {
+        var currentSectionCharacteristics = PE.section[i].Characteristics;
+
+        if ((currentSectionCharacteristics & RWX_MASK) === RWX_MASK ||
+            (currentSectionCharacteristics & RWX_CODE_MASK) === RWX_CODE_MASK) {
+            isRwxSectionPresent = true;
+            rwxSectionNumber = i;
+        }
+    }
+
+    if (isRwxSectionPresent) options += (options.length !== 0 ? " + " : String()) + "Section " + rwxSectionNumber + " (\"" + clearSectionName(PE.getSectionName(rwxSectionNumber)) + "\") has RWX";
+
+
+
+
+    // Offset of the optional header (0x3C is the e_lfanew field)
+    const optHeaderOffset = PE.read_int32(0x3C) + 4 + 20;
+
+
+
+
+    // Check for IAT directory presence
+
+    var iatMissing = false;
+
+    // Offset of the IAT directory (12 is the number of IMAGE_DIRECTORY_ENTRY_ entries, 8 is the size of each entry)
+    const iatDirOffset = optHeaderOffset + (PE.is64() ? 0x70 : 0x60) + 12 * 8;
+
+    if (PE.read_int32(iatDirOffset) === 0) {
+        iatMissing = true;
+    }
+
+    if (iatMissing) options += (options.length != 0 ? " + " : String()) + "IAT directory empty";
 
 
 
