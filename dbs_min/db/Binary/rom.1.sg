@@ -11,6 +11,11 @@ init("ROM", "");
 /* beautify ignore:start */
 function detect() {
 
+	// this C-like pre-declaration is here because lol Qt6
+	var p = 0, i = 0, j = 0, k = 0, l = 0, r = 0, t = 0, x = 0, n = 0, trk = 0, files = 0, sz = -1, fl = -1, sides = -1, ro = -1,
+		title = '', tl = '', a = '', c = '', msg = '', artist = '', hw = '', soption = '', bad = '',
+		fnames = [];
+
 	if((X.c("'A2R1'FF0A0D0A ................'DATA'")) || X.c("'A2R'..FF0A0D0A 'INFO'") && isWithin(X.U8(3),0x32,0x33)) {
 		//ref https://applesaucefdc.com/a2r/ & https://applesaucefdc.com/a2r2-reference/
 		sName = "Apple II Applesauce disk archival image (.A2R)"; sVersion = 'v'+X.SA(3,1);
@@ -411,7 +416,7 @@ function detect() {
 		//ref https://sinclair.wiki.zxnet.co.uk/wiki/MGT_filesystem
 		//TODO test on SAM with subdirs, +D, HDD...
 		if([0x32000,0x64000,0xC8000].indexOf(X.Sz()) < 0) return false; // single-sided 40-cylinder, ds40/ss80, ds80
-		var p = files = erased = subdir = 0, ds = X.Sz() > 0x64000, msz = Math.min(X.Sz(),0xC8000);
+		var p = 0, files = 0, erased = 0, subdir = 0, ds = X.Sz() > 0x64000, msz = Math.min(X.Sz(),0xC8000);
 		var xroot = X.U8(0xFF); if(xroot > 35) return false; //betaDOS/MasterDOS extra tracks for root
 		var zx = [0,'ZX Spectrum'], sam = [0,'SAM Coupé'], dd = [0,'DISCiPLE/+D'], hd = [0,'HDD'];
 		var samboot = X.c("'BOOT'",0x100); if(samboot) sam[0] += 20;
@@ -642,27 +647,27 @@ function detect() {
 
 	function isSCL() {
 		if(!X.c("'SINCLAIR'") || !isWithin(n=X.U8(8),1, 128) || X.Sz() < 9+14*n) return false;
-		files = [], p = 9, i = c = 0; sz = 9+14*n;
+		fnames = [], p = 9, i = c = 0; sz = 9+14*n;
 		sec = 0; bad = '';
 		for(; i < n && sz < X.Sz(); i++,p+=14) {
 			var fn = decAnsi(p,8,CPSpeccy); if(fn.length < 8) return false; fn = fn.trim();
 			if(fn[0] === '\x01') fn[0] = '*'; //deleted file
 			var ext = decAnsi(p+8,1,CPSpeccy); if(!ext.length) return false;
 			//I'd test the filenames for sanity but some copyprots are quite insane...
-			files.push(fn+'.$'+ext); t=X.U8(p+0xD); sec += t; sz += t << 8;
+			fnames.push(fn+'.$'+ext); t=X.U8(p+0xD); sec += t; sz += t << 8;
 		}
 		if(sz > X.Sz() || sz > 655364) return false; //max available size is 835600-ish so not much of a constraint
 		if(X.Sz() >= sz+4) { // despite the barebones specs there seems to be a CRC at the very end
 			for(i=0; i < sz; c+=X.U8(i++)){} sz += 4;
 			if(c != X.U32(i)) bad = '!badcrc' //not returning false; it's not guaranteed that all SCL will have this
 		} else bad = '!nocrc'; //...but it is common enough to mark it as malformed if it's absent
-		files = files.join(';'); return true
+		fnames = fnames.join(';'); return true
 	}
 	if(!bDetected && isSCL()) {
 		sName = 'ZX Spectrum floppy disk image (.SCL)'; bDetected = true;
 		if(bad.length) sVersion = 'malformed'+bad;
 		if(X.isVerbose()) {
-			sOption(addEllipsis(files,0xA0)); sOption('sec:'+sec+' sz:'+outSz(sz))
+			sOption(addEllipsis(fnames,0xA0)); sOption('sec:'+sec+' sz:'+outSz(sz))
 		}
 	}
 
@@ -792,8 +797,8 @@ function detect() {
 		// & https://www.msx.org/wiki/Emulation_related_file_formats#.TSX
 		sVersion = 'v'+X.U8(8)+'.'+X.U8(9).padStart(2,'0'); bDetected = true;
 		var ismsx = end = false, x = 0;
-		var bad = title = publisher = auth = year = lang = apptype = price = protload
-			= org = cmt = hw = sel = fnames = '';
+		var bad = '', title = '', publisher = '', auth = '', year = '', lang = '', apptype = '', price = '',
+			protload = '', org = '', cmt = '', hw = '', sel = '', fnames = [];
 		const types = ['B','N','S','C']
 		p = 10; while(!end && p < X.Sz()) {
 			switch(X.U8(p++)) {
@@ -802,7 +807,7 @@ function detect() {
 					if(charStat(t=X.readBytes(p+6,10), 1).indexOf('allasc') < 0) bad = bad.addIfNone('!nonASCIIfn');
 					t = decEncoding(t,CPSpeccy).trim(); tp = X.U8(p+5);
 					if(!t && tp < 3) bad = bad.addIfNone('!emptyfn');
-					fnames = fnames.appendS(t+'.'+types[tp], ',')
+					fnames.push(t+'.'+types[tp])
 				}
 				p += 4+X.U16(p+2); break;
 			case 0x11: p += 0x12+X.U24(p+0xF); break;
@@ -1006,7 +1011,7 @@ function detect() {
 			sOptionT(title); if(x > 1) sOption(x,'x'); sOptionT(auth,'by:'); sOptionT(year,"'"); sOptionT(publisher,'(c) ');
 			sOptionT(lang,'in:'); sOptionT(apptype,'apptype:'); sOptionT(price,'price:');
 			sOptionT(org,'origin:'); sOptionT(protload,'prot/ldr:'); sOption(hw);
-			sOptionT(addEllipsis(cmt,0xA0)); sOptionT(addEllipsis(fnames,0xA0),'files:');
+			sOptionT(addEllipsis(cmt,0xA0)); sOptionT(addEllipsis(fnames.join(','),0xA0),'files:');
 			sOptionT(sel,'choices:'); sOption(outSz(p),'sz:')
 		}
 	}
