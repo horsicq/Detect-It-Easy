@@ -1,71 +1,41 @@
-init("archive","")
 function checkDeflate(e){var s=new BitReader(e),a=0,r=Math.min(X.Sz(),256)
-do{var f=s.read(1),c=s.read(2)
-var n=0,l=[]
-if(!c){s.init(e)
-var b=s.read(8)
-b|=s.read(8)<<8
-var d=s.read(8)
-d|=s.read(8)<<8
-if(b!=(d^65535))return 0
-s.consume(b)
-if(s.offset>X.Sz())return false
-if(f)a=1}else if(c==1||c==2){if(c==1){a=1}else{var u=s.read(5)+257
-if(u>286)return false
-var o=s.read(5)+1,p=s.read(4)+4
-var k=[]
-const S=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]
-for(i=0;i<p&&s.offset<r;i++)k[S[i]]=s.read(3)
-l=createOrderlyHuffmanTable(k,19,s)
-if(!l)return false
-i=0
-while(i<u+o){if(!l.length)return false
-j=0
-while(l[j][0]||l[j][1]){j=s.read(1)?l[j][1]:l[j][0]
-if(!j)return false}if(l[j][2]<16){if(i>=u+o)return false
-i++}else switch(l[j][2]){case 16:if(i)s.read(2)
-else return false
+do{var f,c=s.read(1),n=s.read(2)
+if(n){if(1!=n&&2!=n)return!1
+if(1==n)a=1
+else{var b=s.read(5)+257
+if(286<b)return!1
+var d=s.read(5)+1,o=s.read(4)+4,u=[],l=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]
+for(i=0;i<o&&s.offset<r;i++)u[l[i]]=s.read(3)
+if(!(f=createOrderlyHuffmanTable(u,19,s)))return!1
+for(i=0;i<b+d;){if(!f.length)return!1
+for(j=0;f[j][0]||f[j][1];)if(!(j=s.read(1)?f[j][1]:f[j][0]))return!1
+if(f[j][2]<16){if(i>=b+d)return!1
+i++}else switch(f[j][2]){case 16:if(!i)return!1
+s.read(2)
 break
 case 17:for(t=s.read(3)+3;t;t--);break
 case 18:for(t=s.read(7)+11;t;t--);break
-default:return false}if(s.offset>X.Sz())return false}a=2
-f=true}}else return false}while(!f)
-if(a==1){if(s.offset>=X.Sz())return false}return a}function checkZlib(e){if(e+6>X.Sz())return false
+default:return!1}if(s.offset>X.Sz())return!1}a=2,c=!0}}else{s.init(e)
+var n=s.read(8),p=(n|=s.read(8)<<8,s.read(8))
+if(n!=(65535^(p|=s.read(8)<<8)))return 0
+if(s.consume(n),s.offset>X.Sz())return!1
+c&&(a=1)}}while(!c)
+return!(1==a&&s.offset>=X.Sz())&&a}function checkZlib(e){if(e+6>X.Sz())return!1
 var s=X.U8(e++)
-if((s&15)!=8||(s&240)>112)return false
+if(8!=(15&s)||112<(240&s))return!1
 var a=2,r=X.U8(e++)
-if(r&32){if(e+8<X.Sz())return false
-a+=4}if((s<<8|r)%31)return false
-if(!checkDeflate(a))return false
-cmprlvl=["fastest","fast","default","max"][r>>6]
-return true}function detect(){bad=""
-if(X.Sz()>=10&&X.c("1FA1")&&checkDeflate(2)){sName="Gzip hack: Quasijarus Strong Compression (Z.)"
-bDetected=true}if(!bDetected&&X.c("1F8B")){method=X.U8(2)
-switch(method){case 0:sVersion="store"
-bad=bad.addIfNone("!badalgo")
+if(32&r){if(e+8<X.Sz())return!1
+a+=4}return!((s<<8|r)%31||!checkDeflate(a)||(cmprlvl=["fastest","fast","default","max"][r>>6],0))}function detect(){if(bad="",10<=X.Sz()&&X.c("1FA1")&&checkDeflate(2)&&(sName="Gzip hack: Quasijarus Strong Compression (Z.)",bDetected=!0),!bDetected&&X.c("1F8B")){switch(method=X.U8(2)){case 0:sVersion="store",bad=bad.addIfNone("!badalgo")
 break
-case 1:sVersion="compress"
-bad=bad.addIfNone("!badalgo")
+case 1:sVersion="compress",bad=bad.addIfNone("!badalgo")
 break
-case 2:sVersion="pack"
-bad=bad.addIfNone("!badalgo")
+case 2:sVersion="pack",bad=bad.addIfNone("!badalgo")
 break
-case 3:sVersion="lz"
-bad=bad.addIfNone("!badalgo")
+case 3:sVersion="lz",bad=bad.addIfNone("!badalgo")
 break
 case 8:sVersion="deflate"
 break
-default:return false}f=X.U8(3)
-fs=[]
-if(f&1)fs.push("ASCII_FLAG")
-if(f&2)fs.push("HEADER_CRC")
-if(f&4)fs.push("EXTRA_FIELD")
-if(f&8)fs.push("ORIG_NAME")
-if(f&16)fs.push("COMMENT")
-if(f&32)fs.push("ENCRYPTED")
-if(f&192)fs.push("RESERVED")
-ts=X.I32(5,_LE)
-if(ts<=0)return false
+default:return!1}if(f=X.U8(3),fs=[],1&f&&fs.push("ASCII_FLAG"),2&f&&fs.push("HEADER_CRC"),4&f&&fs.push("EXTRA_FIELD"),8&f&&fs.push("ORIG_NAME"),16&f&&fs.push("COMMENT"),32&f&&fs.push("ENCRYPTED"),192&f&&fs.push("RESERVED"),(ts=X.I32(5,_LE))<=0)return!1
 if(X.isVerbose()){switch(X.U8(8)){case 2:sOption("best")
 break
 case 4:sOption("fast")}switch(X.U8(9)){case 0:s="FAT FS (MS-DOS, OS/2, NT/Win32"
@@ -98,19 +68,5 @@ case 13:s="Acorn RISCOS"
 break
 case 255:s="unknown OS"
 break
-default:s="?"}sOption(s,"OS code:")}p=10
-if(f&4)p+=4+X.U16(p+2,_LE)
-if(f&8){s=X.SA(p,1024)
-p+=s.length+1
-if(X.isVerbose())sOption(s,'filename:"','"')}if(f&16){s=X.SA(p,1024)
-p+=s.length+1
-if(X.isVerbose())sOptionT(s,"cmt:")}if(f&2)p+=2
-if(checkDeflate(p)){sName="GZIP (.gz)"
-bDetected=true
-if(X.isVerbose())sOption(X.U32(X.Sz()-4,_LE),"unp.sz:")}else if(X.isHeuristicScan()){sName="GZIP (.gz)"
-bDetected=true}}if(!bDetected&&X.isDeepScan()&&X.isHeuristicScan()&&X.calculateEntropy(64,256)>7){for(s=1;s<64&&!bDetected;s++){if(!bDetected&&checkZlib(s)){sName="Zlib stream (.zlib)"
-sOption("@"+Hex(s))
-sOption(cmprlvl,"lv:")
-bDetected=true}if(!bDetected&&checkDeflate(s)>1){sName="Raw Deflate stream"
-sOptions="@"+Hex(s)
-bDetected=true}}}return result()}
+default:s="?"}sOption(s,"OS code:")}p=10,4&f&&(p+=4+X.U16(p+2,_LE)),8&f&&(s=X.SA(p,1024),p+=s.length+1,X.isVerbose())&&sOption(s,'filename:"','"'),16&f&&(s=X.SA(p,1024),p+=s.length+1,X.isVerbose())&&sOptionT(s,"cmt:"),2&f&&(p+=2),checkDeflate(p)?(sName="GZIP (.gz)",bDetected=!0,X.isVerbose()&&sOption(X.U32(X.Sz()-4,_LE),"unp.sz:")):X.isHeuristicScan()&&(sName="GZIP (.gz)",bDetected=!0)}if(!bDetected&&X.isDeepScan()&&X.isHeuristicScan()&&7<X.calculateEntropy(64,256))for(s=1;s<64&&!bDetected;s++)!bDetected&&checkZlib(s)&&(sName="Zlib stream (.zlib)",sOption("@"+Hex(s)),sOption(cmprlvl,"lv:"),bDetected=!0),!bDetected&&1<checkDeflate(s)&&(sName="Raw Deflate stream",sOptions="@"+Hex(s),bDetected=!0)
+return result()}init("archive","")
