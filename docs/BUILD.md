@@ -92,6 +92,28 @@ chmod a+x configure
 make -j4
 ```
 
+# How to build on Linux based on Arch Linux (pacman) 
+  
+#### Install packages:
+
+```bash
+sudo pacman -S --needed git base-devel qt5-base qt5-tools qt5-script
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+#### Build
+
+```bash
+chmod a+x configure
+./configure
+make -j4
+```
+
 # How to build on Linux(Automake)
 
 ### Qt framework has to be installed on the system.
