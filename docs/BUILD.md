@@ -82,7 +82,7 @@ Install Qt 5.15.2: https://github.com/horsicq/build_tools
 
 Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
-Edit build_mac.sh ( check QMAKE_PATH variable)
+Edit build_mac.sh (check QMAKE_PATH variable)
 
 Run build script: bash -x build_mac.sh
 
@@ -96,7 +96,7 @@ Install 7-Zip: https://github.com/horsicq/build_tools
 
 Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
-Edit build_winxp.bat ( check VSVARS_PATH, SEVENZIP_PATH, QMAKE_PATH variables)
+Edit build_winxp.bat (check VSVARS_PATH, SEVENZIP_PATH, QMAKE_PATH variables)
 
 Run build_winxp.bat
 
