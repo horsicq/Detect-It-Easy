@@ -70,6 +70,27 @@ chmod a+x configure
 make -j4
 ```
 
+# How to build on Linux based on openSuse (zypper) 
+  
+#### Install packages:
+
+```bash
+sudo zypper install libqt5-qtbase-devel libqt5-qtscript-devel libqt5-qttools-devel libqt5-qtsvg-devel git gcc-c++ make
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+#### Build
+
+```bash
+chmod a+x configure
+./configure
+make -j4
+```
 
 # How to build on Linux(Automake)
 
