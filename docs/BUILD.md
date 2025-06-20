@@ -48,6 +48,29 @@ bash -x build_dpkg.sh
 sudo dpkg -i release/$(ls release)
 ```
 
+# How to build on Linux based on Fedora (DNF) 
+  
+#### Install packages:
+
+```bash
+sudo dnf install qt5-qtbase-devel qt5-qtscript-devel qt5-qttools-devel git make gcc-c++
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+#### Build
+
+```bash
+chmod a+x configure
+./configure
+make -j4
+```
+
+
 # How to build on Linux(Automake)
 
 ### Qt framework has to be installed on the system.
