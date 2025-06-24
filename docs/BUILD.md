@@ -48,6 +48,72 @@ bash -x build_dpkg.sh
 sudo dpkg -i release/$(ls release)
 ```
 
+# How to build on Linux based on Fedora (DNF) 
+  
+#### Install packages:
+
+```bash
+sudo dnf install qt5-qtbase-devel qt5-qtscript-devel qt5-qttools-devel git make gcc-c++
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+#### Build
+
+```bash
+chmod a+x configure
+./configure
+make -j4
+```
+
+# How to build on Linux based on openSuse (zypper) 
+  
+#### Install packages:
+
+```bash
+sudo zypper install libqt5-qtbase-devel libqt5-qtscript-devel libqt5-qttools-devel libqt5-qtsvg-devel git gcc-c++ make
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+#### Build
+
+```bash
+chmod a+x configure
+./configure
+make -j4
+```
+
+# How to build on Linux based on Arch Linux (pacman) 
+  
+#### Install packages:
+
+```bash
+sudo pacman -S --needed git base-devel qt5-base qt5-tools qt5-script
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+#### Build
+
+```bash
+chmod a+x configure
+./configure
+make -j4
+```
+
 # How to build on Linux(Automake)
 
 ### Qt framework has to be installed on the system.
@@ -82,7 +148,7 @@ Install Qt 5.15.2: https://github.com/horsicq/build_tools
 
 Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
-Edit build_mac.sh ( check QMAKE_PATH variable)
+Edit build_mac.sh (check QMAKE_PATH variable)
 
 Run build script: bash -x build_mac.sh
 
@@ -96,7 +162,7 @@ Install 7-Zip: https://github.com/horsicq/build_tools
 
 Clone project: git clone --recursive https://github.com/horsicq/DIE-engine.git
 
-Edit build_winxp.bat ( check VSVARS_PATH, SEVENZIP_PATH, QMAKE_PATH variables)
+Edit build_winxp.bat (check VSVARS_PATH, SEVENZIP_PATH, QMAKE_PATH variables)
 
 Run build_winxp.bat
 

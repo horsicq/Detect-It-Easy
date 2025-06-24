@@ -1,8 +1,4 @@
-init("format","")
-function detect(){if(Binary.compare("00010000'Standard Jet DB'00")){sName="Microsoft Access database (.MDB)"
-bDetected=true}function e(){nv=X.U8(0)
-v5=false
-switch(nv){case 2:sv="FoxBase 1.0"
+function detect(){return Binary.compare("00010000'Standard Jet DB'00")&&(sName="Microsoft Access database (.MDB)",bDetected=!0),!bDetected&&(function() {switch(nv=X.U8(0),v5=!1,nv){case 2:sv="FoxBase 1.0"
 break
 case 3:sv="FoxBase 2.x / dBASE III, no memo file"
 break
@@ -42,32 +38,14 @@ case 245:sv="FoxPro 2 with memo file"
 break
 case 251:sv="FoxPro 2, no memo file"
 break
-default:return false}if(nv==2){recc=X.U16(1)
-if(!recc)return false
-recsz=X.U16(6)
-if(!recsz)return false
-hdrsz=521
-rectp=8
-enc="IBM437"}else{y=X.U8(1)
-if(y<80)y+=2e3
-else y+=1900
-m=X.U8(2)
-d=X.U8(3)
-if(X.c("000000",1)){upd="never"}else{if(!isWithin(y,1970,2100)||!isWithin(m,1,12)||!isWithin(d,1,31))return false
-upd=y+"-"+m.padStart(2,"0")+d.padStart(2,"0")}recc=X.U32(4)
-if(!recc)return false
-hdrsz=X.U16(8)
-recsz=X.U16(10)
-if(hdrsz<32||!recsz)return false
-res0=X.U24(12)
-res1=X.readBytes(15,13)
-res2=X.U32(28)
-if([4,140].indexOf(nv)>=0){rectp=68
-enc="CP"+X.SA(34,3)
-if(isWithin(t=X.SA(37,1),"0","9"))enc+=t
-if(enc=="CPKOI8")enc+=X.SA(38,1)
-v5=true}else{rectp=32
-switch(X.U8(29)){case 2:enc="CP850"
+default:return}if(2==nv){if(!(recc=X.U16(1)))return
+if(!(recsz=X.U16(6)))return
+hdrsz=521,rectp=8,enc="IBM437"}else{if((y=X.U8(1))<80?y+=2e3:y+=1900,m=X.U8(2),d=X.U8(3),X.c("000000",1))upd="never"
+else{if(!isWithin(y,1970,2100)||!isWithin(m,1,12)||!isWithin(d,1,31))return
+upd=y+"-"+m.padStart(2,"0")+d.padStart(2,"0")}if(!(recc=X.U32(4)))return
+if(hdrsz=X.U16(8),recsz=X.U16(10),hdrsz<32||!recsz)return
+if(res0=X.U24(12),res1=X.readBytes(15,13),res2=X.U32(28),0<=[4,140].indexOf(nv))rectp=68,enc="CP"+X.SA(34,3),isWithin(t=X.SA(37,1),"0","9")&&(enc+=t),"CPKOI8"==enc&&(enc+=X.SA(38,1)),v5=!0
+else switch(rectp=32,X.U8(29)){case 2:enc="CP850"
 break
 case 3:enc="CP1252"
 break
@@ -99,34 +77,10 @@ case 202:enc="CP1254"
 break
 case 203:enc="CP1253"
 break
-case 1:default:enc="IBM437"}}}validC=["C","N","L","D","M","F","B","G","P","Y","T","I","V","X","@","O","+","0"]
-fldc=0
-totalfldsz=1
-p=rectp
-old=[0,1]
-while(X.U8(p)!=13&&p<hdrsz){name=X.readBytes(p,v5?31:11)
-ns=charStat(name,1)
-if(!name[0]||ns.indexOf("allxsc")<0&&ns.indexOf("allforeign")<0)return false
-tp=X.SA(v5?p+32:p+11,1)
-if(validC.indexOf(tp)<0)return false
-if(nv==2)fldst=X.U16(p+13)
-else if(v5)fldst=0
-else fldst=X.U32(p+12)
-fldsz=X.U8(nv==2?p+12:v5?p+33:p+16)
-if(!fldsz)return false
-if(old[0]&&fldst&&old[0]+old[1]!=fldst)return false
-old=[fldsz,fldst]
-totalfldsz+=fldsz
-decn=X.U8(nv==2?p+15:p+17)
-if(tp==="N"&&decn>fldsz)return false
-fldc++
-p+=nv==2?16:v5?48:32
-if(charStat(name.slice(0,name.indexOf(0)),1).indexOf("foreign")>=0&&enc=="IBM437")enc="CP1251"}if(totalfldsz-recsz!=0)return false
-del=0
-if(X.isDeepScan()){p=hdrsz
-for(i=0;i<recc;i++,p+=recc)if(X.U8(p)==42)del++}sz=hdrsz+recc*recsz
-if(X.U8(sz)==26)sz++
-return sz<=X.Sz()||X.isHeuristicScan()}if(!bDetected&&e()){sName="DBase Database (.DBF)"
-sVersion=sv
-bDetected=true
-if(X.isVerbose()){sOption("fld:"+fldc+" rec:"+recc+(del?"(* "+del+")":"")+" enc:"+enc+" sz:"+outSz(sz))}}return result()}
+default:enc="IBM437"}}for(validC=["C","N","L","D","M","F","B","G","P","Y","T","I","V","X","@","O","+","0"],fldc=0,totalfldsz=1,p=rectp,old=[0,1];13!=X.U8(p)&&p<hdrsz;){if(name=X.readBytes(p,v5?31:11),ns=charStat(name,1),!name[0]||ns.indexOf("allxsc")<0&&ns.indexOf("allforeign")<0)return
+if(tp=X.SA(v5?p+32:p+11,1),validC.indexOf(tp)<0)return
+if(fldst=2==nv?X.U16(p+13):v5?0:X.U32(p+12),!(fldsz=X.U8(2==nv?p+12:v5?p+33:p+16)))return
+if(old[0]&&fldst&&old[0]+old[1]!=fldst)return
+if(old=[fldsz,fldst],totalfldsz+=fldsz,decn=X.U8(2==nv?p+15:p+17),"N"===tp&&decn>fldsz)return
+fldc++,p+=2==nv?16:v5?48:32,0<=charStat(name.slice(0,name.indexOf(0)),1).indexOf("foreign")&&"IBM437"==enc&&(enc="CP1251")}if(totalfldsz-recsz==0){if(del=0,X.isDeepScan())for(p=hdrsz,i=0;i<recc;i++,p+=recc)42==X.U8(p)&&del++
+return sz=hdrsz+recc*recsz,26==X.U8(sz)&&sz++,sz<=X.Sz()||X.isHeuristicScan()}})()&&(sName="DBase Database (.DBF)",sVersion=sv,bDetected=!0,X.isVerbose())&&sOption("fld:"+fldc+" rec:"+recc+(del?"(* "+del+")":"")+" enc:"+enc+" sz:"+outSz(sz)),result()}init("format","")

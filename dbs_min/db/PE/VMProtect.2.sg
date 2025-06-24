@@ -1,50 +1,18 @@
-init("protector","VMProtect")
 function detect(){if(PE.isNET())return null
-var e=PE.getNumberOfSections()
-var t
-for(var i=e-1;i>=0;i--){if(i==PE.getRelocsSection()){continue}if(i==PE.getResourceSection()){continue}if(PE.getSectionName(i)!=""){t=PE.getSectionName(i)
-if(i>0&&t==".vmp0"){bDetected=true
-break}else if(i>1&&t.substr(t.length-1)=="1"){var s=PE.getSectionNameCollision("0","1")
-if(PE.isSectionNamePresent(s+"1")){bDetected=true
-break}}else if(i>2&&t.substr(t.length-1)=="2"){var s=PE.getSectionNameCollision("1","2")
-if(PE.isSectionNamePresent(s+"1")&&PE.isSectionNamePresent(s+"0")){bDetected=true
-break}}else if(i>3&&t.substr(t.length-1)=="3"){var s=PE.getSectionNameCollision("2","3")
-if(PE.isSectionNamePresent(s+"2")&&PE.isSectionNamePresent(s+"1")&&PE.isSectionNamePresent(s+"0")){bDetected=true
-break}}}break}if(bDetected){if(PE.is64()){sVersion="2.XX-3.XX"}if(t!=""){if(t.substr(t.length-1)=="0"){sOptions="Min protection"}}if(PE.isImportPositionHashPresent(-1,536023103)){sVersion="1.70"}else if(PE.isImportPositionHashPresent(-1,202825517)){sVersion="1.70"
-sOptions="Max protection"}else if(PE.isImportPositionHashPresent(-1,2635247955)){sVersion="2.0.3-2.13"}else if(PE.isImportPositionHashPresent(-1,508887233)){sVersion="3.0.0"}else if(PE.isImportPositionHashPresent(-1,3321588299)){sVersion="3.0.9"}else if(PE.isImportPositionHashPresent(-1,1554684359)){sVersion="3.2.0-3.5.0"}}var r=true
-if(r&&!bDetected&&PE.isDeepScan()){var n="",c="",o=0,P=0
-var f=PE.OffsetToVA(PE.getEntryPointOffset()),E=0
-while(c.substr(0,c.indexOf("+"))!="MOV EDX, DWORD PTR [EAX*4 "&&c.substr(0,c.indexOf("+"))!="MOV EBX, DWORD PTR [EAX*4 "&&c.substr(0,c.indexOf("+"))!="MOV ECX, DWORD PTR [EAX*4 "&&E<1e3){E++
-var a=PE.readByte(PE.VAToOffset(f)),n=PE.getDisasmString(f),c=n
-if(n.indexOf(" ")!=-1){n=n.substr(0,n.indexOf(" "))}var l=0
-if(a==255&&n=="JMP"||(a==195||a==194)&&n=="RET"){l=1
-break}if(a==255&&n=="CALL")break
-if(n.indexOf(" ")!=-1)n=n.substr(0,n.indexOf(" "))
-if(n=="CLC"||n=="CMC"){o++}if(n=="PUSHFD"){o++}if(n=="PUSHAL"){o++}if(n=="XOR"){o++}if(n=="NEG"||n=="NOT"){o++}if(n=="SAR"||n=="SAL"){o++}if(n=="JMP"||n=="CALL"){P++}if(n=="BT"||n=="BTR"||n=="BTS"||n=="BTC"){o++}if(n=="BSF"||n=="BSR"||n=="BSWAP"){o++}if(n=="ROL"||n=="ROR"||n=="RCL"||n=="RCR"){o++}f=PE.getDisasmNextAddress(f)}if(o>10&&E<200){if(l==1){sVersion="new"}else{sVersion="old"}bDetected=true
-sOptions="DS"}}var $=0
-for(var i=0;i<PE.getNumberOfImports();i++){if(PE.getImportLibraryName(i)==="KERNEL32.dll"){$++}if($>=2){if(PE.is64()&&PE.compare("4D 5A ?? 00 ?? 00 00 00 04 00 ?? 00 FF FF 00 00 B8 00 00 00 00 00 00 00 40 00 ?? 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 80 00 00 00 ?? ?? ?? 0E ?? B4 09 CD 21 B8 01 4C CD")){bDetected=true
-sOptions+=(sOptions.length==0?"":", ")+"packed"}break}}return result()}function detectVMP(e){if(PE.section[e]){var t=PE.section[e].Characteristics
-if(t==1610612832||t==3758096480||t==3758096448||t==1744830560||t==3791650912)return 1}return 0}function detectVMP2(){if(PE.section.length>7){var e=5,t=PE.getResourceSection(),i=PE.getRelocsSection()
-if(t>PE.section.length-e)e++
-if(i>PE.section.length-e)e++
-var s=0,r=0
-for(var n=PE.section.length-e;n<PE.section.length;n++){if(n==t||n==i)continue
-if(PE.section[n].FileSize==0&&PE.section[n].FileOffset==0)s++
-if(PE.section[n].FileSize!=0&&PE.section[n].FileOffset!=0)r=n}if(s>=3){if(PE.getEntryPointSection()==r){if(PE.section[r].Characteristics==3758096480){if(PE.calculateEntropy(PE.section[r].FileOffset,PE.section[r].FileSize)>7.6){return 1}}else if(PE.section[r].Characteristics&536870912){var c=PE.section[r].FileOffset,o=PE.section[r].FileSize,P=c,f=o,e=0,E=0
-while(f>0){E=PE.findSignature(P,f,"9c8d64")
-if(E==-1)break
-e++
-P=E+3
-f=o-(E-c)
-if(e>=2){return 1}}}}}}return 0}function detect_old(){var e=""
-if(PE.section[".vmp0"]&&(PE.compareEP("68........E9")||PE.compareEP("68........E8"))){sVersion="1.60-2.05"
-bDetected=true}else if(detectVMP(".vmp0")||detectVMP(".vmp1")||detectVMP(".vmp2")){bDetected=true}else if(PE.compareEP("54c70424........9c60c74424..........c64424....887424..60")){sVersion="2.06"
-bDetected=true}else if(PE.compareEP("e8$$$$$$$$e9$$$$$$$$880424881c24c70424........9ce8")){sVersion="2.07"
-bDetected=true}else if(PE.compareEP("9ce8$$$$$$$$e8$$$$$$$$c74424..........e9$$$$$$$$e8$$$$$$$$c74424..........526068")){sVersion="2.12-13"
-bDetected=true}else if(PE.compareEP("9c9cc74424..........9cc74424..........9c528d6424..e9")){sVersion="2.12-13"
-bDetected=true}else if(PE.compareEP("68........e8$$$$$$$$41574150448ac350410f96c057415148c7c7")){sVersion="3.0x"
-bDetected=true}else{e=PE.getSectionNameCollision("0","1")
-if(e!=""){if(PE.compareEP("68........E9")||PE.compareEP("68........E8")){sVersion="1.X"
-bDetected=true}else if(PE.compareEP("9cE9")||PE.compareEP("9cFF")){sVersion="2.X"
-bDetected=true}else if(detectVMP(e+"0")&&detectVMP(e+"1")){bDetected=true}}if(!bDetected&&detectVMP2()){sVersion="2.X"
-bDetected=true}}if(bDetected){if(PE.section.length<3||PE.section.length==3&&PE.section[0].FileSize==0){bDetected=false}}}
+for(var e,t=PE.getNumberOfSections()-1;0<=t;t--)if(t!=PE.getRelocsSection()&&t!=PE.getResourceSection()){if(""!=PE.getSectionName(t)){if(e=PE.getSectionName(t),0<t&&".vmp0"==e){bDetected=!0
+break}if(1<t&&"1"==e.substr(e.length-1)){var i=PE.getSectionNameCollision("0","1")
+if(PE.isSectionNamePresent(i+"1")){bDetected=!0
+break}}else if(2<t&&"2"==e.substr(e.length-1)){i=PE.getSectionNameCollision("1","2")
+if(PE.isSectionNamePresent(i+"1")&&PE.isSectionNamePresent(i+"0")){bDetected=!0
+break}}else if(3<t&&"3"==e.substr(e.length-1)){i=PE.getSectionNameCollision("2","3")
+if(PE.isSectionNamePresent(i+"2")&&PE.isSectionNamePresent(i+"1")&&PE.isSectionNamePresent(i+"0")){bDetected=!0
+break}}}break}bDetected&&(PE.is64()&&(sVersion="2.XX-3.XX"),""!=e&&"0"==e.substr(e.length-1)&&(sOptions="Min protection"),PE.isImportPositionHashPresent(-1,536023103)?sVersion="1.70":PE.isImportPositionHashPresent(-1,202825517)?(sVersion="1.70",sOptions="Max protection"):PE.isImportPositionHashPresent(-1,2635247955)?sVersion="2.0.3-2.13":PE.isImportPositionHashPresent(-1,508887233)?sVersion="3.0.0":PE.isImportPositionHashPresent(-1,3321588299)?sVersion="3.0.9":PE.isImportPositionHashPresent(-1,1554684359)&&(sVersion="3.2.0-3.5.0"))
+if(!bDetected&&PE.isDeepScan()){for(var s="",n="",c=0,o=PE.OffsetToVA(PE.getEntryPointOffset()),P=0;"MOV EDX, DWORD PTR [EAX*4 "!=n.substr(0,n.indexOf("+"))&&"MOV EBX, DWORD PTR [EAX*4 "!=n.substr(0,n.indexOf("+"))&&"MOV ECX, DWORD PTR [EAX*4 "!=n.substr(0,n.indexOf("+"))&&P<1e3;){P++
+var r=PE.readByte(PE.VAToOffset(o)),n=s=PE.getDisasmString(o),E=(-1!=s.indexOf(" ")&&(s=s.substr(0,s.indexOf(" "))),0)
+if(255==r&&"JMP"==s||(195==r||194==r)&&"RET"==s){E=1
+break}if(255==r&&"CALL"==s)break
+"CLC"!=(s=-1!=s.indexOf(" ")?s.substr(0,s.indexOf(" ")):s)&&"CMC"!=s||c++,"PUSHFD"==s&&c++,"PUSHAL"==s&&c++,"XOR"==s&&c++,"NEG"!=s&&"NOT"!=s||c++,"SAR"!=s&&"SAL"!=s||c++,"JMP"!=s&&"CALL"!=s||0,"BT"!=s&&"BTR"!=s&&"BTS"!=s&&"BTC"!=s||c++,"BSF"!=s&&"BSR"!=s&&"BSWAP"!=s||c++,"ROL"!=s&&"ROR"!=s&&"RCL"!=s&&"RCR"!=s||c++,o=PE.getDisasmNextAddress(o)}10<c&&P<200&&(sVersion=1==E?"new":"old",bDetected=!0,sOptions="DS")}for(var a=0,t=0;t<PE.getNumberOfImports();t++)if("KERNEL32.dll"===PE.getImportLibraryName(t)&&a++,2<=a){PE.is64()&&PE.compare("4D 5A ?? 00 ?? 00 00 00 04 00 ?? 00 FF FF 00 00 B8 00 00 00 00 00 00 00 40 00 ?? 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 80 00 00 00 ?? ?? ?? 0E ?? B4 09 CD 21 B8 01 4C CD")&&(bDetected=!0,sOptions+=(0==sOptions.length?"":", ")+"packed")
+break}return result()}function detectVMP(e){if(PE.section[e]){e=PE.section[e].Characteristics
+if(1610612832==e||3758096480==e||3758096448==e||1744830560==e||3791650912==e)return 1}return 0}function detectVMP2(){if(7<PE.section.length){for(var e=5,t=PE.getResourceSection(),i=PE.getRelocsSection(),s=(t>PE.section.length-e&&e++,i>PE.section.length-e&&e++,0),n=0,c=PE.section.length-e;c<PE.section.length;c++)c!=t&&c!=i&&(0==PE.section[c].FileSize&&0==PE.section[c].FileOffset&&s++,0!=PE.section[c].FileSize)&&0!=PE.section[c].FileOffset&&(n=c)
+if(3<=s&&PE.getEntryPointSection()==n)if(3758096480==PE.section[n].Characteristics){if(7.6<PE.calculateEntropy(PE.section[n].FileOffset,PE.section[n].FileSize))return 1}else if(536870912&PE.section[n].Characteristics)for(var o,P=PE.section[n].FileOffset,r=PE.section[n].FileSize,E=P,a=r,e=0;0<a&&-1!=(o=PE.findSignature(E,a,"9c8d64"));)if(E=o+3,a=r-(o-P),2<=++e)return 1}return 0}function detect_old(){var e
+PE.section[".vmp0"]&&(PE.compareEP("68........E9")||PE.compareEP("68........E8"))?(sVersion="1.60-2.05",bDetected=!0):detectVMP(".vmp0")||detectVMP(".vmp1")||detectVMP(".vmp2")?bDetected=!0:PE.compareEP("54c70424........9c60c74424..........c64424....887424..60")?(sVersion="2.06",bDetected=!0):PE.compareEP("e8$$$$$$$$e9$$$$$$$$880424881c24c70424........9ce8")?(sVersion="2.07",bDetected=!0):PE.compareEP("9ce8$$$$$$$$e8$$$$$$$$c74424..........e9$$$$$$$$e8$$$$$$$$c74424..........526068")||PE.compareEP("9c9cc74424..........9cc74424..........9c528d6424..e9")?(sVersion="2.12-13",bDetected=!0):PE.compareEP("68........e8$$$$$$$$41574150448ac350410f96c057415148c7c7")?(sVersion="3.0x",bDetected=!0):(""!=(e=PE.getSectionNameCollision("0","1"))&&(PE.compareEP("68........E9")||PE.compareEP("68........E8")?(sVersion="1.X",bDetected=!0):PE.compareEP("9cE9")||PE.compareEP("9cFF")?(sVersion="2.X",bDetected=!0):detectVMP(e+"0")&&detectVMP(e+"1")&&(bDetected=!0)),!bDetected&&detectVMP2()&&(sVersion="2.X",bDetected=!0)),bDetected&&(PE.section.length<3||3==PE.section.length&&0==PE.section[0].FileSize)&&(bDetected=!1)}init("protector","VMProtect")

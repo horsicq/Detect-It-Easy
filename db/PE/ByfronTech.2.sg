@@ -3,65 +3,61 @@
 
 init("protector", "Byfron Technologies");
 
-var bContainsRunExport = false,
-    bContainsTextSection = false,
-    bContainsByfronCodeSection = false,
-    bContainsByfronDataSection = false;
+function detect() {
+    // Engine-managed detection flag
+    // Set bDetected = true when detection criteria is met
 
-function detectExports() {
+    var containsRunExport = false,
+        containsTextSection = false,
+        containsByfronCodeSection = false,
+        containsByfronDataSection = false;
+
+    // --- EXPORT DETECTION ---
+    // Byfron often exports a function named 'run'
     if (PE.isExportFunctionPresent("run")) {
-        bContainsRunExport = true;
+        containsRunExport = true;
     }
-}
 
-function detectSections() {
-    var FLAGS_RX = 0x60000020,
-        FLAGS_INITIALIZED_DATA_DISCARDABLE = 0x02000040;
+    // --- SECTION ANALYSIS ---
+    // .text - standard code section
+    // .byfron - custom RX section used by Byfron
+    // .byfron1 - initialized, discardable data used by Byfron
+
+    const FLAGS_RX = 0x60000020, FLAGS_INITIALIZED_DATA_DISCARDABLE = 0x02000040;
 
     for (var i = PE.nLastSection; i >= 0; i--) {
         var sectionName = PE.getSectionName(i),
             sectionCharacteristics = PE.getSectionCharacteristics(i);
 
         if (sectionName == ".text") {
-            bContainsTextSection = true;
+            containsTextSection = true;
             continue;
         }
 
         if (sectionName == ".byfron" && sectionCharacteristics == FLAGS_RX) {
-            bContainsByfronCodeSection = true;
+            containsByfronCodeSection = true;
             continue;
         }
 
-        if (sectionName == ".byfron1" &&
-            (sectionCharacteristics == FLAGS_INITIALIZED_DATA_DISCARDABLE)) {
-            bContainsByfronDataSection = true;
+        if (sectionName == ".byfron1" && sectionCharacteristics == FLAGS_INITIALIZED_DATA_DISCARDABLE) {
+            containsByfronDataSection = true;
             continue;
         }
     }
-}
 
-function validateDetection() {
-    // Byfron usually has the following:
-    // an export called 'run'
-    // no .text section as it's replaced by one or both of the following:
-    //      .byfron - code section, RX
-    //      .byfron1 - data/mem discarded section
-    if (bContainsRunExport) {
-        if (!bContainsTextSection) {
-            if (bContainsByfronCodeSection || bContainsByfronDataSection) {
+    // --- VALIDATION LOGIC ---
+    // Conditions typically associated with Byfron:
+    // 1. Exported function named 'run'
+    // 2. No standard .text section
+    // 3. Presence of either .byfron or .byfron1 sections
+
+    if (containsRunExport) {
+        if (!containsTextSection) {
+            if (containsByfronCodeSection || containsByfronDataSection) {
                 bDetected = true;
-                return;
             }
         }
     }
-
-    bDetected = false;
-}
-
-function detect() {
-    detectExports();
-    detectSections();
-    validateDetection();
 
     return result();
 }

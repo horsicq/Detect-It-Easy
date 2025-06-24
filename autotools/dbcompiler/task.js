@@ -5,7 +5,7 @@ const UglifyJS = require("uglify-js");
 const inputDirs = ["db", "db_custom", "db_extra"];
 const outputDir = "dbs_min";
 
-const stats = {
+var stats = {
     total: 0,
     minified: 0,
     copied: 0,
@@ -19,6 +19,21 @@ function shouldMinify(filePath) {
     const ext = path.extname(filePath).toLowerCase();
     return ext === ".sg" || ext === "";
 }
+
+function replaceLetWithVarSafe(text) {
+    return text.replace(/(?<!["'`])\blet\b(?!["'`])/g, "var");
+}
+
+function replaceArrowFunctions(text) {
+    text = text.replace(/(\([^()]*\))\s*=>\s*\{/g, (m, args) => 'function' + args + ' {');
+
+    text = text.replace(/\(\)\s*=>\s*\{/g, 'function(){');
+
+    text = text.replace(/([a-zA-Z_$][\w$]*)\s*=>\s*\{/g, (m, param) => 'function(' + param + '){');
+
+    return text;
+}
+
 
 function processFile(srcFile, dstFile) {
     stats.total++;
@@ -35,8 +50,9 @@ function processFile(srcFile, dstFile) {
 
     if (shouldMinify(srcFile)) {
         try {
+
             const result = UglifyJS.minify(text, {
-                compress: false,
+                compress: true,
                 mangle: true,
                 output: {
                     beautify: false,
@@ -47,8 +63,15 @@ function processFile(srcFile, dstFile) {
 
             if (result.error) throw result.error;
 
+            var legacyCompatibleCode =
+                replaceArrowFunctions( // replace arrow functions with regular functions
+                    replaceLetWithVarSafe( // replace `let` with `var` to ensure compatibility with older engines
+                        result.code
+                    )
+                );
+
             fs.mkdirSync(path.dirname(dstFile), { recursive: true });
-            fs.writeFileSync(dstFile, result.code, "utf8");
+            fs.writeFileSync(dstFile, legacyCompatibleCode, "utf8");
             stats.minified++;
             console.log("[MINIFIED] " + srcFile);
         } catch (e) {
@@ -91,7 +114,11 @@ function walk(srcDir, relBase, dstBase) {
         }
     }
 
-    let report = "\n[V] Done!\n" + `— Total:     ${stats.total}\n` + `— Minified:  ${stats.minified}\n` + `— Copied:    ${stats.copied}\n` + `— Failed:    ${stats.failed}\n`;
+    let report = "\n[V] Done!\n" +
+        `— Total:     ${stats.total}\n` +
+        `— Minified:  ${stats.minified}\n` +
+        `— Copied:    ${stats.copied}\n` +
+        `— Failed:    ${stats.failed}\n`;
 
     if (copiedFiles.length > 0) {
         report += "\n[I] Copied (unsupported extension):\n" + copiedFiles.map((f) => " • " + f).join("\n") + "\n";
