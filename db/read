@@ -5,87 +5,87 @@
 // and get rid of the functions themselves
 /* beautify ignore:start */
 
-var _BE = true, _LE = false; //endianness for read_int16+
-//little-endian = reversed notation (Intel, ZX Spectrum),
-//big-endian = direct notation (TCP/IP, Motorola, Amiga)
-//For the BitReader Object, BE is MSB and LE is LSB (intuitively)
+var _BE = true, _LE = false; // endianness for read_int16+
+// little-endian = reversed notation (Intel, ZX Spectrum),
+// big-endian = direct notation (TCP/IP, Motorola, Amiga)
+// For the BitReader Object, BE is MSB and LE is LSB (intuitively)
 var CS_ALL = true, CS_BEST = false; //charStat needall 
 var FINT_QUICK = FINT_FAST = FINT_1 = true; //findIntersections: find just one for speed's sake
 var TOEOF = -1; //use for the size parameter in findSignature
 
 // The encoding tables start with 7F, not 80! 7F is undefined in many charsets but it's good to have something
 // The N(on)B(reakable)SP(ace) and S(oft)HY(phen) are kept as actual A0 and AD characters in this file 
-var CP437 = "⌂"+
-	"ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ"+
-	"áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐"+
-	"└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀"+
-	"αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ",
-  CP866 = "⌂"+ //DOS Cyrillic
-	'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'+
-	'абвгдежзийклмноп░▒▓│┤╡╢╖╕╣║╗╝╜╛┐'+
-	'└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀'+
-	'рстуфхцчшщъыьэюяЁёЄєЇїЎў°∙·√№¤■ ',
-  CP1251 = "⌂"+
-	"ЂЃ‚ѓ„…†‡€‰Љ‹ЊЌЋЏђ‘’“”•–—・™љ›њќћџ"+
-	" ЎўЈ¤Ґ¦§Ё©Є«¬­®Ї°±Ііґµ¶·ё№є»јЅѕї"+
-	"АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"+
-	"абвгдежзийклмнопрстуфхцчшщъыьэюя",
-  CP1252 = "⌂"+ //aka. Western aka. ISO-8859-1
-	"€・‚ƒ„…†‡ˆ‰Š‹Œ・Ž・・‘’“”•–—˜™š›œ・žŸ"+
-	" ¡¢£¤¥¦§¨©ª«¬・®¯°±²³´µ¶·¸¹º»¼½¾¿"+
-	"ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
-	"àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
-  KOI8R = "⌂"+ //aka. RFC 1489, Morse code based
-	'─│┌┐└┘├┤┬┴┼▀▄█▌▐░▒▓⌠■∙√≈≤≥ ⌡°²·÷'+
-	'═║╒ё╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡Ё╢╣╤╥╦╧╨╩╪╫╬©'+
-	'юабцдефгхийклмнопярстужвьызшэщчъ'+
-	'ЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧЪ',
-  JISX0201 = "⌂"+
-	"→-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—˜™š›œ¢žŸ"+ //decided to mix it with cp1252
-	"→｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｶｷｸｹｺｻｼｽｾｿﾀ"+
-	"ﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ"+
-	"àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
-  CPAmiga = "⫽"+ // alternatively, "▒""
-	"абвгдежзийклмнопрстуфхцчшщъыьэюя"+ //0x80~0x9F display Cyrillics, just to fill the void
-	" ¡¢£¤¥¦§¨©ª«¬–®¯°±²³´µ¶·¸¹º»¼½¾¿"+
-	"ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
-	"àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
-  CPRISCOS = "⌂"+
-	"€Ŵŵ◰﯀Ŷŷ�⇦⇨⇩⇧…™‰•‘’‹›“”„–—−Œœ†‡ﬁﬂ"+
-	" ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿"+
-	"ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"+
-	"àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
-  CPATASCII = ['▶',
-	'🖤','├','▊','┘','┤','┐','╱','╲','◤','▛','◥','▙','▟','▆','￣',
-	'▜','♣','┌','─','┼','◘','▀','▐','┬','┴','▐','└','\n','↑','↓','←','→',
-	'█','！','”','＃','＄','％','＆','’','（','）','＊','＋','，','ー','．',
-	'/','𝟶','𝟷','𝟸','𝟹','𝟺','𝟻','𝟼','𝟽','𝟾','𝟿','：','；','＜','＝','＞','？',
-	'＠','𝙰','𝙱','𝙲','𝙳','𝙴','𝙵','𝙶','𝙷','𝙸','𝙹','𝙺','𝙻','𝙼','𝙽','𝙾',
-	'𝙿','𝚀','𝚁','𝚂','𝚃','𝚄','𝚅','𝚆','𝚇','𝚈','𝚉','【','\\','】','＾','＿',
-	'♦','𝚊','𝚋','𝚌','𝚍','𝚎','𝚏','𝚐','𝚑','𝚒','𝚓','𝚔','𝚕','𝚖','𝚗','𝚘',
-	'𝚙','𝚚','𝚛','𝚜','𝚝','𝚞','𝚟','𝚠','𝚡','𝚢','𝚣','♠','-','↰','◁','▷'], //arrow up then NW (🢰) not included for UTF limitations
-  CPAtariST = "⌂"+
-	"ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥ßƒ"+
-	"áíóúñÑªº¿⌐¬½¼¡«»ãõØøœŒÀÃÕ¨´†¶©®™"+
-	"ĳĲאבגדהוזחטיכלמנסעפצקרשתןךםףץ§∧∞"+
-	"αβΓπΣσµτΦΘΩδ∮φ∈∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²³¯",
-  CPSpeccy = ['©', //too SPECIAL with all the tokens-for-characters, gotta use lists
-	'  ',' ▀','▀ ','▀▀',' ▄',' █','▀▄','▄█', '▄ ','▄▀','█ ','█▀','▄▄','▄█','█▄','██', //80~F
-	'𝘼','𝘽','𝘾','𝘿','𝙀','𝙁','𝙂','𝙃','𝙄','𝙅','𝙆','𝙇','𝙈','𝙉','𝙊','𝙋', //90~F
-	'𝙌','𝙍','𝙎','𝚉𝚇¹²⁸','⏯️','𝚁𝙽𝙳','𝙸𝙽𝙺𝙴𝚈$','π', '𝙵𝙽 ','𝙿𝙾𝙸𝙽𝚃 ','𝚂𝙲𝚁𝙴𝙴𝙽$ ','𝙰𝚃𝚃𝚁 ','𝙰𝚃 ','𝚃𝙰𝙱 ','𝚅𝙰𝙻$ ','𝙲𝙾𝙳𝙴' , //A0~F
-	'𝚅𝙰𝙻 ','𝙻𝙴𝙽 ','𝚂𝙸𝙽 ','𝙲𝙾𝚂 ','𝚃𝙰𝙽 ','𝙰𝚂𝙽 ','𝙰𝙲𝚂 ','𝙰𝚃𝙽 ', '𝙻𝙽 ','𝙴𝚇𝙿 ','𝙸𝙽𝚃 ','𝚂𝚀𝚁 ','𝚂𝙶𝙽 ','𝙰𝙱𝚂 ','𝙿𝙴𝙴𝙺 ','𝙸𝙽 ', //B0~F
-	'𝚄𝚂𝚁 ','𝚂𝚃𝚁$ ','𝙲𝙷𝚁$ ','𝙽𝙾𝚃 ','𝙱𝙸𝙽 ','𝙾𝚁 ','𝙰𝙽𝙳 ','≤', '≥','≠','𝙻𝙸𝙽𝙴 ','𝚃𝙷𝙴𝙽 ','𝚃𝙾 ','𝚂𝚃𝙴𝙿 ','𝙳𝙴𝙵 𝙵𝙽 ','𝙲𝙰𝚃 ', //C0~F
-	'𝙵𝙾𝚁𝙼𝙰𝚃 ','𝙼𝙾𝚅𝙴 ','𝙴𝚁𝙰𝚂𝙴 ','𝙾𝙿𝙴𝙽 # ','𝙲𝙻𝙾𝚂𝙴 # ','𝙼𝙴𝚁𝙶𝙴 ','𝚅𝙴𝚁𝙸𝙵𝚈 ', '𝙱𝙴𝙴𝙿 ','𝙲𝙸𝚁𝙲𝙻𝙴 ','𝙸𝙽𝙺 ','𝙿𝙰𝙿𝙴𝚁 ','𝙵𝙻𝙰𝚂𝙷 ','𝙱𝚁𝙸𝙶𝙷𝚃 ','𝙸𝙽𝚅𝙴𝚁𝚂𝙴 ','𝙾𝚅𝙴𝚁 ','𝙾𝚄𝚃 ', //D0~F
-	'𝙻𝙿𝚁𝙸𝙽𝚃 ','𝙻𝙻𝙸𝚂𝚃 ','𝚂𝚃𝙾𝙿 ','𝚁𝙴𝙰𝙳 ','𝙳𝙰𝚃𝙰 ','𝚁𝙴𝚂𝚃𝙾𝚁𝙴 ','𝙽𝙴𝚆 ', '𝙱𝙾𝚁𝙳𝙴𝚁 ','𝙲𝙾𝙽𝚃𝙸𝙽𝚄𝙴 ','𝙳𝙸𝙼 ','𝚁𝙴𝙼 ','𝙵𝙾𝚁 ','𝙶𝙾 𝚃𝙾 ','𝙶𝙾 𝚂𝚄𝙱 ','𝙸𝙽𝙿𝚄𝚃 ','𝙻𝙾𝙰𝙳 ', //E0~F
-	'𝙻𝙸𝚂𝚃 ','𝙻𝙴𝚃 ','𝙿𝙰𝚄𝚂𝙴 ','𝙽𝙴𝚇𝚃 ','𝙿𝙾𝙺𝙴 ','𝙿𝚁𝙸𝙽𝚃 ','𝙿𝙻𝙾𝚃 ', '𝚁𝚄𝙽 ','𝚂𝙰𝚅𝙴 ','𝚁𝙰𝙽𝙳𝙾𝙼𝙸𝚉𝙴 ','𝙸𝙵 ','𝙲𝙻𝚂','𝙳𝚁𝙰𝚆 ','𝙲𝙻𝙴𝙰𝚁 ','𝚁𝙴𝚃𝚄𝚁𝙽', '𝙲𝙾𝙿𝚈'], //F0~F
-  Chars0to1F = "・☺☻♥♦♣♠•◘○◙♂♀♪♫☼▶◀↕‼¶§▬↨↑↓→←∟↔▲▼", //#0 is a small dot from Japanese
-  Chars0to1FLF = "・☺☻♥♦♣♠•◘○\x0A♂♀♪♫☼▶◀↕‼¶§▬↨↑↓→←∟↔▲▼",
-  Chars0to1FCRLF = "・☺☻♥♦♣♠•◘○\x0A♂♀\x0D♫☼▶◀↕‼¶§▬↨↑↓→←∟↔▲▼",
-  Chars0to1FSpeccy = "\x00\x01\x02\x03\x04\x05，📝⬅➡⬇⬆⌫\x0A№\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F", //not mixing...
-  Chars0to1FATASCII = "♥├◨┘┤┐／╲◢▗◣▝▘￣▂▖♣┌─┼•▄▎┬┴▌└␛↑↓←→",
-  Chars0to1FATASCII2 = "áùÑÉçôòì£ïüäöúóöÜâûîéèñêȧàȦ␛↑↓←→",
-  Chars0to1FATASCII_PL = "ŹąźćŚėöÖ£üßŁłŃÓ√ĘśäÜĆĄŻÄż␛↑↓←→",
-  Chars0to1FAtariX = "áùÑÉçôòì£ïüäÖúóöÜâûîéèñêȧàȦË↑↓←→";
+var CP437 = "⌂" +
+    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ" +
+    "áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐" +
+    "└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀" +
+    "αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ",
+    CP866 = "⌂" + //DOS Cyrillic
+        'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ' +
+        'абвгдежзийклмноп░▒▓│┤╡╢╖╕╣║╗╝╜╛┐' +
+        '└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀' +
+        'рстуфхцчшщъыьэюяЁёЄєЇїЎў°∙·√№¤■ ',
+    CP1251 = "⌂" +
+        "ЂЃ‚ѓ„…†‡€‰Љ‹ЊЌЋЏђ‘’“”•–—・™љ›њќћџ" +
+        " ЎўЈ¤Ґ¦§Ё©Є«¬­®Ї°±Ііґµ¶·ё№є»јЅѕї" +
+        "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ" +
+        "абвгдежзийклмнопрстуфхцчшщъыьэюя",
+    CP1252 = "⌂" + //aka. Western aka. ISO-8859-1
+        "€・‚ƒ„…†‡ˆ‰Š‹Œ・Ž・・‘’“”•–—˜™š›œ・žŸ" +
+        " ¡¢£¤¥¦§¨©ª«¬・®¯°±²³´µ¶·¸¹º»¼½¾¿" +
+        "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß" +
+        "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
+    KOI8R = "⌂" + //aka. RFC 1489, Morse code based
+        '─│┌┐└┘├┤┬┴┼▀▄█▌▐░▒▓⌠■∙√≈≤≥ ⌡°²·÷' +
+        '═║╒ё╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡Ё╢╣╤╥╦╧╨╩╪╫╬©' +
+        'юабцдефгхийклмнопярстужвьызшэщчъ' +
+        'ЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧЪ',
+    JISX0201 = "⌂" +
+        "→-‚ƒ„…†‡ˆ‰Š‹Œ↑Ž³™‘’“”•–—˜™š›œ¢žŸ" + //decided to mix it with cp1252
+        "→｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｶｷｸｹｺｻｼｽｾｿﾀ" +
+        "ﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ" +
+        "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
+    CPAmiga = "⫽" + // alternatively, "▒""
+        "абвгдежзийклмнопрстуфхцчшщъыьэюя" + //0x80~0x9F display Cyrillics, just to fill the void
+        " ¡¢£¤¥¦§¨©ª«¬–®¯°±²³´µ¶·¸¹º»¼½¾¿" +
+        "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß" +
+        "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
+    CPRISCOS = "⌂" +
+        "€Ŵŵ◰﯀Ŷŷ�⇦⇨⇩⇧…™‰•‘’‹›“”„–—−Œœ†‡ﬁﬂ" +
+        " ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿" +
+        "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß" +
+        "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
+    CPATASCII = ['▶',
+        '🖤', '├', '▊', '┘', '┤', '┐', '╱', '╲', '◤', '▛', '◥', '▙', '▟', '▆', '￣',
+        '▜', '♣', '┌', '─', '┼', '◘', '▀', '▐', '┬', '┴', '▐', '└', '\n', '↑', '↓', '←', '→',
+        '█', '！', '”', '＃', '＄', '％', '＆', '’', '（', '）', '＊', '＋', '，', 'ー', '．',
+        '/', '𝟶', '𝟷', '𝟸', '𝟹', '𝟺', '𝟻', '𝟼', '𝟽', '𝟾', '𝟿', '：', '；', '＜', '＝', '＞', '？',
+        '＠', '𝙰', '𝙱', '𝙲', '𝙳', '𝙴', '𝙵', '𝙶', '𝙷', '𝙸', '𝙹', '𝙺', '𝙻', '𝙼', '𝙽', '𝙾',
+        '𝙿', '𝚀', '𝚁', '𝚂', '𝚃', '𝚄', '𝚅', '𝚆', '𝚇', '𝚈', '𝚉', '【', '\\', '】', '＾', '＿',
+        '♦', '𝚊', '𝚋', '𝚌', '𝚍', '𝚎', '𝚏', '𝚐', '𝚑', '𝚒', '𝚓', '𝚔', '𝚕', '𝚖', '𝚗', '𝚘',
+        '𝚙', '𝚚', '𝚛', '𝚜', '𝚝', '𝚞', '𝚟', '𝚠', '𝚡', '𝚢', '𝚣', '♠', '-', '↰', '◁', '▷'], // arrow up then NW (🢰) not included for UTF limitations
+    CPAtariST = "⌂" +
+        "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥ßƒ" +
+        "áíóúñÑªº¿⌐¬½¼¡«»ãõØøœŒÀÃÕ¨´†¶©®™" +
+        "ĳĲאבגדהוזחטיכלמנסעפצקרשתןךםףץ§∧∞" +
+        "αβΓπΣσµτΦΘΩδ∮φ∈∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²³¯",
+    CPSpeccy = ['©', //too SPECIAL with all the tokens-for-characters, gotta use lists
+        '  ', ' ▀', '▀ ', '▀▀', ' ▄', ' █', '▀▄', '▄█', '▄ ', '▄▀', '█ ', '█▀', '▄▄', '▄█', '█▄', '██', //80~F
+        '𝘼', '𝘽', '𝘾', '𝘿', '𝙀', '𝙁', '𝙂', '𝙃', '𝙄', '𝙅', '𝙆', '𝙇', '𝙈', '𝙉', '𝙊', '𝙋', //90~F
+        '𝙌', '𝙍', '𝙎', '𝚉𝚇¹²⁸', '⏯️', '𝚁𝙽𝙳', '𝙸𝙽𝙺𝙴𝚈$', 'π', '𝙵𝙽 ', '𝙿𝙾𝙸𝙽𝚃 ', '𝚂𝙲𝚁𝙴𝙴𝙽$ ', '𝙰𝚃𝚃𝚁 ', '𝙰𝚃 ', '𝚃𝙰𝙱 ', '𝚅𝙰𝙻$ ', '𝙲𝙾𝙳𝙴', //A0~F
+        '𝚅𝙰𝙻 ', '𝙻𝙴𝙽 ', '𝚂𝙸𝙽 ', '𝙲𝙾𝚂 ', '𝚃𝙰𝙽 ', '𝙰𝚂𝙽 ', '𝙰𝙲𝚂 ', '𝙰𝚃𝙽 ', '𝙻𝙽 ', '𝙴𝚇𝙿 ', '𝙸𝙽𝚃 ', '𝚂𝚀𝚁 ', '𝚂𝙶𝙽 ', '𝙰𝙱𝚂 ', '𝙿𝙴𝙴𝙺 ', '𝙸𝙽 ', //B0~F
+        '𝚄𝚂𝚁 ', '𝚂𝚃𝚁$ ', '𝙲𝙷𝚁$ ', '𝙽𝙾𝚃 ', '𝙱𝙸𝙽 ', '𝙾𝚁 ', '𝙰𝙽𝙳 ', '≤', '≥', '≠', '𝙻𝙸𝙽𝙴 ', '𝚃𝙷𝙴𝙽 ', '𝚃𝙾 ', '𝚂𝚃𝙴𝙿 ', '𝙳𝙴𝙵 𝙵𝙽 ', '𝙲𝙰𝚃 ', //C0~F
+        '𝙵𝙾𝚁𝙼𝙰𝚃 ', '𝙼𝙾𝚅𝙴 ', '𝙴𝚁𝙰𝚂𝙴 ', '𝙾𝙿𝙴𝙽 # ', '𝙲𝙻𝙾𝚂𝙴 # ', '𝙼𝙴𝚁𝙶𝙴 ', '𝚅𝙴𝚁𝙸𝙵𝚈 ', '𝙱𝙴𝙴𝙿 ', '𝙲𝙸𝚁𝙲𝙻𝙴 ', '𝙸𝙽𝙺 ', '𝙿𝙰𝙿𝙴𝚁 ', '𝙵𝙻𝙰𝚂𝙷 ', '𝙱𝚁𝙸𝙶𝙷𝚃 ', '𝙸𝙽𝚅𝙴𝚁𝚂𝙴 ', '𝙾𝚅𝙴𝚁 ', '𝙾𝚄𝚃 ', //D0~F
+        '𝙻𝙿𝚁𝙸𝙽𝚃 ', '𝙻𝙻𝙸𝚂𝚃 ', '𝚂𝚃𝙾𝙿 ', '𝚁𝙴𝙰𝙳 ', '𝙳𝙰𝚃𝙰 ', '𝚁𝙴𝚂𝚃𝙾𝚁𝙴 ', '𝙽𝙴𝚆 ', '𝙱𝙾𝚁𝙳𝙴𝚁 ', '𝙲𝙾𝙽𝚃𝙸𝙽𝚄𝙴 ', '𝙳𝙸𝙼 ', '𝚁𝙴𝙼 ', '𝙵𝙾𝚁 ', '𝙶𝙾 𝚃𝙾 ', '𝙶𝙾 𝚂𝚄𝙱 ', '𝙸𝙽𝙿𝚄𝚃 ', '𝙻𝙾𝙰𝙳 ', //E0~F
+        '𝙻𝙸𝚂𝚃 ', '𝙻𝙴𝚃 ', '𝙿𝙰𝚄𝚂𝙴 ', '𝙽𝙴𝚇𝚃 ', '𝙿𝙾𝙺𝙴 ', '𝙿𝚁𝙸𝙽𝚃 ', '𝙿𝙻𝙾𝚃 ', '𝚁𝚄𝙽 ', '𝚂𝙰𝚅𝙴 ', '𝚁𝙰𝙽𝙳𝙾𝙼𝙸𝚉𝙴 ', '𝙸𝙵 ', '𝙲𝙻𝚂', '𝙳𝚁𝙰𝚆 ', '𝙲𝙻𝙴𝙰𝚁 ', '𝚁𝙴𝚃𝚄𝚁𝙽', '𝙲𝙾𝙿𝚈'], //F0~F
+    Chars0to1F = "・☺☻♥♦♣♠•◘○◙♂♀♪♫☼▶◀↕‼¶§▬↨↑↓→←∟↔▲▼", // #0 is a small dot from Japanese
+    Chars0to1FLF = "・☺☻♥♦♣♠•◘○\x0A♂♀♪♫☼▶◀↕‼¶§▬↨↑↓→←∟↔▲▼",
+    Chars0to1FCRLF = "・☺☻♥♦♣♠•◘○\x0A♂♀\x0D♫☼▶◀↕‼¶§▬↨↑↓→←∟↔▲▼",
+    Chars0to1FSpeccy = "\x00\x01\x02\x03\x04\x05，📝⬅➡⬇⬆⌫\x0A№\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F", //not mixing...
+    Chars0to1FATASCII = "♥├◨┘┤┐／╲◢▗◣▝▘￣▂▖♣┌─┼•▄▎┬┴▌└␛↑↓←→",
+    Chars0to1FATASCII2 = "áùÑÉçôòì£ïüäöúóöÜâûîéèñêȧàȦ␛↑↓←→",
+    Chars0to1FATASCII_PL = "ŹąźćŚėöÖ£üßŁłŃÓ√ĘśäÜĆĄŻÄż␛↑↓←→",
+    Chars0to1FAtariX = "áùÑÉçôòì£ïüäÖúóöÜâûîéèñêȧàȦË↑↓←→";
 
 
 /**
@@ -102,39 +102,39 @@ var CP437 = "⌂"+
  * 𝑓("\x07\x7F\x00\x32", false, Chars0to1FSpeccy, CPSpeccy]) === "📝© 2"
  */
 function decEncoding(ansi, dectbl, zstop, tbl01F) {
-	if(typeof dectbl === 'undefined') return '';
-	if(typeof zstop === 'undefined') zstop = true;
-	if(typeof tbl01F === 'undefined')
-		if(dectbl == CPSpeccy) tbl01F = Chars0to1FSpeccy;
-		else tbl01F = Chars0to1FCRLF;
-	var s = "", bit8 = 0;
-	for(var i=0; i < ansi.length; i++) {
-		if (!ansi[i] && zstop) break;
-		else if(ansi[i] < 0x80)
-			switch(ansi[i]) { // 7-bit variation processing
-			case 0x0E: if(dectbl == JISX0201 || dectbl == KOI8R) bit8 = 0x80;
-				else s += tbl01F[0xE];  break;
-			case 0x0F: if(dectbl == JISX0201 || dectbl == KOI8R) bit8 = 0;
-				else s += tbl01F[0xF];  break;
-			case 0x5C: if(dectbl == JISX0201) s += '¥'; else s += '\\';  break;
-			case 0x5E: if(dectbl == CPSpeccy) s += '↑'; else s += '^';  break;
-			case 0x60: if(dectbl == CPSpeccy) s += '£'; else s += '`';  break;
-			case 0x7B: if(dectbl == CPATASCII)
-				if(tbl01F == Chars0to1FATASCII2) s += 'Ä';
-				else if(tbl01F == Chars0to1FATASCII_PL) s += ' '; //the Poles didn't need the spades without the other 3 :D
-					else s += '♠';
-				else s += '{'; break;
-			case 0x7D: if(dectbl == CPATASCII) s += '↖'; else s += '}'; break; //arrow up then NW (🢰) not included for UTF limitations
-			case 0x7E: if(dectbl == JISX0201) s += '‾'; else if(dectbl == CPATASCII) s += '◀'; else s += '~';  break;
-			case 0x7F:
-				if(dectbl != JISX0201) s += dectbl[0]; else s += String.fromCharCode(bit8+ansi[i]);  break;
-			default:
-				if(!bit8 && ansi[i] >= 0 && ansi[i] < 0x20) s += tbl01F[ansi[i]];
-				else s += String.fromCharCode(bit8+ansi[i]);
-			}
-		else s += dectbl[ansi[i]-0x7F];
-	}
-	return s;
+    if (typeof dectbl === 'undefined') return '';
+    if (typeof zstop === 'undefined') zstop = true;
+    if (typeof tbl01F === 'undefined')
+        if (dectbl == CPSpeccy) tbl01F = Chars0to1FSpeccy;
+        else tbl01F = Chars0to1FCRLF;
+    var s = "", bit8 = 0;
+    for (var i = 0; i < ansi.length; i++) {
+        if (!ansi[i] && zstop) break;
+        else if (ansi[i] < 0x80)
+            switch (ansi[i]) { // 7-bit variation processing
+                case 0x0E: if (dectbl == JISX0201 || dectbl == KOI8R) bit8 = 0x80;
+                else s += tbl01F[0xE]; break;
+                case 0x0F: if (dectbl == JISX0201 || dectbl == KOI8R) bit8 = 0;
+                else s += tbl01F[0xF]; break;
+                case 0x5C: if (dectbl == JISX0201) s += '¥'; else s += '\\'; break;
+                case 0x5E: if (dectbl == CPSpeccy) s += '↑'; else s += '^'; break;
+                case 0x60: if (dectbl == CPSpeccy) s += '£'; else s += '`'; break;
+                case 0x7B: if (dectbl == CPATASCII)
+                    if (tbl01F == Chars0to1FATASCII2) s += 'Ä';
+                    else if (tbl01F == Chars0to1FATASCII_PL) s += ' '; // the Poles didn't need the spades without the other 3 :D
+                    else s += '♠';
+                else s += '{'; break;
+                case 0x7D: if (dectbl == CPATASCII) s += '↖'; else s += '}'; break; // arrow up then NW (🢰) not included for UTF limitations
+                case 0x7E: if (dectbl == JISX0201) s += '‾'; else if (dectbl == CPATASCII) s += '◀'; else s += '~'; break;
+                case 0x7F:
+                    if (dectbl != JISX0201) s += dectbl[0]; else s += String.fromCharCode(bit8 + ansi[i]); break;
+                default:
+                    if (!bit8 && ansi[i] >= 0 && ansi[i] < 0x20) s += tbl01F[ansi[i]];
+                    else s += String.fromCharCode(bit8 + ansi[i]);
+            }
+        else s += dectbl[ansi[i] - 0x7F];
+    }
+    return s;
 }
 
 
@@ -149,7 +149,7 @@ function decEncoding(ansi, dectbl, zstop, tbl01F) {
  * @returns {String} a string value usable with js, or an empty line if the decoding table wasn't found.
  */
 function decAnsi(ofs, len, dectbl, zstop, tbl01F) {
-	return(decEncoding(X.readBytes(ofs,len), dectbl, zstop, tbl01F))
+    return (decEncoding(X.readBytes(ofs, len), dectbl, zstop, tbl01F))
 }
 
 
@@ -163,7 +163,7 @@ function decAnsi(ofs, len, dectbl, zstop, tbl01F) {
  * 𝑓(20, 10, 40) === true; 𝑓(20,10,20) === true
  */
 function isWithin(a, mina, maxa) {
-	return mina <= a && a <= maxa
+    return mina <= a && a <= maxa
 }
 
 /**
@@ -176,7 +176,7 @@ function isWithin(a, mina, maxa) {
  * 𝑓(20.1, 10.0, 40.0) === true; 𝑓(20.1, 10.0, 20.0) === false
  */
 function isInside(a, mina, maxa) {
-	return mina < a && a < maxa
+    return mina < a && a < maxa
 }
 
 
@@ -187,12 +187,12 @@ function isInside(a, mina, maxa) {
  * @returns {String} The hex value, capital letters A~F, ending with "h".
  */
 function Hex(a, padz) {
-	if(typeof a === 'undefined') return "!Hex("+a+")";
-	if(typeof padz === 'undefined') padz = 2;
-	var minus=""; if(a<0) { a = -a; minus = "-" }
-	var r = a.toString(16).toUpperCase(); var pads="";
-	if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
-	return minus+pads+r+"h"
+    if (typeof a === 'undefined') return "!Hex(" + a + ")";
+    if (typeof padz === 'undefined') padz = 2;
+    var minus = ""; if (a < 0) { a = -a; minus = "-" }
+    var r = a.toString(16).toUpperCase(); var pads = "";
+    if (r.length < padz) pads = Array(1 + padz - r.length).join('0');
+    return minus + pads + r + "h"
 }
 
 
@@ -203,12 +203,12 @@ function Hex(a, padz) {
  * @returns {String} The bin value, characters '0' or '1', ending with "b".
  */
 function Bin(a, padz) {
-	if(typeof a === 'undefined') return "!Bin("+a+")";
-	if(typeof padz === 'undefined') padz = 4;
-	var minus = ""; if(a < 0) { a = -a; minus = "-" }
-	var r = a.toString(2); var pads="";
-	if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
-	return minus+pads+r+"b"
+    if (typeof a === 'undefined') return "!Bin(" + a + ")";
+    if (typeof padz === 'undefined') padz = 4;
+    var minus = ""; if (a < 0) { a = -a; minus = "-" }
+    var r = a.toString(2); var pads = "";
+    if (r.length < padz) pads = Array(1 + padz - r.length).join('0');
+    return minus + pads + r + "b"
 }
 
 
@@ -219,12 +219,12 @@ function Bin(a, padz) {
  * @returns {String} The octal value, characters 0~7, ending with "o".
  */
 function Oct(a, padz) {
-	if(typeof a === 'undefined') return "!Oct("+a+")";
-	if(typeof padz === 'undefined') padz = 3;
-	var minus = ""; if(a < 0) { a = -a; minus = "-" }
-	var r = a.toString(8); var pads="";
-	if(r.length < padz) pads = Array(1 + padz - r.length).join('0');
-	return minus+pads+r+"o"
+    if (typeof a === 'undefined') return "!Oct(" + a + ")";
+    if (typeof padz === 'undefined') padz = 3;
+    var minus = ""; if (a < 0) { a = -a; minus = "-" }
+    var r = a.toString(8); var pads = "";
+    if (r.length < padz) pads = Array(1 + padz - r.length).join('0');
+    return minus + pads + r + "o"
 }
 
 
@@ -233,18 +233,18 @@ function Oct(a, padz) {
  * @param {UInt} ofs - the offset to start from.
  * @returns {List} [length,value] - if length (in physical bytes) = 0, the value had a problem.
  * @example
- * //For file containing '81 80 01  81 83 7F':
+ * // For file containing '81 80 01  81 83 7F':
  * 𝑓(0) === 0x4001; 𝑓(3) === 0x41FF
 **/
 function readVarUInt(ofs) {
-	if(ofs < 0 || ofs >= File.getSize()) return [0,0];
-	var t = 0, wb = 1, r = 1, o = ofs;
-	var b = X.U8(o++); t = (t << 7) | (b&0x7F);
-	var b_ = b; while(b_) { b_ >>= 1; wb++ }
-	for(; r < 16 && (b&0x80); r++) { b = X.U8(o++); t = (t << 7) | (b&0x7F) }
-	if(wb > 64) return [0,0xFFFFFFFFFFFFFFFF]; // sizeof(target) in bits. A 64bit value should be enough, right?
-	else if(b&0x80) return [0,-1]; //EOF
-	else return [r,t]
+    if (ofs < 0 || ofs >= File.getSize()) return [0, 0];
+    var t = 0, wb = 1, r = 1, o = ofs;
+    var b = X.U8(o++); t = (t << 7) | (b & 0x7F);
+    var b_ = b; while (b_) { b_ >>= 1; wb++ }
+    for (; r < 16 && (b & 0x80); r++) { b = X.U8(o++); t = (t << 7) | (b & 0x7F) }
+    if (wb > 64) return [0, 0xFFFFFFFFFFFFFFFF]; // sizeof(target) in bits. A 64bit value should be enough, right?
+    else if (b & 0x80) return [0, -1]; // EOF
+    else return [r, t]
 }
 
 
@@ -263,49 +263,49 @@ function readVarUInt(ofs) {
  * Skip some bytes without changing state: bits.consume(2)
 **/
 function BitReader(nOffset, nEndian) {
-	this.n = 0; // the number of bits in the buffer
-	this.buf = 0; // the bit buffer
-	this.offset = nOffset ? nOffset : 0; // the file offset
-	this.endian = nEndian ? nEndian : _LE; // for different mechanics of bitstreaming; ogg/flac use _BE
+    this.n = 0; // the number of bits in the buffer
+    this.buf = 0; // the bit buffer
+    this.offset = nOffset ? nOffset : 0; // the file offset
+    this.endian = nEndian ? nEndian : _LE; // for different mechanics of bitstreaming; ogg/flac use _BE
 
-	// use this to change the pointer, which will reinit the reader, but not the logger
-	this.init = function(nOffset) { this.ofs = nOffset ? nOffset : 0; this.n = this.buf = 0 }
+    // use this to change the pointer, which will reinit the reader, but not the logger
+    this.init = function (nOffset) { this.ofs = nOffset ? nOffset : 0; this.n = this.buf = 0 }
 
-	// the method to read b bits from the file
-	this.read = function(nBits) {
-		if(nBits > 64) nBits = 64; if(nBits < 0) return 0;
-		if(this.endian === _LE) {
-			while(this.n < nBits) { // while the buffer is not enough
-				this.buf |= Util.shlu64(File.read_uint8(this.offset++),this.n); // read a byte and append it to the buffer
-				this.n += 8; // increase the bit number by 8
-			}
-			var v = this.buf & (Util.shlu64(1,nBits) - 1); // extract the desired bits from the buffer
-			this.buf = Util.shru64(this.buf,nBits); // shift the buffer to the right
-		} else {
-			while(this.n < nBits) {
-				this.buf = Util.shlu64(this.buf,8) | File.read_uint8(this.offset++); // shift the buffer to the left and append a byte
-				this.n += 8;
-			}
-			var v = Util.shru64(this.buf,this.n - nBits); // extract the desired bits from the most significant part of the buffer
-			this.buf &= Util.shru64((Util.shlu64(1,this.n)-1),nBits); // clear the extracted bits from the buffer
-		}
-		this.n -= nBits; // decrease the bit number by b
-		return v; // return the value even if the file is exhausted
-	}
+    // the method to read b bits from the file
+    this.read = function (nBits) {
+        if (nBits > 64) nBits = 64; if (nBits < 0) return 0;
+        if (this.endian === _LE) {
+            while (this.n < nBits) { // while the buffer is not enough
+                this.buf |= Util.shlu64(File.read_uint8(this.offset++), this.n); // read a byte and append it to the buffer
+                this.n += 8; // increase the bit number by 8
+            }
+            var v = this.buf & (Util.shlu64(1, nBits) - 1); // extract the desired bits from the buffer
+            this.buf = Util.shru64(this.buf, nBits); // shift the buffer to the right
+        } else {
+            while (this.n < nBits) {
+                this.buf = Util.shlu64(this.buf, 8) | File.read_uint8(this.offset++); // shift the buffer to the left and append a byte
+                this.n += 8;
+            }
+            var v = Util.shru64(this.buf, this.n - nBits); // extract the desired bits from the most significant part of the buffer
+            this.buf &= Util.shru64((Util.shlu64(1, this.n) - 1), nBits); // clear the extracted bits from the buffer
+        }
+        this.n -= nBits; // decrease the bit number by b
+        return v; // return the value even if the file is exhausted
+    }
 
-	// Skip some bytes without changing state: bits.consume(2)
-	this.consume = function(nBytes) { this.offset += nBytes; }
+    // Skip some bytes without changing state: bits.consume(2)
+    this.consume = function (nBytes) { this.offset += nBytes; }
 
-	// Set the bit-file's offset, in bytes, without changing state:
-	this.seek = function(nOfs) { this.offset = nOfs; }
+    // Set the bit-file's offset, in bytes, without changing state:
+    this.seek = function (nOfs) { this.offset = nOfs; }
 
-	// Set the bit-file's offset in bits:
-	this.bseek = function(nOfs) { this.offset = nOfs - (nOfs%8); this.buf = this.n = 0; this.read(nOfs%8); }
+    // Set the bit-file's offset in bits:
+    this.bseek = function (nOfs) { this.offset = nOfs - (nOfs % 8); this.buf = this.n = 0; this.read(nOfs % 8); }
 }
 
 
 function bitCount(n) {
-	var c = 0; n = !!n; while(n) { if((n&1)) c++; n >>= 1 } return c
+    var c = 0; n = !!n; while (n) { if ((n & 1)) c++; n >>= 1 } return c
 }
 
 /**
@@ -315,19 +315,19 @@ function bitCount(n) {
  * @param {[Array(UInt)] | UInt} bl = [0] - the list of possible u_int8 codes, or just one u_int8. 0 by default.
  * @returns {UInt} - offset if a byte in the slice doesn't belong to the list. If you go beyond EoF or all good, -1.
  * @example
- * //For '00 01 02 01' at offset 6 in the file:
+ * // For '00 01 02 01' at offset 6 in the file:
  * firstNotOf (6, 4, [0,1]) === 8; firstNotOf(6, 4, 1) === 6
  */
 function firstNotOf(ofs, len, bl) {
-	if(ofs+len > X.Sz()) return -1; var c = i = 0;
-	if(Array.isArray(bl)) {
-		for(i = 0; i < bl.length; i++) if(typeof bl[i] !== 'number' || bl[i] < 0 || bl[i] % 1 != 0) break; 
-		if(i < bl.length) throw new Error('firstNotOf cannot parse: '+outArray(bl));
-	}
-	else if(typeof bl === 'number' && bl > 0 && bl % 1 == 0) bl = [bl]; else bl = [0];
-	// and now test the slice
-	for(i = 0; i < len && ofs+i < X.Sz(); i++) if(bl.indexOf(X.U8(ofs+i)) < 0) break;
-	return i < len? ofs+i : -1
+    if (ofs + len > X.Sz()) return -1; var c = i = 0;
+    if (Array.isArray(bl)) {
+        for (i = 0; i < bl.length; i++) if (typeof bl[i] !== 'number' || bl[i] < 0 || bl[i] % 1 != 0) break;
+        if (i < bl.length) throw new Error('firstNotOf cannot parse: ' + outArray(bl));
+    }
+    else if (typeof bl === 'number' && bl > 0 && bl % 1 == 0) bl = [bl]; else bl = [0];
+    // and now test the slice
+    for (i = 0; i < len && ofs + i < X.Sz(); i++) if (bl.indexOf(X.U8(ofs + i)) < 0) break;
+    return i < len ? ofs + i : -1
 }
 
 
@@ -357,19 +357,19 @@ function isAllZeroes(ofs, len) { return firstNotOf(ofs, len, 0) < 0 } //a subcas
  * 𝑓(" 12345 7890, 34 678. 1 3'56789", 16, 10).trim() === "12345 7890, 34…"
  */
 function addEllipsis(a, trim, mintrim) {
-	if(!trim) trim = 0xA0;
-	if(!mintrim) mintrim = 78; if(a.length < trim || mintrim > trim) return a.trim();
-	const spaces = " .,:;!\\/'\"=&\x09\x0D\x0A\x1A\x26。、｡,，・";
-	var i = trim, c = 0, ci = -1;
-	while(i >= mintrim && c < 2) {
-		if(spaces.indexOf(a[i]) >= 0) { c++; while(spaces.indexOf(a[i]) >= 0) i--; if(ci < 0) ci = i+1 }
-		while(spaces.indexOf(a[i]) < 0 && i >= 0) i--
-	}
-	if((i < mintrim && c < 2) //we conclude this language doesn't really have that many spaces...
-	  || !c) //...or none at all in the trimmable slice...
-		return a.slice(0,trim)+'…';
-	else //this language has some spaces and we can use the last one to trim
-		return a.slice(0,Math.max(ci),mintrim)+'…';
+    if (!trim) trim = 0xA0;
+    if (!mintrim) mintrim = 78; if (a.length < trim || mintrim > trim) return a.trim();
+    const spaces = " .,:;!\\/'\"=&\x09\x0D\x0A\x1A\x26。、｡,，・";
+    var i = trim, c = 0, ci = -1;
+    while (i >= mintrim && c < 2) {
+        if (spaces.indexOf(a[i]) >= 0) { c++; while (spaces.indexOf(a[i]) >= 0) i--; if (ci < 0) ci = i + 1 }
+        while (spaces.indexOf(a[i]) < 0 && i >= 0) i--
+    }
+    if ((i < mintrim && c < 2) // we conclude this language doesn't really have that many spaces...
+        || !c) // ...or none at all in the trimmable slice...
+        return a.slice(0, trim) + '…';
+    else // this language has some spaces and we can use the last one to trim
+        return a.slice(0, Math.max(ci), mintrim) + '…';
 }
 
 
@@ -380,13 +380,13 @@ function addEllipsis(a, trim, mintrim) {
  * @param {String} [suffix=''] - what to put after the output string
  * @param {String} [sep=','] - what to put between the previous string and this addition
  * @example
- * //for sOptions === '  ch:2':
- * 𝑓('hello world  ', 'msg:"', '"', ', '); //sOptions === 'ch:2, msg:"hello world\"'
+ * // for sOptions === '  ch:2':
+ * 𝑓('hello world  ', 'msg:"', '"', ', '); // sOptions === 'ch:2, msg:"hello world\"'
  */
 function sOptionT(a, prefix, suffix, sep) {
-  if (typeof prefix === 'undefined') prefix = ""; if (typeof suffix === 'undefined') suffix = "";
-  if (typeof sep === 'undefined') sep = ',';
-  if ((""+a).trim() != "") sOptions = sOptions.appendS(prefix+(""+a).trim()+suffix, sep)
+    if (typeof prefix === 'undefined') prefix = ""; if (typeof suffix === 'undefined') suffix = "";
+    if (typeof sep === 'undefined') sep = ',';
+    if (("" + a).trim() != "") sOptions = sOptions.appendS(prefix + ("" + a).trim() + suffix, sep)
 }
 
 
@@ -397,13 +397,13 @@ function sOptionT(a, prefix, suffix, sep) {
  * @param {String} [suffix=''] - what to put after the output string
  * @param {String} [sep=','] - what to put between the previous string and this addition
  * @example
- * //for sOptions === '  ch:2':
- * 𝑓('hello world  ', 'msg:"', '"', ', '); //sOptions === 'ch:2, msg:"hello world\"'
+ * // for sOptions === '  ch:2':
+ * 𝑓('hello world  ', 'msg:"', '"', ', '); // sOptions === 'ch:2, msg:"hello world\"'
  */
 function sOption(a, prefix, suffix) {
-  if (typeof prefix === 'undefined') prefix = ""; if (typeof suffix === 'undefined') suffix = "";
-  if (typeof sep === 'undefined') sep = ',';
-  if ((""+a) != "") sOptions = sOptions.appendS(prefix+(""+a)+suffix, sep)
+    if (typeof prefix === 'undefined') prefix = ""; if (typeof suffix === 'undefined') suffix = "";
+    if (typeof sep === 'undefined') sep = ',';
+    if (("" + a) != "") sOptions = sOptions.appendS(prefix + ("" + a) + suffix, sep)
 }
 
 
@@ -418,18 +418,19 @@ function sOption(a, prefix, suffix) {
  * outSz(90,100,105) === "90(+10)/100/105(-5!)"
  * // The "!)" thus indicates the file is too short compared to the algorithmic estimation.
  */
-function outSz() { if(!arguments.length || typeof arguments[0] === 'undefined') return "?";
-	var sizes = [], origs = [];
-	for(i = 0; i < arguments.length; i++)
-	  if(arguments[i] >= 0) if(!origs.length || origs.indexOf(arguments[i]) < 0) {
-		origs.push(arguments[i]);
-		sizes.push(
-			arguments[i] < File.getSize() ? arguments[i]+"(+"+(File.getSize()-arguments[i])+")"
-		  : arguments[i] > File.getSize() ? arguments[i]+"(-"+(arguments[i]-File.getSize())+"!)"
-		  : arguments[i]
-		)
-	  } else; else sizes.push("?");
-	return sizes.join("/")
+function outSz() {
+    if (!arguments.length || typeof arguments[0] === 'undefined') return "?";
+    var sizes = [], origs = [];
+    for (i = 0; i < arguments.length; i++)
+        if (arguments[i] >= 0) if (!origs.length || origs.indexOf(arguments[i]) < 0) {
+            origs.push(arguments[i]);
+            sizes.push(
+                arguments[i] < File.getSize() ? arguments[i] + "(+" + (File.getSize() - arguments[i]) + ")"
+                    : arguments[i] > File.getSize() ? arguments[i] + "(-" + (arguments[i] - File.getSize()) + "!)"
+                        : arguments[i]
+            )
+        } else; else sizes.push("?");
+    return sizes.join("/")
 }
 
 
@@ -444,24 +445,24 @@ function outSz() { if(!arguments.length || typeof arguments[0] === 'undefined') 
  * 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 2, 8) == "[00000001, [00000101, [00001010, 00011110]], [[00010111], "test"]]"
  * 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 16) == "[01, [05, [0A, 1E]], [[17], "test"]]"
  */
-function outArray(a,base,pad) {
-//	if(!Array.isArray(a)) return a;
-	if(typeof base !== 'number' || base % 1 !== 0) base = 10;
-	if(typeof pad !== 'number' || pad % 1 !== 0) //not integer
-		if(typeof pad === 'undefined') switch(base) {
-			case 8: pad = 3; break; case 16: pad = 2; break; case 2: pad = 4; break; default: pad = 0
-		}
-	for(var i=0, s = []; i < a.length; i++) {
-		if(Array.isArray(a[i])) s.push(outArray(a[i],base,pad)); else
-			if(typeof a[i] === 'number' && a[i] % 1 === 0) //integer
-				s.push(a[i].toString(base).toUpperCase().padStart(pad,'0'));
-			else if(typeof a[i] === 'string') s.push('"'+a[i]+'"');
-			else s.push(a[i]);
-	}
-	return '['+s.join(', ')+']' //put '[ ' and ' ]' for an even more spaced output
+function outArray(a, base, pad) {
+    //	if(!Array.isArray(a)) return a;
+    if (typeof base !== 'number' || base % 1 !== 0) base = 10;
+    if (typeof pad !== 'number' || pad % 1 !== 0) //not integer
+        if (typeof pad === 'undefined') switch (base) {
+            case 8: pad = 3; break; case 16: pad = 2; break; case 2: pad = 4; break; default: pad = 0
+        }
+    for (var i = 0, s = []; i < a.length; i++) {
+        if (Array.isArray(a[i])) s.push(outArray(a[i], base, pad)); else
+            if (typeof a[i] === 'number' && a[i] % 1 === 0) //integer
+                s.push(a[i].toString(base).toUpperCase().padStart(pad, '0'));
+            else if (typeof a[i] === 'string') s.push('"' + a[i] + '"');
+            else s.push(a[i]);
+    }
+    return '[' + s.join(', ') + ']' // put '[ ' and ' ]' for an even more spaced output
 }
 
-//_l2r('WELP','tests','A:'+outArray(X.readBytes(0,5),16)+' B:'+outArray([...Array(5)].map((_, i) => X.U8(i)),16))
+// _l2r('WELP','tests','A:'+outArray(X.readBytes(0,5),16)+' B:'+outArray([...Array(5)].map((_, i) => X.U8(i)),16))
 
 
 /**
@@ -481,14 +482,14 @@ function extIs(a) { return File.getFileSuffix().toLowerCase() == a.toLowerCase()
  * @returns {String}
 */
 function slashTag(a, b) {
-	if(a == b) return a;
-	else if(a != "" && b == "")
-		return a;
-	else if(a == "" && b != "")
-		return b;
-	else if(a != "" && b != "")
-		return a+"/"+b;
-	else return ""
+    if (a == b) return a;
+    else if (a != "" && b == "")
+        return a;
+    else if (a == "" && b != "")
+        return b;
+    else if (a != "" && b != "")
+        return a + "/" + b;
+    else return ""
 }
 
 
@@ -500,28 +501,34 @@ function slashTag(a, b) {
  * @returns {Array or false}
 */
 function createOrderlyHuffmanTable(lent, btl, br) {
-	var md = 32, Md = reall = code = 0; var _t = [], fi = [], li = [], ni = [];
-	for(i = 0; i < 33; i++) fi[i] = 0xFFFF;
-	for(i = 0; i < btl; i++) { len = lent[i]; if(len) {
-		if(len < md) md = len; if(len > Md) Md = len;
-		if(fi[len] == 0xFFFF) { fi[len] = li[len] = i } else { ni[li[len]] = i; li[len] = i } reall++ } }
-	if(!Md) return false;
-	for(d = md; d <= Md; d++) {
-		if(fi[d] != 0xFFFF) ni[li[d]] = btl;
-		for(i = fi[d]; i < btl; i = ni[i]) {
-			//insert HuffmanCode:
-			var j = 0, le = _t.length;
-			for(var cb = d; cb >= 0; cb--) {
-				var cob = (cb && ( ( (code>>(Md-d)) >> (cb-1) ) & 1 ) ) ? 1 : 0;
-				if(j != le) {
-					if(!cb || (!_t[j][0] && !_t[j][1])) return false; //[0] is left, [1] is right, [2] is value
-					if(!_t[j][cob]) _t[j][cob] = j = le; else j = _t[j][cob];
-				} else {
-					_t.push([ (cb&&!cob)?le+1:0, (cb&&cob)?le+1:0, cb?0:i ]);
-					j++; le++
-				} }
-			code += 1 << (Md-d) } }
-	return _t
+    var md = 32, Md = reall = code = 0; var _t = [], fi = [], li = [], ni = [];
+    for (i = 0; i < 33; i++) fi[i] = 0xFFFF;
+    for (i = 0; i < btl; i++) {
+        len = lent[i]; if (len) {
+            if (len < md) md = len; if (len > Md) Md = len;
+            if (fi[len] == 0xFFFF) { fi[len] = li[len] = i } else { ni[li[len]] = i; li[len] = i } reall++
+        }
+    }
+    if (!Md) return false;
+    for (d = md; d <= Md; d++) {
+        if (fi[d] != 0xFFFF) ni[li[d]] = btl;
+        for (i = fi[d]; i < btl; i = ni[i]) {
+            // insert HuffmanCode:
+            var j = 0, le = _t.length;
+            for (var cb = d; cb >= 0; cb--) {
+                var cob = (cb && (((code >> (Md - d)) >> (cb - 1)) & 1)) ? 1 : 0;
+                if (j != le) {
+                    if (!cb || (!_t[j][0] && !_t[j][1])) return false; // [0] is left, [1] is right, [2] is value
+                    if (!_t[j][cob]) _t[j][cob] = j = le; else j = _t[j][cob];
+                } else {
+                    _t.push([(cb && !cob) ? le + 1 : 0, (cb && cob) ? le + 1 : 0, cb ? 0 : i]);
+                    j++; le++
+                }
+            }
+            code += 1 << (Md - d)
+        }
+    }
+    return _t
 }
 
 
@@ -534,13 +541,13 @@ function createOrderlyHuffmanTable(lent, btl, br) {
  * 𝑓(123456789) === "31Y10M4w21h33m9s"; 𝑓(1234567) === "2w6h56m7s"; 𝑓(12345) === "3:25:45"
  */
 function secondsToTimeStr(s) {
-	const mul = [/*millenia*/315581497635,/*centuries*/3155814976,/*yrs*/31558150,/*mns*/2629846,/*wks*/604800,86400,3600,60];
-	var r = "", ss = s%mul[7], mm = Util.div64(s%mul[6],mul[7]), hh = Util.div64(s%mul[5],mul[6]),
-	dd = Util.div64(s%mul[4],mul[5]), ww = Util.div64(s%mul[3],mul[4]), mn = Util.div64(s%mul[2],mul[3]),
-	yy = Util.div64(s%mul[1],mul[2]), cc = Util.div64(s%mul[0],mul[1]), mi = Util.div64(s,mul[0]);
-	if(s < 86400) { r = mm.padStart(2,'0')+":"+ss.padStart(2,'0'); if(hh) r = hh+":"+r; return r }
-	if(ss) r = ss+"s"+r; if(mm) r = mm+"m"+r; if(hh) r = hh+"h"+r; if(dd) r = dd+"d"+r; if(ww) r = ww+"w"+r;
-	if(mn) r = mn+"M"+r; if(yy) r = yy+"Y"+r; if(cc) r = cc+"C"+r; if(mi) r = ci+"Mil"+r; return r
+    const mul = [/*millenia*/315581497635,/*centuries*/3155814976,/*yrs*/31558150,/*mns*/2629846,/*wks*/604800, 86400, 3600, 60];
+    var r = "", ss = s % mul[7], mm = Util.div64(s % mul[6], mul[7]), hh = Util.div64(s % mul[5], mul[6]),
+        dd = Util.div64(s % mul[4], mul[5]), ww = Util.div64(s % mul[3], mul[4]), mn = Util.div64(s % mul[2], mul[3]),
+        yy = Util.div64(s % mul[1], mul[2]), cc = Util.div64(s % mul[0], mul[1]), mi = Util.div64(s, mul[0]);
+    if (s < 86400) { r = mm.padStart(2, '0') + ":" + ss.padStart(2, '0'); if (hh) r = hh + ":" + r; return r }
+    if (ss) r = ss + "s" + r; if (mm) r = mm + "m" + r; if (hh) r = hh + "h" + r; if (dd) r = dd + "d" + r; if (ww) r = ww + "w" + r;
+    if (mn) r = mn + "M" + r; if (yy) r = yy + "Y" + r; if (cc) r = cc + "C" + r; if (mi) r = ci + "Mil" + r; return r
 }
 
 
@@ -558,73 +565,73 @@ function secondsToTimeStr(s) {
  */
 /* beautify preserve:start */
 function charStat() {
-	if(!arguments.length) return "?";
-	if(typeof arguments[0] === "undefined" || typeof arguments[0] === "number") return "?";
-	str = arguments[0];
-	if(arguments.length < 2) needall = false; else needall = !!arguments[1];
-	if(str == "" || str == []) return "empty";
-	var i, s = [], c = [ /*[0]00*/0, /*[1]t */0, /*[2]asc*/0, /*[3]xsc*/0, /*[4]num*/0,
-	  /*[5]ctl*/0, /*[6]foreign*/0 ], o = [0,0,0,0,0,0,0,0];
-	if(typeof str === "string") for(i = 0; i < str.length; i++) s.push(str.charCodeAt(i)); else s = str;
-	for(i=0;i<s.length;i++) {
-		if(!s[i]) { c[0]++; c[3]++; c[5]++; c[6]++ }
-		else if(s[i] == 9) { c[1]++; c[3]++; c[5]++; c[6]++ }
-		else if(s[i] == 0xA || s[i] == 0xD) { c[3]++; c[5]++; c[6]++ }
-		else if(s[i] == 0xE) { c[3]++; c[5]++ }
-		else if(s[i] <= 0x1F || s[i] == 0x7F) c[5]++;
-		else if(s[i] == 0x20) { c[1]++; c[2]++; c[3]++; c[4]++; c[6]++; }
-		else if(0x2B <= s[i] && s[i] <= 0x2D || 0x30 <= s[i] && s[i] <= 0x39) { c[2]++; c[3]++; c[4]++; c[6]++ }
-		else if(s[i] <= 0x7E) { c[2]++; c[3]++ }
-		else if(s[i] == 0xFF) { c[3]++; c[6]++ }
-		else if(s[i] > 0x7F) c[6]++
-	} for(i = 0; i < c.length; i++) o[i] = Util.div64(c[i]*100,s.length);
-	r = "";
-	//_log((typeof str)+" "+s+" {"+c+"} <"+o+">")
-	if(!needall) {
-		if(o[0] > 70) { if(o[0] === 100) r += "all";  r += "00" }
-		else if(o[1] > 70) { if(o[1] === 100) r += "all";  r += "t " }
-		else if(o[4] > 70) { if(o[4] === 100) r += "all";  r += "num" }
-		else if(o[2] > 70) { if(o[2] === 100) r += "all";  r += "asc" }
-		else if(o[3] > 70) { if(o[3] === 100) r += "all";  r += "xsc" }
-		else if(o[5] > 70) { if(o[5] === 100) r += "all";  r += "ctl" }
-		else if(o[6] > 70) { if(o[6] === 100) r += "all";  r += "foreign" }
-	} else {
-		if(o[0] > 70) { if(o[0] === 100) r += "all";  r += "00" }
-		if(o[1] > 70) { if(o[1] === 100) r += "all";  r += "t " }
-		if(o[4] > 70) { if(o[4] === 100) r += "all";  r += "num" }
-		if(o[2] > 70) { if(o[2] === 100) r += "all";  r += "asc" }
-		if(o[3] > 70) { if(o[3] === 100) r += "all";  r += "xsc" }
-		if(o[5] > 70) { if(o[5] === 100) r += "all";  r += "ctl" }
-		if(o[6] > 70) { if(o[6] === 100) r += "all";  r += "foreign" }
-	} 
-	if(r == "") return "any"+o; else return r
+    if (!arguments.length) return "?";
+    if (typeof arguments[0] === "undefined" || typeof arguments[0] === "number") return "?";
+    str = arguments[0];
+    if (arguments.length < 2) needall = false; else needall = !!arguments[1];
+    if (str == "" || str == []) return "empty";
+    var i, s = [], c = [ /*[0]00*/0, /*[1]t */0, /*[2]asc*/0, /*[3]xsc*/0, /*[4]num*/0,
+	  /*[5]ctl*/0, /*[6]foreign*/0], o = [0, 0, 0, 0, 0, 0, 0, 0];
+    if (typeof str === "string") for (i = 0; i < str.length; i++) s.push(str.charCodeAt(i)); else s = str;
+    for (i = 0; i < s.length; i++) {
+        if (!s[i]) { c[0]++; c[3]++; c[5]++; c[6]++ }
+        else if (s[i] == 9) { c[1]++; c[3]++; c[5]++; c[6]++ }
+        else if (s[i] == 0xA || s[i] == 0xD) { c[3]++; c[5]++; c[6]++ }
+        else if (s[i] == 0xE) { c[3]++; c[5]++ }
+        else if (s[i] <= 0x1F || s[i] == 0x7F) c[5]++;
+        else if (s[i] == 0x20) { c[1]++; c[2]++; c[3]++; c[4]++; c[6]++; }
+        else if (0x2B <= s[i] && s[i] <= 0x2D || 0x30 <= s[i] && s[i] <= 0x39) { c[2]++; c[3]++; c[4]++; c[6]++ }
+        else if (s[i] <= 0x7E) { c[2]++; c[3]++ }
+        else if (s[i] == 0xFF) { c[3]++; c[6]++ }
+        else if (s[i] > 0x7F) c[6]++
+    } for (i = 0; i < c.length; i++) o[i] = Util.div64(c[i] * 100, s.length);
+    r = "";
+    // _log((typeof str)+" "+s+" {"+c+"} <"+o+">")
+    if (!needall) {
+        if (o[0] > 70) { if (o[0] === 100) r += "all"; r += "00" }
+        else if (o[1] > 70) { if (o[1] === 100) r += "all"; r += "t " }
+        else if (o[4] > 70) { if (o[4] === 100) r += "all"; r += "num" }
+        else if (o[2] > 70) { if (o[2] === 100) r += "all"; r += "asc" }
+        else if (o[3] > 70) { if (o[3] === 100) r += "all"; r += "xsc" }
+        else if (o[5] > 70) { if (o[5] === 100) r += "all"; r += "ctl" }
+        else if (o[6] > 70) { if (o[6] === 100) r += "all"; r += "foreign" }
+    } else {
+        if (o[0] > 70) { if (o[0] === 100) r += "all"; r += "00" }
+        if (o[1] > 70) { if (o[1] === 100) r += "all"; r += "t " }
+        if (o[4] > 70) { if (o[4] === 100) r += "all"; r += "num" }
+        if (o[2] > 70) { if (o[2] === 100) r += "all"; r += "asc" }
+        if (o[3] > 70) { if (o[3] === 100) r += "all"; r += "xsc" }
+        if (o[5] > 70) { if (o[5] === 100) r += "all"; r += "ctl" }
+        if (o[6] > 70) { if (o[6] === 100) r += "all"; r += "foreign" }
+    }
+    if (r == "") return "any" + o; else return r
 }
 
 
 // PATCHING FUNCTIONALITY; promised to become native
 // May be useful in some ugly cases for quickly pre-processing the file contents which are then detected.
 var patcheddata = [];
-function rpU8(adr) { //read patched data or passthrough, U8
-	for(var i=0; i < patcheddata.length; i++) if(patcheddata[i][0] == adr) return patcheddata[i][1];
-	return X.U8(adr)
+function rpU8(adr) { // read patched data or passthrough, U8
+    for (var i = 0; i < patcheddata.length; i++) if (patcheddata[i][0] == adr) return patcheddata[i][1];
+    return X.U8(adr)
 }
-function rpU16be(adr) { //read patched data or passthrough, U16 BE
-	return (rpU8(adr) << 8) | rpU8(adr+1)
+function rpU16be(adr) { // read patched data or passthrough, U16 BE
+    return (rpU8(adr) << 8) | rpU8(adr + 1)
 }
-function rpU32be(adr) { //read patched data or passthrough, U32 BE
-	return (rpU8(adr) << 24) | (rpU8(adr+1) << 16) | (rpU8(adr+2) << 8) | rpU8(adr+3)
+function rpU32be(adr) { // read patched data or passthrough, U32 BE
+    return (rpU8(adr) << 24) | (rpU8(adr + 1) << 16) | (rpU8(adr + 2) << 8) | rpU8(adr + 3)
 }
-function wpU8(adr,val) { //add to patches, U8
-	for(var i=0; i < patcheddata.length; i++)
-		if(patcheddata[i][0] == adr) { patcheddata[i][1] = val; return }
-	patcheddata.push([adr,val])
+function wpU8(adr, val) { // add to patches, U8
+    for (var i = 0; i < patcheddata.length; i++)
+        if (patcheddata[i][0] == adr) { patcheddata[i][1] = val; return }
+    patcheddata.push([adr, val])
 }
-function wpU16be(adr,val) { //add to patches, U16 BE
-	wpU8(adr,(val>>8)&0xFF); wpU8(adr+1,val&0xFF)
+function wpU16be(adr, val) { // add to patches, U16 BE
+    wpU8(adr, (val >> 8) & 0xFF); wpU8(adr + 1, val & 0xFF)
 }
-function wpU32be(adr,val) { //add to patches, U32 BE
-	wpU8(adr,(val>>24)&0xFF); wpU8(adr+1,(val>>16)&0xFF);
-	wpU8(adr+2,(val>>8)&0xFF); wpU8(adr+3,val&0xFF)
+function wpU32be(adr, val) { // add to patches, U32 BE
+    wpU8(adr, (val >> 24) & 0xFF); wpU8(adr + 1, (val >> 16) & 0xFF);
+    wpU8(adr + 2, (val >> 8) & 0xFF); wpU8(adr + 3, val & 0xFF)
 }
 function patchLength() { return patcheddata.length }
 function patchClear() { patcheddata = [] }
@@ -641,15 +648,15 @@ function patchClear() { patcheddata = [] }
   * 𝑓([ [10,10], [25,5], [40,10] ]) === [ [20,5], [30,10] ] 
  */
 function findGaps(lst, mingap) {
-	var i, r = []; /* tests for input typing follow */ if(!Array.isArray(lst) || lst.length < 2) return r;
-	for(i = 0; i < lst.length; i++) if(!Array.isArray(lst[i]) || lst[i].length != 2
-		|| typeof lst[i][0] !== 'number' || typeof lst[i][1] !== 'number') return r;
-	if(typeof mingap !== 'number') mingap = 1;
-	function sf(a, b) { if(a[0] != b[0]) return a[0]-b[0]; else return a[1]-b[1] }
-	var a = lst.sort(sf);
-	for(i = 1; i < a.length; i++)
-		if((t=a[i-1][0]+a[i-1][1]) < a[i][0] && a[i][0]-t-mingap >= 0) r.push([t, a[i][0]-t])
-	return r
+    var i, r = []; /* tests for input typing follow */ if (!Array.isArray(lst) || lst.length < 2) return r;
+    for (i = 0; i < lst.length; i++) if (!Array.isArray(lst[i]) || lst[i].length != 2
+        || typeof lst[i][0] !== 'number' || typeof lst[i][1] !== 'number') return r;
+    if (typeof mingap !== 'number') mingap = 1;
+    function sf(a, b) { if (a[0] != b[0]) return a[0] - b[0]; else return a[1] - b[1] }
+    var a = lst.sort(sf);
+    for (i = 1; i < a.length; i++)
+        if ((t = a[i - 1][0] + a[i - 1][1]) < a[i][0] && a[i][0] - t - mingap >= 0) r.push([t, a[i][0] - t])
+    return r
 }
 
 
@@ -663,19 +670,20 @@ function findGaps(lst, mingap) {
  * 𝑓([ [10,20], [15,10], [23,30] ]) = [[15,10], [23,2], [23,7]]
  * 𝑓([ [10,20], [15,10], [23,30] ], true) = [[15,10]]
  */
-function findIntersections(lst,detectone) {
-	var i, t, r = []; /* tests for input typing follow */ if(!Array.isArray(lst) || lst.length < 2) return r;
-	for(i=0; i < lst.length; i++) if(!Array.isArray(lst[i]) || lst[i].length != 2
-		|| typeof lst[i][0] !== 'number' || typeof lst[i][1] !== 'number') return r;
-	function sf(a, b) { if(a[0] != b[0]) return a[0]-b[0]; else return a[1]-b[1] }
-	var a = lst.sort(sf); var found = false;
-	for(i=1; i < a.length && !found; i++)
-		for(j=0; j < i && !found; j++)
-			if((t=a[j][0]+a[j][1]) > a[i][0]) { if(detectone) found = true;
-//_log(' item#'+j+' ['+lst[j][0]+' -> '+lst[j][1]+'] intersects with item#'+i+' ['+lst[i][0]+' -> '+lst[i][1]+']')
-				r.push([a[i][0], a[i][0]+a[i][1] <= t ? a[i][1] : t-a[i][0]])
-			}
-	return r.sort(sf);
+function findIntersections(lst, detectone) {
+    var i, t, r = []; /* tests for input typing follow */ if (!Array.isArray(lst) || lst.length < 2) return r;
+    for (i = 0; i < lst.length; i++) if (!Array.isArray(lst[i]) || lst[i].length != 2
+        || typeof lst[i][0] !== 'number' || typeof lst[i][1] !== 'number') return r;
+    function sf(a, b) { if (a[0] != b[0]) return a[0] - b[0]; else return a[1] - b[1] }
+    var a = lst.sort(sf); var found = false;
+    for (i = 1; i < a.length && !found; i++)
+        for (j = 0; j < i && !found; j++)
+            if ((t = a[j][0] + a[j][1]) > a[i][0]) {
+                if (detectone) found = true;
+                // _log(' item#'+j+' ['+lst[j][0]+' -> '+lst[j][1]+'] intersects with item#'+i+' ['+lst[i][0]+' -> '+lst[i][1]+']')
+                r.push([a[i][0], a[i][0] + a[i][1] <= t ? a[i][1] : t - a[i][0]])
+            }
+    return r.sort(sf);
 }
 
 
@@ -687,20 +695,20 @@ function findIntersections(lst,detectone) {
  * @param {UInt} [nStep=1] - In case subsequent searches fail, skip this many bytes before searching for more (this handles alignments too). If 0, stop if not found immediately.
  * @returns -1 if not found, offset otherwise.
  * @example
- * //on your common Windows EXE file:
+ * // on your common Windows EXE file:
  * 𝑓(0, 0x400, [ ["'MZ'",0], ["'PE'0000",0x200] ])
  */
 function findMultiple(nOffset, nLength, aList, nStep) {
-	var r, lst = aList || [], ofs = ofs0 = nOffset || 0, max = Math.min(X.Sz(), ofs+(nLength||0)), st = nStep || 1;
-	if(!lst.length) return -1;
-	for(i = 0; i < lst.length && ofs <= max; i++) {
-		if(ofs >= max) return -1;
-		r = X.fSig(ofs, lst[i][1], lst[i][0]);
-//_l2r('FMP',ofs,'['+i+'] st:'+st+' max:'+Hex(max)+'    r '+lst[i][0]+' ~ '+Hex(lst[i][1])+' = '+Hex(r));
-		if(r < 0) { if(!st) return -1; ofs0 += st; ofs = ofs0; i = -1; }
-		else { ofs = r+lst[i][1]; if(!i) ofs0 = r; }
-	}
-	return ofs0
+    var r, lst = aList || [], ofs = ofs0 = nOffset || 0, max = Math.min(X.Sz(), ofs + (nLength || 0)), st = nStep || 1;
+    if (!lst.length) return -1;
+    for (i = 0; i < lst.length && ofs <= max; i++) {
+        if (ofs >= max) return -1;
+        r = X.fSig(ofs, lst[i][1], lst[i][0]);
+        // _l2r('FMP',ofs,'['+i+'] st:'+st+' max:'+Hex(max)+'    r '+lst[i][0]+' ~ '+Hex(lst[i][1])+' = '+Hex(r));
+        if (r < 0) { if (!st) return -1; ofs0 += st; ofs = ofs0; i = -1; }
+        else { ofs = r + lst[i][1]; if (!i) ofs0 = r; }
+    }
+    return ofs0
 }
 
 // Heuristic considerations for whether the sample name will be interesting enough to an average user.
@@ -712,68 +720,68 @@ function findMultiple(nOffset, nLength, aList, nStep) {
 //
 // Please add conditions liberally!
 function funSampleName(n, ctx) {
-	var fun = 1, bore = 0; //by default, we're curious about the new line just a little
-	n = n.toString();
-	if(n.trim() == '') return false;
-	if(n.endsWithCI('.wav') || n.endsWithCI('.smp')) bore++;
-	if(n.beginsWithCI('ST-') || n.beginsWithCI('df0:')) bore++;
-	if(/^\d+$/.test(n)) bore++;
-	if(n.beginsWithCI('#')) fun += 5;
-	if(/.*(unnamed|dr[u]?m\d+|loop\d+|strings?\d*|bass\s*|guitar\s*\d+|snare\s*\d+).*/i.test(n)) bore++;
-//_setResult('fsn',n,'fun='+fun+' bore='+bore,'')
-	return fun > bore
+    var fun = 1, bore = 0; // by default, we're curious about the new line just a little
+    n = n.toString();
+    if (n.trim() == '') return false;
+    if (n.endsWithCI('.wav') || n.endsWithCI('.smp')) bore++;
+    if (n.beginsWithCI('ST-') || n.beginsWithCI('df0:')) bore++;
+    if (/^\d+$/.test(n)) bore++;
+    if (n.beginsWithCI('#')) fun += 5;
+    if (/.*(unnamed|dr[u]?m\d+|loop\d+|strings?\d*|bass\s*|guitar\s*\d+|snare\s*\d+).*/i.test(n)) bore++;
+    //_setResult('fsn',n,'fun='+fun+' bore='+bore,'')
+    return fun > bore
 }
 
 
 b64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 function toBase64(buf) {
-	var r = '', i = 0, indexOfLastCompleteTriple = buf.length - (buf.length%3);
-	for (i = 0; i < indexOfLastCompleteTriple; i += 3) {
-		r += b64Chars[buf[i] >> 2];
-		r += b64Chars[((buf[i] & 3) << 4) | ((buf[i+1] & 0xF0) >> 4)];
-		r += b64Chars[((buf[i+1] & 0xF) << 2) | ((buf[i+2] & 0xC0) >> 6)];
-		r += b64Chars[buf[i+2] & 0x3F]
-	}
-	if (i < buf.length) {
-		var i1 = buf[i],  i2 = (i+1 < buf.length) ? buf[i+1] : 0;
-		r += b64Chars[i1 >> 2];
-		r += b64Chars[((i1 & 0x03) << 4) | ((i2 & 0xF0) >> 4)];
-		if (i+1 < buf.length) {
-			r += b64Chars[((i2 & 0x0F) << 2)];
-		}
-		else r += '=';
-		r += '=';
-	}
-	return r
+    var r = '', i = 0, indexOfLastCompleteTriple = buf.length - (buf.length % 3);
+    for (i = 0; i < indexOfLastCompleteTriple; i += 3) {
+        r += b64Chars[buf[i] >> 2];
+        r += b64Chars[((buf[i] & 3) << 4) | ((buf[i + 1] & 0xF0) >> 4)];
+        r += b64Chars[((buf[i + 1] & 0xF) << 2) | ((buf[i + 2] & 0xC0) >> 6)];
+        r += b64Chars[buf[i + 2] & 0x3F]
+    }
+    if (i < buf.length) {
+        var i1 = buf[i], i2 = (i + 1 < buf.length) ? buf[i + 1] : 0;
+        r += b64Chars[i1 >> 2];
+        r += b64Chars[((i1 & 0x03) << 4) | ((i2 & 0xF0) >> 4)];
+        if (i + 1 < buf.length) {
+            r += b64Chars[((i2 & 0x0F) << 2)];
+        }
+        else r += '=';
+        r += '=';
+    }
+    return r
 }
 
 
-function _logBase64(buf) { //simply plops the buffer contents into log stream with a suitable MIME header
-	var fn = File.getFileBaseName()+'.'+File.getFileCompleteSuffix();
-	_log('MIME-Version: 1.0\nContent-Type: application/octet-stream; name="'+fn+'.dec"\n'+
-	'Content-Transfer-Encoding: base64\nContent-Disposition: attachment; filename="'+fn+'.dec"\n');
-	_log(buf)
+function _logBase64(buf) { // simply plops the buffer contents into log stream with a suitable MIME header
+    var fn = File.getFileBaseName() + '.' + File.getFileCompleteSuffix();
+    _log('MIME-Version: 1.0\nContent-Type: application/octet-stream; name="' + fn + '.dec"\n' +
+        'Content-Transfer-Encoding: base64\nContent-Disposition: attachment; filename="' + fn + '.dec"\n');
+    _log(buf)
 }
 
 
-function _logHex(buf) { //same but no header and in hex
-	var o = ''; for(i=0; i < buf.length; i++) {
-		if(!(i % 16)) o += (i? '  |\n': '')+i.toString(16).padStart(6,'0')+' |'; if(!(i % 8)) o += ' ';
-		o += ' '+buf[i].toString(16).padStart(2,'0');
-	}
-	_log('-8<---'); _log(o); _log('--->8-')
+function _logHex(buf) { // same but no header and in hex
+    var o = ''; for (i = 0; i < buf.length; i++) {
+        if (!(i % 16)) o += (i ? '  |\n' : '') + i.toString(16).padStart(6, '0') + ' |'; if (!(i % 8)) o += ' ';
+        o += ' ' + buf[i].toString(16).padStart(2, '0');
+    }
+    _log('-8<---'); _log(o); _log('--->8-')
 }
 
 
-function _logText(buf) { //same but as text put through CP866, or all file with zeroes as spaces and control characters as emoji
-	_log('-8<---['+(typeof buf)+' '+(buf.length)+' bytes]---');
-	if(typeof buf === 'object') {
-		var bf = buf, i = 0; for(; i < buf.length; i++) if(bf[i] == 0) bf[i] = 0x20
-	}
-	_log(decEncoding((typeof buf === 'undefined'? X.readBytes(0,X.Sz(),true): bf), CP866, Chars0to1F));
-	_log('--->8-')
+function _logText(buf) { // same but as text put through CP866, or all file with zeroes as spaces and control characters as emoji
+    _log('-8<---[' + (typeof buf) + ' ' + (buf.length) + ' bytes]---');
+    if (typeof buf === 'object') {
+        var bf = buf, i = 0; for (; i < buf.length; i++) if (bf[i] == 0) bf[i] = 0x20
+    }
+    _log(decEncoding((typeof buf === 'undefined' ? X.readBytes(0, X.Sz(), true) : bf), CP866, Chars0to1F));
+    _log('--->8-')
 }
 
 
-function _l2r(name, pos, issue) { _setResult('debug', issue, '@'+Hex(pos), name) }
+function _l2r(name, pos, issue) { _setResult('debug', issue, '@' + Hex(pos), name) }
 /* beautify ignore:end */
