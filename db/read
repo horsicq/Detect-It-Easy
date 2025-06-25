@@ -492,19 +492,23 @@ function outSz() { if(!arguments.length || typeof arguments[0] === 'undefined') 
  * 𝑓([ 1, [5, [10,30]], [[23],'test'] ], 16) == "[01, [05, [0A, 1E]], [[17], "test"]]"
  */
 function outArray(a,base,pad) {
-	if(!Array.isArray(a)) return a;
+//	if(!Array.isArray(a)) return a;
 	if(typeof base !== 'number' || base % 1 !== 0) base = 10;
 	if(typeof pad !== 'number' || pad % 1 !== 0) //not integer
-		if(typeof pad === 'undefined')
-			if(base == 8) pad = 3; else if(base == 16) pad = 2; else if(base == 2) pad = 4; else pad = 0;
-	for(var i=0, s = []; i < a.length; i++)
+		if(typeof pad === 'undefined') switch(base) {
+			case 8: pad = 3; break; case 16: pad = 2; break; case 2: pad = 4; break; default: pad = 0
+		}
+	for(var i=0, s = []; i < a.length; i++) {
 		if(Array.isArray(a[i])) s.push(outArray(a[i],base,pad)); else
 			if(typeof a[i] === 'number' && a[i] % 1 === 0) //integer
 				s.push(a[i].toString(base).toUpperCase().padStart(pad,'0'));
 			else if(typeof a[i] === 'string') s.push('"'+a[i]+'"');
 			else s.push(a[i]);
-	return '['+s.join(', ')+']' //put '[ '...' ]' for an even more spaced output
+	}
+	return '['+s.join(', ')+']' //put '[ ' and ' ]' for an even more spaced output
 }
+
+//_l2r('WELP','tests','A:'+outArray(X.readBytes(0,5),16)+' B:'+outArray([...Array(5)].map((_, i) => X.U8(i)),16))
 
 
 /**
@@ -756,11 +760,13 @@ function findMultiple(nOffset, nLength, aList, nStep) {
 // Please add conditions liberally!
 function funSampleName(n, ctx) {
 	var fun = 1, bore = 0; //by default, we're curious about the new line just a little
+	n = n.toString();
 	if(n.trim() == '') return false;
 	if(n.endsWithCI('.wav') || n.endsWithCI('.smp')) bore++;
 	if(n.beginsWithCI('ST-') || n.beginsWithCI('df0:')) bore++;
+	if(/^\d+$/.test(n)) bore++;
 	if(n.beginsWithCI('#')) fun += 5;
-	if(/.*(dr[u]?m\d+|loop\d+|strings?\d*|bass\s*|guitar\s*\d+|snare\s*\d+).*/i.test(n)) bore++;
+	if(/.*(unnamed|dr[u]?m\d+|loop\d+|strings?\d*|bass\s*|guitar\s*\d+|snare\s*\d+).*/i.test(n)) bore++;
 //_setResult('fsn',n,'fun='+fun+' bore='+bore,'')
 	return fun > bore
 }
