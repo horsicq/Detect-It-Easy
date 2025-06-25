@@ -2016,7 +2016,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var isHighEntropy = false;
 
     // Checks for high entropy (ignore overlay)
-    if (!(PE.isDll() && (PE.section[".rdata"] || PE.section[".rsrc"])) && // .dll with resources
+    if (!(PE.isDll() && (PE.section[".rdata"] || PE.isSectionNamePresent(".rsrc"))) && // .dll with resources
         PE.calculateEntropy(0x00, PE.getSize() - PE.getOverlaySize()) > 7.3) {
         isHighEntropy = true;
     }
@@ -2818,7 +2818,7 @@ function scanForObfuscations_Native() {
 
     var isTextSectionNotFirst = false;
 
-    if ((PE.section[0].Name != ".text" && PE.section[0].Name != ".textbss") && (PE.section[".text"] && PE.section[".textbss"])) {
+    if ((PE.section[0].Name != ".text" && PE.section[0].Name != ".textbss") && (PE.section[".text"] && PE.isSectionNamePresent(".textbss"))) {
         isTextSectionNotFirst = true;
     }
 
@@ -2940,24 +2940,18 @@ function scanForObfuscations_Native() {
 
 
 
-    // Offset of the optional header (0x3C is the e_lfanew field)
-    const optHeaderOffset = PE.read_int32(0x3C) + 4 + 20;
-
-
-
-
     // Check for IAT directory presence
 
-    var iatMissing = false;
+    var isIatDirEmpty = false;
 
     // Offset of the IAT directory (12 is the number of IMAGE_DIRECTORY_ENTRY_ entries, 8 is the size of each entry)
-    const iatDirOffset = optHeaderOffset + (PE.is64() ? 0x70 : 0x60) + 12 * 8;
+    const iatDirOffset = getOptHeaderOffset() + (PE.is64() ? 0x70 : 0x60) + 12 * 8;
 
-    if (PE.read_int32(iatDirOffset) === 0) {
-        iatMissing = true;
+    if (options.length != 0 && PE.read_int32(iatDirOffset) === 0) {
+        isIatDirEmpty = true;
     }
 
-    if (iatMissing) options += (options.length != 0 ? " + " : String()) + "IAT directory empty";
+    if (isIatDirEmpty) options += (options.length != 0 ? " + " : String()) + "IAT directory empty";
 
 
 
@@ -3254,6 +3248,21 @@ function validateSectionNames(dbCollection) {
 
 
 
+/**
+ * Calculates and returns the offset of the PE optional header within the file.
+ * 
+ * The function reads the e_lfanew field at offset 0x3C to find the PE header start,
+ * then adds 4 bytes for the PE signature and 20 bytes for the COFF header to locate
+ * the start of the optional header.
+ *
+ * @returns {number} The offset (in bytes) to the optional header in the PE file.
+ */
+function getOptHeaderOffset() {
+    return PE.read_int32(0x3C) + 4 + 20;
+}
+
+
+
 function scanForLanguages_NET_and_Native() {
     log(logType.nothing, "Scanning to programming language has started!");
 
@@ -3263,9 +3272,7 @@ function scanForLanguages_NET_and_Native() {
         ["C++", "cpp"],
         ["Rust", "rs"],
         ["Java", "class"],
-        ["JavaScript", "js"],
         ["Python", "pyd"],
-        ["PureBasic", "pb"],
         ["Kotlin", "kt"]
     ];
 
@@ -3303,6 +3310,14 @@ function scanForLanguages_NET_and_Native() {
 
 
 
+    var isCompilerDetected =
+        (
+            _getNumberOfResults("compiler") ||
+            _getNumberOfResults("~compiler")
+        );
+
+
+
     var isPpLibraryPresent = false,
         isCLibraryPresent = false;
 
@@ -3310,14 +3325,14 @@ function scanForLanguages_NET_and_Native() {
         const libraryName = PE.getImportLibraryName(i).toLowerCase();
 
         // Detect mangler
-        for (var k = 0; k < PE.getNumberOfImportThunks(i); k++) {
+        for (var k = 0; k < PE.getNumberOfImportThunks(i) && !isPpLibraryPresent; k++) {
             const functionName = PE.getImportFunctionName(i, k); // import, thunk
 
-            if (!isPpLibraryPresent && isFunctionMangled(functionName)) {
+            if (isFunctionMangled(functionName)) {
                 log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledFunction(functionName) + "\"");
 
 
-                if (!_getNumberOfResults("compiler") && !_getNumberOfResults("~compiler")) {
+                if (!isCompilerDetected) {
                     if (functionName[0] == '_') {
                         _setResult("~compiler", "MinGW", String(), String());
                     } else if (functionName[0] == '?') {
@@ -3354,6 +3369,29 @@ function scanForLanguages_NET_and_Native() {
 
 
 
+    // Detect compilers by Rich signature
+
+    if (!isCompilerDetected && PE.isRichSignaturePresent()) {
+        for (var j = 0; j < PE.getNumberOfRichIDs(); j++) {
+            const
+                richId = PE.getRichID(j),
+                richVersion = PE.getRichVersion(j),
+                richCount = PE.getRichCount(j);
+
+            if (richId === 0x000d && richVersion === 9782 && richCount === 0x0001) {
+                _setResult("~compiler", "Microsoft Visual Basic", "6.0", String());
+                _setLangByHeur("VB");
+                break;
+            } else if (richId === 0x0103) {
+                _setResult("~compiler", "MASM", String(), String());
+                break;
+            }
+        }
+    }
+
+
+
+
     const rdataSection = PE.section[".rdata"];
 
     if (rdataSection) {
@@ -3372,7 +3410,7 @@ function scanForLanguages_NET_and_Native() {
         _setLangByHeur("C++");
     } else if (!_isLangPresent("C++") && isCLibraryPresent && (PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
         _setLangByHeur("C");
-    } else if (PE.isLibraryPresentExp(/^api-ms-win-crt*/i) || PE.section[".msvcjmc"]) {
+    } else if (PE.isLibraryPresentExp(/^api-ms-win-crt*/i) || PE.isSectionNamePresent(".msvcjmc")) {
         _setLangByHeur("C/C++");
     } else if (!_isLangDetected() && !_getNumberOfResults("compiler") && !PE.isNET()) {
         if (!_getNumberOfResults("protector") &&
