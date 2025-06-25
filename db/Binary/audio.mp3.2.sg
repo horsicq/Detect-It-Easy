@@ -27,7 +27,7 @@ var MP3 = {
 
     header: function(nOffset) {
         // AAAAAAAA AAABBCCD EEEEFFGH IIJJKLMM
-        var nHeader = Binary.readBEDword(nOffset);
+        var nHeader = X.U32(nOffset,_BE);
         if ((nHeader & 0xFFE00000) != ~~0xFFE00000) // AAAAAAAAAAA
         {
             return null;
@@ -80,11 +80,11 @@ var MP3 = {
             nVBR = Binary.findString(nOffset, 40, "Info");
             bVBR = 0;
         }
-        if (nVBR != -1 && (Binary.readByte(nVBR + 7) & 1)) {
-            nTime *= Binary.readBEDword(nVBR + 8);
+        if (nVBR != -1 && (X.U8(nVBR + 7) & 1)) {
+            nTime *= X.U32(nVBR + 8,_BE);
             nOffset = bVBR ? -1 : -2;
-        } else if (Binary.compare("'VBRI'", nOffset + 32)) {
-            nTime *= Binary.readBEDword(nVBR + 46);
+        } else if (X.c("'VBRI'", nOffset + 32)) {
+            nTime *= X.U32(nVBR + 46,_BE);
             nOffset = -1;
         } else {
             if (nLayer == 2) // Layer I
@@ -107,17 +107,14 @@ var MP3 = {
 }
 
 function detect() {
-    if (Binary.getSize() >= 128) {
-        if (Binary.compare("'TAG'", Binary.getSize() - 128)) {
+    if (X.Sz() >= 128) {
+        if (X.c("'TAG'", X.Sz() - 128)) {
             sOptions = "ID3v1";
         }
         var nOffset = 0,
             bID3v2 = 0;
-        if (Binary.compare("'ID3'")) {
-            nOffset = (Binary.readByte(6) << 21) |
-                (Binary.readByte(7) << 14) |
-                (Binary.readByte(8) << 7) |
-                (Binary.readByte(9));
+        if (X.c("'ID3'")) {
+            nOffset = (X.U8(6) << 21) | (X.U8(7) << 14) | (X.U8(8) << 7) | (X.U8(9));
             nOffset += 10;
             if (sOptions == "") {
                 sOptions = "ID3v2";
@@ -125,7 +122,7 @@ function detect() {
                 sOptions += "&2";
             }
             bID3v2 = 1;
-        } else if (Binary.compare("'WAVEfmt '........55", 8)) {
+        } else if (X.c("'WAVEfmt '........55", 8)) {
             nOffset = Binary.findString(50, 50, "data") + 8;
         }
         var aResult1, aResult = null;
