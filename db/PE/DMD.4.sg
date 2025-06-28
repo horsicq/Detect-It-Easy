@@ -1,5 +1,6 @@
 // Detect It Easy: detection rule file
 // 27.12.2023 @DosX_dev add strings
+// 29.06.2025 @DosX_dev rule logic optimized
 
 // TODO: Rewrite this script
 
@@ -10,24 +11,19 @@ function detect() {
         bDetected = true;
     }
 
+    var rdataSection = PE.section[".rdata"];
+
     if (!bDetected) {
-        if ((PE.section[".rdata"]) && (PE.isDeepScan())) {
-            var nOffset = PE.section[".rdata"].FileOffset;
-            var nSize = PE.section[".rdata"].FileSize;
-            if (
-                PE.findSignature(nOffset, nSize, "'core.sys.windows.dll'") != -1 &&
-                PE.findSignature(nOffset, nSize, "'string.d'") != -1
-            ) {
+        if (rdataSection && PE.isDeepScan()) {
+            if (PE.findSignature(rdataSection.FileOffset, rdataSection.FileSize, "'core.sys.windows.dll'") != -1 &&
+                PE.findSignature(rdataSection.FileOffset, rdataSection.FileSize, "'string.d'") != -1) {
                 bDetected = true;
             }
         }
     }
 
-    if (bDetected && PE.section[".rdata"]) {
-        var nOffset = PE.section[".rdata"].FileOffset;
-        var nSize = PE.section[".rdata"].FileSize;
-
-        var strOffset = PE.findString(nOffset, nSize, "This program will continue, but will not operate when using DMD ");
+    if (bDetected && rdataSection) {
+        var strOffset = PE.findString(rdataSection.FileOffset, rdataSection.FileSize, "This program will continue, but will not operate when using DMD ");
 
         if (strOffset != -1) {
             sVersion = PE.getString(strOffset - 7, 5);
