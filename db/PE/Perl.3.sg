@@ -9,17 +9,13 @@ function detect() {
 
     var sLib = PE.isLibraryPresentExp(/perl(5)_?(\d\d*)/i);
     if (sLib) {
-
         bDetected = true;
         sVersion = sLib[1] + "." + sLib[2];
 
         _setLang("Perl", bDetected);
-
-    
     }
 
-    var sInterp = PE.isExportFunctionPresentExp("Perl_sv_bless|perl_parse");
-    if (sInterp) {
+    if (PE.isExportFunctionPresentExp("Perl_sv_bless|perl_parse")) {
         bDetected = true;
         sVersion = "v" + getPerlVersion();
 
@@ -33,16 +29,16 @@ function detect() {
 
 function getPerlVersion() {
     const verSig = [
-        "'erl5'..'.dll'", // v5.x
-        "'erl5'....'.dll'", // v5.xx
+        "'erl5'..'.dll'", // v5.X
+        "'erl5'....'.dll'", // v5.XX
         "'erl5_'..'.dll'", // cygwin or msys
         "'erl5_'....'.dll'"
     ];
 
-    var nExp = PE.getExportSection();
-    var sPLVersion = String();
-    var nMinorVer = 0;
-    var nGot = -1;
+    var nExp = PE.getExportSection(),
+        sPLVersion = String(),
+        nMinorVer = 0,
+        nGot = -1;
 
     for (var i = 0; i < verSig.length; ++i) {
         nGot = PE.findSignature(PE.section[nExp].FileOffset, PE.getSize(), verSig[i]);
@@ -51,7 +47,6 @@ function getPerlVersion() {
 
     if (nGot > 0) {
         var sRes = PE.getString(nGot, 12);
-        //_log(" >>debug: Got DLL-ver = " + sRes);
 
         sRes = sRes.match(/(5)_?(\d\d*)/);
 
@@ -62,9 +57,9 @@ function getPerlVersion() {
             return sPLVersion;
         }
 
-        // find 5.X.X or 5.xx.x
-        var sSign = nMinorVer > 9 ? "'5.' .. .. '.' .. " : "'5.' .. '.' ..";
-        var patchVer = findPatchVersion(sSign);
+        // find 5.X.X or 5.XX.X
+        var sSign = nMinorVer > 9 ? "'5.' .. .. '.' .. " : "'5.' .. '.' ..",
+            patchVer = findPatchVersion(sSign);
 
         if (patchVer > 0) sPLVersion += "." + patchVer;
     }
@@ -73,17 +68,15 @@ function getPerlVersion() {
 }
 
 function findPatchVersion(sSign) {
-    var nOffset = 0;
-    var nSize = PE.getSize();
-    var nPatchVer = 0;
-    var nGot = -1;
+    var nOffset = 0,
+        nSize = PE.getSize(),
+        nPatchVer = 0,
+        nGot = -1;
 
     // Traverse and find the max number
     while ((nGot = PE.findSignature(nOffset, nSize, sSign)) != -1) {
         var sRes = PE.getString(nGot, 12);
         nOffset = nGot + sRes.length;
-
-        //_log("  >>debug: Got patchVer = " + sRes);
 
         sRes = sRes.match(/5\.\d\d*\.(\d\d*)/);
         if (sRes && sRes[1] > nPatchVer) nPatchVer = sRes[1];
