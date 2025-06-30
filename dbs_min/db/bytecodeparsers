@@ -30,7 +30,7 @@ function isYM2151Reg(a) {
 }
 
 function YM2151RegStr(a, b) {
-    // from https://retrocdn.net/images/9/9c/YM2151_Application_Manual.pdf
+    //from https://retrocdn.net/images/9/9c/YM2151_Application_Manual.pdf
     // & https://cx5m.file-hunter.com/fmunit.htm - this one contains errors!
     if (!isYM2151Reg(a)) return '!bad#' + Hex(a);
     if (a == 1) if ((b & 2) == b) return 'LFOR'; else return 'TEST' + Bin(b);
@@ -40,7 +40,7 @@ function YM2151RegStr(a, b) {
     if (a == 0x12) return 'CLKA LSB freq' + Hex(b & 3);
     if (a == 0x13) return 'CLKB freq' + Hex(b);
     if (a == 0x14) return 'Clk CSM' + (b >> 7) + ' FResetBA' + Bin((b >> 4) & 3, 2)
-        + ' IRQEnBA' + Bin((b >> 2) & 3, 2) + ' LoadBA' + Bin(b & 3, 2); // 
+        + ' IRQEnBA' + Bin((b >> 2) & 3, 2) + ' LoadBA' + Bin(b & 3, 2); //
     if (a == 0x18) return 'LowOscFreq ' + Hex(b);
     if (a == 0x19) return ['Amp', 'Phase'][b >> 7] + 'Mod depth' + Hex(b & 0x7F);
     if (a == 0x1B) return 'LFOWave ctl' + (b >> 6) + ' ' + ['saw', 'sqr', 'tri', 'noise'][b & 3];
@@ -131,7 +131,7 @@ function isYM2612Reg(a) {
  * no custom data or end marker to be expected.
  */
 function parseMDGYM(p, len) {
-    // ref https://plutiedev.com/ym2612-registers
+    //ref https://plutiedev.com/ym2612-registers
     len = len || BCParseToReasonable; p = p || 0;
     var max = (len == BCParseToEoF) ? X.Sz() - 3 : Math.min(X.Sz() - 3, p + 0x2000),
         notes = 0, v = [0, 0, 0, 0],
@@ -187,7 +187,7 @@ function MUAP98CmdStr(ch, o, recurse) {
         case 0xEE: return C[ch] + (ch == 9 || ch == 10 ? 'Rhythm pan/vol ' : 'hard LFO AMD,PMD,AMon') + outArray(X.readBytes(o + 1, 2), 16);
         case 0xED: return C[ch] + (ch == 9 || ch == 10 ? 'x2 nop' : '3ch 4harm mode ' + outArray(X.readBytes(o + 1, 2), 16));
         case 0xEC: return C[ch] + 'key display mask on/off & colour ' + Hex(X.U8(o + 1));
-        case 0xEB: return C[ch] + (ch == 9 || ch == 10 ? 'PCM Tone ' : cht == 'ssg' ? 'mixer mode ' : 'tone ') + Hex(X.U8(p));
+        case 0xEB: return C[ch] + (ch == 9 || ch == 10 ? 'PCM Tone ' : cht == 'ssg' ? 'mixer mode ' : 'tone ') + Hex(X.U8(o));
         case 0xEA: return C[ch] + '@jump ' + Hex(o + X.I16(o + 1));
         case 0xE9: return C[ch] + '@call ' + Hex(o + X.I16(o + 1)) + ' ("' + MUAP98CmdStr(ch, o + X.I16(o + 1), recurse + 1) + '"...)';
         case 0xE8: return C[ch] + '@ret';
@@ -208,10 +208,10 @@ function MUAP98CmdStr(ch, o, recurse) {
         case 0xDB: return C[ch] + 'cmt: ' + Hex(X.U8(o + 1)) + ' ' + Hex(X.U8(o + 2)) + ': "' + X.SC(o + 4, X.U8(o + 3), 'SJIS') + '"';
         case 0xDA: return C[ch] + 'set X: ' + outArray(X.readBytes(o + 1, 3), 16);
         case 0xD9: return C[ch] + 'set LFO pars. ' + outArray(X.readBytes(o + 1, 6), 16);
-        case 0xD8: return C[ch] + 'LFO start(p,a)/stop ' + Hex(X.U8(o + 1)); break; // LFO start(pmd,amd)/stop
+        case 0xD8: return C[ch] + 'LFO start(p,a)/stop ' + Hex(X.U8(o + 1)); break; //LFO start(pmd,amd)/stop
         case 0xD7: return C[ch] + 'vol += ' + Hex(X.U8(o + 1));
         case 0xD6: return C[ch] + 'vol -= ' + Hex(X.U8(o + 1));
-        case 0xD5: return C[ch] + (ch == 9 || ch == 10 ? 'PCM play ' : cht == 'ssg' ? 'Start vol/Attack rate ' : 'x3 nop ') + X.U16(p);
+        case 0xD5: return C[ch] + (ch == 9 || ch == 10 ? 'PCM play ' : cht == 'ssg' ? 'Start vol/Attack rate ' : 'x3 nop ') + X.U16(o);
         case 0xD4: return C[ch] + (ch == 9 || ch == 10 ? 'PCM addr ' + X.U32(o + 1) : 'x5 nop');
         case 0xD3: var t = (X.U8(o + 1) & 0xF) - 6; return C[ch] + '@if ' + (t >= 0 ? 'x' + t : 'lpcnt') + ' ' + ifop[X.U8(o + 1) >> 4] + ' ' + X.U8(o + 2)
             + ' exit ' + Hex(o + 5 + X.U16(o + 3));
@@ -239,78 +239,75 @@ function parseMUAP98(p, len, ch) {
     while (p0 <= p && p < max && !stop) {
         if (ifd < 0) sus++;
         visited[p] = true; if (p > mp) mp = p;
-        // _log(Hex(p,4)+': '+MUAP98CmdStr(ch,p));
+        //_log(Hex(p,4)+': '+MUAP98CmdStr(ch,p));
         c = X.U8(p);
         if (c < 0x40) {
             if (c > 15 && cht == 'ssg') return re(p, '!badSSGnote');
-            if (!X.U8(p + 1)) ic++; // actually happens...
+            if (!X.U8(p + 1)) ic++; //actually happens...
             notes++; p += 2;
         }
         else if (c < 0xCE) return re(p, '!badcmd' + Hex(c));
         else switch (c) {
-            case 0xFF: p++; break; // keyoff and rest for note length
-            case 0xFE: lpd = 0; p++; break; // reset & restart
-            case 0xFD: p++; stop = true; break; // reset & stop playback
-            case 0xFC: stop = true; p++; if (mp < p) mp = p; break; // channel end playback
+            case 0xFF: p++; break; //keyoff and rest for note length
+            case 0xFE: lpd = 0; p++; break; //reset & restart
+            case 0xFD: p++; stop = true; break; //reset & stop playback
+            case 0xFC: stop = true; p++; if (mp < p) mp = p; break; //channel end playback
             case 0xFB: p++; break; /*wait on '*/
-            case 0xF9: if (ch != 9) notes++; p++; break; // FM/SSG: same frequency play; RHY/PCM: rhythm cmd end
-            case 0xF8: p += 4; break; // add frequency
+            case 0xF9: if (ch != 9) notes++; p++; break; //FM/SSG: same frequency play; RHY/PCM: rhythm cmd end
+            case 0xF8: p += 4; break; //add frequency
             case 0xF7: t = p - X.I16(p + 1); if (!isWithin(t, 0x18, max) || Math.abs(t - p) < 2) return re(p, 'loop@' + Hex(t));
-                if (!isWithin(t, p0, max)) sus++; p += 4; break; // loop N times
-            case 0xF6: p += 2; break; // pan
-            case 0xF5: if (!isWithin(X.U16(p + 1), 0x10, 0xFFF/*dox: C18 max*/)) return re(p, '!badtempo'); // Timer-A tempo
+                if (!isWithin(t, p0, max)) sus++; p += 4; break; //loop N times
+            case 0xF6: p += 2; break; //pan
+            case 0xF5: if (!isWithin(X.U16(p + 1), 0x10, 0xFFF/*dox: C18 max*/)) return re(p, '!badtempo'); //Timer-A tempo
                 p += 3; break;
-            case 0xF4: p += 3; break; // length/ratio change
-            case 0xF3: p++; break; // wait all channels: 小節位置を調整する。演奏しているチャネル全てにこのデータが来るまで待機する。
-            case 0xF2: p += 4; break; // RHY/PCM: DSP mode, level, delay; FM/SSG: a 4-byte nop
-            case 0xF1: p += 3; break; // set reg data
-            case 0xF0: // set system detune; RHY/PCM: Rhythm Key on
+            case 0xF4: p += 3; break; //length/ratio change
+            case 0xF3: p++; break; //wait all channels: 小節位置を調整する。演奏しているチャネル全てにこのデータが来るまで待機する。
+            case 0xF2: p += 4; break; //RHY/PCM: DSP mode, level, delay; FM/SSG: a 4-byte nop
+            case 0xF1: p += 3; break; //set reg data
+            case 0xF0: //set system detune; RHY/PCM: Rhythm Key on
                 if (ch == 9 || ch == 10) { notes++; if (!X.U8(p + 1)) re(p, 'RHY F0: 0') }
                 p += 2; break;
             case 0xDF/*slur*/: case 0xD2/*Play Stack +1*/: case 0xD1/*fade out*/: p++; break;
             case 0xFA: p += 9; break; // 3ch 4harm play; RHY/PCM: a 9-byte nop
-            case 0xEF: p += 2; break; // hard LFO speed; RHY/PCM: Rhythm Dump
-            case 0xEE: p += 3; break; // hard LFO AMD, PMD, AMon; RHY/PCM: set Rhythm pan/vol
-            case 0xED: p += 2; break; // 3ch 4harm mode; RHY/PCM: a 2-byte nop
-            case 0xEC: p += 2; break; // key display mask on/off & colour
-            case 0xEB: p += 2; break; // tone number change
-            case 0xEA: // @jump, @call
+            case 0xEF: p += 2; break; //hard LFO speed; RHY/PCM: Rhythm Dump
+            case 0xEE: p += 3; break; //hard LFO AMD, PMD, AMon; RHY/PCM: set Rhythm pan/vol
+            case 0xED: p += 2; break; //3ch 4harm mode; RHY/PCM: a 2-byte nop
+            case 0xEC: p += 2; break; //key display mask on/off & colour
+            case 0xEB: p += 2; break; //tone number change
+            case 0xEA: //@jump, @call
                 t = p + X.I16(p + 1); if (!isWithin(t, 0x18, max) || Math.abs(t - p) < 2) return re(p, '!' + MUAP98CmdStr(ch, p, 1));
                 if (t < p0) ic++; if (visited[t]) stop = true; p = t; break;
             case 0xE9:
                 t = p + X.I16(p + 1); if (!isWithin(t, 0x18, max) || Math.abs(t - p) < 2) return re(p, '!' + MUAP98CmdStr(ch, p, 1));
                 if (t < p0) ic++; calld++; p += 3; break;
-            case 0xE8: calld--; if (calld < 0) return re(p, '!RetW/oSub'); p++; break; // @ret
-            case 0xE7: p += 3; break; // Source Line symbolic information
+            case 0xE8: calld--; if (calld < 0) return re(p, '!RetW/oSub'); p++; break; //@ret
+            case 0xE7: p += 3; break; //Source Line symbolic information
             case 0xE6:
-                if (cht == 'fm') {
-
-                }
-                p += 27; break; // FM: set USR Tone parameter; SSG, RHY, PCM: a 27-byte nop
-            case 0xE5: p++; break; // Play Stack init
-            case 0xE4: case 0xE3: // if @jump, if @call
+			/* if(cht == 'fm') { TODO } */ p += 27; break; //FM: set USR Tone parameter; SSG, RHY, PCM: a 27-byte nop
+            case 0xE5: p++; break; //Play Stack init
+            case 0xE4: case 0xE3: //if @jump, if @call
                 t = p + 2 + X.I16(p + 3); if (!isWithin(t, 0x18, max) || Math.abs(t - p) < 2 || (X.U8(p + 1) >> 4) > 3) return re(p, '!' + MUAP98CmdStr(ch, p, 1));
                 if (t < p0) ic++;
                 if (c == 0xE3) calld++; if (c == 0xE4) { if (visited[t]) stop = true; p = t } else p += 5; break;
-            case 0xE2: p += 2; break; // change vol data
-            case 0xE1: p++; break; // tie
-            case 0xE0: lpd = 0; p++; break; // loop ctr clear
-            case 0xDE: p += 2; break; // change ratio only
-            case 0xDD: cmtlen = X.U8(p + 1); p += 2; break; // doesn't seem to be of any use...
-            case 0xDC: p += 4; break; // init Skip_data
+            case 0xE2: p += 2; break; //change vol data
+            case 0xE1: p++; break; //tie
+            case 0xE0: lpd = 0; p++; break; //loop ctr clear
+            case 0xDE: p += 2; break; //change ratio only
+            case 0xDD: cmtlen = X.U8(p + 1); p += 2; break; //doesn't seem to be of any use...
+            case 0xDC: p += 4; break; //init Skip_data
             case 0xDB: cmt = cmt.appendS(X.SC(p + 4, X.U8(p + 3), 'SJIS'), ' / '); p += X.U8(p + 3) + 4; break;
-            case 0xDA: p += 4; break; // set X Value
-            case 0xD9: p += 7; break; // set LFO parameters
-            case 0xD8: p += 2; break; // LFO start(pmd,amd)/stop
-            case 0xD7: case 0xD6: p += 2; break; // increase/decrease vol
-            case 0xD5: p += 3; if (ch == 9 || ch == 10) notes++; break; // SSG: Start vol/Attack rate; RHY/PCM: PCM play; FM: a 3-byte nop
-            case 0xD4: p += 5; break; // RHY/PCM: set PCM address; FM/SSG: a 5-byte nop
-            case 0xD3: p += 5; break; // @if... exit current loop
-            case 0xD0: re(p, 'ssg/pcm:' + Hex(X.U8(p + 1))); p += 2; break; // SSG||PCM mode
+            case 0xDA: p += 4; break; //set X Value
+            case 0xD9: p += 7; break; //set LFO parameters
+            case 0xD8: p += 2; break; //LFO start(pmd,amd)/stop
+            case 0xD7: case 0xD6: p += 2; break; //increase/decrease vol
+            case 0xD5: p += 3; if (ch == 9 || ch == 10) notes++; break; //SSG: Start vol/Attack rate; RHY/PCM: PCM play; FM: a 3-byte nop
+            case 0xD4: p += 5; break; //RHY/PCM: set PCM address; FM/SSG: a 5-byte nop
+            case 0xD3: p += 5; break; //@if... exit current loop
+            case 0xD0: re(p, 'ssg/pcm:' + Hex(X.U8(p + 1))); p += 2; break; //SSG||PCM mode
             case 0xCF:
                 ch = X.U8(p + 1); cht = (ch == 9) ? 'rhy' : ch == 10 ? 'pcm' : 3 <= ch && ch <= 5 ? 'ssg' : 'fm';
-                p += 2; break; // send channel change
-            case 0xCE: p++; break; // SSG:set last mixer mode, vol, env; RHY/PCM:set last tone/vol/pan (from before sfx)
+                p += 2; break; //send channel change
+            case 0xCE: p++; break; //SSG:set last mixer mode, vol, env; RHY/PCM:set last tone/vol/pan (from before sfx)
         }
     }
     return [notes, p, 0, cmt, mp, ic]
