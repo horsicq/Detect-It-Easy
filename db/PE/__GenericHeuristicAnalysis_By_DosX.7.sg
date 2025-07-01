@@ -21,15 +21,17 @@
 
 // Detect It Easy: detection rule file
 
-// =================== [ ABOUT ] ===================
-// This heuristic analysis will help identify
-// presence of obfuscation the or wrapper
-// tricks through advanced complex checks.
-// Static emulation, signature analysis,
-// smart checks and much more!
-// ================================================
+// =================== [ ABOUT ] ====================
+// This heuristic analysis helps detect the presence
+// of obfuscation, packers, licensing systems,
+// debugging information, file integrity issues,
+// or even potential malicious code using advanced
+// and complex checks. It includes pinpoint scanning,
+// intelligent inspections, signature-based analysis,
+// thorough file content evaluation, and much more!
+// ==================================================
 
-// ================== [ DONATE ] ==================
+// ================== [ DONATE ] ====================
 // Did you like my work? :D Thank you! But what
 // about donation? I'll be very grateful <3
 //
@@ -43,21 +45,19 @@
 //
 // >> USDT: TUVH7QkcZws78QMC3XyAwfuzxUbaeLnfAC
 //    TRC-20              5 USDT minimum
-// ================================================
+// ==================================================
 
-// ================= [ CONTACTS ] =================
+// ================= [ CONTACTS ] ===================
 // Author: DosX
 // E-Mail: collab@kay-software.ru
 // GitHub: https://github.com/DosX-dev
 // Telegram: @DosX_dev
-// ================================================
+// ==================================================
 // If I don't respond to email, message to Telegram
-// ================================================
+// ==================================================
 
-// For the script to work correctly, the following
-// official Detect It Easy components are required:
-// "language", "FASM", "RosASM", "SpASM", "FPC"
-// "PE\linker.6.sg", "Microsoft.6.sg"
+// For the script to work correctly, official
+// Detect It Easy components are recommended
 
 // Please do not read the code out loud unless you have exorcism skills
 
@@ -3304,6 +3304,12 @@ function getOptHeaderOffset() {
 
 
 
+function isCompilerDetected() {
+    return _getNumberOfResults("compiler") > 0 || _getNumberOfResults("~compiler") > 0;
+}
+
+
+
 function scanForLanguages_NET_and_Native() {
     log(logType.nothing, "Scanning to programming language has started!");
 
@@ -3351,13 +3357,6 @@ function scanForLanguages_NET_and_Native() {
 
 
 
-    var isCompilerDetected =
-        (
-            _getNumberOfResults("compiler") ||
-            _getNumberOfResults("~compiler")
-        );
-
-
 
     var isPpLibraryPresent = false,
         isCLibraryPresent = false;
@@ -3373,7 +3372,7 @@ function scanForLanguages_NET_and_Native() {
                 log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledFunction(functionName) + "\"");
 
 
-                if (!isCompilerDetected) {
+                if (!isCompilerDetected()) {
                     if (functionName[0] == '_') {
                         _setResult("~compiler", "MinGW", String(), String());
                     } else if (functionName[0] == '?') {
@@ -3412,7 +3411,7 @@ function scanForLanguages_NET_and_Native() {
 
     // Detect compilers by Rich signature
 
-    if (!isCompilerDetected && PE.isRichSignaturePresent()) {
+    if (!isCompilerDetected() && PE.isRichSignaturePresent()) {
         for (var j = 0; j < PE.getNumberOfRichIDs(); j++) {
             const
                 richId = PE.getRichID(j),
@@ -3425,6 +3424,30 @@ function scanForLanguages_NET_and_Native() {
                 break;
             } else if (richId === 0x0103) {
                 _setResult("~compiler", "MASM", String(), String());
+                break;
+            }
+        }
+    }
+
+
+
+
+    // Detect IL2CPP by sections (thanks to AyukiDev)
+
+    if (!isCompilerDetected()) {
+        const il2cppSections = [
+            ".text$mn",
+            ".rdata$zzzdbg",
+            ".rtc$IAA",
+            ".rtc$IZZ",
+            ".rtc$TAA",
+            ".rtc$TZZ"
+        ];
+
+        for (var i = 0; i < il2cppSections.length; i++) {
+            if (PE.isSectionNamePresent(il2cppSections[i])) {
+                _setResult("~compiler", "IL2CPP", String(), String());
+                _setLangByHeur("MSIL/C#");
                 break;
             }
         }
