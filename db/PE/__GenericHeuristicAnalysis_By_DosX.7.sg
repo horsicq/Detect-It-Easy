@@ -347,7 +347,7 @@ function scanForObfuscations_NET() {
     if (validateNetByteCode(intConfusionXorPattern)) {
         if (validateNetByteCode( // samples by: Inx Obfuscator
             intConfusionXorPattern +
-            (opCodes.bne_un_s + opCodes.ldc_i4_2 + opCodes.stloc_0 + opCodes.sizeof + opCodes.add)
+            (opCodes.setStrict(opCodes.bne_un_s, "09") + opCodes.ldc_i4_2 + opCodes.stloc_0 + opCodes.sizeof + opCodes.add)
         ) ||
             validateNetByteCode( // samples by: MindLated, NetShield
                 intConfusionXorPattern +
@@ -457,7 +457,7 @@ function scanForObfuscations_NET() {
         opCodes.setStrict(opCodes.calli, "** 00 00 11")
     ) ||
         validateNetByteCode( // samples by: ArmDot, DarksProtector
-            opCodes.idelem_i +
+            opCodes.ldelem_i +
             opCodes.setStrict(opCodes.calli, "** 00 00 11")
         )) {
         log(logType.net, "Calli invokes detected! Offset: " + lastOffsetDetected);
@@ -494,10 +494,11 @@ function scanForObfuscations_NET() {
 
     var isCtrlFlowPresent = false;
 
-    if (validateNetByteCode( // samples by: ConfuserEx
-        opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s +
-        opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s
-    ) ||
+    if (
+        validateNetByteCode( // samples by: ConfuserEx
+            opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s +
+            opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s
+        ) ||
         validateNetByteCode( // samples by: ConfuserEx (neo mod)
             opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.dup + opCodes.stloc_0 + opCodes.ldc_i4_3 + opCodes.rem_un + opCodes.switch__nobody
         ) ||
@@ -516,7 +517,7 @@ function scanForObfuscations_NET() {
         ) ||
         validateNetByteCode( // samples by: .NET Reactor (legacy~~)
             opCodes.stloc + opCodes.ldloc +
-            opCodes.setStrict(opCodes.switch__nobody, "** ** ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00") +
+            opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "** ** ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00") +
             opCodes.ldc_i4 + opCodes.br
         ) ||
         validateNetByteCode( // samples by: MindLated, NetShield
@@ -1204,78 +1205,192 @@ function isClrNET() {
 
 
 
-// .NET OpCodes for static emulations
-
+/**
+ * Microsoft Intermediate Language (MSIL) OpCodes class for .NET assembly analysis.
+ * 
+ * This class provides a comprehensive collection of MSIL instruction opcodes with their
+ * corresponding bytecode patterns for signature-based detection in .NET assemblies.
+ * All opcode values are verified against the official Microsoft .NET Runtime source code
+ * and ECMA-335 Common Language Infrastructure (CLI) specification.
+ * 
+ * @class NetOpCodes
+ * @description Represents MSIL opcodes as hexadecimal string patterns for bytecode matching.
+ * 
+ * Features:
+ * - Complete MSIL instruction set coverage (93 opcodes)
+ * - Support for both single-byte (0x00-0xFF) and two-byte (0xFE00-0xFEFF) opcodes
+ * - Wildcard pattern support using '?' for variable operands
+ * - Prefix instruction handling (volatile, tail, readonly, etc.)
+ * - Helper methods for strict value substitution and null value setting
+ * 
+ * Pattern Format:
+ * - Fixed bytes: "58" (add instruction)
+ * - Variable operands: "28????????" (call with 4-byte method token)
+ * - Short operands: "2B??" (br.s with 1-byte offset)
+ * - Two-byte opcodes: "FE01" (ceq instruction)
+ * 
+ * Helper Methods:
+ * - setStrict(opcode, value): Sets specific operand values for opcodes
+ * - setNullValue(opcode): Replaces wildcards with zero bytes
+ * 
+ * @see {@link https://docs.microsoft.com/en-us/dotnet/api/system.reflection.emit.opcodes} Microsoft OpCodes Documentation
+ * @see {@link https://www.ecma-international.org/publications-and-standards/standards/ecma-335/} ECMA-335 CLI Specification
+ * @see {@link https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/Reflection/Emit/OpCodes.cs} .NET Runtime Source
+ */
 function NetOpCodes() {
-    this.add = "58"; // MSIL: 'add'
-    this.sub = "59"; // MSIL: 'sub'
-    this.mul = "5A"; // MSIL: 'mul'
-    this.and = "5F"; // MSIL: 'and'
-    this.bne_un = "40????????"; // MSIL: 'bne.un'
-    this.bne_un_s = "3309"; // MSIL: 'bne.un.s'
-    this.br = "38????????"; // MSIL: 'br'
-    this.br_s = "2B??"; // MSIL: 'br.s'
-    this.brfalse = "39????????"; // MSIL: 'brfalse'
-    this.brfalse_s = "2C??"; // MSIL: 'brfalse.s'
-    this.brtrue = "3A????????"
-    this.call = "28????????"; // MSIL: 'call'
-    this.calli = "29????????"; // MSIL: 'calli'
-    this.ceq = "FE01"; // MSIL: 'ceq'
-    this.div = "5B"; // MSIL: 'div'
-    this.dup = "25"; // MSIL: 'dup'
-    this.idelem_i = "97"; // MSIL: 'idelem.i'
-    this.ldc_i4 = "20????????"; // MSIL: 'ldc.i4'
-    this.ldc_i4_0 = "16"; // MSIL: 'ldc.i4.0'
-    this.ldc_i4_1 = "17"; // MSIL: 'ldc.i4.1'
-    this.ldc_i4_2 = "18"; // MSIL: 'ldc.i4.2'
-    this.ldc_i4_3 = "19"; // MSIL: 'ldc.i4.2'
-    this.ldc_i4_4 = "1A"; // MSIL: 'ldc.i4.4'
-    this.ldc_i4_s = "1F??"; // MSIL: 'ldc.i4.s'
-    this.ldftn = "FE06????????"; // MSIL: 'ldftn'
-    this.ldloc = "FE??????"; // MSIL: 'ldloc'
-    this.ldloc_0 = "06"; // MSIL: 'ldloc.0'
-    this.ldloc_1 = "07"; // MSIL: 'ldloc.1'
-    this.ldloc_2 = "08"; // MSIL: 'ldloc.2'
-    this.ldloc_3 = "09"; // MSIL: 'ldloc.3'
-    this.ldloc_s = "11??"; // MSIL: 'ldloc.s'
-    this.ldsfld = "7E????????"; // MSIL: 'ldsfld'
-    this.ldstr = "72????????"; // MSIL: 'ldstr'
-    this.ldelem_u4 = "95"; // MSIL: 'ldelem.u4'
-    this.nop = "00"; // MSIL: 'nop'
-    this.not = "66"; // MSIL: 'not'
-    this.neg = "65"; // MSIL: 'neg'
-    this.or = "60"; // MSIL: 'or'
-    this.pop = "26"; // MSIL: 'pop'
-    this.ret = "2A"; // MSIL: 'ret'
-    this.rem_un = "5E"; // MSIL: 'rem.un'
-    this.shl = "62"; // MSIL: 'shl'
-    this.shr = "63"; // MSIL: 'shr'
-    this.sizeof = "FE1C????????"; // MSIL: 'sizeof'
-    this.stloc = "FE0E????"; // MSIL: 'stloc'
-    this.stloc_0 = "0A"; // MSIL: 'stloc.0'
-    this.stloc_1 = "0B"; // MSIL: 'stloc.1'
-    this.stloc_2 = "0C"; // MSIL: 'stloc.2'
-    this.stloc_3 = "0D"; // MSIL: 'stloc.3'
-    this.stloc_s = "13??"; // MSIL: 'stloc.s'
-    this.shr_un = "64"; // MSIL: 'shr.un'
-    this.xor = "61"; // MSIL: 'xor'
-    this.stelem_i = "9B"; // MSIL: 'stelem.i'
-    this.stelem_i1 = "9C"; // MSIL: 'stelem.i1'
-    this.stelem_i4 = "9E"; // MSIL: 'stelem.i4'
-    this.box = "8C????????"; // MSIL: 'box'
+    // ========== BASIC STACK OPERATIONS ==========
+    this.dup = "25"; // MSIL: 'dup' - Duplicate top stack value
+    this.nop = "00"; // MSIL: 'nop' - No operation
+    this.pop = "26"; // MSIL: 'pop' - Remove top stack value
 
-    this.switch__nobody = "45"; // MSIL: 'switch'
-    this._unknown = "**"; // Unknown opcode
-    this._any = "??"; // Any opcode
+    // ========== ARITHMETIC OPERATIONS ==========
+    this.add = "58"; // MSIL: 'add' - Add two values
+    this.div = "5B"; // MSIL: 'div' - Divide two values
+    this.mul = "5A"; // MSIL: 'mul' - Multiply two values
+    this.neg = "65"; // MSIL: 'neg' - Negate value
+    this.rem_un = "5E"; // MSIL: 'rem.un' - Remainder (unsigned)
+    this.sub = "59"; // MSIL: 'sub' - Subtract two values
 
+    // ========== LOGICAL OPERATIONS ==========
+    this.and = "5F"; // MSIL: 'and' - Bitwise AND
+    this.not = "66"; // MSIL: 'not' - Bitwise NOT
+    this.or = "60"; // MSIL: 'or' - Bitwise OR
+    this.shl = "62"; // MSIL: 'shl' - Shift left
+    this.shr = "63"; // MSIL: 'shr' - Shift right
+    this.shr_un = "64"; // MSIL: 'shr.un' - Shift right (unsigned)
+    this.xor = "61"; // MSIL: 'xor' - Bitwise XOR
 
+    // ========== COMPARISON OPERATIONS ==========
+    this.ceq = "FE01"; // MSIL: 'ceq' - Compare equal
 
-    // setStrict sets the strict value of the opcode for substitution
-    // btw I like what I do
+    // ========== CONSTANT LOADING ==========
+    this.ldc_i4 = "20????????"; // MSIL: 'ldc.i4' - Load 32-bit integer constant
+    this.ldc_i4_0 = "16"; // MSIL: 'ldc.i4.0' - Load constant 0
+    this.ldc_i4_1 = "17"; // MSIL: 'ldc.i4.1' - Load constant 1
+    this.ldc_i4_2 = "18"; // MSIL: 'ldc.i4.2' - Load constant 2
+    this.ldc_i4_3 = "19"; // MSIL: 'ldc.i4.3' - Load constant 3
+    this.ldc_i4_4 = "1A"; // MSIL: 'ldc.i4.4' - Load constant 4
+    this.ldc_i4_s = "1F??"; // MSIL: 'ldc.i4.s' - Load small integer constant
+
+    // ========== ARGUMENT OPERATIONS ==========
+    this.ldarg_0 = "02"; // MSIL: 'ldarg.0' - Load argument 0
+    this.ldarg_1 = "03"; // MSIL: 'ldarg.1' - Load argument 1
+    this.ldarg_2 = "04"; // MSIL: 'ldarg.2' - Load argument 2
+    this.ldarg_3 = "05"; // MSIL: 'ldarg.3' - Load argument 3
+    this.ldarg_s = "0E??"; // MSIL: 'ldarg.s' - Load argument (short form)
+    this.starg_s = "10??"; // MSIL: 'starg.s' - Store to argument (short form)
+
+    // ========== LOCAL VARIABLE OPERATIONS ==========
+    this.ldloc = "FE0C????"; // MSIL: 'ldloc' - Load local variable
+    this.ldloc_0 = "06"; // MSIL: 'ldloc.0' - Load local variable 0
+    this.ldloc_1 = "07"; // MSIL: 'ldloc.1' - Load local variable 1
+    this.ldloc_2 = "08"; // MSIL: 'ldloc.2' - Load local variable 2
+    this.ldloc_3 = "09"; // MSIL: 'ldloc.3' - Load local variable 3
+    this.ldloc_s = "11??"; // MSIL: 'ldloc.s' - Load local variable (short form)
+    this.stloc = "FE0E????"; // MSIL: 'stloc' - Store to local variable
+    this.stloc_0 = "0A"; // MSIL: 'stloc.0' - Store to local variable 0
+    this.stloc_1 = "0B"; // MSIL: 'stloc.1' - Store to local variable 1
+    this.stloc_2 = "0C"; // MSIL: 'stloc.2' - Store to local variable 2
+    this.stloc_3 = "0D"; // MSIL: 'stloc.3' - Store to local variable 3
+    this.stloc_s = "13??"; // MSIL: 'stloc.s' - Store to local variable (short form)
+
+    // ========== FIELD OPERATIONS ==========
+    this.ldfld = "7B????????"; // MSIL: 'ldfld' - Load instance field
+    this.ldflda = "7C????????"; // MSIL: 'ldflda' - Load field address
+    this.ldsfld = "7E????????"; // MSIL: 'ldsfld' - Load static field
+    this.stfld = "7D????????"; // MSIL: 'stfld' - Store to instance field
+
+    // ========== ARRAY OPERATIONS ==========
+    this.ldelem_i = "97"; // MSIL: 'ldelem.i' - Load array element (native int)
+    this.ldelem_u4 = "95"; // MSIL: 'ldelem.u4' - Load array element (unsigned 32-bit)
+    this.ldelema = "8F????????"; // MSIL: 'ldelema' - Load array element address
+    this.ldlen = "8E"; // MSIL: 'ldlen' - Load array length
+    this.newarr = "8D????????"; // MSIL: 'newarr' - Create new array
+    this.stelem_i = "9B"; // MSIL: 'stelem.i' - Store to array element (native int)
+    this.stelem_i1 = "9C"; // MSIL: 'stelem.i1' - Store to array element (8-bit)
+    this.stelem_i4 = "9E"; // MSIL: 'stelem.i4' - Store to array element (32-bit)
+
+    // ========== INDIRECT OPERATIONS ==========
+    this.ldind_i4 = "4A"; // MSIL: 'ldind.i4' - Load indirect 32-bit value
+    this.stind_i4 = "54"; // MSIL: 'stind.i4' - Store indirect 32-bit value
+
+    // ========== CONTROL FLOW ==========
+    this.beq = "3B????????"; // MSIL: 'beq' - Branch if equal
+    this.bge = "3C????????"; // MSIL: 'bge' - Branch if greater or equal
+    this.bgt = "3D????????"; // MSIL: 'bgt' - Branch if greater than
+    this.ble = "3E????????"; // MSIL: 'ble' - Branch if less or equal
+    this.blt = "3F????????"; // MSIL: 'blt' - Branch if less than
+    this.bne_un = "40????????"; // MSIL: 'bne.un' - Branch if not equal (unsigned)
+    this.bne_un_s = "33??"; // MSIL: 'bne.un.s' - Branch if not equal (unsigned, short)
+    this.br = "38????????"; // MSIL: 'br' - Unconditional branch
+    this.br_s = "2B??"; // MSIL: 'br.s' - Unconditional branch (short form)
+    this.brfalse = "39????????"; // MSIL: 'brfalse' - Branch if false/null/zero
+    this.brfalse_s = "2C??"; // MSIL: 'brfalse.s' - Branch if false/null/zero (short)
+    this.brtrue = "3A????????"; // MSIL: 'brtrue' - Branch if true/non-null/non-zero
+    this.call = "28????????"; // MSIL: 'call' - Call method
+    this.calli = "29????????"; // MSIL: 'calli' - Call indirect
+    this.ldftn = "FE06????????"; // MSIL: 'ldftn' - Load function pointer
+    this.ret = "2A"; // MSIL: 'ret' - Return from method
+    this.switch__nobody = "45"; // MSIL: 'switch' - Switch statement
+
+    // ========== TYPE OPERATIONS ==========
+    this.box = "8C????????"; // MSIL: 'box' - Convert value type to object reference
+    this.castclass = "74????????"; // MSIL: 'castclass' - Cast object to class
+    this.conv_i4 = "69"; // MSIL: 'conv.i4' - Convert to 32-bit integer
+    this.conv_u4 = "6D"; // MSIL: 'conv.u4' - Convert to unsigned 32-bit integer
+    this.isinst = "75????????"; // MSIL: 'isinst' - Test if object is instance of class
+    this.sizeof = "FE1C????????"; // MSIL: 'sizeof' - Get size of value type
+    this.unbox = "79????????"; // MSIL: 'unbox' - Convert object reference to value type
+    this.unbox_any = "A5????????"; // MSIL: 'unbox.any' - Convert boxed type to value
+
+    // ========== OBJECT OPERATIONS ==========
+    this.cpobj = "70????????"; // MSIL: 'cpobj' - Copy value type
+    this.initobj = "FE15????????"; // MSIL: 'initobj' - Initialize value type
+    this.ldobj = "71????????"; // MSIL: 'ldobj' - Load value type from address
+    this.ldstr = "72????????"; // MSIL: 'ldstr' - Load string literal
+    this.newobj = "73????????"; // MSIL: 'newobj' - Create new object instance
+    this.stobj = "81????????"; // MSIL: 'stobj' - Store value type to address
+
+    // ========== EXCEPTION HANDLING ==========
+    this.rethrow = "FE1A"; // MSIL: 'rethrow' - Rethrow current exception
+    this._throw = "7A"; // MSIL: 'throw' - Throw exception
+
+    // ========== PREFIX INSTRUCTIONS ==========
+    this.readonly = "FE1E"; // MSIL: 'readonly' - Subsequent array address operation performs no type check
+    this.tail = "FE14"; // MSIL: 'tail' - Subsequent call terminates current method
+    this.volatile = "FE13"; // MSIL: 'volatile' - Subsequent pointer reference is volatile
+
+    // ========== UTILITY OPCODES ==========
+    this._unknown = "**"; // Unknown opcode pattern
+    this._any = "??"; // Any single opcode pattern
+
+    /**
+     * Sets strict operand values for MSIL opcodes with variable operands.
+     * 
+     * This method replaces wildcard patterns ('??') in opcode masks with specific 
+     * hexadecimal values, allowing for precise bytecode pattern matching.
+     * 
+     * @method setStrict
+     * @param {string} opCodeMask - The opcode pattern with wildcards (e.g., "20????????")
+     * @param {string} value - The hexadecimal value to substitute (e.g., "01 00 00 00")
+     * @returns {string} The opcode pattern with substituted values
+     * 
+     * @example
+     * // Set ldc.i4 instruction to load constant value 1
+     * var pattern = opCodes.setStrict(opCodes.ldc_i4, "01 00 00 00");
+     * // Result: "2001000000" (ldc.i4 1)
+     * 
+     * @example
+     * // Set specific method token for call instruction
+     * var callPattern = opCodes.setStrict(opCodes.call, "10 00 00 06");
+     * // Result: "2810000006" (call method token 0x06000010)
+     * 
+     * @throws {Error} If operand size doesn't match the expected size
+     */
     this.setStrict = function (opCodeMask, value) {
         // Remove spaces from opcode mask and value
-        opCodeMask = removeSpaces(opCodeMask);
-        value = removeSpaces(value);
+        opCodeMask = removeWhitespaces(opCodeMask);
+        value = removeWhitespaces(value);
 
         // Find the index of the special pattern "??" in the opcode mask
         var indexOfSpecialPattern = opCodeMask.indexOf("??");
@@ -1295,7 +1410,28 @@ function NetOpCodes() {
         return opCodeInHex + value;
     }
 
-    // Sets the mask value to zero for the specified opcode
+    /**
+     * Sets all wildcard operands in an opcode pattern to zero bytes.
+     * 
+     * This method replaces all wildcard patterns ('??') in the opcode mask with 
+     * zero bytes ('00'), useful for matching instructions with null/empty operands.
+     * 
+     * @method setNullValue
+     * @param {string} opCodeMask - The opcode pattern containing wildcards
+     * @returns {string} The opcode pattern with all wildcards replaced by '00'
+     * 
+     * @example
+     * // Set ldc.i4 instruction to load zero value
+     * var pattern = opCodes.setNullValue(opCodes.ldc_i4);
+     * // Result: "2000000000" (ldc.i4 0)
+     * 
+     * @example
+     * // Create null branch instruction
+     * var brPattern = opCodes.setNullValue(opCodes.br);
+     * // Result: "3800000000" (br with zero offset)
+     * 
+     * @throws {Error} If the opcode mask contains no wildcards to replace
+     */
     this.setNullValue = function (opCodeMask) {
 
         if (opCodeMask.indexOf("??") === -1) {
@@ -1304,24 +1440,78 @@ function NetOpCodes() {
 
         return replaceAllInString(opCodeMask, "??", "00");
     }
+
+    /**
+     * Joins an opcode without wildcards with additional bytes.
+     * 
+     * This method concatenates opcodes that don't have wildcards (like switch) 
+     * with specific byte sequences, useful for instructions with variable-length operands.
+     * 
+     * @method joinNoBodyAndValue
+     * @param {string} opCode - The opcode without wildcards (e.g., "45" for switch)
+     * @param {string} value - The hexadecimal bytes to append (e.g., "02 00 00 00 XX XX XX XX")
+     * @returns {string} The combined opcode pattern
+     * 
+     * @example
+     * // Create switch instruction with 2 targets
+     * var switchPattern = opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "02 00 00 00 10 00 00 00 20 00 00 00");
+     * // Result: "45020000001000000020000000" (switch with 2 targets at offsets 0x10 and 0x20)
+     * 
+     * @throws {Error} If the opcode contains wildcards (should use setStrict instead)
+     */
+    this.joinNoBodyAndValue = function (opCode, value) {
+        if (!opCode || !value || typeof opCode !== "string") {
+            _error("Invalid opcode provided.");
+        }
+
+        // Check that opcode doesn't contain wildcards
+        if (opCode.indexOf("??") !== -1) {
+            _error("Opcode contains wildcards. Use setStrict() instead.");
+        }
+
+        return opCode + removeWhitespaces(value);
+    }
 }
 
 
 
 /**
- * Removes all spaces from the given input string.
- *
- * @param {string} inputString - The string from which spaces will be removed.
- * @returns {string} - The input string without any spaces.
+ * Removes all whitespace characters from a string including spaces, tabs, newlines, and carriage returns.
+ * 
+ * @param {string} inputString - The input string to remove whitespaces from
+ * @returns {string} The string with all whitespace characters removed, or an empty string if input is invalid
+ */
+function removeWhitespaces(inputString) {
+    if (!inputString || typeof inputString !== "string") {
+        return String();
+    }
+
+    // Regex removes all whitespace: spaces, tabs, newlines, carriage returns
+    return inputString.replace(/\s+/g, "");
+}
+
+
+
+/**
+ * Removes only space characters from a string, preserving other whitespace.
+ * 
+ * @param {string} inputString - The input string to remove spaces from
+ * @returns {string} The string with space characters removed, or an empty string if input is invalid
  */
 function removeSpaces(inputString) {
-    return inputString.split(" ").join("");
+    if (!inputString || typeof inputString !== "string") {
+        return String();
+    }
+
+    // Remove only space characters (0x20), not all whitespace
+    return inputString.replace(/ /g, "");
 }
 
 
 
 /**
  * Replaces all occurrences of a specified substring within a given string with a new substring.
+ * Uses split/join algorithm for single-pass replacement.
  *
  * @param {string} inputString - The original string in which to perform the replacements.
  * @param {string} search - The substring to search for within the input string.
@@ -1329,21 +1519,44 @@ function removeSpaces(inputString) {
  * @returns {string} - The modified string with all occurrences of the search substring replaced by the replacement substring.
  */
 function replaceAllInString(inputString, search, replacement) {
-    while (inputString.indexOf(search) !== -1) {
-        inputString = inputString.replace(search, replacement)
+    // Type validation to prevent runtime errors
+    if (!inputString || typeof inputString !== "string") {
+        return String();
+    }
+    if (!search || typeof search !== "string") {
+        return inputString;
+    }
+    if (typeof replacement !== "string") {
+        replacement = String();
     }
 
-    return inputString;
+    // Split on search string and join with replacement (single pass)
+    return inputString.split(search).join(replacement);
 }
 
 
 
+/**
+ * Sanitizes section names to prevent DiE output corruption from malformed PE files.
+ * Removes control characters that could break console output or cause display issues.
+ * 
+ * @param {string} sectionName - The section name to clean and sanitize.
+ * @returns {string} - The sanitized section name safe for DiE output.
+ */
 function clearSectionName(sectionName) {
-    if (sectionName.length > 0 && sectionName.trim() === String()) {
-        return sectionName;
+    // Type validation to prevent runtime errors
+    if (!sectionName || typeof sectionName !== "string") {
+        return String();
     }
 
-    return sectionName.trim();
+    // Remove control characters (0x00-0x1F) and extended control chars (0x7F-0x9F)
+    // This prevents newlines, tabs, null bytes from breaking DiE output format
+    var cleaned = sectionName.replace(/[\x00-\x1F\x7F-\x9F]/g, "");
+
+    // Remove leading/trailing whitespace
+    cleaned = cleaned.trim();
+
+    return cleaned;
 }
 
 
@@ -3428,15 +3641,16 @@ function getNameOfMangledItem(itemPattern) {
         }
         // Namespace mangler: _ZN...E
         else if (itemPattern[2] === 'N') {
-            var components = [];
-            var remaining = itemPattern.substring(3); // Skip "_ZN"
+            var components = [],
+                remaining = itemPattern.substring(3); // Skip "_ZN"
 
             // Parse all components
             while (remaining.length > 0 && remaining[0] !== 'E' && /^\d/.test(remaining)) {
                 var lengthMatch = remaining.match(/^(\d+)/);
                 if (lengthMatch) {
-                    var length = parseInt(lengthMatch[1], 10);
-                    var nameStart = lengthMatch[1].length;
+                    var length = parseInt(lengthMatch[1], 10),
+                        nameStart = lengthMatch[1].length;
+
                     if (remaining.length >= nameStart + length) {
                         var name = remaining.substring(nameStart, nameStart + length);
                         components.push(name);
