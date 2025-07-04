@@ -3286,18 +3286,25 @@ function getFirstEpAsmOpCode() {
 /**
  * Checks if an item pattern appears to be a mangled symbol name.
  * 
- * Detects common C++ name mangling patterns used by different compilers:
- * - MSVC++ mangler: starts with '?' and contains "@@" or has double '?'
- * - GNU C++ mangler: starts with "_Z"
- * 
  * @param {string} itemPattern - The pattern string to check for mangling
  * @returns {boolean} True if the pattern appears to be a mangled symbol, false otherwise
  */
 function isItemMangled(itemPattern) {
-    return itemPattern.length > 5 && (
-        (itemPattern[0] === '?' && (itemPattern.indexOf("@@") !== -1 || itemPattern[1] === '?')) || // MSVCPP mangler
-        (itemPattern.substring(0, 2) === "_Z") // GNUCPP mangler
-    );
+    // Check if the pattern is too short to be mangled
+    if (itemPattern.length <= 5) {
+        return false;
+    }
+
+    // MSVC mangling: starts with '?' and contains "@@" or has double '?'
+    if (itemPattern[0] === '?' && (itemPattern.indexOf("@@") !== -1 || itemPattern[1] === '?')) {
+        return true;
+    } else if (itemPattern.substring(0, 2) === "_Z") { // GNU mangling: starts with "_Z"
+        return true;
+    } else if (itemPattern[0] === '@' && itemPattern.indexOf('$') !== -1) { // Borland C++ mangling: starts with '@' and contains '$'
+        return true;
+    }
+
+    return false;
 }
 
 
@@ -3323,6 +3330,12 @@ function isItemMangled(itemPattern) {
  * getNameOfMangledItem('_Z9myFunctionv') // returns 'myFunction'
  * getNameOfMangledItem('_ZSt4cout') // returns 'cout'
  * getNameOfMangledItem('_ZN3std4cout') // returns 'cout'
+ * 
+ * @example
+ * // Borland examples
+ * getNameOfMangledItem('@func$qi') // returns 'func'
+ * getNameOfMangledItem('@Class@method$qpc') // returns 'method'
+ * getNameOfMangledItem('@Class@$bctr$qi') // returns 'Class' (constructor)
  */
 function getNameOfMangledItem(itemPattern) {
     if (!isItemMangled(itemPattern)) {
@@ -3448,6 +3461,34 @@ function getNameOfMangledItem(itemPattern) {
                 var funcNameLength = parseInt(regularMatch[1], 10);
                 return regularMatch[2].substring(0, funcNameLength);
             }
+        }
+    }
+
+    // Borland C++ mangled names start with '@'
+    if (itemPattern[0] === '@') {
+        var parts = itemPattern.split('@');
+
+        // Simple function: @func$qi
+        if (parts.length === 2) {
+            return parts[1].split('$')[0];
+        }
+
+        // Class method: @Class@method$qpc
+        if (parts.length >= 3) {
+            var methodName = parts[2].split('$')[0];
+
+            // Constructor: @Class@$bctr$...
+            if (methodName === '$bctr') {
+                return parts[1]; // Return class name
+            }
+
+            // Destructor: @Class@$bdtr$...
+            if (methodName === '$bdtr') {
+                return '~' + parts[1]; // Return destructor name
+            }
+
+            // Regular method
+            return methodName;
         }
     }
 
