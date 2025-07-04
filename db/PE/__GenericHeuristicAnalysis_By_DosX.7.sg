@@ -2970,6 +2970,70 @@ function scanForObfuscations_Native() {
 
 
 
+
+    // Check for "Address to stack trick" (CALL $+5)
+
+    var isAddrToStackTrickPresent = false;
+
+    // Check first 30 instructions for "Address to stack trick"
+    // This trick uses "CALL $+5" (E8 00 00 00 00) to push next instruction address on stack
+    if (!PE.isDll()) {
+        for (var i = 0; i < 30; i++) {
+            var asmInstruction = getAsmInstructionByIndex(i);
+
+            if (!asmInstruction) break; // Safety check
+
+            // Check if instruction is CALL
+            if (getAsmOpCode(asmInstruction) === "CALL") {
+                // Get address and offset for this instruction
+                var disasmAddress = PE.getAddressOfEntryPoint();
+
+                for (var j = 0; j < i; j++) {
+                    disasmAddress = PE.getDisasmNextAddress(disasmAddress);
+                }
+
+                var currentOffset = PE.VAToOffset(disasmAddress);
+
+                // Check if machine code matches E8 00 00 00 00 pattern
+                if (PE.compare("E8 00 00 00 00", currentOffset)) {
+                    log(logType.any, "Address to stack trick found at offset: 0x" + currentOffset.toString(16));
+                    isAddrToStackTrickPresent = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (isAddrToStackTrickPresent) options += (options.length != 0 ? " + " : String()) + "Address to stack near EP";
+
+
+
+
+    // Check for CPUID at entry point
+
+    var isCpuidAtEpPresent = false;
+
+    // Check first 15 instructions for CPUID instruction
+    if (!PE.isDll()) {
+        for (var i = 0; i < 15; i++) {
+            var asmInstruction = getAsmInstructionByIndex(i);
+
+            if (!asmInstruction) break; // Safety check
+
+            // Check if instruction is CPUID
+            if (getAsmOpCode(asmInstruction) === "CPUID") {
+                log(logType.any, "CPUID at EP found at instruction index: " + i);
+                isCpuidAtEpPresent = true;
+                break;
+            }
+        }
+    }
+
+    if (isCpuidAtEpPresent) options += (options.length != 0 ? " + " : String()) + "CPUID at EP";
+
+
+
+
     // A lot of bugs! Todo.
     /*
         // Example:
@@ -3220,74 +3284,174 @@ function getFirstEpAsmOpCode() {
 
 
 /**
- * Checks if a given function name pattern is mangled.
- *
- * This function determines if a function name pattern is mangled by checking
- * specific characteristics of the pattern. It supports detection for both
- * Microsoft Visual C++ (MSVCPP) and GNU C++ (GNUCPP) mangled names.
- *
- * Examples:
- * - MSVCPP: ??0_Lockit@std@@QEAA@H@Z
- * - GNUCPP: _ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_i
+ * Checks if an item pattern appears to be a mangled symbol name.
  * 
- * @param {string} functionPattern - The function name pattern to check.
- * @returns {boolean} - Returns true if the function name pattern is mangled, otherwise false.
+ * Detects common C++ name mangling patterns used by different compilers:
+ * - MSVC++ mangler: starts with '?' and contains "@@" or has double '?'
+ * - GNU C++ mangler: starts with "_Z"
+ * 
+ * @param {string} itemPattern - The pattern string to check for mangling
+ * @returns {boolean} True if the pattern appears to be a mangled symbol, false otherwise
  */
-function isFunctionMangled(functionPattern) {
-    return functionPattern.length > 5 && (
-        (functionPattern[0] == '?' && functionPattern.indexOf("@@") !== -1) || // MSVCPP mangler
-        (functionPattern.substring(0, 4) == "_ZSt") // GNUCPP mangler
+function isItemMangled(itemPattern) {
+    return itemPattern.length > 5 && (
+        (itemPattern[0] === '?' && (itemPattern.indexOf("@@") !== -1 || itemPattern[1] === '?')) || // MSVCPP mangler
+        (itemPattern.substring(0, 2) === "_Z") // GNUCPP mangler
     );
 }
 
 
 
 /**
- * Extracts the name of a mangled function from a given function pattern.
- *
- * @param {string} functionPattern - The mangled function pattern to analyze.
- * @returns {string} - The extracted function name if the pattern is recognized as mangled, otherwise returns the original pattern.
+ * Extracts the unmangled name from a mangled C++ symbol.
+ * 
+ * This function handles both Microsoft Visual C++ (MSVC) and GNU C++ (GCC) name mangling schemes:
+ * - MSVC mangled names start with '?' and include patterns for functions, constructors, destructors, operators, and templates
+ * - GCC mangled names start with '_Z' and include patterns for STL functions, namespaced functions, and regular functions
+ * 
+ * @param {string} itemPattern - The mangled symbol name to decode
+ * @returns {string} The unmangled function/symbol name, or the original pattern if it's not mangled or cannot be decoded
+ * 
+ * @example
+ * // MSVC examples
+ * getNameOfMangledItem('?myFunction@@YAXXZ') // returns 'myFunction'
+ * getNameOfMangledItem('??0MyClass@@QAE@XZ') // returns 'MyClass' (constructor)
+ * getNameOfMangledItem('??$myTemplate@H@@YAXXZ') // returns 'myTemplate'
+ * 
+ * @example
+ * // GCC examples
+ * getNameOfMangledItem('_Z9myFunctionv') // returns 'myFunction'
+ * getNameOfMangledItem('_ZSt4cout') // returns 'cout'
+ * getNameOfMangledItem('_ZN3std4cout') // returns 'cout'
  */
-function getNameOfMangledFunction(functionPattern) {
-    if (isFunctionMangled(functionPattern)) {
-        if (functionPattern[0] === '?' && functionPattern[1] !== '?') {
+function getNameOfMangledItem(itemPattern) {
+    if (!isItemMangled(itemPattern)) {
+        return itemPattern;
+    }
 
-            // MSVCPP mangler (e.g., ??0_Lockit@std@@QEAA@H@Z)
-            return functionPattern.split("?")[1].split("@")[0];
+    // MSVCPP mangled names start with '?'
+    if (itemPattern[0] === '?') {
+        // Regular function: ?myFunction@@YAXXZ
+        if (itemPattern[1] !== '?') {
+            return itemPattern.split("?")[1].split("@")[0];
+        }
 
-        } else if (functionPattern[0] === '?' && functionPattern[1] === '?' && functionPattern[3] === '?' && functionPattern[4] === '$') {
+        // Handle all ?? patterns
+        if (itemPattern[1] === '?') {
+            var parts, nameWithPrefix;
 
-            // MSVCPP mangler (e.g., ??1?$basic_streambuf@DU?$char_traits@D@std@@@std@@UEAA@XZ)
-            return functionPattern.split("$")[1].split("@")[0];
-
-        } else if (functionPattern[0] === '?' && functionPattern[1] === '?' && functionPattern[2] === '_') {
-            // MSVCPP mangler (e.g., ??_7_Facet_base@std@@6B@)
-            var functionName = functionPattern.split("?")[2].split("@")[0];
-
-            functionName = functionName.substring(2, functionName.length);
-            return functionName;
-
-        } else if (functionPattern[0] === '?' && functionPattern[1] === '?') {
-
-            // MSVCPP mangler
-            var functionName = functionPattern.split("?")[2].split("@")[0];
-            functionName = functionName.substring(1, functionName.length); // first char is a number
-            return functionName;
-
-        } else if (functionPattern[0] === '_') {
-
-            // GNUCPP mangler (e.g., _ZSt12functionName)
-            var match = functionPattern.match(/_ZSt(\d+)(\w+)/);
-            if (match) {
-                return match[2].substring(0, parseInt(match[1], 10));
-            } else {
-                return functionPattern;
+            // Simple template: ??$myTemplate@H@@YAXXZ
+            if (itemPattern[2] === '$') {
+                return itemPattern.split("$")[1].split("@")[0];
             }
 
+            // Complex template: ??0?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@QAE@XZ
+            if (itemPattern.indexOf('?$') !== -1) {
+                var complexMatch = itemPattern.match(/\?\?\d\?\$([^@]+)@/);
+
+                if (complexMatch) {
+                    return complexMatch[1];
+                }
+            }
+
+            // Special mangler: ??_7MyClass@@6B@, ??_EMyClass@@QAEPAXI@Z
+            if (itemPattern[2] === '_') {
+                parts = itemPattern.split("?");
+                if (parts.length >= 3) {
+                    nameWithPrefix = parts[2].split("@")[0];
+                    // For _E, _G, _R patterns, return the full name
+                    if (nameWithPrefix.length > 1 && /[EGR]/.test(nameWithPrefix[1])) {
+                        return nameWithPrefix;
+                    }
+
+                    // For _7 and other patterns, remove underscore and digit
+                    var nameAfterUnderscore = nameWithPrefix.substring(2);
+
+                    return nameAfterUnderscore.indexOf('_') === 0 ? nameAfterUnderscore.substring(1) : nameAfterUnderscore;
+                }
+            }
+
+            // Constructor/destructor/operators: ??0MyClass@@QAE@XZ, ??1MyClass@@QAE@XZ, ??2@YAPAXI@Z
+            if (/[0-9A-D]/.test(itemPattern[2])) {
+                parts = itemPattern.split("?");
+                if (parts.length >= 3) {
+                    nameWithPrefix = parts[2].split("@")[0];
+
+                    // Global operator (single character)
+                    if (nameWithPrefix.length === 1 && /[0-9A-D]/.test(nameWithPrefix[0])) {
+                        var operatorNames = {
+                            '2': 'operator_new', '3': 'operator_delete', '4': 'operator_assign',
+                            '5': 'operator_shift_left', '6': 'operator_shift_right', '8': 'operator_equal',
+                            '9': 'operator_not_equal', 'A': 'operator_subscript', 'B': 'operator_not',
+                            'C': 'operator_cast', 'D': 'operator_cast_const'
+                        };
+
+                        return operatorNames[nameWithPrefix[0]] || 'operator_unknown';
+                    }
+
+                    // Class functions - remove first character
+                    return nameWithPrefix.substring(1);
+                }
+            }
+
+            // Fallback
+            parts = itemPattern.split("?");
+            if (parts.length >= 3) {
+                var name = parts[2].split("@")[0];
+
+                return (name.length > 0 && /[0-9A-D]/.test(name[0])) ? name.substring(1) : name;
+            }
         }
-    } else {
-        return functionPattern;
     }
+
+    // GNUCPP mangled names start with '_Z'
+    if (itemPattern.substring(0, 2) === "_Z") {
+        // STL mangler: _ZSt4cout, _ZSt3minIiET_RKS0_S2_
+        if (itemPattern[2] === 'S' && itemPattern[3] === 't') {
+            var stlMatch = itemPattern.match(/_ZSt(\d+)(.+)/);
+            if (stlMatch) {
+                return stlMatch[2].substring(0, parseInt(stlMatch[1], 10));
+            }
+        }
+        // Namespace mangler: _ZN...E
+        else if (itemPattern[2] === 'N') {
+            var components = [];
+            var remaining = itemPattern.substring(3); // Skip "_ZN"
+
+            // Parse all components
+            while (remaining.length > 0 && remaining[0] !== 'E' && /^\d/.test(remaining)) {
+                var lengthMatch = remaining.match(/^(\d+)/);
+                if (lengthMatch) {
+                    var length = parseInt(lengthMatch[1], 10);
+                    var nameStart = lengthMatch[1].length;
+                    if (remaining.length >= nameStart + length) {
+                        var name = remaining.substring(nameStart, nameStart + length);
+                        components.push(name);
+                        remaining = remaining.substring(nameStart + length);
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            // Return the last component (function name)
+            if (components.length > 0) {
+                return components[components.length - 1];
+            }
+        }
+        // Regular mangler: _Z9myFunctionv, _Z3fooi
+        else {
+            var regularMatch = itemPattern.match(/_Z(\d+)(.+)/);
+            if (regularMatch) {
+                var funcNameLength = parseInt(regularMatch[1], 10);
+                return regularMatch[2].substring(0, funcNameLength);
+            }
+        }
+    }
+
+    return itemPattern;
 }
 
 
@@ -3374,12 +3538,22 @@ function getOptHeaderOffset() {
 
 
 
+/**
+ * Checks if a compiler has been detected in the analysis results.
+ * 
+ * @returns {boolean} Returns true if any compiler or compiler-related results are found, false otherwise.
+ */
 function isCompilerDetected() {
     return _getNumberOfResults("compiler") > 0 || _getNumberOfResults("~compiler") > 0;
 }
 
 
 
+/**
+ * Checks if a linker has been detected in the analysis results.
+ * 
+ * @returns {boolean} Returns true if any linker or linker-related results are found, false otherwise.
+ */
 function isLinkerDetected() {
     return _getNumberOfResults("linker") > 0 || _getNumberOfResults("~linker") > 0;
 }
@@ -3445,8 +3619,8 @@ function scanForLanguages_NET_and_Native() {
         for (var k = 0; k < PE.getNumberOfImportThunks(i) && !isPpLibraryPresent; k++) {
             const functionName = PE.getImportFunctionName(i, k); // import, thunk
 
-            if (isFunctionMangled(functionName)) {
-                log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledFunction(functionName) + "\"");
+            if (isItemMangled(functionName)) {
+                log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledItem(functionName) + "\"");
 
 
                 if (!isCompilerDetected()) {
