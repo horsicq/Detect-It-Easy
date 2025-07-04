@@ -517,7 +517,7 @@ function scanForObfuscations_NET() {
         ) ||
         validateNetByteCode( // samples by: .NET Reactor (legacy~~)
             opCodes.stloc + opCodes.ldloc +
-            opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "** ** ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00") +
+            opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "** ** ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00", "switch__nobody") +
             opCodes.ldc_i4 + opCodes.br
         ) ||
         validateNetByteCode( // samples by: MindLated, NetShield
@@ -1450,23 +1450,36 @@ function NetOpCodes() {
      * @method joinNoBodyAndValue
      * @param {string} opCode - The opcode without wildcards (e.g., "45" for switch)
      * @param {string} value - The hexadecimal bytes to append (e.g., "02 00 00 00 XX XX XX XX")
+     * @param {string} [opCodeName] - Optional: name of the opcode variable for validation
      * @returns {string} The combined opcode pattern
      * 
      * @example
      * // Create switch instruction with 2 targets
-     * var switchPattern = opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "02 00 00 00 10 00 00 00 20 00 00 00");
+     * var switchPattern = opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "02 00 00 00 10 00 00 00 20 00 00 00", "switch__nobody");
      * // Result: "45020000001000000020000000" (switch with 2 targets at offsets 0x10 and 0x20)
      * 
      * @throws {Error} If the opcode contains wildcards (should use setStrict instead)
+     * @throws {Error} If opCodeName is provided but doesn't contain '__nobody'
      */
-    this.joinNoBodyAndValue = function (opCode, value) {
-        if (!opCode || !value || typeof opCode !== "string") {
+    this.joinNoBodyAndValue = function (opCode, value, opCodeName) {
+        // Type validation
+        if (!opCode || typeof opCode !== "string") {
             _error("Invalid opcode provided.");
+        }
+        if (!value || typeof value !== "string") {
+            _error("Invalid value provided.");
         }
 
         // Check that opcode doesn't contain wildcards
         if (opCode.indexOf("??") !== -1) {
             _error("Opcode contains wildcards. Use setStrict() instead.");
+        }
+
+        // Optional validation: check if opcode name contains '__nobody'
+        if (opCodeName && typeof opCodeName === "string") {
+            if (opCodeName.indexOf("__nobody") === -1) {
+                _error("joinNoBodyAndValue should only be used with '__nobody' opcodes (variable-length instructions).");
+            }
         }
 
         return opCode + removeWhitespaces(value);
