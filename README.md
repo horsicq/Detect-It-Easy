@@ -63,7 +63,8 @@ Unknown formats undergo heuristic analysis, providing identification for both kn
 
 ### 📦 Install via Package Managers
 
--   **Windows**: [Chocolatey](https://community.chocolatey.org/packages/die)
+-   **Windows**:    [Chocolatey](https://community.chocolatey.org/packages/die)
+                    [Microsoft store](https://apps.microsoft.com/detail/9nq58d7ghb2x)
 -   **Linux**:
 
     -   **Parrot OS**: Package name `detect-it-easy`
