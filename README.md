@@ -63,7 +63,8 @@ Unknown formats undergo heuristic analysis, providing identification for both kn
 
 ### 📦 Install via Package Managers
 
--   **Windows**: [Chocolatey](https://community.chocolatey.org/packages/die)
+-   **Windows**: [Chocolatey](https://community.chocolatey.org/packages/die) / [Microsoft Store](https://apps.microsoft.com/detail/9nq58d7ghb2x?hl=en-us&gl=AU&ocid=pdpshare)
+
 -   **Linux**:
 
     -   **Parrot OS**: Package name `detect-it-easy`
@@ -72,8 +73,6 @@ Unknown formats undergo heuristic analysis, providing identification for both kn
     -   **REMnux**: Malware analysis distribution
 
     [![Packaging status](https://repology.org/badge/vertical-allrepos/detect-it-easy.svg)](https://repology.org/project/detect-it-easy/versions)
-
-    **Windows**: [Microsoft Store](https://apps.microsoft.com/detail/9nq58d7ghb2x?hl=en-us&gl=AU&ocid=pdpshare)
 
 > [!NOTE]
 > Use **Detect It Easy** bot via **Telegram** to quickly check files: [**@detectiteasy_bot**](https://t.me/detectiteasy_bot)
