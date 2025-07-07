@@ -4,27 +4,30 @@
 init("sfx", "Microsoft Cabinet");
 
 function detect() {
+    var overlayOffset = PE.getOverlayOffset();
+
     if (PE.compareOverlay("'wextract'", 16)) {
         // The version is probably for what's being installed, not what's doing
         // the installing; it does seem, though, the raw product version is for
-        // the installer itself.  Take a punt, anyway.
-        var nOffset = PE.getOverlayOffset();
-        nOffset = PE.findSignature(nOffset - 0xE00, 0xE00, "BD04EFFE00000100");
-        if (nOffset != -1) {
-            nOffset += 16;
-            sVersion = PE.readWord(nOffset + 2) + "." + PE.readWord(nOffset) + "." +
-                PE.readWord(nOffset + 6) + "." + PE.readWord(nOffset + 4);
+        // the installer itself. Take a punt, anyway.
+        overlayOffset = PE.findSignature(overlayOffset - 0xE00, 0xE00, "BD04EFFE00000100");
+
+        if (overlayOffset !== -1) {
+            overlayOffset += 16;
+            sVersion = PE.readWord(overlayOffset + 2) + "." + PE.readWord(overlayOffset) + "." +
+                PE.readWord(overlayOffset + 6) + "." + PE.readWord(overlayOffset + 4);
         }
         bDetected = true;
     } else if (/sfxcab/.test(PE.getManifest())) {
         // There's two version resources, locate the second.
         if (PE.section[".rsrc"]) {
-            var nOffset = PE.section[".rsrc"].FileOffset + PE.section[".rsrc"].VirtualSize;
-            nOffset = PE.findSignature(nOffset - 0x600, 0x600, "BD04EFFE00000100");
-            if (nOffset != -1) {
-                nOffset += 8;
-                sVersion = PE.readWord(nOffset + 2) + "." + PE.readWord(nOffset) + "." +
-                    PE.readWord(nOffset + 6) + "." + PE.readWord(nOffset + 4);
+            var overlayOffset = PE.section[".rsrc"].FileOffset + PE.section[".rsrc"].VirtualSize;
+
+            overlayOffset = PE.findSignature(overlayOffset - 0x600, 0x600, "BD04EFFE00000100");
+            if (overlayOffset != -1) {
+                overlayOffset += 8;
+                sVersion = PE.readWord(overlayOffset + 2) + "." + PE.readWord(overlayOffset) + "." +
+                    PE.readWord(overlayOffset + 6) + "." + PE.readWord(overlayOffset + 4);
             }
         }
         bDetected = true;
@@ -44,16 +47,14 @@ function detect() {
     }
 
     if (PE.getNumberOfResources() > 0) {
-        nOffset = PE.getResourceNameOffset("CABINET"); {
-            if (PE.compare("'MSCF'00000000", nOffset)) {
-                bDetected = true;
-            }
+        if (PE.compare("'MSCF'00000000", PE.getResourceNameOffset("CABINET"))) {
+            bDetected = true;
         }
-        nOffset = PE.getResourceNameOffset("IDR_CABFILE"); {
-            if (PE.compare("'MSCF'00000000", nOffset)) {
-                bDetected = true;
-            }
+
+        if (PE.compare("'MSCF'00000000", PE.getResourceNameOffset("IDR_CABFILE"))) {
+            bDetected = true;
         }
+
     }
 
     return result();
