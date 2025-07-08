@@ -19,12 +19,14 @@ function detect() {
         }
         bDetected = true;
     } else if (/sfxcab/.test(PE.getManifest())) {
+        var rsrcSection = PE.section[".rsrc"];
+
         // There's two version resources, locate the second.
-        if (PE.section[".rsrc"]) {
-            var overlayOffset = PE.section[".rsrc"].FileOffset + PE.section[".rsrc"].VirtualSize;
+        if (rsrcSection) {
+            var overlayOffset = rsrcSection.FileOffset + rsrcSection.VirtualSize;
 
             overlayOffset = PE.findSignature(overlayOffset - 0x600, 0x600, "BD04EFFE00000100");
-            if (overlayOffset != -1) {
+            if (overlayOffset !== -1) {
                 overlayOffset += 8;
                 sVersion = PE.readWord(overlayOffset + 2) + "." + PE.readWord(overlayOffset) + "." +
                     PE.readWord(overlayOffset + 6) + "." + PE.readWord(overlayOffset + 4);
@@ -32,16 +34,12 @@ function detect() {
         }
         bDetected = true;
     } else if (/wextract/i.test(PE.getVersionStringInfo("InternalName"))) {
-        sVersion = PE.getFileVersion();
+        sVersion = PE.getFileVersion().trim();
         bDetected = true;
-    } else if (PE.compareEP("558bec81ec........535657ff15........a3........ff15........a1........6625....3d")) {
-        if (PE.compare("'MSCF'00000000", 0x5000)) {
-            bDetected = true;
-        }
-    } else if (PE.compareEP("6a..68........e8........66813d............75..a1........81b8................75..")) {
-        if (PE.compareOverlay("'MSCF'00000000")) {
-            bDetected = true;
-        }
+    } else if (PE.compareEP("558bec81ec........535657ff15........a3........ff15........a1........6625....3d") && PE.compare("'MSCF'00000000", 0x5000)) {
+        bDetected = true;
+    } else if (PE.compareEP("6a..68........e8........66813d............75..a1........81b8................75..") && PE.compareOverlay("'MSCF'00000000")) {
+        bDetected = true;
     } else if (PE.compareEP("e9$$$$$$$$558bec81ec........830d..........5356576a..33dbbf........68........895d..881d")) {
         bDetected = true;
     }
