@@ -4,238 +4,238 @@
 init('game', '');
 
 function detect() {
-/* beautify ignore:start */
+    /* beautify ignore:start */
 
-function isLCF() { //internal
-	if(!X.isHeuristicScan() && (!X.c("'Lcf'",1) || charStat(X.readBytes(1,X.U8(0)),1).indexOf('allasc' < 0))) return false;
-	return true
-}
-
-
-function isXYZ() {
-	if(!X.c("'XYZ1'")) return false;
-	w = X.U16(4); h = X.U16(6); var max = X.isHeuristicScan()? 0x8000 : 0xA00;
-	// 99.9999% images are within 800×800, but the official limit's 32000
-	if(!isWithin(w,1,max) || !isWithin(h,1,max)) return false;
-	return true
-}
-if(!bDetected && isXYZ()) {
-	sName = 'RPGMaker 2000/2003 bitmap (.XYZ)'; bDetected = true; if(X.isVerbose()) sOption(w+'×'+h);
-}
+    function isLCF() { //internal
+        if (!X.isHeuristicScan() && (!X.c("'Lcf'", 1) || charStat(X.readBytes(1, X.U8(0)), 1).indexOf('allasc' < 0))) return false;
+        return true
+    }
 
 
-function isLSD() {
-	//ref https://github.com/EasyRPG/liblcf/blob/master/src/generated/lcf/lsd/chunks.h etc.
-	if(!isLCF()) return false;  if(!X.c("0B") || !X.c("64",12)) return false;  bad = '';
-	if(!X.c("'LcfSaveData'",1))
-		if(!X.isHeuristicScan()) return false;
-		else bad = bad.addIfNone('!badsig'); // easyRPG won't quit just because the sig is wrong!
-	if(!isWithin(dt=X.F64(0x10), 365*100, 365*200)) return false; // date test, days since 1900. I'll test 2000~2100, let's be real here
-	var delphiEpoch = new Date(Date.UTC(1899, 11, 30));
-	dt = new Date(delphiEpoch.getTime() + dt * 86400000); dt = dt.toISOString(); // Convert days to milliseconds, then to string
-	ch0nm = ch1fs = ch2fs = ch3fs = ch4fs = ''; ch0lv = ch0hp = ch1fsi = ch2fsi = ch3fsi = ch4fsi = -1;  info = '';
-	for(idx = 0, p = 0x18; p < X.Sz(); ) {
-		idx = readVarUInt(p); if(!isWithin(idx[0],1,3)) return false; p += idx[0]; idx = idx[1]; if(!idx) break;
-		sz = readVarUInt(p); if(!isWithin(sz[0],1,5)) return false; p += sz[0]; sz = sz[1];
-		switch(idx) {
-		case 0x0B: heronm = X.SC(p,sz,'SJIS'); break;
-		case 0x0C: herolv = readVarUInt(p,sz)[1]; break;
-		case 0x0D: herohp = readVarUInt(p,sz)[1]; break;
-		case 0x15: ch1fs = X.SC(p,sz,'SJIS'); break;
-		case 0x16: ch1fsi = readVarUInt(p,sz)[1]; break;
-		case 0x17: ch2fs = X.SC(p,sz,'SJIS'); break;
-		case 0x18: ch2fsi = readVarUInt(p,sz)[1]; break;
-		case 0x19: ch3fs = X.SC(p,sz,'SJIS'); break;
-		case 0x1A: ch3fsi = readVarUInt(p,sz)[1]; break;
-		case 0x1B: ch4fs = X.SC(p,sz,'SJIS'); break;
-		case 0x1C: ch4fsi = readVarUInt(p,sz)[1]; break;
-		}
-		p += sz
-	}
-	bad = ''; v = ''; sz = p;
-	for(calcidx = 0x65; p < X.Sz(); calcidx = (calcidx < 0x72 ? calcidx+1: 0xC8)) {
-		idx = readVarUInt(p); if(!isWithin(idx[0],1,3)) return false; p += idx[0]; idx = idx[1]; if(!idx) break;
-		if(calcidx != idx) if(calcidx != 0xC8) { bad = bad.addIfNone('!brokenchunk'); break }
-		sz = readVarUInt(p); if(!isWithin(sz[0],1,5) || !sz[1]) return false;
-		p += sz[0]; sz = sz[1];
-		switch(idx) {
-		case 0xC8: tag = 'easyRPG_data';
-			if(readVarUInt(p)[1] == 1) { t = readVarUInt(p+1)[1]; v = readVarUInt(p+2)[1]; v = (((v>>8)&0xFF)|(v&0xFF)<<8).toString(16) }
-			break;
-		case 0x6C: tag = 'actors';
-			for(q = p+2/*2D array idx? skip 2 bytes, test more*/; q < p+sz; ) {
-				idx2 = readVarUInt(q); if(!isWithin(idx2[0],1,3)) { _l2r('lsd',q,'idx2='+Hex(idx2[0])+' is weird'); q = p+sz; continue }
-				q += idx2[0]; idx2 = idx2[1]; if(!idx2) break;
-				sz2 = readVarUInt(q); if(!isWithin(sz2[0],1,5)) return false;
-				q += sz2[0]; sz2 = sz2[1];
-				switch(idx2) {
-				case 1: t = X.SA(q,sz2); info = info.append('actor:'+(t=='\x01'?'*':X.SC(q,sz2,'SJIS'))); break
-				case 2: t = X.SA(q,sz2); info = info.append('title:'+(t=='\x01'?'*':X.SC(q,sz2,'SJIS'))); break
-				case 0x0B: t = X.SC(q,sz2,'SJIS'); if(t.length) info = info.append('char:'+t); break
-				case 0x15: t = X.SC(q,sz2,'SJIS'); if(t.length) info = info.append('sprite:'+t); break
-				case 0x1F: info = info.append('level:'+readVarUInt(q)[1]); break
-				case 0x21: t = readVarUInt(q)[1]; if(t) info = info.append('hpmod:'+t); break
-				case 0x22: t = readVarUInt(q)[1]; if(t) info = info.append('spmod:'+t); break
-				case 0x47: info = info.append('curhp:'+readVarUInt(q)[1]); break
-				case 0x48: info = info.append('cursp:'+readVarUInt(q)[1]); break
-				}
-				q += sz2
-			}
-			break;
-		case 0x65: tag = 'system'; break;  case 0x66: tag = 'screen'; break;  case 0x67: tag = 'pictures'; break;
-		case 0x68: tag = 'party_loc'; break;  case 0x69: tag = 'boat_loc'; break;  case 0x6A: tag = 'ship_loc'; break;
-		case 0x6B: tag = 'airship_loc'; break;  case 0x6D: tag = 'inventory'; break;
-		case 0x6E: tag = 'teleport_targets'; break;  case 0x6F: tag = 'map_info'; break;  case 0x70: tag = 'panorama'; break;
-		case 0x71: tag = 'fg_ev_execstate'; break;  case 0x72: tag = 'common_events'; break;
-		default: tag = 'ERROR!'+Hex(idx)
-		}
-		p += sz; if(idx == 0xC8) break
-	}
-	if(p > X.Sz()) return false;  sz = p;
-	if(idx == 0xC8) sVersion = 'easyRPG'+(v.length? ' v'+v.slice(0,4): '');  else sVersion = 'RPG_RT';
-	return true
-}
-if(!bDetected && isLSD()) {
-	sName = "RPGMaker 2000/2003 save data (.LSD)"; bDetected = true;
-	if(bad.length) sVersion = sVersion.appendS('malformed'+bad,'/')
-	if(X.isVerbose()) {
-		sOption('on: '+dt.slice(0,19)); sOption(heronm+' lv.'+herolv+' '+herohp+'HP','preview: ');
-		if(ch1fsi >= 0) sOption(ch1fs); if(ch2fsi >= 0) sOption(ch2fs); if(ch3fsi >= 0) sOption(ch3fs); if(ch4fsi >= 0) sOption(ch4fs);
-		sOption(info,'info: ')
-		sOption(outSz(sz),'sz:')
-	}
-}
+    function isXYZ() {
+        if (!X.c("'XYZ1'")) return false;
+        w = X.U16(4); h = X.U16(6); var max = X.isHeuristicScan() ? 0x8000 : 0xA00;
+        // 99.9999% images are within 800×800, but the official limit's 32000
+        if (!isWithin(w, 1, max) || !isWithin(h, 1, max)) return false;
+        return true
+    }
+    if (!bDetected && isXYZ()) {
+        sName = 'RPGMaker 2000/2003 bitmap (.XYZ)'; bDetected = true; if (X.isVerbose()) sOption(w + '×' + h);
+    }
 
 
-function isLMT() {
-	//ref https://github.com/EasyRPG/liblcf/blob/master/src/generated/lcf/lmt/chunks.h etc.
-	if(!isLCF()) return false;  if(!X.c("0A")) return false;  bad = '';
-	if(!X.c("'LcfMapTree'",1))
-		// if(!X.isHeuristicScan())
-			return false;
-		// else
-		// 	bad = bad.addIfNone('!badsig'); // easyRPG won't quit just because the sig is wrong! But we will, because there's not much more to detect it by
-	i = readVarUInt(0xB); if(!isWithin(i[0],1,5)) return false; p = 0xB+i[0]+1; len = i[1];
-	title = ''; maps = [];
-	for(idx = i = 0; p < X.Sz() && i < len; ) {
-		if(idx == 0x33) {
-			p += readVarUInt(p)[0]; aid = readVarUInt(p); p += aid[0]; aid = aid[1]; //array idx
-			if(aid < ++i) { bad = bad.addIfNone('!badidx'); break }
-		}
-		if(i >= len) break;
-		idx = readVarUInt(p); if(!isWithin(idx[0],1,3)) return false; p += idx[0]; idx = idx[1];
-		sz = readVarUInt(p); if(!isWithin(sz[0],1,5) || !sz[1]) return false; p += sz[0]; sz = sz[1];
-		switch(idx) {
-		case 1: t = X.SC(p,sz,'SJIS');
-			if(!title.length) title = t; else maps.push(aid+'.'+t);
-			break;
-		}
-		p += sz;
-	}
-	//tree_order length is in aid
-	for(i=0; i < aid+1; i++) p += readVarUInt(p)[0]; // tree_order + active_node
-//_l2r('lmt',p,'Start')
-	for(i = 0; p < X.Sz(); ) {
-		idx = readVarUInt(p); if(!isWithin(idx[0],1,3)) return false; p += idx[0]; idx = idx[1];
-		if(!idx) break;
-		sz = readVarUInt(p); if(!isWithin(sz[0],1,5) || !sz[1]) return false; p += sz[0]; sz = sz[1];
-		p += sz
-	}
-	sz = p;
-	if(sz > X.Sz()) return false;
-	return true
-}
-if(!bDetected && isLMT()) {
-	sName = "RPGMaker 2000/2003 map tree data (.LMT)"; bDetected = true;
-	if(bad.length) sVersion = sVersion.appendS('malformed'+bad,'/')
-	if(X.isVerbose()) {
-		sOption('for: '+title); sOption(addEllipsis(maps.join('\r'),0xC000), len+' maps:'); sOption(outSz(sz),'sz:')
-	}
-}
+    function isLSD() {
+        //ref https://github.com/EasyRPG/liblcf/blob/master/src/generated/lcf/lsd/chunks.h etc.
+        if (!isLCF()) return false; if (!X.c("0B") || !X.c("64", 12)) return false; bad = '';
+        if (!X.c("'LcfSaveData'", 1))
+            if (!X.isHeuristicScan()) return false;
+            else bad = bad.addIfNone('!badsig'); // easyRPG won't quit just because the sig is wrong!
+        if (!isWithin(dt = X.F64(0x10), 365 * 100, 365 * 200)) return false; // date test, days since 1900. I'll test 2000~2100, let's be real here
+        var delphiEpoch = new Date(Date.UTC(1899, 11, 30));
+        dt = new Date(delphiEpoch.getTime() + dt * 86400000); dt = dt.toISOString(); // Convert days to milliseconds, then to string
+        ch0nm = ch1fs = ch2fs = ch3fs = ch4fs = ''; ch0lv = ch0hp = ch1fsi = ch2fsi = ch3fsi = ch4fsi = -1; info = '';
+        for (idx = 0, p = 0x18; p < X.Sz();) {
+            idx = readVarUInt(p); if (!isWithin(idx[0], 1, 3)) return false; p += idx[0]; idx = idx[1]; if (!idx) break;
+            sz = readVarUInt(p); if (!isWithin(sz[0], 1, 5)) return false; p += sz[0]; sz = sz[1];
+            switch (idx) {
+                case 0x0B: heronm = X.SC(p, sz, 'SJIS'); break;
+                case 0x0C: herolv = readVarUInt(p, sz)[1]; break;
+                case 0x0D: herohp = readVarUInt(p, sz)[1]; break;
+                case 0x15: ch1fs = X.SC(p, sz, 'SJIS'); break;
+                case 0x16: ch1fsi = readVarUInt(p, sz)[1]; break;
+                case 0x17: ch2fs = X.SC(p, sz, 'SJIS'); break;
+                case 0x18: ch2fsi = readVarUInt(p, sz)[1]; break;
+                case 0x19: ch3fs = X.SC(p, sz, 'SJIS'); break;
+                case 0x1A: ch3fsi = readVarUInt(p, sz)[1]; break;
+                case 0x1B: ch4fs = X.SC(p, sz, 'SJIS'); break;
+                case 0x1C: ch4fsi = readVarUInt(p, sz)[1]; break;
+            }
+            p += sz
+        }
+        bad = ''; v = ''; sz = p;
+        for (calcidx = 0x65; p < X.Sz(); calcidx = (calcidx < 0x72 ? calcidx + 1 : 0xC8)) {
+            idx = readVarUInt(p); if (!isWithin(idx[0], 1, 3)) return false; p += idx[0]; idx = idx[1]; if (!idx) break;
+            if (calcidx != idx) if (calcidx != 0xC8) { bad = bad.addIfNone('!brokenchunk'); break }
+            sz = readVarUInt(p); if (!isWithin(sz[0], 1, 5) || !sz[1]) return false;
+            p += sz[0]; sz = sz[1];
+            switch (idx) {
+                case 0xC8: tag = 'easyRPG_data';
+                    if (readVarUInt(p)[1] == 1) { t = readVarUInt(p + 1)[1]; v = readVarUInt(p + 2)[1]; v = (((v >> 8) & 0xFF) | (v & 0xFF) << 8).toString(16) }
+                    break;
+                case 0x6C: tag = 'actors';
+                    for (q = p + 2/*2D array idx? skip 2 bytes, test more*/; q < p + sz;) {
+                        idx2 = readVarUInt(q); if (!isWithin(idx2[0], 1, 3)) { _l2r('lsd', q, 'idx2=' + Hex(idx2[0]) + ' is weird'); q = p + sz; continue }
+                        q += idx2[0]; idx2 = idx2[1]; if (!idx2) break;
+                        sz2 = readVarUInt(q); if (!isWithin(sz2[0], 1, 5)) return false;
+                        q += sz2[0]; sz2 = sz2[1];
+                        switch (idx2) {
+                            case 1: t = X.SA(q, sz2); info = info.append('actor:' + (t == '\x01' ? '*' : X.SC(q, sz2, 'SJIS'))); break
+                            case 2: t = X.SA(q, sz2); info = info.append('title:' + (t == '\x01' ? '*' : X.SC(q, sz2, 'SJIS'))); break
+                            case 0x0B: t = X.SC(q, sz2, 'SJIS'); if (t.length) info = info.append('char:' + t); break
+                            case 0x15: t = X.SC(q, sz2, 'SJIS'); if (t.length) info = info.append('sprite:' + t); break
+                            case 0x1F: info = info.append('level:' + readVarUInt(q)[1]); break
+                            case 0x21: t = readVarUInt(q)[1]; if (t) info = info.append('hpmod:' + t); break
+                            case 0x22: t = readVarUInt(q)[1]; if (t) info = info.append('spmod:' + t); break
+                            case 0x47: info = info.append('curhp:' + readVarUInt(q)[1]); break
+                            case 0x48: info = info.append('cursp:' + readVarUInt(q)[1]); break
+                        }
+                        q += sz2
+                    }
+                    break;
+                case 0x65: tag = 'system'; break; case 0x66: tag = 'screen'; break; case 0x67: tag = 'pictures'; break;
+                case 0x68: tag = 'party_loc'; break; case 0x69: tag = 'boat_loc'; break; case 0x6A: tag = 'ship_loc'; break;
+                case 0x6B: tag = 'airship_loc'; break; case 0x6D: tag = 'inventory'; break;
+                case 0x6E: tag = 'teleport_targets'; break; case 0x6F: tag = 'map_info'; break; case 0x70: tag = 'panorama'; break;
+                case 0x71: tag = 'fg_ev_execstate'; break; case 0x72: tag = 'common_events'; break;
+                default: tag = 'ERROR!' + Hex(idx)
+            }
+            p += sz; if (idx == 0xC8) break
+        }
+        if (p > X.Sz()) return false; sz = p;
+        if (idx == 0xC8) sVersion = 'easyRPG' + (v.length ? ' v' + v.slice(0, 4) : ''); else sVersion = 'RPG_RT';
+        return true
+    }
+    if (!bDetected && isLSD()) {
+        sName = "RPGMaker 2000/2003 save data (.LSD)"; bDetected = true;
+        if (bad.length) sVersion = sVersion.appendS('malformed' + bad, '/')
+        if (X.isVerbose()) {
+            sOption('on: ' + dt.slice(0, 19)); sOption(heronm + ' lv.' + herolv + ' ' + herohp + 'HP', 'preview: ');
+            if (ch1fsi >= 0) sOption(ch1fs); if (ch2fsi >= 0) sOption(ch2fs); if (ch3fsi >= 0) sOption(ch3fs); if (ch4fsi >= 0) sOption(ch4fs);
+            sOption(info, 'info: ')
+            sOption(outSz(sz), 'sz:')
+        }
+    }
 
 
-function isLDB() {
-	//ref https://github.com/EasyRPG/liblcf/blob/master/src/generated/lcf/ldb/chunks.h etc.
-	if(!isLCF()) return false;  if(!X.c("0B") || !X.c("0B",0xC)) return false;  bad = '';
-	if(!X.c("'LcfDataBase'",1))
-		// if(!X.isHeuristicScan())
-			return false;
-		// else
-		// 	bad = bad.addIfNone('!badsig'); // easyRPG won't quit just because the sig is wrong! But we will, because there's not much more to detect it by
-	var debug = -1, char = [];  chars = [];
-	function ret(p,t) { if(debug >= 1)_l2r('ldb',p,t); return false }
-	for(idx = i = 0, p = 0xC; p < X.Sz(); i++) { // go over all chunks found
-		idx = readVarUInt(p); if(!isWithin(idx[0],1,3)) return ret(p,'bad idx');  p += idx[0]; idx = idx[1];
-		if(!isWithin(idx,0xB,0x1F)) if(i < 14) return ret(p,'bad tag '+idx);
-		else { p--; break } //to tell the expected file length. idx = 00 is the last byte
-		sz = readVarUInt(p); if(!isWithin(sz[0],1,6) || !sz[1]) return ret(p,'bad size '+sz[1]);  p += sz[0]; sz = sz[1];
-		if(idx == 0xB) { // an array; let's analyse the Characters one
-			for(q = p; q < p + sz && q < X.Sz(); ) {
-				for(len = j = 0; q < p + sz && q < X.Sz(); j++) {
-					t = readVarUInt(q); if(!isWithin(t[0],1,3)) return false;  q += t[0]; t = t[1];
-					if(!len) { len = t; j = 0 }
-					t = readVarUInt(q); if(!isWithin(t[0],1,3)) return false;  q += t[0]; t = t[1];
-					for(; q < p + sz && q < X.Sz(); ) {
-						idx1 = readVarUInt(q); if(!isWithin(idx1[0],1,3)) return false;  q += idx1[0]; idx1 = idx1[1];
-						if(!idx1) { q--; break }
-						sz1 = readVarUInt(q); if(!isWithin(sz1[0],1,5)) return ret(q,'sz off at idx1='+Hex(idx1));  q += sz1[0]; sz1 = sz1[1];
-						switch(idx1) {
-						case 1: char.push(X.SC(q,sz1,'SJIS')); break; //name
-						case 2: char.push(X.SC(q,sz1,'SJIS')); break; //title
-						default: if(char.length) chars.push(char.join(': '));
-							char = []
-						}
-						q += sz1
-					}
-				}
-				i++
-			}
-		}
-		p += sz
-	}
-	sz = p;
-	return true
-}
-if(!bDetected && isLDB()) {
-	sName = "RPGMaker 2000/2003 database (.LDB)"; bDetected = true;
-	if(bad.length) sVersion = sVersion.appendS('malformed'+bad,'/')
-	if(X.isVerbose()) {
-		sOption(addEllipsis(chars.join(', ')),'chars:')
-		sOption(outSz(sz),'sz:')
-	}
-}
+    function isLMT() {
+        //ref https://github.com/EasyRPG/liblcf/blob/master/src/generated/lcf/lmt/chunks.h etc.
+        if (!isLCF()) return false; if (!X.c("0A")) return false; bad = '';
+        if (!X.c("'LcfMapTree'", 1))
+            // if(!X.isHeuristicScan())
+            return false;
+        // else
+        // 	bad = bad.addIfNone('!badsig'); // easyRPG won't quit just because the sig is wrong! But we will, because there's not much more to detect it by
+        i = readVarUInt(0xB); if (!isWithin(i[0], 1, 5)) return false; p = 0xB + i[0] + 1; len = i[1];
+        title = ''; maps = [];
+        for (idx = i = 0; p < X.Sz() && i < len;) {
+            if (idx == 0x33) {
+                p += readVarUInt(p)[0]; aid = readVarUInt(p); p += aid[0]; aid = aid[1]; //array idx
+                if (aid < ++i) { bad = bad.addIfNone('!badidx'); break }
+            }
+            if (i >= len) break;
+            idx = readVarUInt(p); if (!isWithin(idx[0], 1, 3)) return false; p += idx[0]; idx = idx[1];
+            sz = readVarUInt(p); if (!isWithin(sz[0], 1, 5) || !sz[1]) return false; p += sz[0]; sz = sz[1];
+            switch (idx) {
+                case 1: t = X.SC(p, sz, 'SJIS');
+                    if (!title.length) title = t; else maps.push(aid + '.' + t);
+                    break;
+            }
+            p += sz;
+        }
+        //tree_order length is in aid
+        for (i = 0; i < aid + 1; i++) p += readVarUInt(p)[0]; // tree_order + active_node
+        //_l2r('lmt',p,'Start')
+        for (i = 0; p < X.Sz();) {
+            idx = readVarUInt(p); if (!isWithin(idx[0], 1, 3)) return false; p += idx[0]; idx = idx[1];
+            if (!idx) break;
+            sz = readVarUInt(p); if (!isWithin(sz[0], 1, 5) || !sz[1]) return false; p += sz[0]; sz = sz[1];
+            p += sz
+        }
+        sz = p;
+        if (sz > X.Sz()) return false;
+        return true
+    }
+    if (!bDetected && isLMT()) {
+        sName = "RPGMaker 2000/2003 map tree data (.LMT)"; bDetected = true;
+        if (bad.length) sVersion = sVersion.appendS('malformed' + bad, '/')
+        if (X.isVerbose()) {
+            sOption('for: ' + title); sOption(addEllipsis(maps.join('\r'), 0xC000), len + ' maps:'); sOption(outSz(sz), 'sz:')
+        }
+    }
 
 
-function isLMU() {
-	//ref https://github.com/EasyRPG/liblcf/blob/master/src/generated/lcf/ldb/chunks.h etc.
-	if(!isLCF()) return false;  if(!X.c("0A")) return false;  bad = '';
-	if(!X.c("'LcfMapUnit'",1)) return false;
-	id = -1; bg = ''; bgf = false;
-	for(idx = i = 0, p = 0xB; p < X.Sz(); i++) { // go over all chunks found
-		idx = readVarUInt(p); if(!isWithin(idx[0],1,3)) return false;  p += idx[0]; idx = idx[1];
-		if(!isWithin(idx,1,91)) if(i < 3) return false
-		else break //to tell the expected file length. idx = 00 is the last byte
-		sz = readVarUInt(p); if(!isWithin(sz[0],1,6) || !sz[1]) return false;  p += sz[0]; sz = sz[1];
-		switch(idx) {
-		case 1: id = readVarUInt(p)[1]; break;
-		case 31: bgf = true; break;
-		case 32: bg = X.SC(p,sz,'SJIS'); break
-		}
-		p += sz
-	}
-	sz = p;
-	if(sz > X.Sz()) return false;
-	return true
-}
-if(!bDetected && isLMU()) {
-	sName = "RPGMaker 2000/2003 map unit (.LMU)"; bDetected = true;
-	if(bad.length) sVersion = sVersion.appendS('malformed'+bad,'/')
-	if(X.isVerbose()) {
-		if(id >= 0) sOption(id,'id:'); if(bgf) sOption(bg,'bg:"','"'); sOption(outSz(sz),'sz:')
-	}
-}
+    function isLDB() {
+        //ref https://github.com/EasyRPG/liblcf/blob/master/src/generated/lcf/ldb/chunks.h etc.
+        if (!isLCF()) return false; if (!X.c("0B") || !X.c("0B", 0xC)) return false; bad = '';
+        if (!X.c("'LcfDataBase'", 1))
+            // if(!X.isHeuristicScan())
+            return false;
+        // else
+        // 	bad = bad.addIfNone('!badsig'); // easyRPG won't quit just because the sig is wrong! But we will, because there's not much more to detect it by
+        var debug = -1, char = []; chars = [];
+        function ret(p, t) { if (debug >= 1) _l2r('ldb', p, t); return false }
+        for (idx = i = 0, p = 0xC; p < X.Sz(); i++) { // go over all chunks found
+            idx = readVarUInt(p); if (!isWithin(idx[0], 1, 3)) return ret(p, 'bad idx'); p += idx[0]; idx = idx[1];
+            if (!isWithin(idx, 0xB, 0x1F)) if (i < 14) return ret(p, 'bad tag ' + idx);
+            else { p--; break } //to tell the expected file length. idx = 00 is the last byte
+            sz = readVarUInt(p); if (!isWithin(sz[0], 1, 6) || !sz[1]) return ret(p, 'bad size ' + sz[1]); p += sz[0]; sz = sz[1];
+            if (idx == 0xB) { // an array; let's analyse the Characters one
+                for (q = p; q < p + sz && q < X.Sz();) {
+                    for (len = j = 0; q < p + sz && q < X.Sz(); j++) {
+                        t = readVarUInt(q); if (!isWithin(t[0], 1, 3)) return false; q += t[0]; t = t[1];
+                        if (!len) { len = t; j = 0 }
+                        t = readVarUInt(q); if (!isWithin(t[0], 1, 3)) return false; q += t[0]; t = t[1];
+                        for (; q < p + sz && q < X.Sz();) {
+                            idx1 = readVarUInt(q); if (!isWithin(idx1[0], 1, 3)) return false; q += idx1[0]; idx1 = idx1[1];
+                            if (!idx1) { q--; break }
+                            sz1 = readVarUInt(q); if (!isWithin(sz1[0], 1, 5)) return ret(q, 'sz off at idx1=' + Hex(idx1)); q += sz1[0]; sz1 = sz1[1];
+                            switch (idx1) {
+                                case 1: char.push(X.SC(q, sz1, 'SJIS')); break; //name
+                                case 2: char.push(X.SC(q, sz1, 'SJIS')); break; //title
+                                default: if (char.length) chars.push(char.join(': '));
+                                    char = []
+                            }
+                            q += sz1
+                        }
+                    }
+                    i++
+                }
+            }
+            p += sz
+        }
+        sz = p;
+        return true
+    }
+    if (!bDetected && isLDB()) {
+        sName = "RPGMaker 2000/2003 database (.LDB)"; bDetected = true;
+        if (bad.length) sVersion = sVersion.appendS('malformed' + bad, '/')
+        if (X.isVerbose()) {
+            sOption(addEllipsis(chars.join(', ')), 'chars:')
+            sOption(outSz(sz), 'sz:')
+        }
+    }
 
 
-	return result()
-/* beautify ignore:end */
+    function isLMU() {
+        //ref https://github.com/EasyRPG/liblcf/blob/master/src/generated/lcf/ldb/chunks.h etc.
+        if (!isLCF()) return false; if (!X.c("0A")) return false; bad = '';
+        if (!X.c("'LcfMapUnit'", 1)) return false;
+        id = -1; bg = ''; bgf = false;
+        for (idx = i = 0, p = 0xB; p < X.Sz(); i++) { // go over all chunks found
+            idx = readVarUInt(p); if (!isWithin(idx[0], 1, 3)) return false; p += idx[0]; idx = idx[1];
+            if (!isWithin(idx, 1, 91)) if (i < 3) return false
+            else break //to tell the expected file length. idx = 00 is the last byte
+            sz = readVarUInt(p); if (!isWithin(sz[0], 1, 6) || !sz[1]) return false; p += sz[0]; sz = sz[1];
+            switch (idx) {
+                case 1: id = readVarUInt(p)[1]; break;
+                case 31: bgf = true; break;
+                case 32: bg = X.SC(p, sz, 'SJIS'); break
+            }
+            p += sz
+        }
+        sz = p;
+        if (sz > X.Sz()) return false;
+        return true
+    }
+    if (!bDetected && isLMU()) {
+        sName = "RPGMaker 2000/2003 map unit (.LMU)"; bDetected = true;
+        if (bad.length) sVersion = sVersion.appendS('malformed' + bad, '/')
+        if (X.isVerbose()) {
+            if (id >= 0) sOption(id, 'id:'); if (bgf) sOption(bg, 'bg:"', '"'); sOption(outSz(sz), 'sz:')
+        }
+    }
+
+
+    return result()
+    /* beautify ignore:end */
 }
