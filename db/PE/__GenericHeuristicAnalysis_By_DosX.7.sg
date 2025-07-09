@@ -1932,6 +1932,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["EXECryptor", "1.4-1.5", -1, 0xd1de53b5, 0],
         ["EXECryptor", "2.X", -1, 0xf51b2817, 0],
         ["RLPack", "1.1-1.2", 0, 0x5bd1d713, 0],
+        ["Petite", "2.2", -1, 0x61e53682, 0],
         // protectors
         ["ASProtect", "1.XX-2.XX", 0, 0x1272f45b, 1],
         ["SHRINKER", "3.2", 0, 0xb2a64858, 1],
@@ -1970,6 +1971,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["YodasProtector", "1.0b", -1, 0x1303a51b, 1],
         ["ASM Guard", "2.XX+", -1, 0xf1e0d63b, 1], // https://github.com/DosX-dev/ASM-Guard
         ["Themida", "2.XX-3.XX", 0, 0x3ffccc8a, 1],
+        ["Themida", null, 0, 0xad97c503, 1],
         ["Amber", null, -1, 0x97c72051, 1],
         [".NET Reactor", null, 0, 0x96be8e26, 1], // https://www.eziriz.com/dotnet_reactor.htm
         [".NET Reactor", null, 1, 0xb4cda32f, 1],
@@ -1978,7 +1980,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["DNGuard", null, 0, 0x38432571, 1], // https://www.dnguard.net/
         ["DNGuard", "4.9+", 0, 0x99f8b58e, 1],
         ["obfus.h", null, -1, 0x02f4771f, 1], // https://github.com/DosX-dev/obfus.h  ;  default, antidebug v1
-        ["Crunch", "1.0-2.0", 0, 0x615665dd, 1]
+        ["Crunch", "1.0-2.0", 0, 0x615665dd, 1],
+        ["Private EXE Protector", null, 0, 0xd89af68d, 1] // https://www.privacy-tutorials.com/private-exe-protector/
     ];
 
     const importValidatingResult = validateImportHashes(dbCollectionOfHashesDictionary);
@@ -2011,6 +2014,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["ASM Guard", "2.XX", "ASMGUARD"],
         ["ASPack", "1.08-2.XX", ".adata"], // https://www.aspack.com/
         ["ASPack", "2.XX", ".aspack"],
+        ["ASPack", null, ".ASPack"],
         ["ASPack", null, "ASPack"],
         ["Alienyze", null, ".alien"], // https://alienyze.com/
         ["Alloy", null, ".alloy32"],
@@ -2080,6 +2084,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Themida", "3.XX", ".winlice"],
         ["Themida", null, ".stub01"],
         ["Themida", null, "WinLicen"],
+        ["Themida", null, ".v-lizer"],
+        ["Themida", null, "Themida "],
         ["UPX", null, "UPX0"], // https://github.com/upx/upx
         ["UPX", null, "UPX1"],
         ["UPX", null, "UPX2"],
@@ -2113,7 +2119,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Gentee Installer", null, ".gentee"], // https://www.gentee.com/download/
         ["Nullsoft Installer", null, ".ndata"], // https://sourceforge.net/projects/nsis/
         ["WiX Installer", null, ".wixburn"], // https://github.com/wixtoolset
-        ["BeRoEXEPacker", null, "packerBY"] // https://blog.rosseaux.net/page/875fbe6549aa072b5ee0ac9cefff4827/BeRoEXEPacker
+        ["BeRoEXEPacker", null, "packerBY"], // https://blog.rosseaux.net/page/875fbe6549aa072b5ee0ac9cefff4827/BeRoEXEPacker
+        ["NeoLite", null, ".neolit"],
+        ["Private EXE Protector", null, ".-PEP-"]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDictionary);
@@ -2144,11 +2152,11 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Check if there is a collision
     if (sectionNameCollision.length != 0) {
-        log(logType.nothing, "Section names collision: '" + sectionNameCollision + "'");
+        log(logType.nothing, "Section names collision: '" + clearSectionName(sectionNameCollision) + "'");
         isCollisionInSectionsPresent = true;
     }
 
-    if (isCollisionInSectionsPresent) options += (options.length !== 0 ? " + " : String()) + "Sections collision (\"" + sectionNameCollision + "\")";
+    if (isCollisionInSectionsPresent) options += (options.length !== 0 ? " + " : String()) + "Sections collision (\"" + clearSectionName(sectionNameCollision) + "\")";
 
 
 
@@ -4044,8 +4052,9 @@ function _setLangByHeur(languageName) {
 function log(messageTypeId, messageText) {
     if (!messageText) {
         return;
-    } else if (messageText.indexOf("\n") != -1) {
-        _error("Illegal char at log( ... )");
+    } else if (/\r|\n|\t/.test(messageText)) {
+        messageText = messageText.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+        // _error("Illegal char at log( ... )");
     }
 
     var prefix = String();
