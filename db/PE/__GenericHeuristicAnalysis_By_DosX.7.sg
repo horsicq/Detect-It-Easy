@@ -173,6 +173,10 @@ function scanForObfuscations_NET() {
     const isVbNet = isVbNetStandartLibraryPresent();
 
 
+
+
+    // Is managed entry point modified? Let's check it using default .NET EP names
+
     var isEntryPointModified = false;
 
     const vbNetEntries = [
@@ -180,15 +184,14 @@ function scanForObfuscations_NET() {
         "main",
         "MAIN",
         "MyApplication"
-    ],
-        defaultEntries = [ // like MSIL, C#, C++ NET etc
-            "Main",
-            "main", // F# entry
-            "main@", // F# entry
-            "<Main>$", // For programs with top-level operators (C#)
-            "mainCRTStartup", // C++ CLR .NET (CLI)
-            "wWinMainCRTStartup" // C++ CLR .NET (GUI)
-        ]
+    ], defaultEntries = [ // like MSIL, C#, C++ NET etc
+        "Main",
+        "main", // F# entry
+        "main@", // F# entry
+        "<Main>$", // For programs with top-level operators (C#)
+        "mainCRTStartup", // C++ CLR .NET (CLI)
+        "wWinMainCRTStartup" // C++ CLR .NET (GUI)
+    ]
 
     if (!PE.isDll()) {
         if (isVbNet) {
@@ -519,6 +522,9 @@ function scanForObfuscations_NET() {
             opCodes.stloc + opCodes.ldloc +
             opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "** ** ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00", "switch__nobody") +
             opCodes.ldc_i4 + opCodes.br
+        ) ||
+        validateNetByteCode( // Crypto Obfuscator
+            opCodes.ldc_i4_3 + opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "01 00 00 00 F6 FF FF FF") + opCodes.ldc_i4_1 + opCodes.brtrue_s + opCodes.ldtoken + opCodes.pop
         ) ||
         validateNetByteCode( // samples by: MindLated, NetShield
             opCodes.setNullValue(opCodes.ldc_i4) + // MSIL: 'ldc.i4 0'
@@ -1327,6 +1333,8 @@ function NetOpCodes() {
     this.brfalse = "39????????"; // MSIL: 'brfalse' - Branch if false/null/zero
     this.brfalse_s = "2C??"; // MSIL: 'brfalse.s' - Branch if false/null/zero (short)
     this.brtrue = "3A????????"; // MSIL: 'brtrue' - Branch if true/non-null/non-zero
+    this.brtrue_s = "2D??"; // MSIL: 'brtrue.s' - Branch if true (short, int8)
+    this.brfalse_s = "2C??"; // MSIL: 'brfalse.s' - Branch if false (short, int8)
     this.call = "28????????"; // MSIL: 'call' - Call method
     this.calli = "29????????"; // MSIL: 'calli' - Call indirect
     this.ldftn = "FE06????????"; // MSIL: 'ldftn' - Load function pointer
@@ -1876,7 +1884,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     if (!PE.isDll()) {
         if (isLastSectionEP && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
-            log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + getAsmInstructionByIndex(0).split(" ")[1]);
+            log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + getAsmInstructionByIndex(0).split(" ")[1].toLowerCase());
             isStrangeCallOrJmpPresent = true;
         }
     }
@@ -3363,6 +3371,19 @@ function scanForObfuscations_Native() {
 
 
 
+    // Check for .NET metadata presence
+
+    var isNetMetaDataInNativePresent = false;
+
+    if (isNetMetaDataPresent()) {
+        isNetMetaDataInNativePresent = true;
+    }
+
+    if (isNetMetaDataInNativePresent) options += (options.length !== 0 ? " + " : String()) + "DotNET meta";
+
+
+
+
     // ASM Guard fake signatures
 
     if (PE.section[".asmg"] || PE.section["ASMGUARD"]) {
@@ -3811,6 +3832,32 @@ function getOptHeaderOffset() {
 
 
 /**
+ * Checks if the .NET CLR metadata directory is present in the PE file.
+ *
+ * This function determines the presence of the .NET CLR Runtime Header
+ * by reading the appropriate Data Directory entry from the PE Optional Header.
+ * It supports both PE32 and PE32+ formats.
+ *
+ * @returns {boolean} True if the .NET CLR metadata directory is present, false otherwise.
+ */
+function isNetMetaDataPresent() {
+    var optHeaderOffset = getOptHeaderOffset();
+    if (optHeaderOffset === -1) return false;
+
+    // DataDirectory[14] is CLR Runtime Header
+    // Offset: OptionalHeader + 0xA8 (for PE32) or 0xE0 (for PE32+)
+    var clrDirOffset32 = optHeaderOffset + 0xA8,
+        clrDirOffset64 = optHeaderOffset + 0xE0,
+        clrRva32 = PE.read_int32 ? PE.read_int32(clrDirOffset32) : 0,
+        clrRva64 = PE.read_int32 ? PE.read_int32(clrDirOffset64) : 0,
+        clrDirRva = (clrRva32 !== 0) ? clrRva32 : clrRva64;
+
+    return !!clrDirRva && clrDirRva !== 0;
+}
+
+
+
+/**
  * Checks if a compiler has been detected in the analysis results.
  * 
  * @returns {boolean} Returns true if any compiler or compiler-related results are found, false otherwise.
@@ -3993,7 +4040,12 @@ function scanForLanguages_NET_and_Native() {
 
             _setResult("~linker", "Microsoft Linker", majorLinkerVersion + "." + minorLinkerVersion, String());
             _setResult("~compiler", "Microsoft Visual C/C++", String(), String());
-            _setLangByHeur("C/C++");
+
+            if (isNetMetaDataPresent()) {
+                _setLangByHeur("MSIL/C/C++");
+            } else {
+                _setLangByHeur("C/C++");
+            }
         } else if (!PE.isRichSignaturePresent() && (PE.isSectionNamePresent(".CRT") || PE.isSectionNamePresent(".xdata")) || PE.isSectionNamePresent(".buildid") || PE.isSectionNamePresent(".build-id")) {
             _setResult("~compiler", "MinGW", String(), String());
             _setLangByHeur("C/C++");
@@ -4025,7 +4077,7 @@ function scanForLanguages_NET_and_Native() {
     } else if (!_isLangPresent("C++") && isCLibraryPresent && (PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
         _setLangByHeur("C");
     } else if (PE.isLibraryPresentExp(/^api-ms-win-crt*/i) || PE.isSectionNamePresent(".msvcjmc")) {
-        _setLangByHeur("C/C++");
+        _setLangByHeur("MSIL/C/C++");
     } else if (!_isLangDetected() && !_getNumberOfResults("compiler") && !PE.isNet()) {
         if (!_getNumberOfResults("protector") &&
             !_getNumberOfResults("cryptor") && !_getNumberOfResults("~cryptor") &&
@@ -4231,12 +4283,20 @@ function scanForMaliciousCode_NET_and_Native() {
                         "user32", "GetWindowText"
                     ],
                     isVbNet: true
-                }, {
+                }, { // NjRAT Generic 1
                     type: "NjRAT",
                     edition: undefined,
                     references: [
                         "System.Drawing", "System.Windows.Forms", "GetForegroundWindow", "System.Runtime.InteropServices", "System.Security.Cryptography", "GetWindowText",
-                        "avicap32.dll", "A", "OK", "kl"
+                        "avicap32.dll", "A", "kl", "OK"
+                    ],
+                    isVbNet: true
+                }, { // NjRAT Generic 2 (with USB-spreader)
+                    type: "NjRAT",
+                    edition: undefined,
+                    references: [
+                        "System.Drawing", "System.Windows.Forms", "GetForegroundWindow", "System.Runtime.InteropServices", "System.Security.Cryptography", "GetWindowText",
+                        "avicap32.dll", "A", "kl", "USB"
                     ],
                     isVbNet: true
                 }
@@ -4271,7 +4331,7 @@ function scanForMaliciousCode_NET_and_Native() {
             }
         }
 
-        // Detect NjRAT via requests-separator
+        // // NjRAT Generic: Detect NjRAT via requests-separator
         if (verdicts.length === 0 && PE.isSignatureInSectionPresent(0, "7C 00 27 00 7C 00 27 00 7C 00")) {
             verdicts.push({
                 type: "NjRAT",
