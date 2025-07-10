@@ -1933,6 +1933,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["EXECryptor", "2.X", -1, 0xf51b2817, 0],
         ["RLPack", "1.1-1.2", 0, 0x5bd1d713, 0],
         ["Petite", "2.2", -1, 0x61e53682, 0],
+        ["bambam", "0.1-0.4", 0, 0xb5b153cd, 0],
         // protectors
         ["ASProtect", "1.XX-2.XX", 0, 0x1272f45b, 1],
         ["SHRINKER", "3.2", 0, 0xb2a64858, 1],
@@ -2121,7 +2122,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["WiX Installer", null, ".wixburn"], // https://github.com/wixtoolset
         ["BeRoEXEPacker", null, "packerBY"], // https://blog.rosseaux.net/page/875fbe6549aa072b5ee0ac9cefff4827/BeRoEXEPacker
         ["NeoLite", null, ".neolit"],
-        ["Private EXE Protector", null, ".-PEP-"]
+        ["Private EXE Protector", null, ".-PEP-"],
+        ["bambam", null, ".bedrock"]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDictionary);
@@ -2900,7 +2902,7 @@ function scanForObfuscations_Native() {
         var isIdioticMinGwSectionsPresent = false;
 
         if (_isResultPresent("linker", "GNU linker ld (GNU Binutils)")) {
-            if (PE.section[".build-id"]) {
+            if (PE.isSectionNamePresent(".build-id")) {
                 isIdioticMinGwSectionsPresent = true;
             } else {
                 for (var d = 1; d < 10 && !isIdioticMinGwSectionsPresent; d++) { // sections like "/5", "/2" etc
@@ -3982,11 +3984,22 @@ function scanForLanguages_NET_and_Native() {
 
     if (!isCompilerDetected() && !isLinkerDetected()) {
         if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000") ||
-            PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")) {
+            PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") ||
+            (PE.isRichSignaturePresent() && PE.isSectionNamePresent(".00cfg"))) {
+
+            if (PE.isSectionNamePresent(".gfids") || PE.isSectionNamePresent(".giats") || PE.isSectionNamePresent(".gljmp")) {
+                _setResult("~tool", "Microsoft Visual Studio", String(), String())
+            }
 
             _setResult("~linker", "Microsoft Linker", majorLinkerVersion + "." + minorLinkerVersion, String());
             _setResult("~compiler", "Microsoft Visual C/C++", String(), String());
             _setLangByHeur("C/C++");
+        } else if (!PE.isRichSignaturePresent() && (PE.isSectionNamePresent(".CRT") || PE.isSectionNamePresent(".xdata")) || PE.isSectionNamePresent(".buildid") || PE.isSectionNamePresent(".build-id")) {
+            _setResult("~compiler", "MinGW", String(), String());
+            _setLangByHeur("C/C++");
+        } else if (!PE.isRichSignaturePresent() && PE.isSectionNamePresent(".flat")) {
+            _setResult("~compiler", "FASM", String(), String());
+            _setLangByHeur("ASMx" + (PE.is64() ? "64" : "86"));
         }
     }
 
