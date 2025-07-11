@@ -306,32 +306,32 @@ function scanForObfuscations_NET() {
 
     // Check PE image for strange sections
 
-    var strangeSections = false;
+    var isStrangeSectionsPresent = false;
 
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
 
-    if (PE.getNumberOfSections() > (!isClrNET() ? 6 : 10) || !PE.section[".text"]) { strangeSections = true; } else {
+    if (PE.getNumberOfSections() > (!isClrNET() ? 6 : 10) || !PE.section[".text"]) { isStrangeSectionsPresent = true; } else {
         // Iterate through each section
-        for (var i = 0; i < PE.getNumberOfSections() && !strangeSections; i++) {
+        for (var i = 0; i < PE.getNumberOfSections() && !isStrangeSectionsPresent; i++) {
             const sectionName = PE.getSectionName(i);
 
             // Check if the first character is not "." and the length of name is less than 3
             if (sectionName[0] !== "." && sectionName.length < 3) {
-                strangeSections = true;
+                isStrangeSectionsPresent = true;
                 break;
             }
 
             // Iterate through characters after "."
             // Check if the character is in the badChars list
-            for (var d = 0; d < badChars.length && !strangeSections; d++) {
+            for (var d = 0; d < badChars.length && !isStrangeSectionsPresent; d++) {
                 if (sectionName.substr(1, sectionName.length).indexOf(badChars[d]) !== -1) {
-                    strangeSections = true;
+                    isStrangeSectionsPresent = true;
                 }
             }
         }
     }
 
-    if (strangeSections) options += (options.length !== 0 ? " + " : String()) + "Strange sections";
+    if (isStrangeSectionsPresent) options += (options.length !== 0 ? " + " : String()) + "Strange sections";
 
 
 
@@ -2596,6 +2596,19 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
 
 
+    // Check for -Wl,--export-all-symbols linker option
+
+    var isSymbolsExported = false;
+
+    if (!PE.isDll() && PE.isExportFunctionPresent("main")) {
+        isSymbolsExported = true;
+    }
+
+    if (isSymbolsExported) options += (options.length !== 0 ? " + " : String()) + "Symbols exported";
+
+
+
+
     // Check for absolute PDB path
 
     var isPdbFullPathPresent = false;
@@ -2892,17 +2905,17 @@ function scanForObfuscations_Native() {
 
     // Check for section names containing forbidden characters
 
-    var strangeSections = false;
+    var isStrangeSectionsPresent = false;
 
     // Define forbidden characters
     const badSectionChars = '-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<> ';
 
     // Iterate through sections and characters to check for forbidden characters
-    for (var i = 0; i < PE.getNumberOfSections() && !strangeSections; i++) {
+    for (var i = 0; i < PE.getNumberOfSections() && !isStrangeSectionsPresent; i++) {
         var sectionName = PE.getSectionName(i);
 
         if (sectionName.length === 0 || sectionName[0] === " ") {
-            strangeSections = true;
+            isStrangeSectionsPresent = true;
         }
 
 
@@ -2921,22 +2934,22 @@ function scanForObfuscations_Native() {
         }
 
         if (isIdioticMinGwSectionsPresent) {
-            strangeSections = false;
+            isStrangeSectionsPresent = false;
             break;
         }
 
 
-        for (var d = 0; d < badSectionChars.length && !strangeSections; d++) {
+        for (var d = 0; d < badSectionChars.length && !isStrangeSectionsPresent; d++) {
             // If forbidden character is found, set flag and break
             if (sectionName.indexOf(badSectionChars[d]) !== -1) {
-                strangeSections = true;
+                isStrangeSectionsPresent = true;
             }
         }
 
 
     }
 
-    if (strangeSections) options += (options.length !== 0 ? " + " : String()) + "Strange sections";
+    if (isStrangeSectionsPresent) options += (options.length !== 0 ? " + " : String()) + "Strange sections";
 
 
 
