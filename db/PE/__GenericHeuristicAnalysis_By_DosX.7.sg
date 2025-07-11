@@ -646,10 +646,10 @@ function scanForObfuscations_NET() {
 
         const currentStringPattern = patternsToExplore[i];
 
-        if (currentStringPattern.indexOf("<") === -1 && currentStringPattern.match(/^(?=\d|[a-z])(?=.*[a-z]\d[a-z])(?=(?:.*\d){4,})/i))
+        if (currentStringPattern.indexOf("<") === -1 && isNameObfuscated(currentStringPattern))
             strangePatternsCounter++;
 
-        if (strangePatternsCounter > 4)
+        if (strangePatternsCounter > 3)
             badNamings = true;
 
     }
@@ -2199,39 +2199,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
-    // Many not-so-smart virus writers use base64 to pack
-    // or hide malicious code, but do not realize that this
-    // is very easily detected by heuristic analysis.
-
-    const signaturesVariants = [
-        "TVoAAAAAA", // MZ ~[00 00 00 00 00]
-        "TVqQAA", // MZ ~[90 00 03]
-        "TVpQAA", // MZ ~[50 00 02]
-        "TVp4AA" // MZ ~[78 00 01]
-    ];
-
-    var isEncodedPeDetected = false;
-
-    // Iterate through signature variants
-    for (var s = 0; s < signaturesVariants.length && !isEncodedPeDetected; s++) {
-        const trigger = signaturesVariants[s];
-
-        // Check if the signature is valid using Unicode signature mask or the original signature
-        if (
-            validateGlobalUnicodeString(trigger) ||
-            validateSignature("'" + trigger + "'")
-        ) {
-            log(logType.nothing, "Encoded PE detected! (with Base64)");
-            isCryptor = true;
-            isEncodedPeDetected = true;
-        }
-    }
-
-    if (isEncodedPeDetected) options += (options ? " + " : String()) + "Base64 payload";
-
-
-
-
     // Check for 'MZ' signature in the overlay
 
     var isMzSignatureDetected = false;
@@ -2899,6 +2866,52 @@ function findAndMark(sign, isFullName) {
         return sign;
     }
     return String();
+}
+
+
+
+/**
+ * Determines if a given name string appears to be obfuscated based on specific heuristics.
+ *
+ * The function checks for:
+ *  - A regex pattern indicating a mix of digits and lowercase letters with at least four digits.
+ *  - Alternatively, counts the number of digits, lowercase, and uppercase letters.
+ *    If the name contains at least 5 digits, 2 lowercase letters, and 1 uppercase letter, it is considered obfuscated.
+ *
+ * @param {string} name - The name string to analyze for obfuscation.
+ * @returns {boolean} Returns true if the name is detected as obfuscated, otherwise false.
+ */
+function isNameObfuscated(name) {
+    var isNameObfuscated = false;
+
+    if (name.match(/^(?=\d|[a-z])(?=.*[a-z]\d[a-z])(?=(?:.*\d){4,})/i)) {
+        isNameObfuscated = true;
+    } else {
+        // Count digits, lowercase, and uppercase letters; Heuristic method
+        var stats = { digits: 0, lower: 0, upper: 0 };
+
+        for (var i = 0; i < name.length; i++) {
+            if (name[i] >= '0' && name[i] <= '9') {
+                stats.digits++;
+            }
+            else if (name[i] >= 'a' && name[i] <= 'z') {
+                stats.lower++;
+            } else if (name[i] >= 'A' && name[i] <= 'Z') {
+                stats.upper++;
+            }
+        }
+
+        if ((stats.digits >= 5 && stats.lower >= 2 && stats.upper >= 1) ||
+            (stats.digits >= 6 && stats.lower >= 5)) {
+            isNameObfuscated = true;
+        }
+    }
+
+    if (isNameObfuscated) {
+        log(logType.nothing, "Obfuscated name detected: \"" + name + "\"");
+    }
+
+    return isNameObfuscated;
 }
 
 
@@ -4066,7 +4079,8 @@ function scanForLanguages_NET_and_Native() {
     var majorLinkerVersion = PE.getMajorLinkerVersion(),
         minorLinkerVersion = PE.getMinorLinkerVersion();
 
-    if (!isCompilerDetected() && !isLinkerDetected()) {
+    if (!isCompilerDetected() && !isLinkerDetected() && PE.isNet()) {
+
         if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000") ||
             PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") ||
             (PE.isRichSignaturePresent() && PE.isSectionNamePresent(".00cfg"))) {
@@ -4170,18 +4184,10 @@ function log(messageTypeId, messageText) {
     }
 
     switch (messageTypeId) {
-        case -2:
-            prefix = "!";
-            break;
-        case -1:
-            prefix += "About";
-            break;
-        case 1:
-            prefix += "Any";
-            break;
-        case 2:
-            prefix += ".NET";
-            break;
+        case -2: prefix = "!"; break;
+        case -1: prefix += "About"; break;
+        case 1: prefix += "Any"; break;
+        case 2: prefix += ".NET"; break;
     }
 
     if (typeof _log !== "undefined") {
@@ -4369,14 +4375,16 @@ function scanForMaliciousCode_NET_and_Native() {
             }
         }
 
-        // // NjRAT Generic: Detect NjRAT via requests-separator
-        if (verdicts.length === 0 && PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("|'|'|") + "00")) {
+        // // NjRAT Generic: Detect NjRAT via requests-separator or assembly name
+        if (verdicts.length === 0 && (PE.getNetAssemblyName() === "w" ||
+            PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("|'|'|") + "00"))) {
             verdicts.push({
                 type: "NjRAT",
                 version: String(),
                 details: String()
             });
         }
+
 
         if (verdicts.length === 0 && PE.isSignatureInSectionPresent(0, "00" + generateUnicodeSignatureMask(" RAT") + "00 **")) {
             verdicts.push({
@@ -4385,7 +4393,19 @@ function scanForMaliciousCode_NET_and_Native() {
                 details: "General signs"
             });
         }
+
+
+        if (verdicts.length === 0 && (PE.getNetAssemblyName().toLowerCase() === "stub" || isNameObfuscated(PE.getNetAssemblyName()) || isNameObfuscated(PE.getNetModuleName()))) {
+            verdicts.push({
+                type: "Anomalous build info",
+                version: String(),
+                details: "May be infected, be careful!"
+            });
+        }
     }
+
+
+
 
     if (verdicts.length === 0 && PE.isSectionNamePresent(".rmnet")) {
         verdicts.push({
@@ -4394,6 +4414,9 @@ function scanForMaliciousCode_NET_and_Native() {
             details: String()
         });
     }
+
+
+
 
     if (verdicts.length === 0 && PE.compareEP(
         "55" +             // push ebp
@@ -4418,9 +4441,40 @@ function scanForMaliciousCode_NET_and_Native() {
             type: "Neshta",
             version: String(),
             details: "infected"
-        })
+        });
     }
 
+
+
+
+    // Many not-so-smart virus writers use base64 to pack
+    // or hide malicious code, but do not realize that this
+    // is very easily detected by heuristic analysis.
+
+    const signaturesVariants = [
+        "TVoAAAAAA", // MZ ~[00 00 00 00 00]
+        "TVqQAA", // MZ ~[90 00 03]
+        "TVpQAA", // MZ ~[50 00 02]
+        "TVp4AA" // MZ ~[78 00 01]
+    ];
+
+    // Iterate through signature variants
+    for (var s = 0; s < signaturesVariants.length; s++) {
+        const trigger = signaturesVariants[s];
+
+        // Check if the signature is valid using Unicode signature mask or the original signature
+        if (
+            validateGlobalUnicodeString(trigger) ||
+            validateSignature("'" + trigger + "'")
+        ) {
+            verdicts.push({
+                type: "Base64 payload",
+                version: String(),
+                details: "May be infected, be careful!"
+            });
+            break;
+        }
+    }
 
 
 
