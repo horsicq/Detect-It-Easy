@@ -3846,10 +3846,10 @@ function isNetMetaDataPresent() {
 
     if (!PE.is64()) {
         numRvaAndSizesOffset = optHeaderOffset + 0x5C;
-        clrDirOffset = optHeaderOffset + 0xD0;
+        clrDirOffset = optHeaderOffset + 0xD0; // CLR offset for PE32
     } else {
         numRvaAndSizesOffset = optHeaderOffset + 0x6C;
-        clrDirOffset = optHeaderOffset + 0xE0;
+        clrDirOffset = optHeaderOffset + 0xE0; // CLR offset for PE64
     }
 
     // Check if the offsets are within the bounds of the PE file size
@@ -3858,13 +3858,17 @@ function isNetMetaDataPresent() {
         return false;
     }
 
-    // Check if the number of RVA and sizes is valid (should be at least 15 for CLR)
+    // Check if the number of RVA and sizes is valid
     if (PE.read_int32(numRvaAndSizesOffset) < 15) {
         return false;
     }
 
-    // If the CLR directory RVA is not zero, it is present
-    return PE.read_int32(clrDirOffset) !== 0;
+    // Read CLR directory RVA and size
+    var clrRva = PE.read_int32(clrDirOffset),
+        clrSize = PE.read_int32(clrDirOffset + 4);
+
+    // Validate CLR directory RVA and size
+    return clrRva !== 0 && clrSize !== 0;
 }
 
 
