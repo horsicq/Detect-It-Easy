@@ -4014,7 +4014,6 @@ function scanForLanguages_NET_and_Native() {
         ) {
             log(logType.any, "C++ library present -> \"" + libraryName + "\"");
             isPpLibraryPresent = true;
-            break;
         }
 
 
@@ -4022,7 +4021,6 @@ function scanForLanguages_NET_and_Native() {
         if (libraryName.indexOf("msvcr") !== -1) {
             log(logType.any, "C library present -> \"" + libraryName + "\"");
             isCLibraryPresent = true;
-            break;
         }
     }
 
@@ -4076,14 +4074,16 @@ function scanForLanguages_NET_and_Native() {
 
 
 
+    var isCLikeLibsNotFound = !isCLibraryPresent && !isPpLibraryPresent;
+
     var majorLinkerVersion = PE.getMajorLinkerVersion(),
         minorLinkerVersion = PE.getMinorLinkerVersion();
 
-    if (!isCompilerDetected() && !isLinkerDetected() && PE.isNet()) {
+    if (!isCompilerDetected() && !isLinkerDetected() && !PE.isNet()) {
 
-        if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000") ||
+        if (PE.isRichSignaturePresent() && (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000") ||
             PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") ||
-            (PE.isRichSignaturePresent() && PE.isSectionNamePresent(".00cfg"))) {
+            PE.isSectionNamePresent(".00cfg"))) {
 
             if (PE.isSectionNamePresent(".gfids") || PE.isSectionNamePresent(".giats") || PE.isSectionNamePresent(".gljmp")) {
                 _setResult("~tool", "Microsoft Visual Studio", String(), String())
@@ -4092,15 +4092,22 @@ function scanForLanguages_NET_and_Native() {
             _setResult("~linker", "Microsoft Linker", majorLinkerVersion + "." + minorLinkerVersion, String());
             _setResult("~compiler", "Microsoft Visual C/C++", String(), String());
 
-            if (isNetMetaDataPresent()) {
-                _setLangByHeur("MSIL/C/C++");
-            } else {
+            if (!_isLangDetected() && isCLikeLibsNotFound) {
+                if (isNetMetaDataPresent()) {
+                    _setLangByHeur("MSIL/C/C++");
+                } else {
+                    _setLangByHeur("C/C++");
+                }
+            }
+        } else if (!PE.isRichSignaturePresent() && PE.isSectionNamePresent(".CRT") && PE.isSectionNamePresent(".rdata") && PE.isSectionNamePresent(".xdata") && PE.isSectionNamePresent(".idata") &&
+            (PE.isSectionNamePresent(".tls") || PE.isSectionNamePresent(".bss")) || PE.isSectionNamePresent(".buildid") || PE.isSectionNamePresent(".build-id")) {
+
+            _setResult("~compiler", "MinGW", String(), String());
+
+            if (!_isLangDetected() && isCLikeLibsNotFound) {
                 _setLangByHeur("C/C++");
             }
-        } else if (!PE.isRichSignaturePresent() && (PE.isSectionNamePresent(".CRT") || PE.isSectionNamePresent(".xdata")) || PE.isSectionNamePresent(".buildid") || PE.isSectionNamePresent(".build-id")) {
-            _setResult("~compiler", "MinGW", String(), String());
-            _setLangByHeur("C/C++");
-        } else if (!PE.isRichSignaturePresent() && PE.isSectionNamePresent(".flat")) {
+        } else if (!PE.isRichSignaturePresent() && PE.isSectionNamePresent(".flat") && !isPpLibraryPresent) {
             _setResult("~compiler", "FASM", String(), String());
             _setLangByHeur("ASMx" + (PE.is64() ? "64" : "86"));
         }
