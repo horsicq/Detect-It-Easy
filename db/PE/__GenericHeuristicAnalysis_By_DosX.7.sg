@@ -1333,8 +1333,7 @@ function NetOpCodes() {
     this.brfalse = "39????????"; // MSIL: 'brfalse' - Branch if false/null/zero
     this.brfalse_s = "2C??"; // MSIL: 'brfalse.s' - Branch if false/null/zero (short)
     this.brtrue = "3A????????"; // MSIL: 'brtrue' - Branch if true/non-null/non-zero
-    this.brtrue_s = "2D??"; // MSIL: 'brtrue.s' - Branch if true (short, int8)
-    this.brfalse_s = "2C??"; // MSIL: 'brfalse.s' - Branch if false (short, int8)
+    this.brtrue_s = "2D??"; // MSIL: 'brtrue.s' - Branch if true/non-null/non-zero (short)
     this.call = "28????????"; // MSIL: 'call' - Call method
     this.calli = "29????????"; // MSIL: 'calli' - Call indirect
     this.ldftn = "FE06????????"; // MSIL: 'ldftn' - Load function pointer
@@ -3842,17 +3841,30 @@ function getOptHeaderOffset() {
  */
 function isNetMetaDataPresent() {
     var optHeaderOffset = getOptHeaderOffset();
-    if (optHeaderOffset === -1) return false;
 
-    // DataDirectory[14] is CLR Runtime Header
-    // Offset: OptionalHeader + 0xA8 (for PE32) or 0xE0 (for PE32+)
-    var clrDirOffset32 = optHeaderOffset + 0xA8,
-        clrDirOffset64 = optHeaderOffset + 0xE0,
-        clrRva32 = PE.read_int32 ? PE.read_int32(clrDirOffset32) : 0,
-        clrRva64 = PE.read_int32 ? PE.read_int32(clrDirOffset64) : 0,
-        clrDirRva = (clrRva32 !== 0) ? clrRva32 : clrRva64;
+    var numRvaAndSizesOffset, clrDirOffset;
 
-    return !!clrDirRva && clrDirRva !== 0;
+    if (!PE.is64()) {
+        numRvaAndSizesOffset = optHeaderOffset + 0x5C;
+        clrDirOffset = optHeaderOffset + 0xD0;
+    } else {
+        numRvaAndSizesOffset = optHeaderOffset + 0x6C;
+        clrDirOffset = optHeaderOffset + 0xE0;
+    }
+
+    // Check if the offsets are within the bounds of the PE file size
+    if (clrDirOffset + 8 > PE.getSize() ||
+        numRvaAndSizesOffset + 4 > PE.getSize()) {
+        return false;
+    }
+
+    // Check if the number of RVA and sizes is valid (should be at least 15 for CLR)
+    if (PE.read_int32(numRvaAndSizesOffset) < 15) {
+        return false;
+    }
+
+    // If the CLR directory RVA is not zero, it is present
+    return PE.read_int32(clrDirOffset) !== 0;
 }
 
 
