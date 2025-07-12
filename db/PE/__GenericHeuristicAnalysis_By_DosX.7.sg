@@ -57,8 +57,8 @@
 //    └───────────────────────────────────────────────────────────┘
 
 //         ┌───────────────────────────────────────────────┐
-//         │  For the module to work correctly, official   │
-//         │    Detect It Easy components are recommended  │
+//         │   For the module to work correctly, official  │
+//         │   Detect It Easy components are recommended   │
 //         ├───────────────────────────────────────────────┘
 //         └─┐
 //           └──  Please don't read the code out loud
@@ -721,7 +721,8 @@ function scanForObfuscations_NET() {
 
 
 
-    // Detects the use of unusual mathematical expressions that would be simplified by the compiler. For example, an expression like "912874 + 39188124^834"
+    // Detects the use of unusual mathematical expressions that would be simplified by the compiler. 
+    // For example, an expression like "912874 + 39188124^834"
 
     var isMutationsPresent = false;
 
@@ -950,6 +951,23 @@ function scanForObfuscations_NET() {
     }
 
     if (isWatermarkPresent) options += (options ? " + " : String()) + "Watermark";
+
+
+
+
+    // The module name must always contain the assembly name and the output file extension (Assembly "App", Module "App.dll").
+    // If this standard is not followed, it means that the sample was modified after compilation.
+
+    var isBuildInfoModified = false;
+
+    var buildAssemblyName = PE.getNetAssemblyName(),
+        buildModuleName = PE.getNetModuleName();
+
+    if (buildAssemblyName !== getFileNameWithoutExtension(buildModuleName) || buildAssemblyName === buildModuleName) {
+        isBuildInfoModified = true;
+    }
+
+    if (isBuildInfoModified) options += (options ? " + " : String()) + "Modified build info";
 
 
 
@@ -1584,6 +1602,29 @@ function clearSectionName(sectionName) {
     cleaned = cleaned.trim();
 
     return cleaned;
+}
+
+
+
+/**
+ * Returns the file name without its extension.
+ *
+ * @param {string} fileName - The name of the file, possibly including an extension.
+ * @returns {string} The file name without the extension. If no extension is found, returns the original file name.
+ */
+function getFileNameWithoutExtension(fileName) {
+    // Type validation to prevent runtime errors
+    if (!fileName || typeof fileName !== "string") {
+        return String();
+    }
+
+    // Remove the file extension by splitting on the last dot and returning the first part
+    var lastDotIndex = fileName.lastIndexOf(".");
+    if (lastDotIndex === -1) {
+        return fileName; // No extension found, return original name
+    }
+
+    return fileName.substring(0, lastDotIndex);
 }
 
 
@@ -4209,6 +4250,8 @@ function log(messageTypeId, messageText) {
 function scanForMaliciousCode_NET_and_Native() {
     var verdicts = [];
 
+    const mayBeInfected = "May be infected, be careful!";
+
 
     if (PE.isNet()) {
 
@@ -4468,7 +4511,7 @@ function scanForMaliciousCode_NET_and_Native() {
             verdicts.push({
                 type: "Base64 payload",
                 version: String(),
-                details: "May be infected, be careful!"
+                details: mayBeInfected
             });
 
             break;
@@ -4489,7 +4532,7 @@ function scanForMaliciousCode_NET_and_Native() {
         verdicts.push({
             type: "Anomalous build info",
             version: String(),
-            details: "May be infected, be careful!"
+            details: mayBeInfected
         });
     }
 
