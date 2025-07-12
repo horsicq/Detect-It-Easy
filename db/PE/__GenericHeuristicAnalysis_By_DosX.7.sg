@@ -3244,11 +3244,11 @@ function scanForObfuscations_Native() {
 
 
 
-    // Check for "Address to stack trick" (CALL $+5)
+    // Check for "Stack-push address near EP" (CALL $+5)
 
     var isAddrToStackTrickPresent = false;
 
-    // Check first 30 instructions for "Address to stack trick"
+    // Check first 30 instructions for "Stack-push address near EP"
     // This trick uses "CALL $+5" (E8 00 00 00 00) to push next instruction address on stack
     if (!PE.isDll()) {
         for (var i = 0; i < 30; i++) {
@@ -3269,7 +3269,7 @@ function scanForObfuscations_Native() {
 
                 // Check if machine code matches E8 00 00 00 00 pattern
                 if (PE.compare("E8 00 00 00 00", currentOffset)) {
-                    log(logType.any, "Address to stack trick found at offset: 0x" + currentOffset.toString(16));
+                    log(logType.any, "Stack-push address near EP found at offset: 0x" + currentOffset.toString(16));
                     isAddrToStackTrickPresent = true;
                     break;
                 }
@@ -3277,7 +3277,7 @@ function scanForObfuscations_Native() {
         }
     }
 
-    if (isAddrToStackTrickPresent) options += (options ? " + " : String()) + "Address to stack near EP";
+    if (isAddrToStackTrickPresent) options += (options ? " + " : String()) + "Stack-push address near EP";
 
 
 
@@ -4400,15 +4400,6 @@ function scanForMaliciousCode_NET_and_Native() {
                 details: "General signs"
             });
         }
-
-
-        if (verdicts.length === 0 && (PE.getNetAssemblyName().toLowerCase() === "stub" || isNameObfuscated(PE.getNetAssemblyName()) || isNameObfuscated(PE.getNetModuleName()))) {
-            verdicts.push({
-                type: "Anomalous build info",
-                version: String(),
-                details: "May be infected, be careful!"
-            });
-        }
     }
 
 
@@ -4426,23 +4417,23 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
     if (verdicts.length === 0 && PE.compareEP(
-        "55" +             // push ebp
-        "8B EC" +          // mov ebp, esp
-        "83 C4 E0" +       // add esp, -0x20
-        "33 C0" +          // xor eax, eax
-        "89 45 E0" +       // mov dword ptr [ebp - 0x20], eax
-        "89 45 E8" +       // mov dword ptr [ebp - 0x18], eax
-        "89 45 E4" +       // mov dword ptr [ebp - 0x1c], eax
-        "89 45 EC" +       // mov dword ptr [ebp - 0x14], eax
-        "B8 54 80 40 00" + // mov eax, 0x408054
-        "E8 12 BE FF FF" + // call $+5 - 0x41EE
-        "33 C0" +          // xor eax, eax
-        "55" +             // push ebp
-        "68 20 82 40 00" + // push 0x408220
-        "64 FF 30" +       // push dword ptr fs:[eax]
-        "64 89 20" +       // mov dword ptr fs:[eax], esp
-        "B8 A8 91 40 00" + // mov eax, 0x4091a8
-        "B9 0B 00 00 00"   // mov ecx, 0xb
+        "55" +              // push ebp
+        "8B EC" +           // mov ebp, esp
+        "83 C4 E0" +        // add esp, -0x20
+        "33 C0" +           // xor eax, eax
+        "89 45 E0" +        // mov dword ptr [ebp - 0x20], eax
+        "89 45 E8" +        // mov dword ptr [ebp - 0x18], eax
+        "89 45 E4" +        // mov dword ptr [ebp - 0x1c], eax
+        "89 45 EC" +        // mov dword ptr [ebp - 0x14], eax
+        "B8 54 80 40 00" +  // mov eax, 0x408054
+        "E8 12 BE FF FF" +  // call $+5 - 0x41EE
+        "33 C0" +           // xor eax, eax
+        "55" +              // push ebp
+        "68 20 82 40 00" +  // push 0x408220
+        "64 FF 30" +        // push dword ptr fs:[eax]
+        "64 89 20" +        // mov dword ptr fs:[eax], esp
+        "B8 A8 91 40 00" +  // mov eax, 0x4091a8
+        "B9 0B 00 00 00"    // mov ecx, 0xb
     )) {
         verdicts.push({
             type: "Neshta",
@@ -4479,9 +4470,29 @@ function scanForMaliciousCode_NET_and_Native() {
                 version: String(),
                 details: "May be infected, be careful!"
             });
+
             break;
         }
     }
+
+
+
+
+    // Check for obfuscated names in .NET and native assemblies
+
+    if ((PE.isNet() && (
+        PE.getNetAssemblyName().toLowerCase() === "stub" ||
+        isNameObfuscated(PE.getNetAssemblyName()) || isNameObfuscated(PE.getNetModuleName())
+    ) ||
+        isNameObfuscated(replaceAllInString(PE.getVersionStringInfo("ProductName"), " ", String())))) {
+
+        verdicts.push({
+            type: "Anomalous build info",
+            version: String(),
+            details: "May be infected, be careful!"
+        });
+    }
+
 
 
 
