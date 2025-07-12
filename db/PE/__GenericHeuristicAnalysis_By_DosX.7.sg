@@ -769,7 +769,7 @@ function scanForObfuscations_NET() {
 
     var isStringsEncryptionPresent = false;
 
-    if (isVbNet) {
+    if (isVbNet && !isFrameworkComponent()) {
         if (PE.isNetObjectPresent("Resources") && !validateGlobalUnicodeString(".Resources")) {
             isStringsEncryptionPresent = true;
         }
@@ -961,7 +961,8 @@ function scanForObfuscations_NET() {
 
     var isBuildInfoModified = false;
 
-    var buildAssemblyName = PE.getNetAssemblyName(),
+    const
+        buildAssemblyName = PE.getNetAssemblyName(),
         buildModuleName = PE.getNetModuleName();
 
     if (buildAssemblyName !== getFileNameWithoutExtension(buildModuleName) || buildAssemblyName === buildModuleName) {
@@ -1078,7 +1079,7 @@ function scanForAntiAnalysis_NET() {
     var isAntiDumpPresent = false;
 
     if (
-        validateNetObject("VirtualProtect") && ( // from 'kernel32.dll', WinAPI
+        !isFrameworkComponent() && validateNetObject("VirtualProtect") && ( // from 'kernel32.dll', WinAPI
             // Need to check
             isAllNetReferencesPresent( // samples by: ConfuserEx, SkiDzEX
                 references = [
@@ -1646,7 +1647,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         var isAssemblyInvokeFound = false;
 
-        if (isAllNetReferencesPresent( // TODO: update [!!!]
+        if (!isFrameworkComponent() && PE.getNetModuleName !== "System.dll" && isAllNetReferencesPresent( // TODO: update [!!!]
             references = [
                 "System.Reflection", // System.Reflection.dll
                 "get_EntryPoint", // MSIL: '*.Assembly::get_EntryPoint()'
@@ -2715,12 +2716,24 @@ function isVbNetStandartLibraryPresent() {
 
 
 /**
- * Determines if the current file is a .NET DLL signed by Microsoft Corporation.
+ * Determines if the current PE file is a .NET component.
  *
- * @returns {boolean} True if the file meets the criteria, false otherwise.
+ * @returns {boolean} Returns true if the PE file is identified as a .NET component, otherwise false.
  */
 function isFrameworkComponent() {
-    return PE.isNet() && PE.isDll() && PE.isSigned() && PE.findSignature(PE.getOverlayOffset(), 300, "'Microsoft Corporation'") != -1;
+    if (!PE.isNet() || !PE.isDll() || PE.isNetGlobalCctorPresent()) {
+        return false;
+    }
+
+    const
+        buildAssemblyName = PE.getNetAssemblyName(),
+        buildModuleName = PE.getNetModuleName();
+
+    if (buildAssemblyName.length >= 6 && buildAssemblyName.substring(0, 6) === "System" && buildModuleName === (buildAssemblyName + ".dll")) {
+        return true;
+    }
+
+    return false;
 }
 
 
