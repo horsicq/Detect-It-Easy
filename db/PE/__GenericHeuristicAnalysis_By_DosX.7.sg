@@ -194,7 +194,8 @@ function scanForObfuscations_NET() {
         "main@", // F# entry
         "<Main>$", // For programs with top-level operators (C#)
         "mainCRTStartup", // C++ CLR .NET (CLI)
-        "wWinMainCRTStartup" // C++ CLR .NET (GUI)
+        "wWinMainCRTStartup", // C++ CLR .NET (GUI)
+        "_WinMainCRTStartup"
     ]
 
     if (!PE.isDll()) {
@@ -211,7 +212,7 @@ function scanForObfuscations_NET() {
         }
     }
 
-    if (isEntryPointModified) options = "Modified EP";
+    if (isEntryPointModified) options = "Modified managed EP";
 
 
 
@@ -961,9 +962,12 @@ function scanForObfuscations_NET() {
 
     var isBuildInfoModified = false;
 
-    const
-        buildAssemblyName = PE.getNetAssemblyName(),
+    var buildAssemblyName = PE.getNetAssemblyName(),
         buildModuleName = PE.getNetModuleName();
+
+    if (buildAssemblyName.indexOf("Interop.") === 0) {
+        buildAssemblyName = buildAssemblyName.substring(8, buildAssemblyName.length);
+    }
 
     if (buildAssemblyName !== getFileNameWithoutExtension(buildModuleName) || buildAssemblyName === buildModuleName) {
         isBuildInfoModified = true;
@@ -1866,7 +1870,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         }
     }
 
-    if (entryLikePacker) options += (options ? " + " : String()) + "EntryPoint pattern";
+    if (entryLikePacker) options += (options ? " + " : String()) + "EntryPoint";
 
 
 
@@ -1885,10 +1889,11 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         case "PUSHF":
         case "POPA":
             log(logType.nothing, "'" + firstEpAsmOpCode + "' at EP");
+
             isStartsWithStackOperation = true;
     }
 
-    if (isStartsWithStackOperation) options += (options ? " + " : String()) + firstEpAsmOpCode.toLowerCase() + " at EP";
+    if (isStartsWithStackOperation) options += (options ? " + " : String()) + firstEpAsmOpCode[0].toUpperCase() + firstEpAsmOpCode.toLowerCase().substring(1, firstEpAsmOpCode.length) + " at EP";
 
 
 
@@ -1915,8 +1920,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
             // Check if the entry point is greater than or equal to the last section address
             if (entryPointAddress >= lastSectionAddress) {
-                isLastSectionEP = true;
                 log(logType.nothing, "EP address (" + entryPointAddress + ") more than last section address (" + lastSectionAddress + ")");
+
+                isLastSectionEP = true;
             }
         }
     }
@@ -2051,6 +2057,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         versionByImportsDetected = importValidatingResult[1];
 
         log(logType.nothing, "Imports hash like " + importValidatingResult[0] + (versionByImportsDetected ? " (version " + versionByImportsDetected + ")" : String()) + " (" + importValidatingResult[3] + ")")
+
         isImportsLikePacker = true;
     }
 
@@ -2192,6 +2199,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         versionBySectionDetected = sectionNamesValidatingResult[1];
 
         log(logType.nothing, "Sections like " + sectionNamesValidatingResult[0] + (versionBySectionDetected ? " (v" + versionBySectionDetected + ")" : String()));
+
         isSectionNameLikePacker = true;
     }
 
@@ -2213,6 +2221,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     // Check if there is a collision
     if (sectionNameCollision.length != 0) {
         log(logType.nothing, "Section names collision: '" + clearSectionName(sectionNameCollision) + "'");
+
         isCollisionInSectionsPresent = true;
     }
 
@@ -2233,6 +2242,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         sectionNamesDictionary[sectionName] = (sectionNamesDictionary[sectionName] || 0) + 1;
         if (sectionNamesDictionary[sectionName] > 1) {
             log(logType.nothing, "Section names repeating: '" + clearSectionName(sectionName) + "'");
+
             isSectionNamesRepeatingPresent = true;
         }
     }
@@ -2249,7 +2259,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (PE.isOverlayPresent() &&
         PE.getOverlaySize() >= 100 &&
         PE.compareOverlay("'MZ'")) {
-        log(logType.any, "PE signature at overlay");
+        log(logType.any, "PE signature at overlay detected");
+
         isMzSignatureDetected = true;
     }
 
@@ -2270,6 +2281,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             PE.getOverlaySize() > (PE.getSize() - PE.getOverlaySize())
         ) {
             log(logType.any, "Overlay size: " + PE.getOverlaySize() + " bytes; Entropy: " + overlayEntropy);
+
             hasStrangeOverlay = true;
         }
     }
@@ -2323,6 +2335,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         var name = PE.getImportLibraryName(i);
         importNames[name] = (importNames[name] || 0) + 1;
         if (importNames[name] >= 3) {
+            log(logType.nothing, "Recurring import name: \"" + name + "\"");
+
             recurringImports = true;
         }
     }
@@ -2605,7 +2619,8 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
     var isNetNativeDebugDataPresent = false;
 
     if (!PE.isNet() && PE.isExportFunctionPresent("DotNetRuntimeDebugHeader")) {
-        log(logType.any, ".NET Native debug function detected");
+        log(logType.any, ".NET Native debug symbols detected");
+
         isNetNativeDebugDataPresent = true;
     }
 
@@ -2619,6 +2634,8 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
     var isSymbolsExported = false;
 
     if (!PE.isDll() && PE.isExportFunctionPresent("main")) {
+        log(logType.any, "The \"--export-all-symbols\" linker option was probably used");
+
         isSymbolsExported = true;
     }
 
@@ -2653,6 +2670,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
         if (pdbPath.match(/^[a-zA-Z]:\\/) !== null) {
             log(logType.any, "PDB absolute path: \"" + pdbPath + "\"");
+
             isPdbFullPathPresent = true;
         }
     }
@@ -2672,6 +2690,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
         pdbTextType = validateSignature("00 52 53 44 53") ? "Embedded" : "Portable";
 
         log(logType.any, pdbTextType + " PDB name: \"" + pdbPath + "\"");
+
         isPortableOrEmbeddedPdbDetected = true;
     }
 
@@ -2686,6 +2705,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     if (PE.isNet() && PE.isNetObjectPresent("costura.costura.pdb.compressed")) {
         log(logType.any, "Costura embedded PDB detected");
+
         isCosturaEmbeddedDebugData = true;
     }
 
@@ -2841,16 +2861,16 @@ function validateGlobalUnicodeString(ustring) {
  * 
  * "test" -> "'t'00'e'00's'00't'"
  *
- * @param {string} inputString - The input string for which to generate the Unicode signature mask.
+ * @param {string} ustring - The input string for which to generate the Unicode signature mask.
  * @returns {string} The generated Unicode signature mask.
  */
-function generateUnicodeSignatureMask(inputString) {
+function generateUnicodeSignatureMask(ustring) {
     var output = String();
 
     // Iterate through each character in the input string
-    for (var c = 0; c < inputString.length; c++) {
+    for (var c = 0; c < ustring.length; c++) {
         // Append the Unicode representation of the character to the output
-        output += (c != 0 ? "00" : String()) + "'" + inputString[c] + "'";
+        output += (c != 0 ? "00" : String()) + "'" + ustring[c] + "'";
     }
 
     // Return the generated Unicode signature mask
@@ -3357,7 +3377,7 @@ function scanForObfuscations_Native() {
         }
     }
 
-    if (isCpuidNearEpPresent) options += (options ? " + " : String()) + "\"cpuid\" near EP";
+    if (isCpuidNearEpPresent) options += (options ? " + " : String()) + "Cpuid near EP";
 
 
 
@@ -3634,16 +3654,11 @@ function isItemMangled(itemPattern) {
         return false;
     }
 
-    // MSVC mangling: starts with '?' and contains "@@" or has double '?'
-    if (itemPattern[0] === '?' && (itemPattern.indexOf("@@") !== -1 || itemPattern[1] === '?')) {
-        return true;
-    } else if (itemPattern.substring(0, 2) === "_Z") { // GNU mangling: starts with "_Z"
-        return true;
-    } else if (itemPattern[0] === '@' && itemPattern.indexOf('$') !== -1) { // Borland C++ mangling: starts with '@' and contains '$'
-        return true;
-    }
-
-    return false;
+    return (
+        (itemPattern[0] === '?' && (itemPattern.indexOf("@@") !== -1 || itemPattern[1] === '?')) || // MSVC mangling: starts with '?' and contains "@@" or has double '?'
+        (itemPattern.substring(0, 2) === "_Z") ||                                                   // GNU mangling: starts with "_Z"
+        (itemPattern[0] === '@' && itemPattern.indexOf('$') !== -1)                                 // Borland C++ mangling: starts with '@' and contains '$'
+    );
 }
 
 
@@ -4190,7 +4205,7 @@ function scanForLanguages_NET_and_Native() {
     } else if (!_isLangPresent("C++") && isCLibraryPresent && (PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
         _setLangByHeur("C");
     } else if (PE.isLibraryPresentExp(/^api-ms-win-crt*/i) || PE.isSectionNamePresent(".msvcjmc")) {
-        _setLangByHeur("MSIL/C/C++");
+        _setLangByHeur("C/C++");
     } else if (!_isLangDetected() && !_getNumberOfResults("compiler") && !PE.isNet()) {
         if (!_getNumberOfResults("protector") &&
             !_getNumberOfResults("cryptor") && !_getNumberOfResults("~cryptor") &&
@@ -4431,7 +4446,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
                 verdicts.push({
                     type: pattern.type,
-                    edition: pattern.edition ? pattern.edition : String(),
+                    version: pattern.edition ? pattern.edition : String(),
                     details: String()
                 });
 
@@ -4440,7 +4455,7 @@ function scanForMaliciousCode_NET_and_Native() {
         }
 
         // // NjRAT Generic: Detect NjRAT via requests-separator or assembly name
-        if (verdicts.length === 0 && (PE.getNetAssemblyName() === "w" ||
+        if (verdicts.length === 0 && (PE.getNetAssemblyName() === "w" || PE.getNetModuleName() === "w.exe" ||
             PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("|'|'|") + "00"))) {
             verdicts.push({
                 type: "NjRAT",
@@ -4539,9 +4554,14 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if ((PE.isNet() && (
         PE.getNetAssemblyName().toLowerCase() === "stub" ||
+        PE.getNetModuleName().toLowerCase().indexOf("stub.") === 0 ||
         isNameObfuscated(PE.getNetAssemblyName()) || isNameObfuscated(PE.getNetModuleName())
     ) ||
-        isNameObfuscated(replaceAllInString(PE.getVersionStringInfo("ProductName"), " ", String())))) {
+        PE.getVersionStringInfo("FileDescription").toLowerCase().indexOf("stub.") === 0 ||
+        isNameObfuscated(PE.cleanString(PE.getVersionStringInfo("ProductName"))) ||
+        isNameObfuscated(PE.cleanString(PE.getVersionStringInfo("FileDescription"))) ||
+        isNameObfuscated(PE.cleanString(PE.getVersionStringInfo("LegalCopyright"))) ||
+        isNameObfuscated(PE.cleanString(PE.getVersionStringInfo("InternalName"))))) {
 
         verdicts.push({
             type: "Anomalous build info",
