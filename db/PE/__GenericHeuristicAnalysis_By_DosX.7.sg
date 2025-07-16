@@ -2971,8 +2971,7 @@ function isNameObfuscated(name) {
         for (var i = 0; i < name.length; i++) {
             if (name[i] >= '0' && name[i] <= '9') {
                 stats.digits++;
-            }
-            else if (name[i] >= 'a' && name[i] <= 'z') {
+            } else if (name[i] >= 'a' && name[i] <= 'z') {
                 stats.lower++;
             } else if (name[i] >= 'A' && name[i] <= 'Z') {
                 stats.upper++;
@@ -3667,6 +3666,37 @@ function isItemMangled(itemPattern) {
 
 
 /**
+ * Determines the name of the C++ name mangler based on the given mangled item pattern.
+ *
+ * @param {string} itemPattern - The mangled item pattern to analyze.
+ * @returns {string|undefined} The name of the detected mangler ("Visual C++", "MinGW", "Borland C++"), or undefined if not recognized or not mangled.
+ */
+function getManglerNameByMangledItem(itemPattern) {
+    if (!isItemMangled(itemPattern)) {
+        return undefined;
+    }
+
+    // Visual C++ (MSVC)
+    if (itemPattern[0] === '?') {
+        return "Microsoft Visual C++";
+    }
+
+    // MinGW (GNU)
+    if (itemPattern.substring(0, 2) === "_Z") {
+        return "MinGW";
+    }
+
+    // Borland C++
+    if (itemPattern[0] === '@' && itemPattern.indexOf('$') !== -1) {
+        return "Borland C++";
+    }
+
+    return undefined;
+}
+
+
+
+/**
  * Extracts the unmangled name from a mangled C++ symbol.
  * 
  * This function handles both Microsoft Visual C++ (MSVC) and GNU C++ (GCC) name mangling schemes:
@@ -4057,19 +4087,18 @@ function scanForLanguages_NET_and_Native() {
     for (var i = 0; i < PE.getNumberOfImports(); i++) {
         const libraryName = PE.getImportLibraryName(i).toLowerCase();
 
-        // Detect mangler
+        // Detect mangler in imported libraries
         for (var k = 0; k < PE.getNumberOfImportThunks(i) && !isPpLibraryPresent; k++) {
             const functionName = PE.getImportFunctionName(i, k); // import, thunk
 
             if (isItemMangled(functionName)) {
                 log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledItem(functionName) + "\"");
 
-
                 if (!isCompilerDetected()) {
-                    if (functionName[0] == '_') {
-                        _setResult("~compiler", "MinGW", String(), String());
-                    } else if (functionName[0] == '?') {
-                        _setResult("~compiler", "Microsoft Visual C++", String(), String());
+                    var manglerName = getManglerNameByMangledItem(functionName);
+
+                    if (manglerName) {
+                        _setResult("~compiler", manglerName, String(), String());
                     }
                 }
 
@@ -4080,17 +4109,6 @@ function scanForLanguages_NET_and_Native() {
 
 
 
-        // Check for mangled names in exports
-        for (var e = 0; e < PE.getNumberOfExportFunctions() && !isPpLibraryPresent; e++) {
-            var exportName = PE.getExportFunctionName(e);
-            if (exportName && isItemMangled(exportName)) {
-                log(logType.any, "Mangler detected in export -> \"" + libraryName + "\", at function \"" + getNameOfMangledItem(exportName) + "\"");
-
-                isPpLibraryPresent = true;
-            }
-        }
-
-
 
         if (
             libraryName.indexOf("++") !== -1 ||
@@ -4098,6 +4116,7 @@ function scanForLanguages_NET_and_Native() {
             libraryName.indexOf("msvcp") !== -1
         ) {
             log(logType.any, "C++ library present -> \"" + libraryName + "\"");
+
             isPpLibraryPresent = true;
         }
 
@@ -4105,7 +4124,29 @@ function scanForLanguages_NET_and_Native() {
 
         if (libraryName.indexOf("msvcr") !== -1 || libraryName.indexOf("crtdll") !== -1) {
             log(logType.any, "C library present -> \"" + libraryName + "\"");
+
             isCLibraryPresent = true;
+        }
+    }
+
+
+
+
+    // Detect mangler in exports
+    for (var e = 0; e < PE.getNumberOfExportFunctions() && !isPpLibraryPresent; e++) {
+        var exportName = PE.getExportFunctionName(e);
+        if (exportName && isItemMangled(exportName)) {
+            log(logType.any, "Mangler detected in exported item \"" + getNameOfMangledItem(exportName) + "\"");
+
+            if (!isCompilerDetected()) {
+                var manglerName = getManglerNameByMangledItem(exportName);
+
+                if (manglerName) {
+                    _setResult("~compiler", manglerName, String(), String());
+                }
+            }
+
+            isPpLibraryPresent = true;
         }
     }
 
