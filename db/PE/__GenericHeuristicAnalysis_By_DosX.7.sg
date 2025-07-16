@@ -3481,6 +3481,25 @@ function scanForObfuscations_Native() {
 
 
 
+    // Check for unused exception section
+
+    var isUnusedExceptionSectionPresent = false;
+
+    if (PE.isSectionNamePresent(".pdata") || PE.isSectionNamePresent(".xdata")) {
+
+        // Offset of the exception directory (12 is the number of IMAGE_DIRECTORY_ENTRY_ entries, 8 is the size of each entry)
+        var exceptionDirOffset = getOptHeaderOffset() + (PE.is64() ? 0x88 : 0x78);
+
+        if (PE.read_int32(exceptionDirOffset) === 0 && PE.read_int32(exceptionDirOffset + 4) === 0) {
+            isUnusedExceptionSectionPresent = true;
+        }
+    }
+
+    if (isUnusedExceptionSectionPresent) options += (options ? " + " : String()) + "Exceptions directory empty";
+
+
+
+
     // Check for .NET metadata presence
 
     var isNetMetaDataInNativePresent = false;
