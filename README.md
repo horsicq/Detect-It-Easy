@@ -63,10 +63,10 @@ Unknown formats undergo heuristic analysis, providing identification for both kn
 
 ### 📦 Install via Package Managers
 
--   **Windows**: 
+-   **Windows**:
 
-    - [Chocolatey](https://community.chocolatey.org/packages/die)
-    - [Microsoft Store](https://apps.microsoft.com/detail/9nq58d7ghb2x)
+    -   [Chocolatey](https://community.chocolatey.org/packages/die)
+    -   [Microsoft Store](https://apps.microsoft.com/detail/9nq58d7ghb2x)
 
 -   **Linux**:
 
@@ -114,10 +114,12 @@ For detailed usage, refer to the [RUN.md](docs/RUN.md).
 
 Thanks to all contributors!
 
-<a href="https://github.com/horsicq/Detect-It-Easy/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=horsicq/Detect-It-Easy" />
-</a>
+**Thanks to [DosX](https://github.com/DosX-dev)**
 
 Thanks to [PELock](https://www.pelock.com)
+
+<a href="https://github.com/horsicq/Detect-It-Easy/graphs/contributors">
+<img src="https://contrib.rocks/image?repo=horsicq/Detect-It-Easy" />
+</a>
 
 ![Mascot](docs/logo.png)
