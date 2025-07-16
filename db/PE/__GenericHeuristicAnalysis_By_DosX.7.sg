@@ -2651,7 +2651,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     var isPdbFullPathPresent = false;
 
-    var pdbExtensionPatternOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'.pdb'");
+    var pdbExtensionPatternOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'.pdb' 00");
 
     var pdbPathBeginOffset, pdbPath = String();
 
@@ -2953,7 +2953,7 @@ function findAndMark(sign, isFullName) {
  *
  * The function checks for obfuscation in two cases:
  * 1. If the name contains spaces, it splits the name into tokens and checks each token for obfuscation.
- * 2. If the name does not contain spaces, it checks each chunk of the string (of size 16) for obfuscation.
+ * 2. If the name does not contain spaces, it checks each chunk of the string (of size 20) for obfuscation.
  *
  * Logs a message if an obfuscated segment or chunk is found.
  *
@@ -2966,7 +2966,7 @@ function isNameObfuscated(name) {
     if (name.indexOf(' ') !== -1) {
         const tokens = name.split(/\s+/);
         for (var i = 0; i < tokens.length; i++) {
-            if (isObfuscatedToken(tokens[i])) {
+            if (isTokenObfuscated(tokens[i])) {
                 log(logType.nothing, "Obfuscated string segment: \"" + tokens[i] + "\" in \"" + name + "\"");
                 return true;
             }
@@ -2974,11 +2974,12 @@ function isNameObfuscated(name) {
         return false;
     }
 
-    // Случай 2: Строка без пробелов
-    const CHUNK_SIZE = 16;
+    // Split the name into chunks
+    const CHUNK_SIZE = 20;
+
     for (var start = 0; start < name.length; start += CHUNK_SIZE) {
         const chunk = name.substring(start, start + CHUNK_SIZE);
-        if (isObfuscatedToken(chunk)) {
+        if (isTokenObfuscated(chunk)) {
             log(logType.nothing, "Obfuscated string chunk: \"" + chunk + "\" in \"" + name + "\"");
             return true;
         }
@@ -2990,23 +2991,26 @@ function isNameObfuscated(name) {
 
 
 /**
- * Determines whether a given token is considered obfuscated based on specific heuristics.
- *
+ * Determines whether a given token is considered obfuscated based on advanced heuristics.
+ * 
  * The function checks for:
- * - Tokens shorter than 4 characters are not considered obfuscated.
- * - A regular expression pattern that matches tokens containing a mix of letters and digits,
- *   with at least four digits and a specific arrangement.
- * - Statistical analysis of the token's characters:
- *   - At least 5 digits, 3 lowercase letters, and 3 uppercase letters, OR
- *   - At least 6 digits and 5 lowercase letters.
+ * - Tokens shorter than 7 characters are automatically considered clean
+ * - Hexadecimal strings (8+ chars) like 'd3adc0de'
+ * - Regular expression patterns indicating mixed alphanumeric sequences with:
+ *   - Minimum 4 digits
+ *   - Letter-digit-letter pattern
+ * - Statistical character analysis requiring either:
+ *   - 7+ digits (absolute count)
+ *   - High digit density (>35% of total characters)
+ *   - Balanced mix (5+ digits, 3+ lowercase AND 3+ uppercase)
+ *   - Digit-heavy with lowercase (5+ digits, 5+ lowercase)
  *
- * @param {string} token - The string token to analyze.
- * @returns {boolean} Returns true if the token is considered obfuscated, otherwise false.
+ * @param {string} token - The string token to analyze
+ * @returns {boolean} True if token matches obfuscation patterns, false otherwise
  */
-function isObfuscatedToken(token) {
-    if (!token || token.length < 4) return false;
+function isTokenObfuscated(token) {
+    if (!token || token.length < 7) return false;
 
-    // Регулярное выражение для детекции паттернов
     if (token.match(/^(?=\d|[a-z])(?=.*[a-z]\d[a-z])(?=(?:.*\d){4,})/i)) {
         return true;
     }
@@ -3024,7 +3028,13 @@ function isObfuscatedToken(token) {
         }
     }
 
+    if (token.match(/^[0-9a-f]{8,}$/i)) return true;  // Detects hashes like d3adc0de
+
+    const totalChars = token.length;
+
     return (
+        (stats.digits >= 7) ||
+        (stats.digits >= 4 && stats.digits / totalChars > 0.35) ||
         (stats.digits >= 5 && stats.lower >= 3 && stats.upper >= 3) ||
         (stats.digits >= 6 && stats.lower >= 5)
     );
