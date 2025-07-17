@@ -73,3 +73,7 @@ _log(123); // display a number
 
 ```
 ```
+**QString _getQtVersion()** 
+
+```
+```
