@@ -333,6 +333,10 @@ function scanForObfuscations_NET() {
                     isStrangeSectionsPresent = true;
                 }
             }
+
+            if (!isAnsiString(sectionName) && !isStrangeSectionsPresent) {
+                isStrangeSectionsPresent = true;
+            }
         }
     }
 
@@ -593,7 +597,7 @@ function scanForObfuscations_NET() {
         isShortNamesPresent = true;
     }
 
-    if (!isShortNamesPresent && PE.compare("00**00", afterCtorOffset)) { // second way :D
+    if (!isShortNamesPresent && PE.compare("00**00", afterCtorOffset)) { // the second way :D
         var shortNamesFound = 0;
 
         const chars = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm";
@@ -691,7 +695,7 @@ function scanForObfuscations_NET() {
 
 
 
-    // If in the assembly you can find a second object starting with “<Module>”, then this is a fakeee!
+    // If in the assembly you can find the second object starting with “<Module>”, then this is a fakeee!
 
     var isModuleCtorMultiple = false;
 
@@ -1367,6 +1371,7 @@ function NetOpCodes() {
     this.brtrue_s = "2D??"; // MSIL: 'brtrue.s' - Branch if true/non-null/non-zero (short)
     this.call = "28????????"; // MSIL: 'call' - Call method
     this.calli = "29????????"; // MSIL: 'calli' - Call indirect
+    this.ldtoken = "D0????????"; // MSIL: 'ldtoken' - Load metadata token
     this.ldftn = "FE06????????"; // MSIL: 'ldftn' - Load function pointer
     this.ret = "2A"; // MSIL: 'ret' - Return from method
     this.switch__nobody = "45"; // MSIL: 'switch' - Switch statement
@@ -1533,6 +1538,7 @@ function NetOpCodes() {
  * @returns {string} The string with all whitespace characters removed, or an empty string if input is invalid
  */
 function removeWhitespaces(inputString) {
+    // Type validation to prevent runtime errors
     if (!inputString || typeof inputString !== "string") {
         return String();
     }
@@ -1541,22 +1547,6 @@ function removeWhitespaces(inputString) {
     return inputString.replace(/\s+/g, "");
 }
 
-
-
-/**
- * Removes only space characters from a string, preserving other whitespace.
- * 
- * @param {string} inputString - The input string to remove spaces from
- * @returns {string} The string with space characters removed, or an empty string if input is invalid
- */
-function removeSpaces(inputString) {
-    if (!inputString || typeof inputString !== "string") {
-        return String();
-    }
-
-    // Remove only space characters (0x20), not all whitespace
-    return inputString.replace(/ /g, "");
-}
 
 
 
@@ -1574,9 +1564,11 @@ function replaceAllInString(inputString, search, replacement) {
     if (!inputString || typeof inputString !== "string") {
         return String();
     }
+
     if (!search || typeof search !== "string") {
         return inputString;
     }
+
     if (typeof replacement !== "string") {
         replacement = String();
     }
@@ -1608,6 +1600,23 @@ function clearSectionName(sectionName) {
     cleaned = cleaned.trim();
 
     return cleaned;
+}
+
+
+
+/**
+ * Checks if a given string consists only of ANSI printable characters (ASCII range 0x20 to 0x7E).
+ *
+ * @param {string} inputString - The string to validate.
+ * @returns {boolean} Returns true if the string contains only ANSI printable characters, otherwise false.
+ */
+function isAnsiString(inputString) {
+    // Type validation to prevent runtime errors
+    if (!inputString || typeof inputString !== "string") {
+        return String();
+    }
+
+    return /^[\x20-\x7E]+$/.test(inputString);
 }
 
 
@@ -2191,7 +2200,10 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["BeRoEXEPacker", null, "packerBY"], // https://blog.rosseaux.net/page/875fbe6549aa072b5ee0ac9cefff4827/BeRoEXEPacker
         ["NeoLite", null, ".neolit"],
         ["Private EXE Protector", null, ".-PEP-"],
-        ["bambam", null, ".bedrock"]
+        ["bambam", null, ".bedrock"],
+        ["WibuKey", null, ".wibu"],
+        ["Wibu CodeMeter", null, "__wibu00"],
+        ["Wibu CodeMeter", null, "__wibu01"]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDictionary);
@@ -3065,7 +3077,6 @@ function scanForObfuscations_Native() {
             isStrangeSectionsPresent = true;
         }
 
-
         var isIdioticMinGwSectionsPresent = false;
 
         if (_isResultPresent("linker", "GNU linker ld (GNU Binutils)")) {
@@ -3085,7 +3096,6 @@ function scanForObfuscations_Native() {
             break;
         }
 
-
         for (var d = 0; d < badSectionChars.length && !isStrangeSectionsPresent; d++) {
             // If forbidden character is found, set flag and break
             if (sectionName.indexOf(badSectionChars[d]) !== -1) {
@@ -3093,7 +3103,9 @@ function scanForObfuscations_Native() {
             }
         }
 
-
+        if (!isAnsiString(sectionName) && !isStrangeSectionsPresent) {
+            isStrangeSectionsPresent = true;
+        }
     }
 
     if (isStrangeSectionsPresent) options += (options ? " + " : String()) + "Strange sections";
@@ -3208,33 +3220,6 @@ function scanForObfuscations_Native() {
     }
 
     if (isUnreadableResourcesPresent) options += (options ? " + " : String()) + "Unreadable resources";
-
-
-
-    /*
-        var isCheckSumEmpty = false;
-
-        if (PE.getImageOptionalHeader("CheckSum") == 0) {
-            log(logType.any, "IMAGE_OPTIONAL_HEADER : CheckSum == 0");
-            isCheckSumEmpty = true;
-        }
-
-        if (isCheckSumEmpty) options += (options ? " + " : String()) + "No checksum";
-
-
-
-
-        // False-positive detections; Todo: fix
-        var aLotOfBreaks = false;
-
-        const codeSection = PE.section[".text"];
-
-        if (codeSection && PE.isSignaturePresent(codeSection.FileOffset, codeSection.FileSize, "CC CC CC CC CC CC CC CC CC CC CC CC CC")) { // ret (c3); int 3 (cc)
-            aLotOfBreaks = true;
-        }
-
-        if (aLotOfBreaks) options += (options ? " + " : String()) + "A lot of \"__debugbreak()\"";
-        */
 
 
 
@@ -3429,41 +3414,6 @@ function scanForObfuscations_Native() {
     }
 
     if (isCpuidNearEpPresent) options += (options ? " + " : String()) + "Cpuid near EP";
-
-
-
-
-    // A lot of bugs! Todo.
-    /*
-        // Example:
-        //  xor eax, eax
-        //  je $+1
-        var isBreakerDetected = false;
-
-       //
-       // 0:  31 c0  |  xor eax, eax
-       // 1:  31 db  |  xor ebx, ebx
-       // 2:  31 c9  |  xor ecx, ecx
-       // 3:  31 d2  |  xor edx, edx
-       // 4:  31 f6  |  xor esi, esi
-       // 5:  31 ff  |  xor edi, edi
-       // 6:  31 ed  |  xor ebp, ebp
-       // 7:  31 e4  |  xor esp, esp
-       //
-        const xorPatterns_x86 = [
-            "c0", "db", "c9", "d2", "f6", "ff", "ed", "e4"
-        ];
-
-        for (var i = 0; i < xorPatterns_x86.length && !isBreakerDetected; i++) {
-            const foundOffset = PE.findSignature(0x00, PE.getSize() - PE.getOverlaySize(), "31 " + xorPatterns_x86[i] + "0F84......00"); // ... je $+[*] ...
-
-            if (foundOffset !== -1 && !PE.compare("%% %% %% %% %% %% %%", foundOffset - 7)) {
-                isBreakerDetected = true;
-            }
-        }
-
-        if (isBreakerDetected) options += (options ? " + " : String()) + "Anti-Decompile";
-        */
 
 
 
@@ -4674,17 +4624,23 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
-    // Check for obfuscated names in .NET and native assemblies
+    // Check for obfuscated names and anomalous signs in .NET and native assemblies
 
     if ((PE.isNet() && (
         PE.getNetAssemblyName().toLowerCase() === "stub" ||
         PE.getNetModuleName().toLowerCase().indexOf("stub.") === 0 ||
         isNameObfuscated(PE.getNetAssemblyName()) || isNameObfuscated(PE.getNetModuleName())
     ) ||
-        PE.getVersionStringInfo("FileDescription").toLowerCase().indexOf("stub.") === 0 ||
-        isNameObfuscated(PE.cleanString(PE.getVersionStringInfo("ProductName"))) ||
-        isNameObfuscated(PE.cleanString(PE.getVersionStringInfo("FileDescription"))) ||
-        isNameObfuscated(PE.cleanString(PE.getVersionStringInfo("InternalName"))))) {
+        PE.getVersionStringInfo("OriginalFilename").toLowerCase().indexOf("stub.") === 0 ||
+        PE.getVersionStringInfo("InternalName").toLowerCase().indexOf("stub.") === 0 ||
+        isNameObfuscated(PE.getVersionStringInfo("Comments")) ||
+        isNameObfuscated(PE.getVersionStringInfo("CompanyName")) ||
+        isNameObfuscated(PE.getVersionStringInfo("FileDescription")) ||
+        isNameObfuscated(PE.getVersionStringInfo("ProductName")) ||
+        isNameObfuscated(PE.getVersionStringInfo("LegalCopyright")) ||
+        isNameObfuscated(PE.getVersionStringInfo("LegalTrademarks")) ||
+        isNameObfuscated(PE.getVersionStringInfo("OriginalFilename")) ||
+        isNameObfuscated(PE.getVersionStringInfo("InternalName")))) {
 
         verdicts.push({
             type: "Anomalous build info",
