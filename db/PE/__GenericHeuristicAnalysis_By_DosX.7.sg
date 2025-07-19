@@ -1764,6 +1764,21 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 }
             }
         }
+
+
+
+
+        var isRunPePresent = false;
+
+        if (PE.isNetObjectPresent("RunPE") ||
+            PE.isNetObjectPresent("PELoader") || // https://github.com/nettitude/RunPE/blob/main/RunPE/Internals/PELoader.cs
+            (PE.isNetObjectPresent("GetProcAddress") && PE.isNetUStringPresent("WriteProcessMemory") && PE.isNetUStringPresent("VirtualAllocEx")) ||
+            (PE.isNetObjectPresent("GetProcAddress") && PE.isNetObjectPresent("WriteProcessMemory") && PE.isNetObjectPresent("VirtualAllocEx"))
+        ) {
+            isRunPePresent = true;
+        }
+
+        if (isRunPePresent) options += (options ? " + " : String()) + "RunPE";
     }
 
 
@@ -4538,9 +4553,12 @@ function scanForMaliciousCode_NET_and_Native() {
             }
         }
 
+        var separatorToSearch = generateUnicodeSignatureMask("|'|'|") + "00";
+        separatorToSearch = "??" + separatorToSearch.substring(2, separatorToSearch.length);
+
         // // NjRAT Generic: Detect NjRAT via requests-separator or assembly name
         if (verdicts.length === 0 && (PE.getNetAssemblyName() === "w" || PE.getNetModuleName() === "w.exe" ||
-            PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("|'|'|") + "00"))) {
+            PE.isSignatureInSectionPresent(0, separatorToSearch))) {
             verdicts.push({
                 type: "NjRAT",
                 version: String(),
