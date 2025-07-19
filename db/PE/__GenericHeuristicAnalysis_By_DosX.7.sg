@@ -601,14 +601,17 @@ function scanForObfuscations_NET() {
         var shortNamesFound = 0;
 
         const chars = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm";
-        for (var i = 1; i < chars.length && !isShortNamesPresent; i++) {
-            if (PE.isNetObjectPresent(chars[i])) {
-                shortNamesFound++;
-                log(logType.net, "Short name found: '" + chars[i] + "' (" + shortNamesFound + "/20)");
-            }
 
-            if (shortNamesFound === 20) {
-                isShortNamesPresent = true;
+        for (var i in chars) {
+            if (i > 0 && !isShortNamesPresent) {
+                if (PE.isNetObjectPresent(chars[i])) {
+                    shortNamesFound++;
+                    log(logType.net, "Short name found: '" + chars[i] + "' (" + shortNamesFound + "/20)");
+                }
+
+                if (shortNamesFound === 20) {
+                    isShortNamesPresent = true;
+                }
             }
         }
     }
@@ -749,18 +752,21 @@ function scanForObfuscations_NET() {
         opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.br_s // samples by: [Unknown protector, only samples]
     ];
 
-    for (var y = 0; y < mathTemplates.length && !isMutationsPresent; y++) {
-        const template = mathTemplates[y];
+    for (var y in mathTemplates) {
+        if (!isMutationsPresent) {
+            const template = mathTemplates[y];
 
-        for (var e = 0; e < mathOpCodes.length && !isMutationsPresent; e++) {
+            for (var e in mathOpCodes) {
+                if (!isMutationsPresent) {
+                    if (e == 0 && !validateNetByteCode(template.replace("%s", opCodes._unknown))) break; // No math mutations
 
-            if (e == 0 && !validateNetByteCode(template.replace("%s", opCodes._unknown))) break; // No math mutations
+                    const pattern = template.replace("%s", mathOpCodes[e]);
 
-            const pattern = template.replace("%s", mathOpCodes[e]);
-
-            if (validateNetByteCode(pattern)) {
-                log(logType.net, "Math mutations detected! Offset: " + lastOffsetDetected);
-                isMutationsPresent = true;
+                    if (validateNetByteCode(pattern)) {
+                        log(logType.net, "Math mutations detected! Offset: " + lastOffsetDetected);
+                        isMutationsPresent = true;
+                    }
+                }
             }
         }
     }
@@ -858,7 +864,7 @@ function scanForObfuscations_NET() {
         { lib: "HVMRuntm.dll", name: "DNGuard" }
     ];
 
-    for (var i = 0; i < protectionsRuntime.length; i++) {
+    for (var i in protectionsRuntime) {
         const
             runtimeInfo = protectionsRuntime[i],
             runtimeLibraryName = runtimeInfo.lib,
@@ -919,18 +925,18 @@ function scanForObfuscations_NET() {
     var obfuscatorAttributeFound = String();
 
     // Iterate through obfuscators attributes
-    for (var t = 0; t < obfuscatorsAttributes.length && !isFakeSignaturesPresent; t++) {
+    for (var t in obfuscatorsAttributes) {
+        if (!isFakeSignaturesPresent) {
+            if (validateNetObject(obfuscatorsAttributes[t])) {
+                obfuscatorAttributeFound = obfuscatorsAttributes[t];
+                signaturesCounter++;
+            }
 
-        if (validateNetObject(obfuscatorsAttributes[t])) {
-            obfuscatorAttributeFound = obfuscatorsAttributes[t];
-            signaturesCounter++;
-        }
-
-        // Check if the number of detected signatures exceeds 1
-        if (signaturesCounter > 1) {
-
-            // Set flag indicating the presence of fake signatures
-            isFakeSignaturesPresent = true;
+            // Check if the number of detected signatures exceeds 1
+            if (signaturesCounter > 1) {
+                // Set flag indicating the presence of fake signatures
+                isFakeSignaturesPresent = true;
+            }
         }
     }
 
@@ -1019,16 +1025,16 @@ function scanForObfuscations_NET() {
     // Волки делают АУФ 🐺☝️
 
     if (isFakeSignaturesPresent) {
-        for (var d = 0; d < protectorsLabelsToRemove.length; d++) {
+        for (var d in protectorsLabelsToRemove) {
             _removeResult("protector", protectorsLabelsToRemove[d]);
         }
 
-        for (var d = 0; d < packersLabelsToRemove.length; d++) {
+        for (var d in packersLabelsToRemove) {
             _removeResult("cryptor", packersLabelsToRemove[d]);
             _removeResult("packer", packersLabelsToRemove[d]);
         }
 
-        for (var d = 0; d < protectionsLabelsToRemove.length; d++) {
+        for (var d in protectionsLabelsToRemove) {
             _removeResult("protection", protectionsLabelsToRemove[d]);
         }
     }
@@ -1136,16 +1142,18 @@ function scanForAntiAnalysis_NET() {
     var isAntiDnSpyPresent = false;
 
     // Iterate through anti-DnSpy triggers
-    for (var l = 0; l < antiDnSpyTriggers.length && !isAntiDnSpyPresent; l++) {
-        const dnSpyName = antiDnSpyTriggers[l];
+    for (var l in antiDnSpyTriggers) {
+        if (!isAntiDnSpyPresent) {
+            const dnSpyName = antiDnSpyTriggers[l];
 
-        // Check if the signature for anti-DnSpy trigger is valid using Unicode signature mask or the original signature
-        if (
-            validateGlobalUnicodeString(dnSpyName) ||
-            validateSignature("'" + dnSpyName + "'")
-        ) {
-            // Set flag indicating the presence of anti-DnSpy behavior
-            isAntiDnSpyPresent = true;
+            // Check if the signature for anti-DnSpy trigger is valid using Unicode signature mask or the original signature
+            if (
+                validateGlobalUnicodeString(dnSpyName) ||
+                validateSignature("'" + dnSpyName + "'")
+            ) {
+                // Set flag indicating the presence of anti-DnSpy behavior
+                isAntiDnSpyPresent = true;
+            }
         }
     }
 
@@ -1163,14 +1171,16 @@ function scanForAntiAnalysis_NET() {
 
     var isAntiIlSpyPresent = false;
 
-    for (var l = 0; l < antiIlSpyTriggers.length && !isAntiIlSpyPresent; l++) {
-        const ilSpyName = antiIlSpyTriggers[l];
+    for (var l in antiIlSpyTriggers) {
+        if (!isAntiIlSpyPresent) {
+            const ilSpyName = antiIlSpyTriggers[l];
 
-        if (
-            validateGlobalUnicodeString(ilSpyName) ||
-            validateSignature("'" + ilSpyName + "'")
-        ) {
-            isAntiIlSpyPresent = true;
+            if (
+                validateGlobalUnicodeString(ilSpyName) ||
+                validateSignature("'" + ilSpyName + "'")
+            ) {
+                isAntiIlSpyPresent = true;
+            }
         }
     }
 
@@ -1190,16 +1200,18 @@ function scanForAntiAnalysis_NET() {
     // Check if the signature for 'GetModuleHandle' is present
     if (validateSignature("'GetModuleHandle'")) { // from 'kernel32.dll') {
         // Iterate through Sandboxie variants
-        for (var l = 0; l < sbieVariants.length && !isAntiSbiePresent; l++) {
-            const sbieLib = sbieVariants[l];
+        for (var l in sbieVariants) {
+            if (!isAntiSbiePresent) {
+                const sbieLib = sbieVariants[l];
 
-            // Check if the signature for Sandboxie variant is valid using Unicode signature mask or the original signature
-            if (
-                validateGlobalUnicodeString(sbieLib) ||
-                validateSignature("'" + sbieLib + "'")
-            ) {
-                // Set flag indicating the presence of anti-Sandboxie behavior
-                isAntiSbiePresent = true;
+                // Check if the signature for Sandboxie variant is valid using Unicode signature mask or the original signature
+                if (
+                    validateGlobalUnicodeString(sbieLib) ||
+                    validateSignature("'" + sbieLib + "'")
+                ) {
+                    // Set flag indicating the presence of anti-Sandboxie behavior
+                    isAntiSbiePresent = true;
+                }
             }
         }
     }
@@ -1442,10 +1454,10 @@ function NetOpCodes() {
         var isOpCodeMaskHasBody = indexOfSpecialPattern !== -1; // -1 if not found
 
         // Extract the opcode in hexadecimal
-        var opCodeInHex = isOpCodeMaskHasBody ? opCodeMask.substr(0x00, indexOfSpecialPattern) : opCodeMask;
+        var opCodeInHex = isOpCodeMaskHasBody ? opCodeMask.substring(0x00, indexOfSpecialPattern) : opCodeMask;
 
         // Check if the opcode mask has a body and the length of the body matches the length of the value
-        if (isOpCodeMaskHasBody && opCodeMask.substr(opCodeInHex.length).length != value.length) {
+        if (isOpCodeMaskHasBody && opCodeMask.substring(opCodeInHex.length).length != value.length) {
             _error("The size of the input values does not match.");
         }
 
@@ -1688,7 +1700,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 "DESCryptoServiceProvider",
                 "AesCryptoServiceProvider",
                 "Rfc2898DeriveBytes",
-                "SHA256Managed",
                 "TripleDES",
                 "Rijndael",
                 "ECDsaCng",
@@ -1698,33 +1709,28 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 "Aes128Cbc",
                 "AesManaged",
                 "AesCng",
-                "SHA256",
-                "SHA512",
-                "SHA1CryptoServiceProvider",
-                "SHA512CryptoServiceProvider",
                 "RC2CryptoServiceProvider",
-                "SHA384CryptoServiceProvider",
-                // "MD5CryptoServiceProvider",
-                "SHA256CryptoServiceProvider",
                 "RNGCryptoServiceProvider"
             ];
 
             // Iterate through cryptography classes
-            for (var i = 0; i < cryptoClasses.length && !isCryptor; i++) {
-                var cryptoClassSign = cryptoClasses[i],
-                    result = findAndMark(
-                        sign = cryptoClassSign,
-                        isFullName = true
-                    );
+            for (var i in cryptoClasses) {
+                if (!isCryptor) {
+                    var cryptoClassSign = cryptoClasses[i],
+                        result = findAndMark(
+                            sign = cryptoClassSign,
+                            isFullName = true
+                        );
 
-                // Check if assembly invoke is found and the cryptography class is present
-                if (isAssemblyInvokeFound && result.length != 0) {
-                    log(logType.net, "Crypto class present: " + cryptoClassSign);
+                    // Check if assembly invoke is found and the cryptography class is present
+                    if (isAssemblyInvokeFound && result.length) {
+                        log(logType.net, "Crypto class present: " + cryptoClassSign);
 
-                    isCryptor = true;
+                        isCryptor = true;
 
-                    // Add the cryptography class to options
-                    options += (options ? " + " : String()) + cryptoClassSign;
+                        // Add the cryptography class to options
+                        options += (options ? " + " : String()) + cryptoClassSign;
+                    }
                 }
             }
         }
@@ -1733,7 +1739,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
         // Check if any class from System.IO.Compression namespace is used (non-full name)
-        if (findAndMark("System.IO.Compression", isFullName = false).length != 0) {
+        if (findAndMark("System.IO.Compression", isFullName = false).length) {
 
             // Specify compression classes to look for
             const compressionClasses = [
@@ -1742,12 +1748,12 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             ];
 
             // Iterate through compression classes
-            for (var i = 0; i < compressionClasses.length; i++) {
+            for (var i in compressionClasses) {
                 var compressionClassSign = compressionClasses[i],
                     result = findAndMark(compressionClassSign, isFullName = true);
 
                 // Check if assembly invoke is found and the compression class is present
-                if (isAssemblyInvokeFound && result.length != 0) {
+                if (isAssemblyInvokeFound && result.length) {
                     log(logType.net, "Compression class present: " + compressionClassSign);
 
                     // If it's a cryptor, add the compression class to options
@@ -1773,7 +1779,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             "';!@Install@!UTF-8!'", "'7z'BCAF271C", "efbbbf';!@Install@!UTF-8!'" // samples by: 7z
         ]
 
-        for (var l = 0; l < overlayPatterns.length; l++) {
+        for (var l in overlayPatterns) {
             if (PE.compareOverlay(overlayPatterns[l])) {
                 log(logType.nothing, "SFX overlay pattern: " + overlayPatterns[l]);
                 isSfx = true;
@@ -1814,7 +1820,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 isSfx = true;
             }
 
-            for (var k = 0; k < sfxEntries.length; k++) {
+            for (var k in sfxEntries) {
                 if (PE.compareEP(sfxEntries[k])) {
                     log(logType.nothing, "SFX entry pattern: " + sfxEntries[k]);
 
@@ -1868,14 +1874,16 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     ];
 
     // Iterate through the entries to check against the entry point
-    for (var e = 0; e < entries.length && !entryLikePacker; e++) {
-        const entryToCheck = entries[e];
+    for (var e in entries) {
+        if (!entryLikePacker) {
+            const entryToCheck = entries[e];
 
-        // If the entry point matches the current entry, set the flag to true and break the loop
-        if (PE.compareEP(entryToCheck)) {
-            log(logType.nothing, "EP like a packer: \"" + entryToCheck + "\"");
+            // If the entry point matches the current entry, set the flag to true and break the loop
+            if (PE.compareEP(entryToCheck)) {
+                log(logType.nothing, "EP like a packer: \"" + entryToCheck + "\"");
 
-            entryLikePacker = true;
+                entryLikePacker = true;
+            }
         }
     }
 
@@ -2234,7 +2242,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     const sectionNameCollision = PE.getSectionNameCollision("0", "1");
 
     // Check if there is a collision
-    if (sectionNameCollision.length != 0) {
+    if (sectionNameCollision.length) {
         log(logType.nothing, "Section names collision: '" + clearSectionName(sectionNameCollision) + "'");
 
         isCollisionInSectionsPresent = true;
@@ -3134,9 +3142,11 @@ function scanForObfuscations_Native() {
         isCustomDosPresent = true;
 
         // Iterate through messages to check for custom DOS
-        for (var d = 0; d < messages.length && isCustomDosPresent; d++) {
-            if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'" + messages[d] + "'") != -1) {
-                isCustomDosPresent = false;
+        for (var d in messages) {
+            if (isCustomDosPresent) {
+                if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'" + messages[d] + "'") != -1) {
+                    isCustomDosPresent = false;
+                }
             }
         }
     }
@@ -4626,22 +4636,34 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // Check for obfuscated names and anomalous signs in .NET and native assemblies
 
-    if ((PE.isNet() && (
-        PE.getNetAssemblyName().toLowerCase() === "stub" ||
-        PE.getNetModuleName().toLowerCase().indexOf("stub.") === 0 ||
-        isNameObfuscated(PE.getNetAssemblyName()) || isNameObfuscated(PE.getNetModuleName())
-    ) ||
+    if (
+        PE.isNet() && (
+            PE.getNetAssemblyName().toLowerCase() === "stub" ||
+            PE.getNetModuleName().toLowerCase().indexOf("stub.") === 0 ||
+            isNameObfuscated(PE.getNetAssemblyName()) ||
+            isNameObfuscated(PE.getNetModuleName())
+        ) ||
         PE.getVersionStringInfo("OriginalFilename").toLowerCase().indexOf("stub.") === 0 ||
         PE.getVersionStringInfo("InternalName").toLowerCase().indexOf("stub.") === 0 ||
-        isNameObfuscated(PE.getVersionStringInfo("Comments")) ||
-        isNameObfuscated(PE.getVersionStringInfo("CompanyName")) ||
-        isNameObfuscated(PE.getVersionStringInfo("FileDescription")) ||
-        isNameObfuscated(PE.getVersionStringInfo("ProductName")) ||
-        isNameObfuscated(PE.getVersionStringInfo("LegalCopyright")) ||
-        isNameObfuscated(PE.getVersionStringInfo("LegalTrademarks")) ||
-        isNameObfuscated(PE.getVersionStringInfo("OriginalFilename")) ||
-        isNameObfuscated(PE.getVersionStringInfo("InternalName")))) {
+        (function () {
+            var fieldsToCheck = [
+                "Comments",
+                "CompanyName",
+                "FileDescription",
+                "ProductName",
+                "LegalCopyright",
+                "LegalTrademarks",
+                "OriginalFilename",
+                "InternalName"
+            ];
 
+            for (var fieldToCheck in fieldsToCheck) {
+                if (isNameObfuscated(PE.getVersionStringInfo(fieldToCheck))) return true;
+            }
+
+            return false;
+        })()
+    ) {
         verdicts.push({
             type: "Anomalous build info",
             version: String(),
@@ -4652,12 +4674,10 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
-    if (verdicts.length > 0) {
-        for (var v = 0; v < verdicts.length; v++) {
-            var verdict = verdicts[v];
+    for (var v = 0; v < verdicts.length; v++) {
+        var verdict = verdicts[v];
 
-            _setResult("~malware", verdict.type, verdict.version, verdict.details);
-        }
+        _setResult("~malware", verdict.type, verdict.version, verdict.details);
     }
 }
 
