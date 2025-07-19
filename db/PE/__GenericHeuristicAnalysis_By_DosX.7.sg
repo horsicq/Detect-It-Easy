@@ -221,7 +221,7 @@ function scanForObfuscations_NET() {
 
     var isNetCctorPresent = false;
 
-    if (PE.isNetGlobalCctorPresent() && !isClrNET()) {
+    if (PE.isNetGlobalCctorPresent() && !isCppClrLikeApp()) {
         log(logType.net, "Global constructor detected!");
         isNetCctorPresent = true;
     }
@@ -247,7 +247,7 @@ function scanForObfuscations_NET() {
     const defaultNetSection = 0;
 
     // Check conditions for a strange entry point position (not for CLR apps)
-    if (!PE.isDll() && PE.getNumberOfSections() > 1 && !isClrNET()) {
+    if (!PE.isDll() && PE.getNumberOfSections() > 1 && !isCppClrLikeApp()) {
         // Iterate through .NET metadata headers
         for (var s = 0; s < netMetaHeaders.length; s++) {
             const headerName = netMetaHeaders[s];
@@ -269,7 +269,7 @@ function scanForObfuscations_NET() {
 
     var isNativeEntryPointModified = false;
 
-    if (!PE.isDll() && !isClrNET()) { // not for CLR apps
+    if (!PE.isDll() && !isCppClrLikeApp()) { // not for CLR apps
         if (!PE.is64()) {
             // FF2500????00: jmp dword ptr [ ... ]
             const firstOpCode = getFirstEpAsmOpCode();
@@ -315,7 +315,7 @@ function scanForObfuscations_NET() {
 
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
 
-    if (PE.getNumberOfSections() > (!isClrNET() ? 6 : 10) || !PE.section[".text"]) { isStrangeSectionsPresent = true; } else {
+    if (PE.getNumberOfSections() > (!isCppClrLikeApp() ? 6 : 10) || !PE.section[".text"]) { isStrangeSectionsPresent = true; } else {
         // Iterate through each section
         for (var i = 0; i < PE.getNumberOfSections() && !isStrangeSectionsPresent; i++) {
             const sectionName = PE.getSectionName(i);
@@ -1242,17 +1242,18 @@ function scanForAntiAnalysis_NET() {
 
 
 
+
 /**
- * Checks if the Portable Executable (PE) file is a .NET assembly.
+ * Determines if the current PE file is a C++/CLR .NET application.
  *
- * This function determines if the PE file is a .NET assembly by verifying the following:
- * 1. The PE file is identified as a .NET assembly.
- * 2. The PE file has the "KERNEL32.DLL" library present.
- * 3. The PE file has a global .cctor (class constructor) method present.
+ * Checks if the PE file:
+ * - Is a .NET assembly
+ * - Imports the "KERNEL32.DLL" library
+ * - Has a .NET global class constructor present
  *
- * @returns {boolean} True if the PE file is a .NET assembly, otherwise false.
+ * @returns {boolean} True if the PE file matches the C++/CLR .NET application heuristics, otherwise false.
  */
-function isClrNET() {
+function isCppClrLikeApp() {
     return PE.isNet() && PE.isLibraryPresent("KERNEL32.DLL") && PE.isNetGlobalCctorPresent();
 }
 
