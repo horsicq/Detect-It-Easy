@@ -15,8 +15,7 @@ function detect() {
 
         // d3d12.dll -> d3d[12].dll -> Direct3D v12
         if (runtimeLibrary) {
-
-            var versionNumber = String(runtimeLibrary).substr(3, 2);
+            var versionNumber = String(runtimeLibrary).slice(3, 5);
 
             if (isNumber(versionNumber)) { // 10+
                 sVersion = versionNumber;
@@ -24,15 +23,32 @@ function detect() {
                 sVersion = versionNumber[0];
             }
         }
-    } else if (PE.isExportFunctionPresent("D3D12SDKPath")) {
-        sVersion = "12";
-        bDetected = true;
-    } else if (PE.isExportFunctionPresentExp(/^NVSDK_NGX_D3D11_/)) {
-        sVersion = "11";
-        bDetected = true;
+
+        var version = getVersionByExports();
+        if (version) {
+            sVersion += (sVersion ? "/" : String()) + version;
+        }
+    } else {
+        var version = getVersionByExports();
+        if (version && version !== sVersion) {
+            sVersion = version;
+            bDetected = true;
+        }
     }
 
     return result();
+}
+
+// Retrieves the Direct3D version from the exports of the library
+function getVersionByExports() {
+    var exportName = PE.isExportFunctionPresentExp(/D3D\d{1,2}/i);
+    if (exportName) {
+        var versionMatch = String(exportName).match(/D3D(\d{1,2})/i);
+        if (versionMatch && isNumber(versionMatch[1])) {
+            return versionMatch[1];
+        }
+    }
+    return null;
 }
 
 // Checks whether the resulting string is a number
