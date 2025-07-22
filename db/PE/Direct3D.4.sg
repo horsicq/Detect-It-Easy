@@ -8,54 +8,28 @@
 init("library", "Direct3D");
 
 function detect() {
-    if (PE.isLibraryPresentExp(/^d3d*/i) || PE.isExportFunctionPresentExp(/^d3d/i)) {
+    var maxVersion = 0,
+        re = /d3d(\d+)/i;
+
+    for (var n = 0; n < PE.getNumberOfImports(); n++) {
+        var m = PE.getImportLibraryName(n).match(re);
+        if (m && /^\d+$/.test(m[1]) && Number(m[1]) > maxVersion) {
+            maxVersion = Number(m[1]);
+        }
+    }
+
+    for (var n = 0; n < PE.getNumberOfExportFunctions(); n++) {
+        var m = PE.getExportFunctionName(n).match(re);
+        if (m && /^\d+$/.test(m[1]) && Number(m[1]) > maxVersion) {
+            maxVersion = Number(m[1]);
+        }
+    }
+
+    if (maxVersion > 0) {
         bDetected = true;
-
-        var runtimeLibrary = PE.isLibraryPresentExp(/^d3d\d/i);
-
-        // d3d12.dll -> d3d[12].dll -> Direct3D v12
-        if (runtimeLibrary) {
-            var versionNumber = String(runtimeLibrary).slice(3, 5);
-
-            if (isNumber(versionNumber)) { // 10+
-                sVersion = versionNumber;
-            } else { // 8, 9
-                sVersion = versionNumber[0];
-            }
-        }
-
-        var version = getVersionByExports();
-        if (version && version !== sVersion) {
-            sVersion += (sVersion ? "/" : String()) + version;
-        }
-    } else {
-        var version = getVersionByExports();
-        if (version) {
-            sVersion = version;
-            bDetected = true;
-        }
+        sVersion = String(maxVersion);
     }
 
     return result();
 }
 
-// Retrieves the Direct3D version from the exports of the library
-function getVersionByExports() {
-    var exportName = PE.isExportFunctionPresentExp(/D3D\d{1,2}/i);
-    if (exportName) {
-        var versionMatch = String(exportName).match(/D3D(\d{1,2})/i);
-        if (versionMatch && isNumber(versionMatch[1])) {
-            return versionMatch[1];
-        }
-    }
-    return null;
-}
-
-// Checks whether the resulting string is a number
-function isNumber(str) {
-    if (str.length === 0) return false;
-    for (var n = 0; n < str.length; n++)
-        for (var e = 0; e < 10 && str[n] !== "0123456789"[e]; e++)
-            if (e === 9) return false;
-    return true;
-}
