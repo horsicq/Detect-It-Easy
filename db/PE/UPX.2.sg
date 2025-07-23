@@ -1,86 +1,79 @@
 // Detect It Easy: detection rule file
-// History:
-// 1:00 06.10.2013 x64 support (ajax)
-//      2014-05-25 rewritten (adoxa)
+// Authors: ajax, adoxa, DosX
 
 init("packer", "UPX");
 
 function isPatchedUPX() {
-    var nResult = 0,
+    var isDetected = 0,
         nNumberOfFunctions = PE.getNumberOfImportThunks(0);
 
     if (nNumberOfFunctions > 1 && nNumberOfFunctions < 7) {
         if (PE.getSizeOfCode() && PE.getSizeOfUninitializedData() && PE.section.length > 2 && PE.section[0].FileSize == 0) {
-            var nCount = 0;
+            var funcCounter = 0;
 
             if (PE.getImportFunctionName(0, 0) == "LoadLibraryA") {
-                nCount++;
+                funcCounter++;
             }
 
             if (PE.getImportFunctionName(0, 1) == "GetProcAddress") {
-                nCount++;
+                funcCounter++;
             }
 
             if (nNumberOfFunctions == 4) {
                 if (PE.getImportFunctionName(0, 2) == "VirtualProtect") {
-                    nCount++;
+                    funcCounter++;
                 }
 
                 if (PE.getImportFunctionName(0, 3) == "ExitProcess") {
-                    nCount++;
+                    funcCounter++;
                 }
             }
 
-            if (nNumberOfFunctions >= 3 && nCount < 4) {
+            if (nNumberOfFunctions >= 3 && funcCounter < 4) {
                 if (PE.getImportFunctionName(0, 2) == "ExitProcess") {
-                    nCount++;
+                    funcCounter++;
                 } else if (PE.isDll()) {
                     if (PE.getImportFunctionName(0, 2) == "VirtualProtect") {
-                        nCount++;
+                        funcCounter++;
                     }
                 }
             }
 
             if (nNumberOfFunctions == 6) {
                 if (PE.getImportFunctionName(0, 2) == "VirtualProtect") {
-                    nCount++;
+                    funcCounter++;
                 }
+
                 if (PE.getImportFunctionName(0, 3) == "VirtualAlloc") {
-                    nCount++;
+                    funcCounter++;
                 }
+
                 if (PE.getImportFunctionName(0, 4) == "VirtualFree") {
-                    nCount++;
+                    funcCounter++;
                 }
+
                 if (PE.getImportFunctionName(0, 5) == "ExitProcess") {
-                    nCount++;
+                    funcCounter++;
                 }
             }
 
-            if (nCount == 2 && nNumberOfFunctions == 2) {
-                nResult = 1;
+            if (funcCounter == 2 && nNumberOfFunctions == 2 ||
+                funcCounter == 3 && nNumberOfFunctions >= 3 ||
+                funcCounter == 4 && nNumberOfFunctions == 4 ||
+                funcCounter == 6 && nNumberOfFunctions == 6) {
+                isDetected = true;
             }
 
-            if (nCount == 3 && nNumberOfFunctions >= 3) {
-                nResult = 1;
-            }
-
-            if (nCount == 4 && nNumberOfFunctions == 4) {
-                nResult = 1;
-            }
-            if (nCount == 6 && nNumberOfFunctions == 6) {
-                nResult = 1;
-            }
-
-            if (nResult) {
+            if (isDetected) {
                 if (PE.getAddressOfEntryPoint() == 0x00001018) {
                     // (Win)Upack
-                    nResult = 0;
+                    isDetected = false;
                 }
             }
         }
     }
 
-    return nResult;
+    return isDetected;
 }
 
 function getUPXOptions(nOffset) {
@@ -94,18 +87,12 @@ function getUPXOptions(nOffset) {
         case 4: case 5:
         case 6: case 7:
         case 8: case 9:
-        case 10:
-            sCompression = "NRV";
-            break;
-        case 14:
-            sCompression = "LZMA";
-            break;
-        case 15:
-            sCompression = "zlib";
-            break;
+        case 10: sCompression = "NRV"; break;
+        case 14: sCompression = "LZMA"; break;
+        case 15: sCompression = "zlib"; break;
     }
 
-    if (sCompression != "") {
+    if (sCompression) {
         sOptions = sOptions.append(sCompression);
         if (nLevel == 8) {
             sOptions = sOptions.append("best");
@@ -127,11 +114,11 @@ function getUPXVersion() {
         sVersion = PE.getString(nOffset1 + 9, 4);
     }
 
-    if (sVersion == "" && nOffset2 != -1) {
+    if (!sVersion && nOffset2 != -1) {
         sVersion = PE.getString(nOffset2 - 5, 4);
     }
 
-    if (sVersion != "") {
+    if (sVersion) {
         if (+sVersion.toString() != sVersion) {
             if (PE.is64()) {
                 sVersion = "3.91+";
@@ -144,32 +131,31 @@ function getUPXVersion() {
 }
 
 function detect() {
+    if (PE.isNet()) return; // Doesn't support .NET
+
     if (!PE.is64()) {
-        var nEP = PE.compareEP("807C") ? 27 : 0;
-        if (PE.compareEP("60BE........8DBE........57", nEP)) {
+        if (PE.compareEP("60BE........8DBE........57", PE.compareEP("807C") ? 27 : 0)) {
             bDetected = true;
         } else if (PE.compareEP("60e8000000005883e8..508db8........578db0........83cd..31db9090909001db75")) {
             sVersion = "0.70";
             bDetected = true;
         }
     } else {
-        var nEP = PE.compareEP("4889") ? 24 : 0;
-        if (PE.compareEP("53565755488D35........488DBE........57", nEP)) {
+        if (PE.compareEP("53565755488D35........488DBE........57", PE.compareEP("4889") ? 24 : 0)) {
             bDetected = true;
         }
     }
 
     getUPXVersion();
-    if (sVersion != "") {
+
+    if (sVersion) {
         bDetected = true;
     }
 
     if (!bDetected) {
         bDetected = isPatchedUPX();
-    }
-
-    if (bDetected) {
-        if (sVersion == "") {
+    } else {
+        if (!sVersion) {
             if (PE.is64()) {
                 sVersion = "3.91+"; // UPX 3.91 was the first version with a PE+ support.
             }
