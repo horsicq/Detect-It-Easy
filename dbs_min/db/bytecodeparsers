@@ -25,8 +25,7 @@ const debug = 0;
 
 //The OPM doesn't use these registers:
 function isYM2151Reg(a) {
-    return [0, 2, 3, 4, 5, 6, 7, 9, 0xA, 0xB, 0xC, 0xD, 0xE, 0x10, 0x13, 0x15, 0x16, 0x17, 0x1A, 0x1C, 0x1D, 0x1E, 0x1F]
-        .indexOf(a) >= 0
+    return [0, 2, 3, 4, 5, 6, 7, 9, 0xA, 0xB, 0xC, 0xD, 0xE, 0x10, 0x13, 0x15, 0x16, 0x17, 0x1A, 0x1C, 0x1D, 0x1E, 0x1F].indexOf(a) >= 0;
 }
 
 function YM2151RegStr(a, b) {
@@ -40,14 +39,14 @@ function YM2151RegStr(a, b) {
     if (a == 0x12) return 'CLKA LSB freq' + Hex(b & 3);
     if (a == 0x13) return 'CLKB freq' + Hex(b);
     if (a == 0x14) return 'Clk CSM' + (b >> 7) + ' FResetBA' + Bin((b >> 4) & 3, 2)
-        + ' IRQEnBA' + Bin((b >> 2) & 3, 2) + ' LoadBA' + Bin(b & 3, 2); //
+        + ' IRQEnBA' + Bin((b >> 2) & 3, 2) + ' LoadBA' + Bin(b & 3, 2);
     if (a == 0x18) return 'LowOscFreq ' + Hex(b);
     if (a == 0x19) return ['Amp', 'Phase'][b >> 7] + 'Mod depth' + Hex(b & 0x7F);
     if (a == 0x1B) return 'LFOWave ctl' + (b >> 6) + ' ' + ['saw', 'sqr', 'tri', 'noise'][b & 3];
     if (a <= 0x27) return 'Ch ' + (a & 0x7) + ' ctl ' + (b & 0x80 ? 'R' : '') + (b & 0x40 ? 'L' : '') + ' FB' + ((b >> 3) & 7) + ' con' + (b & 7);
     if (a <= 0x2F) {
         o = ((b >> 4) & 7);
-        return 'KC/prep note-on ch' + (a & 0x7) + ' ' + (o ? ['C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', "C'"][b & 0xF] + o : '--')
+        return 'KC/prep note-on ch' + (a & 0x7) + ' ' + (o ? ['C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', "C'"][b & 0xF] + o : '--');
     }
     if (a <= 0x37) return 'KF/prep p.bend ch' + (a & 0x7) + ' kf' + (b >> 2);
     if (a <= 0x3F) return 'ModSensy. ch' + (a & 0x7) + ' phase' + ((b >> 4) & 7) + ' amp' + (b & 3);
@@ -86,7 +85,7 @@ function MDXCmdStr(ch, o) {
     else if (c <= 0xDF) {
         c -= 0x80;
         if (ch > 8) return C[ch] + ': smp#' + c;
-        else return C[ch] + ': ' + notes[c % 12] + (Util.divu64(c, 12)) + ' ~' + (X.U8(o + 1) + 1)
+        else return C[ch] + ': ' + notes[c % 12] + (Util.divu64(c, 12)) + ' ~' + (X.U8(o + 1) + 1);
     }
     else switch (c) {
         case 0xFF: return C[ch] + ': bpm ' + X.U8(o + 1); case 0xFE: return C[ch] + ': R ' + YM2151RegStr(X.U8(o + 1), X.U8(o + 2));
@@ -113,7 +112,7 @@ function MDXCmdStr(ch, o) {
         else return C[ch] + ': LFO OPM syn/wf ' + X.U8(o + 1) + ' lfrq ' + X.U8(o + 2) + ' PMD ' + X.U8(o + 3) + ' AMD ' + X.U8(o + 4) + ' P/AMS ' + X.U8(o + 5);
         case 0xE9: return C[ch] + ': LFO key-on dly ' + X.U8(o + 1); case 0xE8: return C[ch] + ': PCM8 on';
         case 0xE7: return C[ch] + ': Fadeout' + (X.U8(o + 1) == 1 ? '' : Hex(X.U8(o + 1))) + ' spd ' + X.U8(o + 2);
-        default: return C[ch] + ': unknown command ' + Hex(X.U8(o))
+        default: return C[ch] + ': unknown command ' + Hex(X.U8(o));
     }
 }
 
@@ -124,7 +123,7 @@ function MDXCmdStr(ch, o) {
 function isYM2612Reg(a) {
     return !(a < 0x22 || a == 0x23 || isWithin(a, 0x2C, 0x2F) || a > 0xB6
         || (isWithin(a, 0x30, 0xAF) && (a & 3) == 3) // per-op registers from 3x to Ax must not have x3,x7, xB, xF
-    )
+    );
 }
 
 /** Mega Drive GYM bytecode detector. If <= 0, consider invalid.
@@ -136,7 +135,7 @@ function parseMDGYM(p, len) {
     var max = (len == BCParseToEoF) ? X.Sz() - 3 : Math.min(X.Sz() - 3, p + 0x2000),
         notes = 0, v = [0, 0, 0, 0],
         c, r, x;
-    function re(p, t) { if (debug > 1) _l2r('gym', p, t); return [BCInvalidFormat] }
+    function re(p, t) { if (debug > 1) _l2r('gym', p, t); return [BCInvalidFormat]; }
     while (p < max) switch (c = X.U8(p++)) {
         case 0: break;
         case 1: case 2: r = X.U8(p++), x = X.U8(p++); if (!isYM2612Reg(r)) return re(p - 3, c + ': R ' + Hex(r));
@@ -147,7 +146,7 @@ function parseMDGYM(p, len) {
             if ((r & 0xF0) == 0x60) v[3]++; // DR/AM set
             break;
         case 3: p++; break;
-        default: return re(p - 1, '!cmd' + Hex(c))
+        default: return re(p - 1, '!cmd' + Hex(c));
     }
     if (!notes || v[0] < 24 || v[1] < 24 || v[2] < 24 || v[3] < 24) return [BCInvalidFormat]; else return [notes, p, 0];
 }
@@ -157,7 +156,7 @@ function MUAP98CmdStr(ch, o, recurse) {
     if (typeof recurse != 'number') recurse = 0; if (recurse > 2) return '…';
     const
         C = [/*0~2: FM:*/'FM1: ', 'FM2: ', 'FM3: ', /*3~5:*/'SSGA: ', 'SSGB: ', 'SSGC: ',
-		/*6~8,11~17: FM:*/'FM4: ', 'FM5: ', 'FM6: ', /*9,10:*/'RHY: ', 'PCM: ',
+        /*6~8,11~17: FM:*/'FM4: ', 'FM5: ', 'FM6: ', /*9,10:*/'RHY: ', 'PCM: ',
             'FM7: ',/*12~14: either YM3438 or YM2203*/'FM8: ', 'FM9: ', 'FM10: ', 'FM11: ', 'FM12: '],
         notes = ['C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C'],
         c = X.U8(o), cht = ch == 9 ? 'rhy' : ch == 10 ? 'pcm' : 3 <= ch && ch <= 5 ? 'ssg' : 'fm',
@@ -234,8 +233,9 @@ function parseMUAP98(p, len, ch) {
             (len == BCParseToEoF || len == BCParseToEndMarker) ? Math.min(0x10000, X.Sz()) : p + len;
     var cht = (ch == 9) ? 'rhy' : ch == 10 ? 'pcm' : 3 <= ch && ch <= 5 ? 'ssg' : 'fm',
         c, notes = 0, stop = false, cmtlen = -1, cmt = "", /*stack depths:*/ lpd = 1, calld = ifd = mp = ic = 0;
-    var visited = []; for (i = p0; i < max; i++) visited[i] = false;
-    function re(p, t) { if (debug > 1) _l2r('muap98', p, 'ch' + ch + ': ' + t); delete visited; return [BCInvalidFormat] }
+    var visited = [];
+    for (i = p0; i < max; i++) visited[i] = false;
+    function re(p, t) { if (debug > 1) _l2r('muap98', p, 'ch' + ch + ': ' + t); delete visited; return [BCInvalidFormat]; }
     while (p0 <= p && p < max && !stop) {
         if (ifd < 0) sus++;
         visited[p] = true; if (p > mp) mp = p;
@@ -283,7 +283,7 @@ function parseMUAP98(p, len, ch) {
             case 0xE8: calld--; if (calld < 0) return re(p, '!RetW/oSub'); p++; break; //@ret
             case 0xE7: p += 3; break; //Source Line symbolic information
             case 0xE6:
-			/* if(cht == 'fm') { TODO } */ p += 27; break; //FM: set USR Tone parameter; SSG, RHY, PCM: a 27-byte nop
+            /* if(cht == 'fm') { TODO } */ p += 27; break; //FM: set USR Tone parameter; SSG, RHY, PCM: a 27-byte nop
             case 0xE5: p++; break; //Play Stack init
             case 0xE4: case 0xE3: //if @jump, if @call
                 t = p + 2 + X.I16(p + 3); if (!isWithin(t, 0x18, max) || Math.abs(t - p) < 2 || (X.U8(p + 1) >> 4) > 3) return re(p, '!' + MUAP98CmdStr(ch, p, 1));
@@ -310,7 +310,7 @@ function parseMUAP98(p, len, ch) {
             case 0xCE: p++; break; //SSG:set last mixer mode, vol, env; RHY/PCM:set last tone/vol/pan (from before sfx)
         }
     }
-    return [notes, p, 0, cmt, mp, ic]
+    return [notes, p, 0, cmt, mp, ic];
 }
 
 /* beautify ignore:end */
