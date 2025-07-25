@@ -1206,7 +1206,7 @@ function scanForAntiAnalysis_NET() {
     var isAntiSbiePresent = false;
 
     // Check if the signature for 'GetModuleHandle' is present
-    if (validateSignature("'GetModuleHandle'")) { // from 'kernel32.dll') {
+    if (validateSignature("'GetModuleHandle'")) { // from 'kernel32.dll'
         // Iterate through Sandboxie variants
         for (var l in sbieVariants) {
             if (!isAntiSbiePresent) {
@@ -4586,9 +4586,8 @@ function scanForMaliciousCode_NET_and_Native() {
         var separatorToSearch = generateUnicodeSignatureMask("|'|'|") + "00";
         separatorToSearch = "??" + separatorToSearch.substring(2, separatorToSearch.length);
 
-        // // NjRAT Generic: Detect NjRAT via requests-separator or assembly name
-        if (verdicts.length === 0 && (PE.getNetAssemblyName() === "w" || PE.getNetModuleName() === "w.exe" ||
-            PE.isSignatureInSectionPresent(0, separatorToSearch))) {
+        // NjRAT Generic: Detect NjRAT via requests-separator or assembly name
+        if (verdicts.length === 0 && (PE.getNetAssemblyName() === "w" || PE.getNetModuleName() === "w.exe" || PE.isSignatureInSectionPresent(0, separatorToSearch))) {
             verdicts.push({
                 type: "NjRAT",
                 version: String(),
@@ -4597,7 +4596,17 @@ function scanForMaliciousCode_NET_and_Native() {
         }
 
 
-        if (verdicts.length === 0 && PE.isSignatureInSectionPresent(0, "00" + generateUnicodeSignatureMask(" RAT") + "00 **")) {
+        if (verdicts.length === 0 && (PE.getNetAssemblyName() === "AsyncClient" || PE.getNetModuleName() === "AsyncClient.exe" || PE.isNetObjectPresent("Pastebin"))) {
+            verdicts.push({
+                type: "AsyncRAT",
+                version: String(),
+                details: String()
+            });
+        }
+
+
+        if (verdicts.length === 0 && (PE.isSignatureInSectionPresent(0, "00" + generateUnicodeSignatureMask(" RAT") + "00 **") ||
+            (PE.isNetObjectPresent("System.Net.Sockets") && PE.isNetObjectPresent("GetForegroundWindow") && PE.isNetObjectPresent("GetWindowText") && (PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("AntivirusProduct")) || PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("DisableTaskMgr")))))) {
             verdicts.push({
                 type: "RAT",
                 version: String(),
