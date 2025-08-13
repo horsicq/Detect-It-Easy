@@ -2315,6 +2315,81 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    // Check for compressed sections using entropy
+
+    var isCompressedSectionPresent = false;
+
+    var sectionIndex = 0;
+
+    for (var t = 0; t < PE.getNumberOfSections() && !isCompressedSectionPresent; t++) {
+        sectionIndex = t;
+        if (PE.calculateEntropy(PE.getSectionFileOffset(sectionIndex), PE.getSectionFileSize(sectionIndex)) > 7.4) {
+            isCompressedSectionPresent = true;
+        }
+    }
+
+    if (isCompressedSectionPresent) options += (options ? " + " : String()) + "Section #" + sectionIndex + " (\"" + clearSectionName(PE.getSectionName(sectionIndex)) + "\") compressed";
+
+
+
+
+    // Check for sections without virtual address
+
+    var isSectionHasWrongOffsetOrSize = false;
+
+    var sectionIndex = 0;
+
+    var wrongOffset = false,
+        wrongSize = false;
+
+    for (var t = 0; t < PE.getNumberOfSections() && !isSectionHasWrongOffsetOrSize; t++) {
+        sectionIndex = t;
+        if (PE.getSectionName(sectionIndex) !== ".bss") {
+            if (PE.section[sectionIndex].FileOffset === 0x00) {
+                wrongOffset = true;
+            }
+
+            if (PE.section[sectionIndex].FileSize === 0x00) {
+                wrongSize = true;
+            }
+
+            isSectionHasWrongOffsetOrSize = wrongOffset || wrongSize;
+        }
+    }
+
+    if (isSectionHasWrongOffsetOrSize) options += (options ? " + " : String()) + "Section #" + sectionIndex + " (\"" + clearSectionName(PE.getSectionName(sectionIndex)) + "\") has wrong " + (wrongOffset ? "offset" : String()) + (wrongOffset && wrongSize ? " and " : String()) + (wrongSize ? "size" : String());
+
+
+
+
+    // Check for sections with identical offsets
+
+    var isSectionHasDuplicateOffset = false;
+
+    var firstSectionIndex = 0,
+        firstSectionName = String(),
+        secondSectionIndex = 0,
+        secondSectionName = String();
+
+    for (var i = 0; i < PE.getNumberOfSections() && !isSectionHasDuplicateOffset; i++) {
+        for (var j = i + 1; j < PE.getNumberOfSections() && !isSectionHasDuplicateOffset; j++) {
+            if (PE.section[i].FileOffset === PE.section[j].FileOffset && PE.section[i].FileOffset !== 0) {
+                isSectionHasDuplicateOffset = true;
+
+                firstSectionIndex = i;
+                secondSectionIndex = j;
+
+                firstSectionName = clearSectionName(PE.getSectionName(i));
+                secondSectionName = clearSectionName(PE.getSectionName(j));
+            }
+        }
+    }
+
+    if (isSectionHasDuplicateOffset) options += (options ? " + " : String()) + "Section #" + firstSectionIndex + " (\"" + firstSectionName + "\") and #" + secondSectionIndex + " (\"" + secondSectionName + "\") have one offset";
+
+
+
+
     // Check for 'MZ' signature in the overlay
 
     var isMzSignatureDetected = false;
@@ -2365,41 +2440,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     if (isHighEntropy) options += (options ? " + " : String()) + "High entropy";
-
-
-
-
-    // Check for compressed sections using entropy
-
-    var isCompressedSectionPresent = false;
-
-    var sectionIndex = 0;
-
-    for (var t = 0; t < PE.getNumberOfSections() && !isCompressedSectionPresent; t++) {
-        sectionIndex = t;
-        if (PE.calculateEntropy(PE.getSectionFileOffset(sectionIndex), PE.getSectionFileSize(sectionIndex)) > 7.4) {
-            isCompressedSectionPresent = true;
-        }
-    }
-
-    if (isCompressedSectionPresent) options += (options ? " + " : String()) + "Section " + sectionIndex + " (\"" + clearSectionName(PE.getSectionName(sectionIndex)) + "\") compressed";
-
-
-
-
-    var isSectionWithoutVirtualAddressPresent = false;
-
-    var sectionIndex = 0;
-
-    for (var t = 0; t < PE.getNumberOfSections() && !isSectionWithoutVirtualAddressPresent; t++) {
-        sectionIndex = t;
-        if (PE.section[sectionIndex].FileOffset === 0x00) {
-            isSectionWithoutVirtualAddressPresent = true;
-        }
-    }
-
-
-    if (isSectionWithoutVirtualAddressPresent) options += (options ? " + " : String()) + "Section " + sectionIndex + " (\"" + clearSectionName(PE.getSectionName(sectionIndex)) + "\") has wrong offset";
 
 
 
@@ -2711,7 +2751,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
         }
     }
 
-    if (isDebugSectionPresent) options = "Section " + sectionNumber + " (\"" + clearSectionName(PE.getSectionName(sectionNumber)) + "\")";
+    if (isDebugSectionPresent) options = "Section #" + sectionNumber + " (\"" + clearSectionName(PE.getSectionName(sectionNumber)) + "\")";
 
 
 
@@ -3548,7 +3588,7 @@ function scanForObfuscations_Native() {
         }
     }
 
-    if (isRwxSectionPresent) options += (options ? " + " : String()) + "Section " + rwxSectionNumber + " (\"" + clearSectionName(PE.getSectionName(rwxSectionNumber)) + "\") has RWX";
+    if (isRwxSectionPresent) options += (options ? " + " : String()) + "Section #" + rwxSectionNumber + " (\"" + clearSectionName(PE.getSectionName(rwxSectionNumber)) + "\") has RWX";
 
 
 
