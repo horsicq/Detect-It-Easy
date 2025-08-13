@@ -9,120 +9,59 @@ function detect() {
     if (Binary.getSize() >= 0x0E) {
         bDetected = true;
         switch (Binary.read_uint32(0x00, _BE)) {
-            case 0x4D4D002A:
-                var bEndian = _BE;
-                sOption("BE");
-                break;
-            case 0x49492A00:
-                var bEndian = _LE;
-                sOption("LE");
-                break;
-            default:
-                bDetected = false;
+            case 0x4D4D002A: var bEndian = _BE; sOption("BE"); break;
+            case 0x49492A00: var bEndian = _LE; sOption("LE"); break;
+            default: return;
         }
 
-        if (bDetected) {
-            var nOffset = Binary.read_uint32(0x04, bEndian);
-            var nTagCount = Binary.read_uint16(nOffset, bEndian);
-            nOffset += 2;
-            var nWidth, nHeight, nBPS, nCol, nComp;
-            while (nTagCount--) {
-                var nTag = Binary.read_uint16(nOffset, bEndian);
-                var nType = Binary.read_uint16(nOffset + 2, bEndian);
-                var nCount = Binary.read_uint32(nOffset + 4, bEndian);
-                switch (nTag) {
-                    case 0x100: // ImageWidth (256)
-                        nWidth = ReadTagValue(nType);
-                        break;
+        var nOffset = Binary.read_uint32(0x04, bEndian),
+            nTagCount = Binary.read_uint16(nOffset, bEndian);
 
-                    case 0x101: // ImageLength (257)
-                        nHeight = ReadTagValue(nType);
-                        break;
+        nOffset += 2;
 
-                    case 0x102: // BitsPerSample (258)
-                        nBPS = nCount * ReadTagValue(nType);
-                        break;
+        var nWidth, nHeight, nBPS, nCol, nComp;
 
-                    case 0x103: // Compression (259)
-                        nComp = ReadTagValue(nType);
-                        break;
+        while (nTagCount--) {
+            var nTag = Binary.read_uint16(nOffset, bEndian),
+                nType = Binary.read_uint16(nOffset + 2, bEndian),
+                nCount = Binary.read_uint32(nOffset + 4, bEndian);
 
-                    case 0x106: // PhotometricInterpretation (262)
-                        nCol = ReadTagValue(nType);
-                        break;
-
-                    case 271: // Make (271)
-                        sOption("Make:" + ReadTagValue(nType));
-                        break;
-
-                    case 50706: // DNGVersion (50706)
-                        sName = "Digital Negative (.DNG)"
-                        break;
-                    default:
-
-                }
-                nOffset += 0x0C;
-
+            switch (nTag) {
+                case 0x100: nWidth = ReadTagValue(nType); break; // ImageWidth (256)
+                case 0x101: nHeight = ReadTagValue(nType); break; // ImageLength (257)
+                case 0x102: nBPS = nCount * ReadTagValue(nType); break; // BitsPerSample (258)
+                case 0x103: nComp = ReadTagValue(nType); break; // Compression (259)
+                case 0x106: nCol = ReadTagValue(nType); break; // PhotometricInterpretation (262)
+                case 271: sOption("Make:" + ReadTagValue(nType)); break; // Make (271)
+                case 50706: sName = "Digital Negative (.DNG)"; break; // DNGVersion (50706)
+                default: break;
             }
+            nOffset += 0x0C;
+        }
 
-
-            switch (nComp) {
-                case 1:
-                    sOption("Uncompressed");
-                    break;
-                case 2:
-                    sOption("Huffman");
-                    break;
-                case 3:
-                    sOption("Group 3");
-                    break;
-                case 4:
-                    sOption("Group 4");
-                    break;
-                case 5:
-                    sOption("LZW");
-                    break;
-                case 6:
-                    sOption("embedded JPEG (602Photo software)");
-                    break;
-                case 7:
-                    sOption("JPEG");
-                    break;
-                case 32771:
-                    sOption("Alchemy software type 6 unknown compression");
-                    break;
-                case 32773:
-                    sOption("PackBits");
-                    break;
-                case 32946:
-                    sOption("Deflate");
-                    break;
-                case 34690:
-                    sOption("LDF bitonal");
-                    break;
-                case 65000:
-                    sOption("Kodak DCR");
-                    sName = "Kodak DCS Pro SLR (.DCR)";
-                    break;
-            }
-            if (nWidth != 0 && nHeight != 0) {
-                sOption(nWidth + "x" + nHeight);
-            }
-            sOption(nBPS + "-bit ");
-            switch (nCol) {
-                case 0:
-                    sOption("W/B");
-                    break;
-                case 1:
-                    sOption("B/W");
-                    break;
-                case 2:
-                    sOption("RGB");
-                    break;
-                case 3:
-                    sOption("index");
-                    break;
-            }
+        switch (nComp) {
+            case 1: sOption("Uncompressed"); break;
+            case 2: sOption("Huffman"); break;
+            case 3: sOption("Group 3"); break;
+            case 4: sOption("Group 4"); break;
+            case 5: sOption("LZW"); break;
+            case 6: sOption("embedded JPEG (602Photo software)"); break;
+            case 7: sOption("JPEG"); break;
+            case 32771: sOption("Alchemy software type 6 unknown compression"); break;
+            case 32773: sOption("PackBits"); break;
+            case 32946: sOption("Deflate"); break;
+            case 34690: sOption("LDF bitonal"); break;
+            case 65000: sOption("Kodak DCR"); sName = "Kodak DCS Pro SLR (.DCR)"; break;
+        }
+        if (nWidth != 0 && nHeight != 0) {
+            sOption(nWidth + "x" + nHeight);
+        }
+        sOption(nBPS + "-bit ");
+        switch (nCol) {
+            case 0: sOption("W/B"); break;
+            case 1: sOption("B/W"); break;
+            case 2: sOption("RGB"); break;
+            case 3: sOption("index"); break;
         }
     }
 
@@ -130,13 +69,11 @@ function detect() {
         var nTempValue = 0,
             nTempOffset = 0;
         switch (nType) {
-            case 1: // eBYTE
-                break;
-            case 2: // eASCII
+            case 1: break; // eBYTE
+            case 2:
                 nTempOffset = Binary.read_uint32(nOffset + 8, bEndian);
                 nTempValue = Binary.getString(nTempOffset, nCount);
-                return nTempValue;
-                break;
+                return nTempValue; // eASCII
             case 3: // eSHORT
                 if (nCount == 1) {
                     nTempValue = Binary.read_uint16(nOffset + 8, bEndian);
@@ -144,41 +81,29 @@ function detect() {
                 } else {
                     nTempOffset = Binary.read_uint32(nOffset + 8, bEndian);
                     while (nCount--) {
-                        nTempValue = Binary.read_uint16(nTempOffset, bEndian);
-                        nTempOffset += 2;
+                        nTempValue = Binary.read_uint16(nTempOffset, bEndian); nTempOffset += 2;
                     }
                     return nTempValue;
                 }
-                break;
-            case 4: // eLONG
+            case 4: // eLONG 
                 if (nCount == 1) {
                     nTempValue = Binary.read_uint32(nOffset + 8, bEndian);
                     return nTempValue;
                 } else {
                     nTempOffset = Binary.read_uint32(nOffset + 8, bEndian);
                     while (nCount--) {
-                        nTempValue = Binary.read_uint32(nTempOffset, bEndian);
-                        nTempOffset += 4;
+                        nTempValue = Binary.read_uint32(nTempOffset, bEndian); nTempOffset += 4;
                     }
                     return nTempValue;
                 }
-                break;
-            case 5: // eRATIONAL
-                break;
-            case 6: // eSBYTE
-                break;
-            case 7: // eUNDEF
-                break;
-            case 8: // eSSHORT
-                break;
-            case 9: // eSLONG
-                break;
-            case 10: // eSRATIONAL
-                break;
-            case 11: // eFLOAT
-                break;
-            case 12: // eDOUBLE
-                break;
+            case 5: break; // eRATIONAL
+            case 6: break; // eSBYTE
+            case 7: break; // eUNDEF
+            case 8: break; // eSSHORT
+            case 9: break; // eSLONG
+            case 10: break; // eSRATIONAL
+            case 11: break; // eFLOAT
+            case 12: break; // eDOUBLE
         }
     }
 

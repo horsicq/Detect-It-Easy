@@ -1,0 +1,25 @@
+// Detect It Easy: detection rule file
+// Author: Kae <TG@kaens>
+
+init("audio", "José Ramón 'Gryzor87' García/Abylight's Nintendo 3DS stream (.STRM)");
+
+function detect() {
+  //ref https://github.com/Gota7/NitroStudio2/blob/master/docs/specs/stream.md
+  if (!X.c("'STRM'E8030000") || !X.U32(0x10) || X.U32(0x18) < 0x1F || (sz=X.U32(0x10)) != X.U32(0x18)) return;
+  bDetected = true;
+  if (X.isVerbose()) {
+    const m = Math.min(sz, X.Sz());
+    var sr = X.U32(8), len = 0;
+    if (X.isDeepScan()) for(p=0x1E; p < m; len++) { // parse AAC to count samples
+       var fsy = (X.U16(p,_BE) >> 4) & 0xFFF,
+         fsz = (X.U32(p+2,_BE) >> 5) & 0x1FFF;
+       if(fsy != 0xFFF || fsz <= 8) break;
+       p += fsz
+    }
+    if(p < m) sVersion = 'malformed!badAAC';
+    len = (len * 1024 / sr).toFixed(0);
+    sOption((len?'len '+secondsToTimeStr(len)+' ':'')+'s/r:'+sr+'Hz'+' sz:'+outSz(0x1E+sz))
+  }
+
+  return result();
+}
