@@ -2335,6 +2335,11 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    var standartSectionsWithUnusualValuesDict = [".bss", "BSS", ".tls"];
+
+
+
+
     // Check for sections with strange characteristics
 
     var isSectionHasWrongOffsetOrSize = false;
@@ -2346,7 +2351,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     for (var t = 0; t < PE.getNumberOfSections() && !isSectionHasWrongOffsetOrSize; t++) {
         sectionIndex = t;
-        if (PE.getSectionName(sectionIndex) !== ".bss") {
+        if (standartSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(sectionIndex)) === -1) {
             if (PE.section[sectionIndex].FileOffset === 0x00) {
                 wrongOffset = true;
             }
@@ -2368,6 +2373,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isSectionHasDuplicateOffset = false;
 
+    var sectionIndex = 0;
+
     var firstSectionIndex = 0,
         firstSectionName = String(),
         secondSectionIndex = 0,
@@ -2376,18 +2383,21 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var sectionOffsetsDict = {};
 
     for (var i = 0; i < PE.getNumberOfSections() && !isSectionHasDuplicateOffset; i++) {
-        var currentSectionOffset = PE.section[i].FileOffset;
-        if (currentSectionOffset !== 0) {
-            if (typeof sectionOffsetsDict[currentSectionOffset] === "undefined") {
-                sectionOffsetsDict[currentSectionOffset] = [i];
-            } else {
-                isSectionHasDuplicateOffset = true;
+        sectionIndex = i;
+        if (standartSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(sectionIndex)) === -1) {
+            var currentSectionOffset = PE.section[sectionIndex].FileOffset;
+            if (currentSectionOffset !== 0) {
+                if (typeof sectionOffsetsDict[currentSectionOffset] === "undefined") {
+                    sectionOffsetsDict[currentSectionOffset] = [sectionIndex];
+                } else {
+                    isSectionHasDuplicateOffset = true;
 
-                firstSectionIndex = sectionOffsetsDict[currentSectionOffset][0];
-                secondSectionIndex = i;
+                    firstSectionIndex = sectionOffsetsDict[currentSectionOffset][0];
+                    secondSectionIndex = sectionIndex;
 
-                firstSectionName = clearSectionName(PE.getSectionName(firstSectionIndex));
-                secondSectionName = clearSectionName(PE.getSectionName(secondSectionIndex));
+                    firstSectionName = clearSectionName(PE.getSectionName(firstSectionIndex));
+                    secondSectionName = clearSectionName(PE.getSectionName(secondSectionIndex));
+                }
             }
         }
     }
@@ -2460,13 +2470,15 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var importNamesDict = {};
 
-    for (var i = 0; i < PE.getNumberOfImports() && !recurringImports; i++) {
-        var name = PE.getImportLibraryName(i);
-        importNamesDict[name] = (importNamesDict[name] || 0) + 1;
-        if (importNamesDict[name] >= 3) {
-            log(logType.nothing, "Recurring import name: \"" + name + "\"");
+    if (_getNumberOfResults("linker", "Turbo Linker") < 1) { // Ignore Delphi
+        for (var i = 0; i < PE.getNumberOfImports() && !recurringImports; i++) {
+            var name = PE.getImportLibraryName(i);
+            importNamesDict[name] = (importNamesDict[name] || 0) + 1;
+            if (importNamesDict[name] >= 3) {
+                log(logType.nothing, "Recurring import name: \"" + name + "\"");
 
-            recurringImports = true;
+                recurringImports = true;
+            }
         }
     }
 
