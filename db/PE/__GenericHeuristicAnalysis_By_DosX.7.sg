@@ -2005,7 +2005,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     // ["Name", "Version", ImportLibraryIndex, Hash, Type (0 = packer, 1 = protector, 2 = protection)]
     // If {ImportLibraryIndex} is -1, it means the hash has no index
 
-    var dbCollectionOfHashesDictionary = [
+    var dbCollectionOfHashesDict = [
         // packers
         ["UPX", "0.59-0.93", 0, 0xd4fdcab1, 0], // https://github.com/upx/upx
         ["UPX", "0.94-1.93", 0, 0x1d51299a, 0],
@@ -2101,7 +2101,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["CodeVirtualizer", null, 4, 0x4fbeea23, 1], // https://www.oreans.com/CodeVirtualizer.php
     ];
 
-    const importValidatingResult = validateImportHashes(dbCollectionOfHashesDictionary);
+    const importValidatingResult = validateImportHashes(dbCollectionOfHashesDict);
 
     var versionByImportsDetected;
 
@@ -2114,7 +2114,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     // Clean up: release the dictionary
-    dbCollectionOfHashesDictionary = undefined;
+    dbCollectionOfHashesDict = undefined;
 
     if (isImportsLikePacker) options += (options ? " + " : String()) + "Imports like " + importValidatingResult[0] + (versionByImportsDetected ? " (v" + importValidatingResult[1] + ")" : String());
 
@@ -2123,7 +2123,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isSectionNameLikePacker = false;
 
-    var dbCollectionOfSectionNamesDictionary = [
+    var dbCollectionOfSectionNamesDict = [
         [".NET Reactor", "2.XX", ".reacto"], // https://www.eziriz.com/dotnet_reactor.htm
         [".NET Reactor", null, ".reacto"],
         ["ACProtect", null, ".perplex"], // https://acprotect-standard.soft112.com/
@@ -2254,7 +2254,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["DotFix NiceProtect", null, "."]
     ];
 
-    const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDictionary);
+    const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDict);
 
     var versionBySectionDetected;
 
@@ -2267,7 +2267,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     // Clean up: release the dictionary
-    dbCollectionOfSectionNamesDictionary = undefined;
+    dbCollectionOfSectionNamesDict = undefined;
 
     if (isSectionNameLikePacker) options += (options ? " + " : String()) + "Sections like " + sectionNamesValidatingResult[0] + (versionBySectionDetected ? " (v" + sectionNamesValidatingResult[1] + ")" : String());
 
@@ -2297,18 +2297,20 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isSectionNamesRepeatingPresent = false;
 
-    var sectionCount = PE.getNumberOfSections(),
-        sectionNamesDictionary = {};
+    var sectionNamesDict = {};
 
-    for (var i = 0; i < sectionCount && !isSectionNamesRepeatingPresent; i++) {
+    for (var i = 0; i < PE.getNumberOfSections() && !isSectionNamesRepeatingPresent; i++) {
         var sectionName = PE.getSectionName(i);
-        sectionNamesDictionary[sectionName] = (sectionNamesDictionary[sectionName] || 0) + 1;
-        if (sectionNamesDictionary[sectionName] > 1) {
+        sectionNamesDict[sectionName] = (sectionNamesDict[sectionName] || 0) + 1;
+        if (sectionNamesDict[sectionName] > 1) {
             log(logType.nothing, "Section names repeating: '" + clearSectionName(sectionName) + "'");
 
             isSectionNamesRepeatingPresent = true;
         }
     }
+
+    // Clean up: release the dictionary
+    sectionNamesDict = undefined;
 
     if (isSectionNamesRepeatingPresent) options += (options ? " + " : String()) + "Section names repeating";
 
@@ -2371,19 +2373,27 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         secondSectionIndex = 0,
         secondSectionName = String();
 
+    var sectionOffsetsDict = {};
+
     for (var i = 0; i < PE.getNumberOfSections() && !isSectionHasDuplicateOffset; i++) {
-        for (var j = i + 1; j < PE.getNumberOfSections() && !isSectionHasDuplicateOffset; j++) {
-            if (PE.section[i].FileOffset === PE.section[j].FileOffset && PE.section[i].FileOffset !== 0) {
+        var currentSectionOffset = PE.section[i].FileOffset;
+        if (currentSectionOffset !== 0) {
+            if (typeof sectionOffsetsDict[currentSectionOffset] === "undefined") {
+                sectionOffsetsDict[currentSectionOffset] = [i];
+            } else {
                 isSectionHasDuplicateOffset = true;
 
-                firstSectionIndex = i;
-                secondSectionIndex = j;
+                firstSectionIndex = sectionOffsetsDict[currentSectionOffset][0];
+                secondSectionIndex = i;
 
-                firstSectionName = clearSectionName(PE.getSectionName(i));
-                secondSectionName = clearSectionName(PE.getSectionName(j));
+                firstSectionName = clearSectionName(PE.getSectionName(firstSectionIndex));
+                secondSectionName = clearSectionName(PE.getSectionName(secondSectionIndex));
             }
         }
     }
+
+    // Clean up: release the dictionary
+    sectionOffsetsDict = undefined;
 
     if (isSectionHasDuplicateOffset) options += (options ? " + " : String()) + "Section #" + firstSectionIndex + " (\"" + firstSectionName + "\") and #" + secondSectionIndex + " (\"" + secondSectionName + "\") have one offset";
 
@@ -2448,18 +2458,20 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var recurringImports = false;
 
-    var importCount = PE.getNumberOfImports(),
-        importNames = {};
+    var importNamesDict = {};
 
-    for (var i = 0; i < importCount && !recurringImports; i++) {
+    for (var i = 0; i < PE.getNumberOfImports() && !recurringImports; i++) {
         var name = PE.getImportLibraryName(i);
-        importNames[name] = (importNames[name] || 0) + 1;
-        if (importNames[name] >= 3) {
+        importNamesDict[name] = (importNamesDict[name] || 0) + 1;
+        if (importNamesDict[name] >= 3) {
             log(logType.nothing, "Recurring import name: \"" + name + "\"");
 
             recurringImports = true;
         }
     }
+
+    // Clean up: release the dictionary
+    importNamesDict = undefined;
 
     if (recurringImports) options += (options ? " + " : String()) + "Recurring import names";
 
