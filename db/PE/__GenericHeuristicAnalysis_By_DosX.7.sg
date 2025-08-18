@@ -2331,16 +2331,16 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isCompressedSectionPresent = false;
 
-    var sectionIndex = 0;
+    var compressedSectionIndex = -1;
 
     for (var t = 0; t < PE.getNumberOfSections() && !isCompressedSectionPresent; t++) {
-        sectionIndex = t;
-        if (PE.calculateEntropy(PE.getSectionFileOffset(sectionIndex), PE.getSectionFileSize(sectionIndex)) > 7.4) {
+        compressedSectionIndex = t;
+        if (PE.calculateEntropy(PE.getSectionFileOffset(compressedSectionIndex), PE.getSectionFileSize(compressedSectionIndex)) > 7.4) {
             isCompressedSectionPresent = true;
         }
     }
 
-    if (isCompressedSectionPresent) options += (options ? " + " : String()) + "Section #" + sectionIndex + " (\"" + clearSectionName(PE.getSectionName(sectionIndex)) + "\") compressed";
+    if (isCompressedSectionPresent) options += (options ? " + " : String()) + "Section #" + compressedSectionIndex + " (\"" + clearSectionName(PE.getSectionName(compressedSectionIndex)) + "\") compressed";
 
 
 
@@ -2354,19 +2354,19 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isSectionHasWrongOffsetOrSize = false;
 
-    var sectionIndex = 0;
+    var sectionWithWrongOffsetOrSizeIndex = -1;
 
     var wrongOffset = false,
         wrongSize = false;
 
     for (var t = 0; t < PE.getNumberOfSections() && !isSectionHasWrongOffsetOrSize; t++) {
-        sectionIndex = t;
-        if (standartSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(sectionIndex)) === -1) {
-            if (PE.section[sectionIndex].FileOffset === 0x00) {
+        sectionWithWrongOffsetOrSizeIndex = t;
+        if (standartSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(sectionWithWrongOffsetOrSizeIndex)) === -1) {
+            if (PE.section[sectionWithWrongOffsetOrSizeIndex].FileOffset === 0x00) {
                 wrongOffset = true;
             }
 
-            if (PE.section[sectionIndex].FileSize === 0x00) {
+            if (PE.section[sectionWithWrongOffsetOrSizeIndex].FileSize === 0x00) {
                 wrongSize = true;
             }
 
@@ -2374,7 +2374,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         }
     }
 
-    if (isSectionHasWrongOffsetOrSize) options += (options ? " + " : String()) + "Section #" + sectionIndex + " (\"" + clearSectionName(PE.getSectionName(sectionIndex)) + "\") has wrong " + (wrongOffset ? "offset" : String()) + (wrongOffset && wrongSize ? " and " : String()) + (wrongSize ? "size" : String());
+    if (isSectionHasWrongOffsetOrSize) options += (options ? " + " : String()) + "Section #" + sectionWithWrongOffsetOrSizeIndex + " (\"" + clearSectionName(PE.getSectionName(sectionWithWrongOffsetOrSizeIndex)) + "\") has wrong " + (wrongOffset ? "offset" : String()) + (wrongOffset && wrongSize ? " and " : String()) + (wrongSize ? "size" : String());
 
 
 
@@ -2383,7 +2383,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isSectionHasDuplicateOffset = false;
 
-    var sectionIndex = 0;
+    var currentSectionIndex = -1;
 
     var firstSectionIndex = 0,
         firstSectionName = String(),
@@ -2393,20 +2393,20 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var sectionOffsetsDict = {};
 
     for (var i = 0; i < PE.getNumberOfSections() && !isSectionHasDuplicateOffset; i++) {
-        sectionIndex = i;
-        if (standartSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(sectionIndex)) === -1) {
-            var currentSectionOffset = PE.section[sectionIndex].FileOffset;
+        currentSectionIndex = i;
+        if (standartSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(currentSectionIndex)) === -1) {
+            var currentSectionOffset = PE.section[currentSectionIndex].FileOffset;
             if (currentSectionOffset !== 0) {
                 if (typeof sectionOffsetsDict[currentSectionOffset] === "undefined") {
-                    sectionOffsetsDict[currentSectionOffset] = [sectionIndex];
+                    sectionOffsetsDict[currentSectionOffset] = [currentSectionIndex];
                 } else {
                     isSectionHasDuplicateOffset = true;
 
                     firstSectionIndex = sectionOffsetsDict[currentSectionOffset][0];
-                    secondSectionIndex = sectionIndex;
+                    currentSectionIndex = sectionIndex;
 
-                    firstSectionName = clearSectionName(PE.getSectionName(firstSectionIndex));
-                    secondSectionName = clearSectionName(PE.getSectionName(secondSectionIndex));
+                    firstSectionName = clearSectionName(PE.getSectionName(currentSectionIndex));
+                    secondSectionName = clearSectionName(PE.getSectionName(currentSectionIndex));
                 }
             }
         }
@@ -2784,21 +2784,21 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     var isDebugSectionPresent = false;
 
-    var sectionNumber = 0;
+    var debugSectionIndex = -1;
 
     for (var i = 0; i < PE.getNumberOfSections() && !isDebugSectionPresent; i++) {
-        sectionNumber = i;
+        debugSectionIndex = i;
 
         const currentSectionName = PE.getSectionName(i).toLowerCase();
 
         if (currentSectionName.indexOf("debug") !== -1 || // Modern LLVM debug sections
             currentSectionName === ".stab" || currentSectionName === ".stabstr") { // TCC/GCC
-            log(logType.any, "Debug section detected: \"" + clearSectionName(PE.getSectionName(sectionNumber)) + "\"");
+            log(logType.any, "Debug section detected: \"" + clearSectionName(PE.getSectionName(debugSectionIndex)) + "\"");
             isDebugSectionPresent = true;
         }
     }
 
-    if (isDebugSectionPresent) options = "Section #" + sectionNumber + " (\"" + clearSectionName(PE.getSectionName(sectionNumber)) + "\")";
+    if (isDebugSectionPresent) options = "Section #" + debugSectionIndex + " (\"" + clearSectionName(PE.getSectionName(debugSectionIndex)) + "\")";
 
 
 
@@ -3612,7 +3612,7 @@ function scanForObfuscations_Native() {
 
     var isRwxSectionPresent = false;
 
-    var rwxSectionNumber = 0;
+    var rwxSectionIndex = -1;
 
     const
         SECTION_FLAGS_EXECUTE = 0x20000000, // IMAGE_SCN_MEM_EXECUTE
@@ -3631,11 +3631,42 @@ function scanForObfuscations_Native() {
         if ((currentSectionCharacteristics & RWX_MASK) === RWX_MASK ||
             (currentSectionCharacteristics & RWX_CODE_MASK) === RWX_CODE_MASK) {
             isRwxSectionPresent = true;
-            rwxSectionNumber = i;
+            rwxSectionIndex = i;
         }
     }
 
-    if (isRwxSectionPresent) options += (options ? " + " : String()) + "Section #" + rwxSectionNumber + " (\"" + clearSectionName(PE.getSectionName(rwxSectionNumber)) + "\") has RWX";
+    if (isRwxSectionPresent) options += (options ? " + " : String()) + "Section #" + rwxSectionIndex + " (\"" + clearSectionName(PE.getSectionName(rwxSectionIndex)) + "\") has RWX";
+
+
+
+
+    // Check for zero padding at the beginning of the entry point section
+
+    var isEpSectionZeroPaddingPresent = false;
+
+    var epSectionWithZeroPaddingIndex = -1;
+
+    // Find the section that contains the entry point
+    const entryPointRva = PE.getAddressOfEntryPoint() - PE.getImageBase();
+
+    for (var i = 0; i < PE.getNumberOfSections() && !isEpSectionZeroPaddingPresent; i++) {
+        const
+            sectionVirtualAddress = PE.getSectionVirtualAddress(i),
+            sectionVirtualSize = PE.getSectionVirtualSize(i);
+
+        // Check if the entry point is within this section
+        if (entryPointRva >= sectionVirtualAddress &&
+            entryPointRva < sectionVirtualAddress + sectionVirtualSize) {
+            epSectionWithZeroPaddingIndex = i;
+
+            // Check for zero padding at the beginning of the section
+            if (PE.compare("00 00 00", PE.getSectionFileOffset(epSectionWithZeroPaddingIndex))) {
+                isEpSectionZeroPaddingPresent = true;
+            }
+        }
+    }
+
+    if (isEpSectionZeroPaddingPresent) options += (options ? " + " : String()) + "EP-section #" + epSectionWithZeroPaddingIndex + " (\"" + clearSectionName(PE.getSectionName(epSectionWithZeroPaddingIndex)) + "\") zero padding";
 
 
 
