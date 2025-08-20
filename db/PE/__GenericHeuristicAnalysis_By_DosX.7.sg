@@ -135,7 +135,7 @@ function stubForWrongEnvironment() {
     }
 
     if (!_getNumberOfResults("operation system")) {
-        stdout(">>> Warning: Script is running outside the environment <<<");
+        stdout(">>> Script is running outside the environment! <<<");
     }
 
     return false;
@@ -338,7 +338,7 @@ function scanForObfuscations_NET() {
                 }
             }
 
-            if (!isAnsiString(sectionName) && !isStrangeSectionsPresent) {
+            if (!isAsciiString(sectionName) && !isStrangeSectionsPresent) {
                 isStrangeSectionsPresent = true;
             }
         }
@@ -1442,8 +1442,8 @@ function NetOpCodes() {
     this.volatile = "FE13"; // MSIL: 'volatile' - Subsequent pointer reference is volatile
 
     // ========== UTILITY OPCODES ==========
-    this._unknown = "**"; // Unknown opcode pattern
-    this._any = "??"; // Any single opcode pattern
+    this._unknown = "**"; // Unknown opcode pattern (any byte except 0x00)
+    this._any = "??"; // Any single byte pattern
 
     /**
      * Sets strict operand values for MSIL opcodes with variable operands.
@@ -3378,27 +3378,6 @@ function scanForObfuscations_Native() {
 
 
 
-    // Looks for sections whose names contain strange (or invalid) characters
-
-    var isInvalidImportsPresent = false;
-
-    const badImportChars = '=~!@#$%^&*()"№;%:?*():;,|\'`<> ';
-
-    for (var i = 0; i < PE.getNumberOfImports() && !isInvalidImportsPresent; i++) {
-        const libraryName = PE.getImportLibraryName(i).toLowerCase();
-
-        for (var l = 0; l < badImportChars.length && !isInvalidImportsPresent; l++) {
-            if (libraryName.indexOf(badImportChars[l]) !== -1) {
-                isInvalidImportsPresent = true;
-            }
-        }
-    }
-
-    if (isInvalidImportsPresent) options += (options ? " + " : String()) + "Invalid imports";
-
-
-
-
     // Checks if application resources can be read or if they are compressed/encrypted
 
     var isUnreadableResourcesPresent = false;
@@ -3745,6 +3724,31 @@ function scanForObfuscations_Native() {
     }
 
     if (isStrangeExportsPresent) options += (options ? " + " : String()) + "Strange exports";
+
+
+
+
+    // Looks for sections whose names contain strange (or invalid) characters
+
+    var isStrangeImportsPresent = false;
+
+    const badImportChars = '=~!@#$%^&*()"№;%:?*():;,|\'`<> ';
+
+    for (var i = 0; i < PE.getNumberOfImports() && !isStrangeImportsPresent; i++) {
+        const libraryName = PE.getImportLibraryName(i);
+
+        if (isAsciiString(libraryName)) {
+            for (var l = 0; l < badImportChars.length && !isStrangeImportsPresent; l++) {
+                if (!isAsciiString(libraryName) || libraryName.indexOf(badImportChars[l]) !== -1) {
+                    isStrangeImportsPresent = true;
+                }
+            }
+        } else if (libraryName.indexOf("MZ") !== 0) { // 'MZ' -> IAT corrupted
+            isStrangeImportsPresent = true;
+        }
+    }
+
+    if (isStrangeImportsPresent) options += (options ? " + " : String()) + "Strange imports";
 
 
 
