@@ -15,13 +15,20 @@ function detect() {
             PE.getImportFunctionName(0, 0) === "VirtualProtect" &&
             PE.getImportFunctionName(0, 1) === "GetCurrentProcess" &&
             PE.getImportFunctionName(0, 2) === "GetModuleHandleA" &&
-            PE.getImportFunctionName(0, 3) === "MultiByteToWideChar"
+            PE.getImportFunctionName(0, 3) === "MultiByteToWideChar" &&
+            PE.getImportFunctionName(0, 4) === "FlushInstructionCache"
         )) {
-        bDetected = true;
-    }
+        var packedLatestSection = PE.section[".packed"];
 
-    if (bDetected && !PE.isSectionNamePresent(".packed")) {
-        sOptions = "modified";
+        if (!packedLatestSection) {
+            packedLatestSection = PE.section[PE.getNumberOfSections() - 1];
+            sOptions = "modified";
+        }
+
+        if (PE.compare("00 ** ?? 00", packedLatestSection.FileOffset)) {
+            bDetected = true;
+        }
+
     }
 
     return result();
