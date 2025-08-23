@@ -1826,6 +1826,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 (PE.isNetObjectPresent("CreateProcess") || PE.isNetObjectPresent("NtCreateProcess") || PE.isNetObjectPresent("CreateProcessA") || PE.isNetObjectPresent("CreateProcessW")) &&
                 PE.isNetObjectPresent("VirtualAllocEx"))
         ) {
+            log(logType.net, "RunPE-like behavior detected");
+
             isRunPePresent = true;
         }
 
@@ -2027,6 +2029,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (!PE.isDll()) {
         if (isLastSectionEP && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
             log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + getAsmInstructionByIndex(0).split(" ")[1].toLowerCase());
+
             isStrangeCallOrJmpPresent = true;
         }
     }
@@ -2375,6 +2378,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     for (var t = 0; t < PE.getNumberOfSections() && !isCompressedSectionPresent; t++) {
         compressedSectionIndex = t;
         if (PE.calculateEntropy(PE.getSectionFileOffset(compressedSectionIndex), PE.getSectionFileSize(compressedSectionIndex)) > 7.4) {
+            log(logType.any, "Section #" + compressedSectionIndex + " (\"" + clearSectionName(PE.getSectionName(compressedSectionIndex)) + "\") entropy: " + PE.calculateEntropy(PE.getSectionFileOffset(compressedSectionIndex), PE.getSectionFileSize(compressedSectionIndex)));
+
             isCompressedSectionPresent = true;
         }
     }
@@ -2401,15 +2406,24 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     for (var t = 0; t < PE.getNumberOfSections() && !isSectionHasWrongOffsetOrSize; t++) {
         sectionWithWrongOffsetOrSizeIndex = t;
         if (standartSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(sectionWithWrongOffsetOrSizeIndex)) === -1) {
-            if (PE.section[sectionWithWrongOffsetOrSizeIndex].FileOffset === 0x00) {
+            const currentSection = PE.section[sectionWithWrongOffsetOrSizeIndex];
+
+            // Todo: add more checks
+            if (currentSection.FileOffset === 0x00) {
                 wrongOffset = true;
             }
 
-            if (PE.section[sectionWithWrongOffsetOrSizeIndex].FileSize === 0x00) {
+            if (currentSection.FileSize === 0x00) {
                 wrongSize = true;
-            }
+            };
 
             isSectionHasWrongOffsetOrSize = wrongOffset || wrongSize;
+
+            if (isSectionHasWrongOffsetOrSize) {
+                log(logType.any,
+                    "Section #" + sectionWithWrongOffsetOrSizeIndex + " (\"" + clearSectionName(PE.getSectionName(sectionWithWrongOffsetOrSizeIndex)) + "\") has wrong " +
+                    (wrongOffset ? "offset (0x" + currentSection.FileOffset.toString(16) + ")" : String()) + (wrongOffset && wrongSize ? ", " : String()) + (wrongSize ? "size (0x" + currentSection.FileSize.toString(16) + ")" : String()));
+            }
         }
     }
 
@@ -2439,13 +2453,15 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 if (typeof sectionOffsetsDict[currentSectionOffset] === "undefined") {
                     sectionOffsetsDict[currentSectionOffset] = [currentSectionIndex];
                 } else {
-                    isSectionHasDuplicateOffset = true;
+                    log(logType.any, "Section #" + sectionOffsetsDict[currentSectionOffset][0] + " (\"" + clearSectionName(PE.getSectionName(sectionOffsetsDict[currentSectionOffset][0])) + "\") and #" + currentSectionIndex + " (\"" + clearSectionName(PE.getSectionName(currentSectionIndex)) + "\") have one offset: 0x" + currentSectionOffset.toString(16));
 
                     firstSectionIndex = sectionOffsetsDict[currentSectionOffset][0];
                     secondSectionIndex = currentSectionIndex;
 
                     firstSectionName = clearSectionName(PE.getSectionName(firstSectionIndex));
                     secondSectionName = clearSectionName(PE.getSectionName(secondSectionIndex));
+
+                    isSectionHasDuplicateOffset = true;
                 }
             }
         }
@@ -2483,6 +2499,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     // Conditions to check for a strange overlay
     if (!isPeAtOverlayDetected && !isSfx && !PE.isSigned() && PE.isOverlayPresent()) {
         var overlayEntropy = PE.calculateEntropy(PE.getOverlayOffset(), PE.getOverlaySize());
+
         if (
             PE.getOverlaySize() > 150 && overlayEntropy > 7 ||
             PE.getOverlaySize() > (PE.getSize() - PE.getOverlaySize())
@@ -2494,6 +2511,25 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     if (hasStrangeOverlay) options += (options ? " + " : String()) + "Strange overlay";
+
+
+
+
+    // Checks if a PE file is embedded in the resources
+
+    var isPeInResourcesPresent = false;
+
+    for (var i = 0; i < PE.getNumberOfResources() && !isPeInResourcesPresent; i++) {
+        const resourceOffset = PE.getResourceOffsetByNumber(i);
+
+        if (PE.compare("'MZ'", resourceOffset)) {
+            log(logType.any, "PE signature in resources detected");
+
+            isPeInResourcesPresent = true;
+        }
+    }
+
+    if (isPeInResourcesPresent) options += (options ? " + " : String()) + "PE in resources";
 
 
 
@@ -3419,25 +3455,6 @@ function scanForObfuscations_Native() {
 
 
 
-    // Checks if a PE file is embedded in the resources
-
-    var isPeInResourcesPresent = false;
-
-    for (var i = 0; i < PE.getNumberOfResources() && !isPeInResourcesPresent; i++) {
-        const resourceOffset = PE.getResourceOffsetByNumber(i);
-
-        if (PE.compare("'MZ'", resourceOffset)) {
-            log(logType.any, "PE signature in resources detected");
-
-            isPeInResourcesPresent = true;
-        }
-    }
-
-    if (isPeInResourcesPresent) options += (options ? " + " : String()) + "PE in resources";
-
-
-
-
     // Checks is executable application has been compiled or converted to a DLL
     // Like https://github.com/hasherezade/exe_to_dll
 
@@ -3765,7 +3782,7 @@ function scanForObfuscations_Native() {
         for (var i = 0; i < PE.getNumberOfExports() && !isStrangeExportsPresent; i++) {
             const functionName = PE.getExportFunctionName(i);
 
-            if (functionName && !isAsciiString(functionName)) {
+            if (functionName && (!isAsciiString(functionName) || isNameObfuscated(functionName))) {
                 isStrangeExportsPresent = true;
             }
         }
