@@ -2461,17 +2461,17 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Check for 'MZ' signature in the overlay
 
-    var isMzSignatureDetected = false;
+    var isPeAtOverlayDetected = false;
 
     if (PE.isOverlayPresent() &&
         PE.getOverlaySize() >= 100 &&
         PE.compareOverlay("'MZ'")) {
         log(logType.any, "PE signature at overlay detected");
 
-        isMzSignatureDetected = true;
+        isPeAtOverlayDetected = true;
     }
 
-    if (isMzSignatureDetected) options += (options ? " + " : String()) + "PE in overlay";
+    if (isPeAtOverlayDetected) options += (options ? " + " : String()) + "PE at overlay";
 
 
 
@@ -2481,7 +2481,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var hasStrangeOverlay = false;
 
     // Conditions to check for a strange overlay
-    if (!isMzSignatureDetected && !isSfx && !PE.isSigned() && PE.isOverlayPresent()) {
+    if (!isPeAtOverlayDetected && !isSfx && !PE.isSigned() && PE.isOverlayPresent()) {
         var overlayEntropy = PE.calculateEntropy(PE.getOverlayOffset(), PE.getOverlaySize());
         if (
             PE.getOverlaySize() > 150 && overlayEntropy > 7 ||
@@ -3415,6 +3415,25 @@ function scanForObfuscations_Native() {
     }
 
     if (isUnreadableResourcesPresent) options += (options ? " + " : String()) + "Unreadable resources";
+
+
+
+
+    // Checks if a PE file is embedded in the resources
+
+    var isPeInResourcesPresent = false;
+
+    for (var i = 0; i < PE.getNumberOfResources() && !isPeInResourcesPresent; i++) {
+        const resourceOffset = PE.getResourceOffsetByNumber(i);
+
+        if (PE.compare("'MZ'", resourceOffset)) {
+            log(logType.any, "PE signature in resources detected");
+
+            isPeInResourcesPresent = true;
+        }
+    }
+
+    if (isPeInResourcesPresent) options += (options ? " + " : String()) + "PE in resources";
 
 
 
