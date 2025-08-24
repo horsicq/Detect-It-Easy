@@ -1,0 +1,53 @@
+// Detect It Easy: detection rule file
+// Author: Kaens (TG @kaens)
+
+init("audio", "Adobe Director Protected Cast file (.CXT)");
+
+/* beautify ignore:start */
+function detect() {
+
+	const debug = 0;
+
+	var
+		p = 0xC, e = _BE,
+		labl = [], txts = [],
+		sz = -1,
+		snds = 0, sndh = 0, snd = 0,
+		hksz = 4,
+		end = false, checklist = [false, false, false];
+	if (X.Sz() < 0x10) return;
+	if(X.c("'RIFX'") && ["MV93","FGDM", "MC95", "FGDC"].includes(X.SA(8,4))) e = _BE;
+	else if(X.c("'XFIR'") && ["39VM","MDGF", "59CM", "CDGF"].includes(X.SA(8,4))) e = _LE;
+	else return;
+	if((sz = 8+X.U32(4, e)) < 12) return;
+	if(debug) var chunks = "";
+	while (p < X.Sz() && p < sz) {
+		hkhd = X.SA(p, 4);
+		hksz = X.U32(p + 4, e);
+//_l2r('cxt',p,hkhd+' ['+Hex(hksz)+']')
+		if(debug) chunks += " " + hkhd + " [" + Hex(hksz) + "] @" + Hex(p);
+		p += 8;
+		if(hkhd.slice(0,3) === "CAS") checklist[0] = 1;
+		else if(hkhd === "KEY*") checklist[1] = 1;
+		else if(hkhd.slice(0,3) === "snd") checklist[2] = 1;
+		switch (hkhd) {
+		case "sndH": sndh++; break;
+		case "sndS": snds++; break;
+		case "snd ": snd++; break;
+		}
+		hksz += hksz & 1; //align
+		p += hksz
+	} // end of chunks
+
+	if(!checklist[0] || !checklist[1] || !checklist[2]) return;  bDetected = true;
+	sVersion = e == _LE? "le": "be";
+
+	if (debug) if (chunks != "") _l2r('rifx',0,'chunks: ['+chunks+']');
+
+	if(X.isVerbose()) {
+		sOption('snd:'+snd+' sndH:'+sndh+' sndS:'+snds+' sz:'+outSz(sz))
+	}
+
+	return result();
+}
+/* beautify ignore:end */
