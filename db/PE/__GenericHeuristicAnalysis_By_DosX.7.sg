@@ -2147,7 +2147,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["obfus.h", null, -1, 0x02f4771f, 2], // https://github.com/DosX-dev/obfus.h  ;  default, antidebug v1
         ["Crunch", "1.0-2.0", 0, 0x615665dd, 2],
         ["Private EXE Protector", null, 0, 0xd89af68d, 2], // https://www.privacy-tutorials.com/private-exe-protector/
-        ["CodeVirtualizer", null, 4, 0x4fbeea23, 2] // https://www.oreans.com/CodeVirtualizer.php
+        ["CodeVirtualizer", null, 4, 0x4fbeea23, 2], // https://www.oreans.com/CodeVirtualizer.php
+        ["PELock", null, 0, 0x6eb8f6f1, 2],
+        ["PELock", null, 0, 0xe571f715, 2]
     ];
 
     const importValidatingResult = validateImportHashes(dbCollectionOfHashesDict);
@@ -2228,6 +2230,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["PECompact", null, "pec"],
         ["PECompact", null, "pec1"],
         ["PELock", null, "PELOCKnt"], // https://www.pelock.com/ 💩
+        ["PELock", null, ".pelock"],
         ["Perplex", null, ".perplex"],
         ["Petite", null, ".petite"], // https://www.un4seen.com/petite/
         ["Petite", null, "petite"],
@@ -2315,7 +2318,12 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["XPack", null, ".XPack"]
     ];
 
-    const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDict);
+    const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDict.concat(
+        [
+            ["a packer", null, /pack|^.pe/i],
+            ["a cryptor", null, /crypt|crpt/i]
+        ]
+    ));
 
     var versionBySectionDetected;
 
@@ -4321,8 +4329,14 @@ function validateSectionNames(dbCollection) {
             version = currentArrayPattern[1],
             sectionName = currentArrayPattern[2];
 
-        if (PE.section[sectionName]) {
-            return currentArrayPattern;
+        if (typeof sectionName === "string") {
+            if (PE.section[sectionName]) {
+                return currentArrayPattern;
+            }
+        } else if (sectionName instanceof RegExp) {
+            if (PE.isSectionNamePresentExp(sectionName)) {
+                return currentArrayPattern;
+            }
         }
     }
 
