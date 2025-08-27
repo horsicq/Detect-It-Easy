@@ -1943,7 +1943,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         "669C60", // samples by: Petite (x??)
         "EB..60", // samples by: kkryptor, dePACK (x32)
         "60E8", // samples by: mpress, Packman, Pack Master, Yodas Crypter, DxPack, ASPack, MSLRH, tElock (x32), WinUPack
-        "6068" // samples by: BeRo, ExE Pack, AHPacker (x32)
+        "6068", // samples by: BeRo, ExE Pack, AHPacker (x32)
+        "9C60" // samples by: PEBundle (x32)
     ];
 
     // Iterate through the entries to check against the entry point
@@ -2092,6 +2093,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["nPack", "1.1+", 0, 0xba8bf4be, 0],
         ["CExe", "1.0a", 0, 0xdcf764d2, 0],
         ["PE-PACK", "1.0", 0, 0xa4d96677, 0],
+        ["BoxedApp", null, 0, 0x6206c0c2, 0],
         // cryptors
         ["Yoda's Crypter", "1.X", -1, 0x1303a51b, 1],
         ["EXECryptor", "1.4-1.5", -1, 0xd1de53b5, 1],
@@ -2165,6 +2167,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var dbCollectionOfSectionNamesDict = [
         ["fake UPX", null, /^.upx/i],
         ["fake Themida", null, ".Themida"],
+        ["Themida", "2.XX", "   "], // https://www.oreans.com/Themida.php
+        ["Themida", "3.XX", [".imports", ".loadcon", ".themida", ".winlice"]],
+        ["Themida", null, [".stub01", "WinLicen", ".v-lizer", "Themida "]],
         ["UPX", null, /^UPX[0-3]$/], // https://github.com/upx/upx
         ["VMProtect", null, /^\.vmp[0-3]?$/], // https://vmpsoft.com/
         [".NET Reactor", "2.XX", ".reacto"], // https://www.eziriz.com/dotnet_reactor.htm
@@ -2198,7 +2203,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["NakedPacker", null, [".naked1", ".naked2"]],
         ["NativeCryptor", null, "NATIVES~"],
         ["NeoLite", null, ".neolite"],
-        ["NsPack", null, [".nsp0", ".nsp1", "nsp0", "nsp1"]], // https://nspack.apponic.com/
+        ["NsPack", null, [".nsp0", ".nsp1", "nsp0", "nsp1", ".Packer!"]], // https://nspack.apponic.com/
         ["PE Diminisher", null, ".teraphy"], // https://web.archive.org/web/20060111104142/http://www.exetools.com/files/compressors/win/ped.zip
         ["PE-PACK", "1.0", "PEPACK!!"],
         ["PE-SHiELD", null, "PESHiELD"], // https://webscene.ir/tools/show/PE-SHIELD-0.25
@@ -2220,9 +2225,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Software Compress", null, "SoftComp"],
         ["StarForce", "3.X", ".sforce3"], // https://www.star-force.com/
         ["StarForce", "4.X-5.X", ".ps4"],
-        ["Themida", "2.XX", "   "], // https://www.oreans.com/Themida.php
-        ["Themida", "3.XX", [".imports", ".loadcon", ".themida", ".winlice"]],
-        ["Themida", null, [".stub01", "WinLicen", ".v-lizer", "Themida "]],
         ["VCL", null, ".vcl"],
         ["VirtualizeProtect", null, "VProtect"],
         ["WWPack", null, ".WWPACK"],
@@ -2263,13 +2265,15 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["ExeStealth", null, "ExeS"],
         ["ExeShield", null, ".shield"],
         ["XPack", null, [".XPack0", ".XPack"]],
+        ["KByS", null, ".shoooo"],
+        ["HyperTech Crackproof", null, "peC"]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDict.concat(
         // Scan last to avoid incompatibility with other signatures
         [
             ["a packer", null, /pack|^.pe/i],
-            ["a cryptor", null, /crypt|crpt|stub/i]
+            ["a cryptor", null, /crypt|crpt|stub|encr/i]
         ]
     ));
 
@@ -3748,7 +3752,7 @@ function scanForObfuscations_Native() {
         for (var i = 0; i < PE.getNumberOfExports() && !isStrangeExportsPresent; i++) {
             const functionName = PE.getExportFunctionName(i);
 
-            if (functionName && (!isAsciiString(functionName) || (!isItemMangled(functionName) && isNameObfuscated(functionName)))) {
+            if (functionName && (!isAsciiString(functionName) || (!isItemMangled(functionName) && isNameObfuscated(replaceAllInString(functionName, "_", " "))))) {
                 isStrangeExportsPresent = true;
             }
         }
