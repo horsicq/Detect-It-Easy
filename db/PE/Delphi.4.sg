@@ -41,7 +41,7 @@ function getVersion() {
         nLng1,
         bNewVersion = false;
 
-    var nAddressSize = PE.isPEPlus() ? 8 : 4;
+    var nAddressSize = PE.is64() ? 8 : 4;
 
     while (nSize > 0) {
         nOffset = PE.findSignature(nOffset, nSize, "0708'TControl'");
@@ -65,8 +65,8 @@ function getVersion() {
                         } else if (nLng1 == 0x4F540774) {
                             sVersion = "2";
                         }
-                        break;
 
+                        break;
                     case 0x0B4: sVersion = "C++ Builder"; break;
                     case 0x114: sVersion = "4"; break;
                     case 0x120: sVersion = "5"; break;
@@ -74,8 +74,7 @@ function getVersion() {
                     case 0x12C: sVersion = "7 CLX"; break;
                     case 0x138: sVersion = "Kylix"; break;
                     case 0x15C:
-                    case 0x160:
-                        sVersion = (nLng1 == 0x40100000 || nLng1 == 0x100000) ? "7" : "6"; break;
+                    case 0x160: sVersion = (nLng1 == 0x40100000 || nLng1 == 0x100000) ? "7" : "6"; break;
                     case 0x164: sVersion = "2005"; break;
                     case 0x190: sVersion = "2006"; break;
 
@@ -86,9 +85,13 @@ function getVersion() {
                             sName = "Embarcadero Delphi";
                             sVersion = "2009";
                         } else if (nLng == 0x1AC) {
-                            if (PE.resource["PACKAGEINFO"]) {
-                                nOffset = PE.resource["PACKAGEINFO"].Offset;
-                                nSize = PE.resource["PACKAGEINFO"].Size;
+                            var packageInfoResource = PE.resource["PACKAGEINFO"];
+
+                            if (packageInfoResource) {
+
+                                nOffset = packageInfoResource.Offset;
+                                nSize = packageInfoResource.Size;
+
                                 if (PE.isSignaturePresent(nOffset, nSize, "'ExcUtils'")) {
                                     sName = "Embarcadero Delphi";
                                     sVersion = "XE";
@@ -131,7 +134,7 @@ function getVersion() {
                 }
 
                 if (!sVersion && !bNewVersion) {
-                    return 1;
+                    return true;
                 }
             }
         }
@@ -161,20 +164,20 @@ function getVersion() {
         }
 
         if (!sVersion && !bNewVersion) {
-            return 1;
+            return true;
         }
     } else {
         if (PE.findString(PE.section[0].FileOffset, PE.section[0].FileSize, "Borland\\Delphi") != -1) {
             sVersion = "2-3";
-            return 1;
+            return true;
         }
     }
 
     if (bNewVersion) {
-        if (PE.section[".rdata"]) {
-            var nRDataOffset = PE.section[".rdata"].FileOffset,
-                nRDataSize = PE.section[".rdata"].FileSize,
-                nVersionOffset = PE.findString(nRDataOffset, nRDataSize, "Embarcadero Delphi for Win");
+        var rdataSection = PE.section[".rdata"];
+
+        if (rdataSection) {
+            var nVersionOffset = PE.findString(rdataSection.FileOffset, rdataSection.FileSize, "Embarcadero Delphi for Win");
 
             if (nVersionOffset != -1) {
                 var sCompilerVersion = PE.getString(nVersionOffset + 46, 4);
@@ -202,10 +205,10 @@ function getVersion() {
             }
         }
 
-        return 1;
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 function detect() {
