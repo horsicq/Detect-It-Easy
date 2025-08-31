@@ -4884,17 +4884,17 @@ function scanForMaliciousCode_NET_and_Native() {
         }
 
 
-        if (verdicts.length === 0 && PE.isNetObjectPresent("AntiTaskManager")) {
-            verdicts.push({
-                type: "RootKit",
-                version: String(),
-                details: String()
-            });
-        }
-
-
-        if (verdicts.length === 0 && (PE.isSignatureInSectionPresent(0, "00" + generateUnicodeSignatureMask(" RAT") + "00 **") ||
-            (PE.isNetObjectPresent("System.Net.Sockets") && PE.isNetObjectPresent("GetForegroundWindow") && PE.isNetObjectPresent("GetWindowText") && (PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("AntivirusProduct")) || PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("DisableTaskMgr")))))) {
+        if (verdicts.length === 0 && (PE.isSignatureInSectionPresent(0, "00" + generateUnicodeSignatureMask(" RAT") + "00 **") || PE.isNetObjectPresent("AntiTaskManager") ||
+            (
+                // System.Net.Sockets + GetForegroundWindow + GetWindowsText
+                PE.isNetObjectPresent("System.Net.Sockets") && PE.isNetObjectPresent("GetForegroundWindow") && PE.isNetObjectPresent("GetWindowText") &&
+                ( // Search for 'AntivirusProduct' or 'DisableTaskMgr'
+                    PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("AntivirusProduct")) || PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("DisableTaskMgr"))
+                )
+            ) || (
+                // GetForegroundWindow + GetWindowText + NtSetInformationProcess
+                PE.isNetObjectPresent("GetForegroundWindow") && PE.isNetObjectPresent("GetWindowText") && PE.isNetObjectPresent("NtSetInformationProcess")
+            ))) {
             verdicts.push({
                 type: "RAT",
                 version: String(),
@@ -5031,7 +5031,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
         if (netWireVersion) {
             verdicts.push({
-                type: "NetWire",
+                type: "NetWire RAT",
                 version: netWireVersion,
                 details: String()
             });
