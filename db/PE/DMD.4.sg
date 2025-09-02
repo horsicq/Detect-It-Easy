@@ -7,23 +7,32 @@
 meta("compiler", "DMD");
 
 function detect() {
-    if (!PE.isNet() && PE.isSectionNamePresent(".minfo") && PE.isSectionNamePresent("._deh")) {
+    if (PE.isNet()) return; // Doesn't support .NET
+
+    if (PE.isSectionNamePresent(".minfo") && PE.isSectionNamePresent("._deh")) {
         bDetected = true;
     }
 
-    var rdataSection = PE.section[".rdata"];
+    var rdataSection = PE.section[".rdata"],
+        rdataSectionOffset = -1,
+        rdataSectionSize = -1;
+
+    if (rdataSection) {
+        rdataSectionOffset = rdataSection.FileOffset;
+        rdataSectionSize = rdataSection.FileSize;
+    }
 
     if (!bDetected) {
         if (rdataSection && PE.isDeepScan()) {
-            if (PE.findSignature(rdataSection.FileOffset, rdataSection.FileSize, "'core.sys.windows.dll'") != -1 &&
-                PE.findSignature(rdataSection.FileOffset, rdataSection.FileSize, "'string.d'") != -1) {
+            if (PE.findSignature(rdataSectionOffset, rdataSectionSize, "'core.sys.windows.dll'") != -1 &&
+                PE.findSignature(rdataSectionOffset, rdataSectionSize, "'string.d'") != -1) {
                 bDetected = true;
             }
         }
     }
 
     if (bDetected && rdataSection) {
-        var strOffset = PE.findString(rdataSection.FileOffset, rdataSection.FileSize, "This program will continue, but will not operate when using DMD ");
+        var strOffset = PE.findString(rdataSectionOffset, rdataSectionSize, "This program will continue, but will not operate when using DMD ");
 
         if (strOffset != -1) {
             sVersion = PE.getString(strOffset - 7, 5);
