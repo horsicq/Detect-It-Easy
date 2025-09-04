@@ -1,0 +1,37 @@
+// Detect-It-Easy signature file
+// Various parser helpers from vgmstream, modified for DiE.
+// Author: Kaens (TG @kaens)
+/* beautify ignore:start */
+
+includeScript("read");
+
+/** Read values from an 'old' XMA2 RIFF "XMA2" chunk (XMA2WAVEFORMAT), starting from an offset *after* chunk type+size.
+ * Useful as custom X360 headers commonly have it lurking inside.
+ * @param Int p  - offset
+ * @return [channels, sample rate, loop flag, raw samples, start loop sample, end loop sample]
+ */
+
+function xma2_parse_xma2_chunk(p) {
+    //ref vgmstream coding_utils.c
+    var hkver = X.U8(p), strm = X.U8(p+1), lpst = X.U32(p+4, _BE), lped = X.U32(p+8, _BE),
+        lp = X.U8(p+3) > 0 || lped, sr = X.U32(p+0xC, _BE),
+        smp = X.U32(p+(hkver == 3 ? 0x14 : 0x1C), _BE),
+        ch = 0, ofs = hkver == 3? 0x20 : 0x28;
+        for(var i=0; i < strm; i++) ch += X.U8(p+ofs+i*4);
+        return [ch, sr, lp, smp, lpst, lped]
+}
+
+/** Read values from a 'new' XMA2 RIFF "fmt" chunk (XMA2WAVEFORMATEX), starting from an offset *after* chunk type+size.
+ * Useful as custom X360 headers commonly have it lurking inside. Only parses the extra data (before is a normal WAVEFORMATEX).
+ * @param Int p - offset
+ * @param Int e - endianness
+ * @return [loop flag, samples, start loop sample, end loop sample]
+ */
+function xma2_parse_fmt_chunk_extra(p, e) {
+    var smp = X.U32(p+0x18, e), lpst = X.U32(p+0x28, e), lped = X.U32(p+0x2C, e), lp = X.U8(p+0x30) || lped;
+    //source bugfix:
+    if(lpst+128-512 == 0 && lped+128-512+256 >= smp+128-512) lp = false;
+    return [lp, smp, lpst, lped]
+}
+
+/* beautify ignore:end */

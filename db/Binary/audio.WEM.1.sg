@@ -1,0 +1,127 @@
+// Detect It Easy: detection rule file
+// Author: Kaens (TG @kaens)
+// ref. vgmstream > wwise.c , coding_utils.c
+
+init("audio", "Audiokinetic Wwise RIFF (.WEM,.BNK)");
+includeScript("vgmcodingutils");
+
+/* beautify ignore:start */
+function detect() {
+
+    const debug = 0;
+
+    var
+        p = 0xC, e = _BE,
+        fmtsz = fmtp = 0, xma2sz = xma2p = 0, datasz = datap = 0, vorbsz = vorbp = 0,
+        wiihsz = wiihp = 0, seeksz = seekp = 0, smplsz = smplp = 0, metasz = metap = 0,
+        hksz = 4,
+        hkhd = "", title = "", dt = "", by = "", genre = "", cms = "", cmt = "", cop = "", sft = "";
+    if (X.Sz() < 36) return;
+    if(!X.c("'WAVE'",8) && !X.c("'XWMA'",8)) return;
+    if(X.c("'RIFF'")) e = _LE;
+    else if(X.c("'RIFX'")) e = _BE;
+    else return;
+if(debug) var chunks = "";
+    while (p < X.Sz()) {
+        hkhd = X.SA(p, 4);
+        hksz = X.U32(p + 4, e);
+        p += 8;
+        if(debug) chunks += " " + hkhd + " [" + Hex(hksz) + "] @" + Hex(p);
+        switch (hkhd) {
+            case "fact": return; //shouldn't have any
+            case "fmt ": fmtp = p; fmtsz = hksz; break;
+            case "XMA2": xma2p = p; xma2sz = hksz; break;
+            case "data": datap = p; datasz = hksz; break;
+            case "vorb": vorbp = p; vorbsz = hksz; break;
+            case "WiiH": wiihp = p; wiihsz = hksz; break;
+            case "seek": seekp = p; seeksz = hksz; break;
+            case "smpl": smplp = p; smplsz = hksz; break;
+            case "meta": metap = p; metasz = hksz; break;
+            default: if (p + hksz > X.Sz()) return
+        }
+        p += hksz
+    } // end of chunks
+
+    if(!datap) return;
+
+    var nFormat = nRate = nChannels = nBPS = 0,
+        dur = -1, sz = 8+X.U32(4, e),
+        smp = xsz = chlo = chtp = 0;
+        iswem = extIs('wem') || extIs('bnk'),
+        info = [],
+        lp = prefetch = false;
+    if(xma2p) {
+        nFormat = 0x165;
+        info = xma2_pase_xma2_chunk(xma2p);
+        nChannels = info[0]; nRate = info[1]; lp = info[2]; smp = info[3]
+    }
+    else {
+        if(fmtsz < 0x10) return;
+        nFormat = X.U16(fmtp, _LE);
+        nChannels = X.U16(fmtp + 2, _LE);
+        nRate = X.U32(fmtp + 4, _LE);
+        nBlockSize = X.U16(fmtp + 0xC, _LE);
+        nBPS = X.U16(fmtp + 0x0E, _LE);
+        if (fmtsz > 0x10 && nFormat != 0x165 && nFormat != 0x166) xsz = X.U16(fmtp+0x14,_BE);
+            if(xsz == 6)
+                if((chlo=X.U32(p+0x14,_BE)) == nChannels) { chtp = (chlo >> 8) & 0xF; chlo >>= 12 }
+    }
+    if(nFormat == 0x166) {
+        info = xma2_parse_fmt_chunk_extra(p, _BE);
+        lp = info[0]; smp = info[1]
+    }
+    if(smplp && smplsz >= 34 && X.U32(p+0x1C) == 1 && X.U32(p+0x28) == 0) lp = true;
+
+    switch(nFormat) {
+    case 0x0001: sVersion = 'older Wwise, PCM'; prefetch = 1; break;
+    case 0x0002: sVersion = 'newer Wwise IMA:platform ADPCM'; prefetch = 1;
+        if(xsz == 0xC+nChannels*0x2E) sVersion += ':DSP+coefs';
+        else if(xsz == 0xA && wiihp) sVersion += ':WiiH_DSP';
+        else if(nBlockSize == 0x104*nChannels) sVersion += ':PTADPCM';
+        break;
+    case 0x0069: sVersion = 'older Wwise IMA'; prefetch = 1; break;
+    case 0x0161: sVersion = 'Microsoft WMAv2'; prefetch = 1; break;
+    case 0x0162: sVersion = 'Microsoft WMAPro'; prefetch = 1; break;
+    case 0x0165: sVersion = 'Microsoft XMA2'; prefetch = 1; break;
+    case 0x0166: sVersion = 'fmt-chunk Microsoft XMA2'; prefetch = 1; break;
+    case 0x3039: sVersion = 'Opus NX'; prefetch = 1; break;
+    case 0x3040: sVersion = 'Opus'; prefetch = 1; break;
+    case 0x3041: sVersion = 'Wwise 2019.2.3 Opus_WEM/WW'; prefetch = 1; break;
+    case 0x8311: sVersion = 'Wwise 2019.1 PTADPCM'; prefetch = 1; break;
+    case 0xAAC0: sVersion = 'AAC'; break;
+    case 0xFFF0: sVersion = 'DSP'; prefetch = 1; break;
+    case 0xFFFB: sVersion = 'HEVAG'; break;
+    case 0xFFFC: sVersion = 'ATRAC9'; prefetch = 1; break;
+    case 0xFFFE: sVersion = 'PCM for Wwise Authoring'; prefetch = 1; break;
+    case 0xFFFF: sVersion = 'Vorbis'; prefetch = 1; break;
+    default:
+        if(iswem) _setResult('audio', 'Wwise: unknown format ', Hex(nFormat, 4), ''); return
+    }
+
+    if(datap+datasz > X.Sz()) {
+        if(datap+datasz < 0x5000 && X.Sz() > 0x10000) {
+            _setResult('audio', 'Wwise: bad rip?', '' , 'datasz:'+Hex(datasz)); return;
+        }
+        if(prefetch) prefetch = 2; else return
+    }
+
+    if(nFormat == 0xFFFE && prefetch == 2 && X.c("'OggS'",datap)) sVersion = 'CP2077 Opus';
+
+    bDetected = true;
+    sVersion += e == _LE? "/le": "/be";
+
+    if(smp) {
+        var nmSeconds = Math.round(smp / nRate / nChannels * 10000) / 10;
+        dur = new Date(nmSeconds).toISOString().substr(11, 8);
+    }
+
+    if(X.isVerbose()) {
+        sOption('ch:' + nChannels + (nBPS ? ' ' + nBPS + '-bit' : '') + ' s/r:' + nRate + 'Hz'
+            + (dur !== -1 ? ' len: '+dur : '')
+            + (lp ? ' looped': '')
+            +' sz:'+outSz(sz));
+    }
+
+    return result();
+}
+/* beautify ignore:end */
