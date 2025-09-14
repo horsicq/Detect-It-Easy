@@ -100,26 +100,42 @@ Detect It Easy offers three versions:
 
 -   **die** - Graphical interface.
 -   **diec** - Command-line version for batch processing.
--   **diel** - Lightweight GUI version.
+-   **diel** - Lightweight GUI version. (scanner only)
 
 For detailed usage, refer to the [RUN.md](docs/RUN.md).
 
 ### 🔎 Example Use Cases
 
--   **Malware Analysis**: Identify file types, packers, or protections.
--   **Security Audits**: Determine executable file types and potential security risks.
--   **Software Forensics**: Inspect software components and validate compliance.
+-   🦠 **Malware Analysis**: Identify file types, packers, or protections.
+-   🛡 **Security Audits**: Determine executable file types and potential security risks.
+-   🔎 **Software Forensics**: Inspect software components and validate compliance.
 
-## 🏆 Special Thanks
+## 🏆 Special thanks
 
-Thanks to all contributors!
+-   ⭐️ **Thanks to [DosX](https://github.com/DosX-dev)**
 
-**Thanks to [DosX](https://github.com/DosX-dev)**
+-   ⭐️ Thanks to [PELock](https://www.pelock.com)
 
-Thanks to [PELock](https://www.pelock.com)
+## 🤝 Thanks to all contributors
 
 <a href="https://github.com/horsicq/Detect-It-Easy/graphs/contributors">
-<img src="https://contrib.rocks/image?repo=horsicq/Detect-It-Easy" />
+<img src="https://readme-contribs.as93.net/contributors/horsicq/Detect-It-Easy?textColor=737373&perRow=9&shape=squircle&isResponsive=true" />
 </a>
 
-![Mascot](docs/logo.png)
+---
+
+![Mascot](docs/logo2.png)
+
+<!-- Dinosaur -->
+<!--
+                        . - ~ ~ ~ - .
+      ..     _      .-~               ~-.
+     //|     \ `..~                      `.
+    || |      }  }              /       \  \
+(\   \\ \~^..'                 |         }  \
+ \`.-~  o      /       }       |        /    \
+ (__          |       /        |       /      `.
+  `- - ~ ~ -._|      /_ - ~ ~ ^|      /- _      `.
+              |     /          |     /     ~-.     ~- _
+              |_____|          |_____|         ~ - . _ _~_-_
+-->
