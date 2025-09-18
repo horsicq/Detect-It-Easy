@@ -137,11 +137,13 @@ function detect() {
 
         // Checking for signs of .NET Native debug information
         var isDotNetRuntimeDebugBuild = (
-            secondSection &&
-            PE.compare("48 8d 05", secondSection.FileOffset) && // .managed, debug
-            PE.isExportFunctionPresent(dotNetDebugHeaderName) && (
-                PE.section[".managed"] ||
-                PE.section["hydrated"]
+            secondSection && (
+                PE.isExportFunctionPresent(dotNetDebugHeaderName) || (
+                    PE.compare("48 8d 05", secondSection.FileOffset) && ( // .managed, debug
+                        PE.section[".managed"] || // .NET ~8.X
+                        PE.section["hydrated"]
+                    )
+                )
             )
         );
 
@@ -163,8 +165,9 @@ function detect() {
                 }
 
                 if (PE.section[0].Name !== ".text" || (secondSection.Name !== ".rdata" && secondSection.Name !== ".managed") || (
-                    PE.getNumberOfExports() === 1 &&
-                    PE.getExportFunctionName(0) !== dotNetDebugHeaderName
+                    !PE.isDll() && // executable?
+                    PE.getNumberOfExports() === 1 && // only one export
+                    PE.getExportFunctionName(0) !== dotNetDebugHeaderName // and it's not DotNetRuntimeDebugHeader
                 )) {
                     dotNetLibraryOptions = dotNetLibraryOptions.append("modified");
                 }
