@@ -8,11 +8,25 @@
 meta("library", "Lua Runtime");
 
 function detect() {
-    if (PE.isLibraryPresentExp(/^lua5*/i)) {
+    if (PE.isLibraryPresentExp(/^lua5/i)) {
+        sLang = "Lua";
+        sVersion = "5.X";
         bDetected = true;
+    } else if (PE.isExportFunctionPresentExp(/^lua(L)?_/)) {
+        sOptions = "EAT, static";
+        bDetected = true;
+
+        var rdataSection = PE.section[".rdata"];
+
+        if (rdataSection) {
+            var embeddedLuaVersion = PE.findSignature(rdataSection.FileOffset, rdataSection.FileSize, "'Lua ' %% '.' %%");
+
+            if (embeddedLuaVersion !== -1) {
+                sVersion = PE.getString(embeddedLuaVersion + 4, 3);
+            }
+        }
     }
 
-    sLang = "Lua";
 
     return result();
 }
