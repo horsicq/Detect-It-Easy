@@ -8,6 +8,9 @@
 import "pe"
 import "math"
 
+// Is PE?
+private rule IsPE { condition: pe.is_pe }
+
 // Is i386?
 private rule Is32 { condition: pe.machine == 0x14c }
 
@@ -25,6 +28,7 @@ private rule IsRichSignPresent {
 
 rule Compiler__NET_Native__debug {
     condition:
+        IsPE and
         IsNative and
         IsRichSignPresent and
         pe.exports("DotNetRuntimeDebugHeader")
@@ -34,6 +38,7 @@ rule Compiler__NET_Native__release {
     strings:
         $exc_text = "Fatal error. Invalid Program: attempted to call a UnmanagedCallersOnly method from managed code."
     condition:
+        IsPE and
         IsNative and
         IsRichSignPresent and
         not Compiler__NET_Native__debug and
@@ -45,12 +50,15 @@ rule Library__Qt_Framework {
         $core_module_name = "QtCore"
         $qstring = "QString"
     condition:
-        IsNative and $core_module_name and $qstring
+        IsPE and
+        IsNative and
+        $core_module_name and $qstring
 }
 
 rule Packer__UPX {
     strings: $magicVerId = "UPX!"
-    condition: (
+    condition:
+        IsPE and (
             pe.sections[0].name == "UPX0" and
             pe.sections[1].name == "UPX1"
         ) or $magicVerId in (0x40..0x400)
@@ -62,7 +70,8 @@ rule Packer__MPRESS {
         $pushedi = { 57 }
         $magicForNative = { 57 69 6e ?? ?? 20 2e}
         $magicForDotNet = "It's .NET EXE"
-    condition: (
+    condition:
+        IsPE and (
             pe.sections[0].name == ".MPRESS1" or (
                 (IsNative and $magicForNative in (0x40..0x400)) or
                 (not IsNative and $magicForDotNet in (0x40..0x400))
@@ -77,6 +86,7 @@ rule Packer__MPRESS {
 
 rule Protection__obfus_h {
     condition:
+        IsPE and
         IsNative and
         not IsRichSignPresent and (
             for any i in (0..pe.number_of_sections - 1) : (
