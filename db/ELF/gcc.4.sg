@@ -2,13 +2,13 @@
 
 meta("compiler", "GCC");
 
-function getGCCVersion(nOffset, nSize) {
-    var sResult = "";
-    var nOffset = ELF.findString(nOffset, nSize, "GCC:");
-    if (nOffset != -1) {
-        sResult = ELF.getString(nOffset + 5, 100);
+function getVersion(nOffset, nSize) {
+    var versionString = ELF.findString(nOffset, nSize, "GCC:");
+    if (versionString != -1) {
+        return ELF.getString(versionString + 5, 100);
     }
-    return sResult;
+
+    return String();
 }
 
 function detect() {
@@ -36,26 +36,24 @@ function detect() {
             bDetected = true;
         }
     } else if (ELF.compareEP("31ed5589e583e4..8d45..83ec..50ff75..52e8$$$$$$$$5589e557565383ec..8b5d..8b7d..8d74....8935........85db7e..8b0785c074..a3........0fb610")) {
-        sVersion = "4.4.7, exe"; //BSD
+        sVersion = "4.4.7, exe"; // BSD
         bDetected = true;
     } else if (ELF.compareEP("5589e5565383ec..83e4..8b5d..89d18d74....85db8935........7e..8b45..85c074..a3........0fb610")) {
-        sVersion = "4.2.1, exe"; //BSD
+        sVersion = "4.2.1, exe"; // BSD
         bDetected = true;
     } else if (ELF.compareEP("55575653e8........81c3........83ec..8b93........8b8b........8b83........8b2a8b93........890c24895424..8b93........895424..eb")) {
-        sVersion = "4.7.2(so)";
+        sVersion = "4.7.2, so";
         bDetected = true;
     } else if (ELF.compareEP("5589e557565383ec..83e4..8b5d..89d78d74....85db8935........7e..8b45..85c074..a3........89c10fb601")) {
-        sVersion = "3.4.6, exe"; //BSD
+        sVersion = "3.4.6, exe"; // BSD
         bDetected = true;
     } else if (ELF.compareEP("5589e557565383ec..89d18d7d..8b5f..8d74....8935........85db7e..837d....74..8b45..a3........89c28038..74..8db6........8dbf........803a..75..8d42..a3")) {
-        sVersion = "3.2.1, exe"; //BSD
+        sVersion = "3.2.1, exe"; // BSD
         bDetected = true;
     } else if (ELF.compareEP("5557565383ec..8b7424..8b6c24..8b3ec745..........c74424..........c74424..........8b078904248d4424..894424..ff57")) {
-        sVersion = "3.2(so)"; //BSD
+        sVersion = "3.2, so"; // BSD
         bDetected = true;
-    } else if (ELF.compareEP("7c290b785421....38......9421ff..7c0803a690......3d......85......48"))
-    //PowerPC instruction set
-    {
+    } else if (ELF.compareEP("7c290b785421....38......9421ff..7c0803a690......3d......85......48")) { // PowerPC instruction set
         sVersion = "3.2.X";
         bDetected = true;
     } else if (ELF.compareEP("6a..6a..8bec52b8........85c074")) {
@@ -71,19 +69,19 @@ function detect() {
         bDetected = true;
     }
     var nSection = ELF.getSectionNumber(".comment");
-    if (nSection != -1 && sVersion == "") {
-        var sGCCVersion = getGCCVersion(ELF.getSectionFileOffset(nSection), ELF.getSectionFileSize(nSection));
-        if (sGCCVersion) {
-            sVersion = sGCCVersion;
+    if (nSection != -1 && !sVersion) {
+        var versionString = getVersion(ELF.getSectionFileOffset(nSection), ELF.getSectionFileSize(nSection));
+        if (versionString) {
+            sVersion = versionString;
             bDetected = true;
         }
     }
-    if (sVersion == "") {
-        if (ELF.isOverlayPresent()) // TODO Check!!!
-        {
-            var sGCCVersion = getGCCVersion(ELF.getOverlayOffset(), Math.min(8192, ELF.getOverlaySize()));
-            if (sGCCVersion) {
-                sVersion = sGCCVersion; // Version mb corrupted!
+
+    if (!sVersion) {
+        if (ELF.isOverlayPresent()) { // TODO Check!!!
+            var versionString = getVersion(ELF.getOverlayOffset(), Math.min(8192, ELF.getOverlaySize()));
+            if (versionString) {
+                sVersion = versionString; // Version mb corrupted!
                 bDetected = true;
             }
         }
