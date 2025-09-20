@@ -1,0 +1,44 @@
+// Detect It Easy: detection rule file
+// Author: Kae <TG@kaens>
+
+// from https://www.psdevwiki.com/ps3/Certified_File
+// & https://www.psdevwiki.com/ps3/SELF_-_SPRX#ELF_Header
+meta("format", "Unknown Certified File");
+
+function detect() {
+    if (X.c("'SCE'00")) {
+        var tp, e;
+        if (X.c('0000 0002', 4)) e = _BE; //PS3
+        else if (X.c('0300 0000', 4)) e = _LE; //Vita
+        else return;
+        // PS3/Vita Certified File
+        const attr = X.U16(8, e), tp = X.U16(0xA, e), exhdsz = X.U32(0xC, e), fofs = X.U64(0x10, e),
+            fsz = X.U64(0x18, e), CFfsz = (e == _BE) ? 0 : X.U64(0x20, e), padding = (e == _BE) ? 0 : X.U64(0x28, e);
+        var p = e == _BE? 0x20 : 0x30;
+        switch (tp) {
+        case 1:
+            const eexhdsz = X.U64(p, e);
+            if(!(e == _BE && eexhdsz == 3 || e == _LE && eexhdsz == 4)) return;
+            const progidhdp = X.U64(p+8, e), ehdrp = X.U64(p+0x10, e),
+                phdrp = X.U64(p+0x18, e), shdrp = X.U64(p+0x20, e);
+                if (progidhdp+0x20 != ehdrp || ehdrp+0x40 != phdrp) return;
+            if(X.c("7F 'ELF' .. .. 01", ehdrp)) sName = "Nintendō signed ELF/PRX (.SELF,.SPRX)";
+            else sName = "Nintendō signed ELF/PRX, headerless (.SELF,.SPRX)";
+            break;
+        case 2: sName = "Nintendō signed revoke list (.SRVK)"; break;
+        case 3: sName = "Nintendō signed package (.SPKG)"; break;
+        case 4: sName = "Nintendō signed security policy profile (.SSPP)"; break;
+        case 5: sName = "Nintendō signed diff (.SDIFF)"; break;
+        case 6: sName = "Nintendō signed param.sfo"; break;
+        default: if (X.isHeuristicScan()) { sType = '~'+sType; sName += ' type '+Hex(tp); } else return;
+        }
+        
+        if (!isWithin(fofs, p,X.Sz()) || fsz < fofs) return;
+
+        bDetected = true; sVersion = e == _BE ? 'PS3'  : 'PSVita';
+        if(attr == 0x8000) sOption('fSELF');
+        if(X.isVerbose()) sOption(outSz(fofs+fsz),'sz:')
+    }
+
+    return result();
+}
