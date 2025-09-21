@@ -25,9 +25,10 @@ const debug = 0;
 
 // -= Yamaha YM2151 FM Operator Type-M (OPM) related functionality =-
 
-//The OPM doesn't use these registers:
 function isYM2151Reg(a) {
-    return [0, 2, 3, 4, 5, 6, 7, 9, 0xA, 0xB, 0xC, 0xD, 0xE, 0x10, 0x13, 0x15, 0x16, 0x17, 0x1A, 0x1C, 0x1D, 0x1E, 0x1F].indexOf(a) >= 0;
+//The OPM doesn't use these registers so we break off if we hit one:
+    return [0, 2, 3, 4, 5, 6, 7, 9, 0xA, 0xB, 0xC, 0xD, 0xE, 0x10,
+        0x13, 0x15, 0x16, 0x17, 0x1A, 0x1C, 0x1D, 0x1E, 0x1F].indexOf(a) < 0;
 }
 
 function YM2151RegStr(a, b) {
@@ -48,7 +49,8 @@ function YM2151RegStr(a, b) {
     if (a <= 0x27) return 'Ch ' + (a & 0x7) + ' ctl ' + (b & 0x80 ? 'R' : '') + (b & 0x40 ? 'L' : '') + ' FB' + ((b >> 3) & 7) + ' con' + (b & 7);
     if (a <= 0x2F) {
         o = ((b >> 4) & 7);
-        return 'KC/prep note-on ch' + (a & 0x7) + ' ' + (o ? ['C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', "C'"][b & 0xF] + o : '--');
+        return 'KC/prep note-on ch' + (a & 0x7) + ' '
+            + (o ? ['C#', 'D', 'D#', '', 'E', 'F', 'F#', '', 'G', 'G#', 'A', '', 'A#', 'B', 'C', ''][b & 0xF] + o : '--');
     }
     if (a <= 0x37) return 'KF/prep p.bend ch' + (a & 0x7) + ' kf' + (b >> 2);
     if (a <= 0x3F) return 'ModSensy. ch' + (a & 0x7) + ' phase' + ((b >> 4) & 7) + ' amp' + (b & 3);
@@ -119,11 +121,75 @@ function MDXCmdStr(ch, o) {
 }
 
 
+/** Callus OPL register log detector against OPM/YM2151. If <= 0, consider invalid.
+ * no custom data or end marker to be expected.
+ */
+function parseYM2151RegLog(p, len) {
+    //ref https://retrocdn.net/images/9/9c/YM2151_Application_Manual.pdf
+    len = len || BCParseToReasonable; p = p || 0;
+    var max = (len == BCParseToEoF) ? X.Sz() : Math.min(X.Sz(), p + 0x2000),
+        notes = 0, ic = 0,
+        v = [0, 0, 0, 0, 0], chinits = [],
+        r, x;
+    for(var i=0; i < 8; chinits[i]=0,i++);
+    function re(p, t) { if(debug>1)_l2r('opm', p, t);  return [BCInvalidFormat]; }
+    function iC() { if(debug>0)_l2r('opm', p-2, Hex(r)+' - '+Hex(x)+': invalid value');  ic++; }
+    while (p < max && ic < 10) {
+        r = X.U8(p++); if (!r) continue; x = X.U8(p++);
+        if (!isYM2151Reg(r)) iC();
+        if(debug>1)_log('@'+Hex(p-2)+': '+YM2151RegStr(r,x));
+/* The working YM2151 regs are:
+    01: TEST
+    08: x111 1222: (SM)KON, CH №
+    0F: 1xx2 2222: NE, NFRQ
+    10: CLKA1
+    11: xxxx xx11: CLKA2
+    12: CLKAB
+    14: 1x22 3344: CSM, FLAG RESET B&A, IRQ-EN B&A, LOAD B&A
+    18: LFRQ
+    19: PMD/AMD
+    1B: 11xx xx22: CT, W
+    20~27: 1122 23333: RL, FB, CONECT
+    28~2F: x111 2222: KC { OCT, NOTE }
+    30~37: 1111 11xx: KF
+    38~3F: x111 xx22: PMS, AMS
+    40~5F: x111 2222: DT1, MUL
+    60~7F: x111 1111: TL
+    80~9F: 11x2 2222: KS, AR
+    A0~BF: 1xx2 2222: AMS-EN, D1R
+    C0~DF: 11x2 2222:  DT2, D2R
+    E0~FF: 1111 2222: D1L, RR
+*/
+        if (r <= 0x27) {
+            if (r == 1) { if (x & 0xFD) break; }
+            else if (r == 8) { if (x & 0x78) { notes += bitCount((x >> 3) & 0xF); v[0]++ } else if (x & 0x80) iC(); }
+            else if (r == 0xF) { if (x & 0x60) iC(); }
+            else if (r == 0x11) { if (x > 3) iC(); }
+            else if (r == 0x14) { if (x & 0x40) iC(); }
+            else if (r == 0x1B) { if (x & 0x3C) iC(); }
+        }
+        else if (r <= 0x2F) { if ((x & 0x80) || [3,7,0xB,0xF].indexOf(x&0xF) >= 0) iC(); }
+        else if (r <= 0x37) {} //{ if (x & 3) iC(); } // should be a filter but some tunes want it that way
+        else if (r <= 0x3F) { if (x & 0x8C) iC(); }
+        else if (r <= 0x7F) { if (x & 0x80) iC(); v[1]++; chinits[r & 7]++; } // TL set
+        else if (r <= 0x9F) { if (x & 0x20) iC(); v[2]++; chinits[r & 7]++; } // KS/AR set
+        else if (r <= 0xBF) { if (x & 0x60) iC(); v[3]++; chinits[r & 7]++; } // AMS/D1R set
+        else if (r <= 0xDF) { if (x & 0x20) iC(); v[4]++; chinits[r & 7]++; } // DT2/D2R set
+        else { v[4]++; chinits[r & 7]++; } // D1L/RR set
+    }
+    var chok = 0; for (var i=0; i < 8; i++) if (chinits[i] > 5) chok++;
+    if (ic >= 40 || chok < 8 || !notes || v[0] < 24 || v[1] < 24 || v[2] < 24 || v[3] < 24 || v[4] < 24 )
+        return [BCInvalidFormat];
+    return [notes, p, 0];
+}
+
+
+
 // -= Yamaha YM2612(OPN2) related functionality =-
 
-//The OPN2 doesn't use these registers:
 function isYM2612Reg(a) {
-    return !(a < 0x22 || a == 0x23 || isWithin(a, 0x2C, 0x2F) || a > 0xB6
+//The OPN2 doesn't these registers:
+    return !( a < 0x22 || a == 0x23 || isWithin(a, 0x2C, 0x2F) || a > 0xB6
         || (isWithin(a, 0x30, 0xAF) && (a & 3) == 3) // per-op registers from 3x to Ax must not have x3,x7, xB, xF
     );
 }
@@ -134,7 +200,7 @@ function isYM2612Reg(a) {
 function parseMDGYM(p, len) {
     //ref https://plutiedev.com/ym2612-registers
     len = len || BCParseToReasonable; p = p || 0;
-    var max = (len == BCParseToEoF) ? X.Sz() - 3 : Math.min(X.Sz() - 3, p + 0x2000),
+    var max = (len == BCParseToEoF) ? X.Sz() : Math.min(X.Sz(), p + 0x2000),
         notes = 0, v = [0, 0, 0, 0],
         c, r, x;
     function re(p, t) { if (debug > 1) _l2r('gym', p, t); return [BCInvalidFormat]; }
@@ -150,7 +216,9 @@ function parseMDGYM(p, len) {
         case 3: p++; break;
         default: return re(p - 1, '!cmd' + Hex(c));
     }
-    if (!notes || v[0] < 24 || v[1] < 24 || v[2] < 24 || v[3] < 24) return [BCInvalidFormat]; else return [notes, p, 0];
+if(debug>0)_l2r('gym',p,'end of tested area')
+    if (!notes || v[0] < 24 || v[1] < 24 || v[2] < 24 || v[3] < 24) return [BCInvalidFormat];
+    return [notes, p, 0];
 }
 
 
@@ -313,6 +381,69 @@ function parseMUAP98(p, len, ch) {
         }
     }
     return [notes, p, 0, cmt, mp, ic];
+}
+
+
+// -= AdLib/Sound Blaster YM3812 related functionality =-
+
+//ref https://web.archive.org/web/20050205055453/http://www.gamedev.net/reference/articles/article446.asp
+
+//The AdLib uses these registers:
+function isYM3812Reg(a) {
+    return [1,2,3,4,8,0xBD].includes(a) || isWithin(a, 0x20,0x35)
+      || ( isWithin(a, 0x40,0x55) || isWithin(a, 0x60,0x75) || isWithin(a, 0x80,0x95)
+        || isWithin(a, 0xE0,0xF5) ) && [6,7,14,15].indexOf(a & 0x1F) < 0
+      || isWithin(a, 0xA0,0xA8) || isWithin(a, 0xB0,0xB8) || isWithin(a, 0xC0,0xC8);
+}
+
+var __adlibnote = []; for(var _0=0; _0 < 9; _0++) __adlibnote.push([-1,-1,-1]); //channel: key-on, octave, F-num
+
+function YM3812CmdStr(o, recurse) {
+    const
+        C = ['1.1:','2.1:','3.1:', '1.2:','2.2:','3.2:','!6:','!7:', '4.1:','5.1:','6.1:', '4.2:','5.2:','6.2:','!E:','!F:',
+          '7.1:','8.1:','9.1:', '7.2:','8.2:','9.2:'],
+        wf = ['sine', '/￣\\_', '/￣\\/￣\\', '/|_/|_'],
+        //notes = ['C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C'], //TODO? parse the F-number
+        c = X.U8(o);
+    var t;
+    if (c >= 0xE0) return C[c & 0x1F] + 'wf ' + wf[X.U8(o + 1)];
+    else if (c >= 0xC0) return ((c & 0xF) + 1) + ':fb/conn'  + Hex(X.U8(o + 1));
+    else if (c == 0xBD) return 'AMdepth/VD/Rhy ' + Hex(X.U8(o + 1));
+    else if (c >= 0xB0) return ((c & 0xF) + 1) + 'oct/F_msb/key-on ' + Hex(X.U8(o + 1));
+    else if (c >= 0xA0) return ((c & 0xF) + 1) + 'F_lsb ' + Hex(X.U8(o + 1));
+    else if (c >= 0x80) return C[c & 0x1F] + 'S/R ' + Hex(X.U8(o + 1));
+    else if (c >= 0x60) return C[c & 0x1F] + 'A/D ' + Hex(X.U8(o + 1));
+    else if (c >= 0x40) return C[c & 0x1F] + 'level ' + Hex(X.U8(o + 1));
+    else if (c >= 0x20) return C[c & 0x1F] + 'AM/vib/envgen/keyscale/MFmul ' + Hex(X.U8(o + 1));
+    else if (c == 8) return 'CSM/keysplit ' + Hex(X.U8(o + 1));
+    else if (c == 4) return 'tmrctl ' + Hex(X.U8(o + 1));
+    else if (c == 3) return 'tmr2 ' + Hex(X.U8(o + 1));
+    else if (c == 2) return 'tmr1 ' + Hex(X.U8(o + 1));
+    else if (c == 4) return 'test/wfctl ' + Hex(X.U8(o + 1));
+}
+
+/** AdLib bytecode detector. If <= 0, consider invalid.
+ * no custom data or end marker to be expected.
+ */
+function parseYM3812(p, len) {
+    len = len || BCParseToReasonable; p = p || 0;
+    var max = (len == BCParseToEoF) ? X.Sz() - 2 : Math.min(X.Sz() - 2, p + 0x2000),
+        notes = 0, v = [0, 0, 0, 0],
+        c, r, x;
+    function re(p, t) { if(debug>1)_l2r('adlib',p,t); return [BCInvalidFormat]; }
+    while (p < max) switch (c = X.U8(p++)) {
+        case 0: break;
+        case 1: case 2: r = X.U8(p++), x = X.U8(p++); if (!isYM2612Reg(r)) return re(p - 3, c + ': R ' + Hex(r));
+            if (r == 0x28 && (x >> 4)) notes += bitCount(x >> 4);
+            if ((r & 0xF0) == 0x30) v[0]++; // MUL/DT set
+            if ((r & 0xF0) == 0x40 && X.U8(p) > 0) v[1]++; // TL set
+            if ((r & 0xF0) == 0x50) v[2]++; // AR/RS set
+            if ((r & 0xF0) == 0x60) v[3]++; // DR/AM set
+            break;
+        case 3: p++; break;
+        default: return re(p - 1, '!cmd' + Hex(c));
+    }
+    if (!notes || v[0] < 24 || v[1] < 24 || v[2] < 24 || v[3] < 24) return [BCInvalidFormat]; else return [notes, p, 0];
 }
 
 /* beautify ignore:end */
