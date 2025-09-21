@@ -84,6 +84,22 @@ rule Packer__MPRESS {
         )
 }
 
+rule Packer__VPacker {
+    strings:
+        $entry = { 60 E8 ?? ?? ?? ?? C3 90 01 00 00 00 2C ?? 00 00 70 ?? 00 00 25 }
+    condition:
+        IsPE and
+        IsNative and
+        $entry at pe.entry_point
+}
+
+rule Packer__XPack {
+    condition:
+        IsPE and
+        IsNative and
+        pe.sections[0].name == ".XPack0"
+}
+
 rule Protection__obfus_h {
     condition:
         IsPE and
