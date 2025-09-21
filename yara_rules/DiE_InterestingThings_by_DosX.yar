@@ -103,6 +103,26 @@ rule Packer__XPack {
         pe.sections[0].name == ".XPack0"
 }
 
+rule Packer__PEPack {
+    condition:
+        IsPE and
+        IsNative and (
+            for any i in (0..pe.number_of_sections - 1) : (
+                pe.sections[i].name == "PEPACK!!"
+            )
+        )
+}
+
+rule Packer__SoftwareCompress {
+    condition:
+        IsPE and
+        IsNative and (
+            for any i in (0..pe.number_of_sections - 1) : (
+                pe.sections[i].name == "SoftComp"
+            )
+        )
+}
+
 rule Protection__obfus_h {
     condition:
         IsPE and
