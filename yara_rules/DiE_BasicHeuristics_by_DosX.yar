@@ -5,6 +5,9 @@
     Telegram: @DosX_dev
 */
 
+// This module was written specifically for the Detect It Easy project.
+// Please retain the copyright information when distributing it.
+
 import "pe"
 import "math"
 
