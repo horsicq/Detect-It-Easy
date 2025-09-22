@@ -123,6 +123,16 @@ rule Packer__SoftwareCompress {
         )
 }
 
+rule Packer__SimplePack {
+    condition:
+        IsPE and
+        IsNative and (
+            for any i in (0..pe.number_of_sections - 1) : (
+                pe.sections[i].name == ".spack"
+            )
+        )
+}
+
 rule Protection__obfus_h {
     condition:
         IsPE and
