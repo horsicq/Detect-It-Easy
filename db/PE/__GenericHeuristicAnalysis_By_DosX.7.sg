@@ -3647,7 +3647,7 @@ function scanForObfuscations_Native() {
 
     // Check first 15 instructions for CPUID instruction
     if (!PE.isDll()) {
-        for (var i = 0; i < 15; i++) {
+        for (var i = 0; i < 15 && !isCpuidNearEpPresent; i++) {
             var asmInstruction = getAsmInstructionByIndex(i);
 
             if (!asmInstruction) break; // Safety check
@@ -3655,13 +3655,26 @@ function scanForObfuscations_Native() {
             // Check if instruction is CPUID
             if (getAsmOpCode(asmInstruction) === "CPUID") {
                 log(logType.any, "CPUID near EP found at instruction index: " + i);
+
                 isCpuidNearEpPresent = true;
-                break;
             }
         }
     }
 
     if (isCpuidNearEpPresent) options += (options ? " + " : String()) + "Cpuid near EP";
+
+
+
+
+    // Check for multiple JMPs leading to each other
+
+    var proxyJumpsAtEpPresent = false;
+
+    if (PE.compareEP("EB $$ EB")) {
+        proxyJumpsAtEpPresent = true;
+    }
+
+    if (proxyJumpsAtEpPresent) options += (options ? " + " : String()) + "Proxy jmp at EP";
 
 
 
@@ -4415,7 +4428,7 @@ function scanForLanguages_NET_and_Native() {
     const extdb = [
         ["C++", "cpp"],
         ["Rust", "rs"],
-        ["Java", "class"],
+        ["Java", "jar"],
         ["Python", "pyd"],
         ["Kotlin", "kt"]
     ];
