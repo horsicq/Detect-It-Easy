@@ -2,7 +2,8 @@
 // Author: LinXP
 // Status: WIP
 
-meta("format", "");
+meta("format");
+
 includeScript("zlib");
 
 function detect() {
@@ -11,66 +12,53 @@ function detect() {
             var nVer = Binary.read_uint16(0x1E);
             sVersion = nVer + ".0";
             switch (Binary.getString(0, 4)) {
-                case "IDA0":
-                    bDetected = true;
-                    sName = "IDA Database (.IDB)"
-                    break;
-                case "IDA1":
-                    bDetected = true;
-                    sName = "IDA Database for 32-bit binary (.IDB)"
-                    break;
-                case "IDA2":
-                    bDetected = true;
-                    sName = "IDA Database for 64-bit binary (.I64)"
-                    break;
+                case "IDA0": bDetected = true; sName = "IDA Database (.IDB)"; break;
+                case "IDA1": bDetected = true; sName = "IDA Database for 32-bit binary (.IDB)"; break;
+                case "IDA2": bDetected = true; sName = "IDA Database for 64-bit binary (.I64)"; break;
             }
+
             if (bDetected) {
                 switch (nVer) {
-                    case 2:
-                        detect_zlib(Binary, Binary.read_uint32(0x06) + 0x05);
-                        break;
-                    case 3:
-                        detect_zlib(Binary, Binary.read_uint32(0x06) + 0x05);
-                        break;
-                    case 4:
-                        detect_zlib(Binary, Binary.read_uint32(0x06) + 0x05);
-                        break;
-                    case 5:
-                        detect_zlib(Binary, Binary.read_uint32(0x06) + 0x09);
-                        break;
-                    case 6:
-                        detect_zlib(Binary, Binary.read_uint32(0x06) + 0x09);
-                        break;
+                    case 2: detect_zlib(Binary, Binary.read_uint32(0x06) + 0x05); break;
+                    case 3: detect_zlib(Binary, Binary.read_uint32(0x06) + 0x05); break;
+                    case 4: detect_zlib(Binary, Binary.read_uint32(0x06) + 0x05); break;
+                    case 5: detect_zlib(Binary, Binary.read_uint32(0x06) + 0x09); break;
+                    case 6: detect_zlib(Binary, Binary.read_uint32(0x06) + 0x09); break;
                 }
             }
         } else if (Binary.compare("'IDASGN'")) {
+            sName = "IDA FLIRT Signature Database (.SIG)";
             bDetected = true;
-            sName = "IDA FLIRT Signature Database (.SIG)"
-            var nVer = Binary.read_uint8(0x06);
-            var nModules = Binary.read_uint16(0x12);
-            var nFlags = Binary.read_uint8(0x10);
-            var nLibNameSz = Binary.read_uint8(0x22);
-            var nLibNameOf = 0x25;
-            sVersion = "v" + nVer;
+
+            const
+                nVer = Binary.read_uint8(0x06),
+                nModules = Binary.read_uint16(0x12),
+                nFlags = Binary.read_uint8(0x10),
+                nLibNameSz = Binary.read_uint8(0x22),
+                nLibNameOf = 0x25;
+
+            sVersion = nVer;
+
             if (!nModules) {
                 nModules = Binary.read_uint32(0x25);
                 nLibNameOf += 4;
-                if (nVer >= 10) { nLibNameOf += 4; }
+                if (nVer >= 10) nLibNameOf += 4;
             }
+
             sOptions = "\"" + Binary.getString(nLibNameOf, nLibNameSz) + "\"";
 
             if (Binary.isVerbose()) {
                 detect_zlib(Binary, nLibNameOf + nLibNameSz);
-                sOption("modules:" + nModules) // count modules
-                sOption("p:" + Binary.read_uint8(0x7)) // processor id
-                sOption("a:" + Binary.read_uint16(0xE)) // application type
-                sOption("o:" + Binary.read_uint16(0xC)) // os type
-                sOption("f:" + Binary.read_uint32(0x8)) // file format type
+                sOption("modules:" + nModules); // count modules
+                sOption("p:" + Binary.read_uint8(0x7)); // processor id
+                sOption("a:" + Binary.read_uint16(0xE)); // application type
+                sOption("o:" + Binary.read_uint16(0xC)); // os type
+                sOption("f:" + Binary.read_uint32(0x8)); // file format type
             }
         } else if (Binary.compare("'IDATIL'")) {
-            bDetected = true;
             sName = "IDA Type Information List (.TIL)";
             sOptions = "\"" + Binary.getString(0xF, Binary.read_uint8(0xE)) + "\"";
+            bDetected = true;
         }
     }
 
