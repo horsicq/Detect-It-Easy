@@ -3,14 +3,13 @@
 meta("installer", "Nullsoft Scriptable Install System");
 
 function detect() {
+    if (PE.isNet()) return; // Doesn't support .NET
+
     var nOffset = PE.getOverlayOffset();
     if (!PE.compareOverlay("EFBEADDE'Null'..'oftInst'", 4) && !PE.compareOverlay("EFBEADDE'nsisinstall'")) {
-        //        if(!PE.section[".ndata"]) {
-        //            return "";
-        //        }
         if (PE.isOverlayPresent()) {
             nOffset += PE.readDword(nOffset);
-            if (nOffset + 4 >= PE.getSize() || !PE.compare("EFBEADDE'Null'..'oftInst'", nOffset + 4)) {
+            if (nOffset + 4 >= PE.getSize() || !PE.compare("EFBEADDE'Null' %% 'oftInst'", nOffset + 4)) {
                 nOffset = 0;
             }
         }
@@ -30,6 +29,7 @@ function detect() {
                     return "zlib";
                 }
             }
+
             if (PE.compare("8", nOffset + 3)) {
                 sOptions = sOptions.append(BorZ(nOffset + 4));
             } else {
@@ -54,14 +54,9 @@ function detect() {
         bDetected = true;
     } else if (PE.compareEP("83EC0C535657FF15....40000")) {
         switch (PE.readWord(PE.getEntryPointOffset() + 8)) {
-            case 0x812C:
-                sVersion = "1.98";
-                break;
-            case 0x10B4:
-                sVersion = "2.0a0";
-                break;
-            default:
-                sVersion = "1.XX";
+            case 0x812C: sVersion = "1.98"; break;
+            case 0x10B4: sVersion = "2.0a0"; break;
+            default: sVersion = "1.XX";
         }
         bDetected = true;
     } else if (PE.compareEP("83EC0C53555657FF15..7040008B35..92400005E803000089442414B320FF152C704000")) {
