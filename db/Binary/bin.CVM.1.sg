@@ -1,0 +1,33 @@
+// Detect It Easy: detection rule file
+// Author: Kae <TG@kaens>
+
+// https://amicitia.miraheze.org/wiki/CVM  ← found by BJNFNE
+// https://github.com/JayFoxRox/cvm_tool/blob/master/cvm_parser.h
+meta("format", "CRI Middleware's PS2 CVM/ROFS image (.CVM)");
+
+function detect() {
+    if (X.Sz() < 0x800 || !X.c("'CVMH'") || !isAllZeroes(0x0C, 0x10) || !X.c("'ROFS'", 0x34)) return;
+    var versionNumber = X.SA(0x44, 4);
+    if (!/^[0-9\.]{4}/.test(versionNumber)) return;
+    var sz = X.U64(0x1C,_BE), sec = X.U32(0x80,_BE), p = 0, hkhd, hksz, end = false;
+    if(sz < 0xC+X.U64(4,_BE)) return;
+    if (!isWithin(sec, 1, (0xC+X.U64(4,_BE)-0x100)>>2)) return;
+    while (p < sz && p < X.Sz()) {
+        hkhd = X.SA(p, 4); hksz = X.U64(p+4,_BE); p += 0xC;
+        if (!hksz || !charStat(hkhd, true).includes('allasc')) return;
+        switch(hkhd) {
+        case 'CVMH': break; //already got all info...
+        case 'ZONE': break; //nothing to see here...
+        default: end = true; break; //time to stop, we found unexpected characters
+        }
+        if(end) break; p += hksz
+    }
+
+    sVersion = 'v'+versionNumber;
+    bDetected = true;
+
+    if (X.isVerbose()) sOption(outSz(sz),'sz:');
+    else if (sz < X.Sz()) sVersion += '/malformed!short';
+
+    return result();
+}
