@@ -1,13 +1,41 @@
 // Detect It Easy: detection rule file
-// Author: BJNFNE <bjnfne@web.de>
+// Author: Kaens <TG@kaens>
 
-// https://en.wikipedia.org/wiki/Variant_Call_Format
-meta("format", "Variant Call Format (.VCF)");
+// https://en.wikipedia.org/wiki/vCard
+// https://www.rfc-editor.org/rfc/rfc6350, 6868, 9554, 9555
+meta("format", "vCard/Virtual Contact File (.VCF,.vcard)");
 
 function detect() {
-    if (Binary.compare("'BEGIN:VCARD'0d0a")) {
-        bDetected = true;
-    }
+    var ep, vp, sV;
+    if ( !X.c("'BEGIN:VCARD'0d0a")
+        || (ep=X.fSig(20,0x2000,"0d0a'END:VCARD'")) < 20
+        || (vp=X.fSig(10,ep,"0d0a'VERSION:'")) < 10
+        || !/\d(\.\d)?/.test(sV=X.SA(vp+10,3).trim())
+    ) return;
+    bDetected = true;
+    var nV = 2.1;
+    const sz = ep+13, st = 11;
+    sVersion = 'v'+sV;
+    if (X.isVerbose()) {
+        if ( X.fSig(st, ep, "0d0a'GEO:geo:'") > st || X.fSig(st, ep, "0d0a'ANNIVERSARY'") > st
+          || X.fSig(st, ep, "0d0a'CALADRURI'") > st || X.fSig(st, ep, "0d0a'CALURI'") > st
+          || X.fSig(st, ep, "0d0a'CLIENTPIDMAP'") > st || X.fSig(st, ep, "0d0a'FBURL'") > st
+          || X.fSig(st, ep, "0d0a'GENDER'") > st || X.fSig(st, ep, "0d0a'PRONOUNS'") > st
+          || X.fSig(st, ep, "0d0a'KIND'") > st || X.fSig(st, ep, "0d0a'MEMBER'") > st
+          || X.fSig(st, ep, "0d0a'RELATED'") > st || X.fSig(st, ep, "0d0a'XML'") > st)
+            nV = 4.0;
 
+        if ( X.fSig(st, ep, "0d0a'CATEGORIES:'") > st || X.fSig(st, ep, "0d0a'CLASS:'") > st
+          || X.fSig(st, ep, "0d0a'IMPP'") > st || X.fSig(st, ep, "0d0a'NAME'") > st
+          || X.fSig(st, ep, "0d0a'NICKNAME'") > st || X.fSig(st, ep, "0d0a'PRODID'") > st
+          || X.fSig(st, ep, "0d0a'PROFILE'") > st || X.fSig(st, ep, "0d0a'SORT-STRING'") > st)
+            nV = Math.max(nV, 3.0);
+
+        if ( (+sV) < nV || (nV == 4.0 && sV == "4.0" && ( X.fSig(st, ep, "0d0a'LABEL'") > st
+          || X.fSig(st, ep, "0d0a'SORT-STRING'") > st )) )
+            sOption('version-incompatible fields');
+
+        sOption(outSz(sz),'sz:')
+    }
     return result();
 }

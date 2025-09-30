@@ -318,7 +318,25 @@ function detect() {
         sName = "NEC PC-98 disk image (.HDM)"; bDetected = true
     }
 
-    else if (X.c("'HXCPICFE'") && isWithin(sides = X.U8(0xA), 1, 2)
+    function isHOBETA() {
+        if(X.Sz() < 0x111) return;
+        var chk = 0; for (var i=0; i < 0xF; ++i) { if(i < 9 && X.U8(i) < 0x20) return;  chk += X.U8(i) }
+        chk = (105+0x101*chk) & 0xFFFF; if(chk != X.U16(0xF)) return;
+        sz = X.U16(0xB); addr = X.U16(9); alsz = X.U16(0xD);
+        if(!isWithin(alsz, 0x100,0xFF00) || !isWithin(sz, 0x100,0xFF00)
+            || addr < 0x4000 /*ROM*/ || addr+sz > 0x10000) return;
+        if(sz+(sz%0x100? (0x100-sz%0x100): 0) != alsz) return;
+        var tp = X.U8(8);
+        return true;
+    }
+    if(isHOBETA()) {
+        sName = 'ZX Spectrum HOBETA wrapper (.HOB)'; bDetected = true;
+        sOptions = decAnsi(0,  8, CPSpeccy).trim()+'.'+X.SA(8,1);
+        if(X.isVerbose()) sOption('data @11h['+Hex(sz)+'] RAM$'+addr.toString(16)+' sz:'+outSz(0x11+alsz));
+        else if(0x11+alsz > X.Sz()) sVersion = 'malformed!short';
+    }
+
+    if(!bDetected) if (X.c("'HXCPICFE'") && isWithin(sides = X.U8(0xA), 1, 2)
         && isWithin(baud = X.U16(0xC) * 1000, 150000, 3000000) && (ro = X.U8(0x11)) <= 1) {
         //ref https://github.com/latchdevel/HxCFloppyImageConverter/blob/master/libhxcfe/trunk/sources/loaders/hfe_loader/hfe_format.h
         // & hfe_writer.c & hfe_loader.c
@@ -485,8 +503,7 @@ function detect() {
     }
 
 
-    if (!bDetected)
-        if (X.c("'NES'1A") && (X.Sz() > 15)) {
+    if (!bDetected) if (X.c("'NES'1A") && (X.Sz() > 15)) {
             //ref https://www.nesdev.org/wiki/INES & https://www.nesdev.org/wiki/NES_2.0
             sName = "NES ROM image (.nes)"; bDetected = true; malformed = false;
             szprg = X.U8(4) * 16384; szchr = X.U8(5) * 8192;
@@ -680,6 +697,7 @@ function detect() {
         }
     }
 
+
     function isSCP() {
         if (!X.c("'SCP'") || X.U8(6) > 165 || X.U8(7) > 165 || X.U8(0xA) > 2) return false;
         var p, mtdp = mtdsz = 0, r = X.U8(5), bitw = X.U8(9);
@@ -725,434 +743,433 @@ function detect() {
         }
     }
 
-    if (!bDetected)
-        if (X.c("EC..A50000") && X.c("EC00", 0x100) && X.c("55AA55AA55AA55AAFFFFFFFFFFFFFFFF0000", 0x110)
-            && X.c("FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF", 0x400)
-            && X.c("4199015564F0FFFF 201B0C824118EA61 F00107F60301EE1B 0C834118EA617001 07760301EE15140500", 0X4630)) {
-            sName = "GamePark GP32 SmartMedia card (.SMC)"; bDetected = true //may not catch all options, but the official games are there
-        }
+    if (!bDetected) if (X.c("EC..A50000") && X.c("EC00", 0x100) && X.c("55AA55AA55AA55AAFFFFFFFFFFFFFFFF0000", 0x110)
+        && X.c("FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF", 0x400)
+        && X.c("4199015564F0FFFF 201B0C824118EA61 F00107F60301EE1B 0C834118EA617001 07760301EE15140500", 0X4630)) {
+        sName = "GamePark GP32 SmartMedia card (.SMC)"; bDetected = true //may not catch all options, but the official games are there
+    }
 
-        else if (X.c("'RSY'000300")) {
-            //ref http://info-coach.fr/atari/documents/_mydoc/Pasti-documentation.pdf
-            sName = "Jorge 'Ijor' Cwik's Pasti disk image (.STX)"; bDetected = true;
-            sVersion = 'v3' + (X.U8(11) == 2 ? ' new' : X.U8(11) == 0 ? ' old' : '');
-            if (X.isVerbose()) {
-                sOption(X.U8(10), 'trk.total:');
-                for (i = 0, p = 0x10; i < X.U8(10) && p < X.Sz(); i++, p += X.U32(p)) { }
-                sOption(outSz(p), 'sz:')
-            }
+    else if (X.c("'RSY'000300")) {
+        //ref http://info-coach.fr/atari/documents/_mydoc/Pasti-documentation.pdf
+        sName = "Jorge 'Ijor' Cwik's Pasti disk image (.STX)"; bDetected = true;
+        sVersion = 'v3' + (X.U8(11) == 2 ? ' new' : X.U8(11) == 0 ? ' old' : '');
+        if (X.isVerbose()) {
+            sOption(X.U8(10), 'trk.total:');
+            for (i = 0, p = 0x10; i < X.U8(10) && p < X.Sz(); i++, p += X.U32(p)) { }
+            sOption(outSz(p), 'sz:')
         }
+    }
 
-        else if (X.c("'ZXST'") && charStat(X.readBytes(0x10 + X.U32(0xC), 4), 1).indexOf('allxsc') >= 0
-            && X.fSig(8, 0x200, "'Z80R'") > 0 && X.fSig(0x20, 0x200, "'SPCR'") > 0
-            && isWithin(V = X.U8(4), 1, 1) && (v = X.U8(5)) <= 5 && (hw = X.U8(6)) <= 16 && (fl = X.U8(7)) <= 1) {
-            //ref https://sinclair.wiki.zxnet.co.uk/wiki/ZX-State_format
-            sName = 'Spectaculator zx-state file (.SZX)'; sVersion = 'v' + V + '.' + v; bDetected = true;
-            switch (hw) {
-                case 0: hw = 'ZX Spectrum 16k'; break; case 1: hw = 'ZX Spectrum 48k/+'; break;
-                case 2: hw = 'ZX Spectrum 128k'; break; case 3: hw = 'ZX Spectrum +2'; break;
-                case 4: hw = 'ZX Spectrum +2A/B'; break; case 5: hw = 'ZX Spectrum +3'; break;
-                case 6: hw = 'ZX Spectrum +3e'; break; case 7: hw = 'Pentagon 128'; break;
-                case 8: hw = 'Timex Sinclair TC-2048'; break; case 9: hw = 'Timex Sinclair TC-2068'; break;
-                case 0xA: hw = 'Scorpion ZS-256'; break; case 0xB: hw = 'ZX Spectrum SE'; break;
-                case 0xC: hw = 'Timex Sinclair TS-2068'; break; case 0xD: hw = 'Pentagon 512'; break;
-                case 0xE: hw = 'Pentagon 1024'; break; case 0xF: hw = 'ZX Spectrum 48k (NTSC)'; break;
-                case 0x10: hw = 'ZX Spectrum 128Ke'; break;
-                default: hw = '(unk.)'
-            }
-            sOption(hw, 'h/w:');
-            if (X.isVerbose()) {
-                var p = 8;
-                while (p < X.Sz()) {
-                    var hkhd = X.SA(p, 4), hksz = X.U32(p + 4);
-                    if (!hksz || hksz + p > X.Sz() || charStat(X.readBytes(p, 4), 1).indexOf('allxsc') < 0
-                        || hkhd.length < 2 || hkhd.toUpperCase() != hkhd) break;
-                    p += 8;
-                    switch (hkhd) {
-                        case 'CRTR': sOption(X.SA(p, 0x20), 'in:'); break;
-                    }
-                    p += hksz
+    else if (X.c("'ZXST'") && charStat(X.readBytes(0x10 + X.U32(0xC), 4), 1).indexOf('allxsc') >= 0
+        && X.fSig(8, 0x200, "'Z80R'") > 0 && X.fSig(0x20, 0x200, "'SPCR'") > 0
+        && isWithin(V = X.U8(4), 1, 1) && (v = X.U8(5)) <= 5 && (hw = X.U8(6)) <= 16 && (fl = X.U8(7)) <= 1) {
+        //ref https://sinclair.wiki.zxnet.co.uk/wiki/ZX-State_format
+        sName = 'Spectaculator zx-state file (.SZX)'; sVersion = 'v' + V + '.' + v; bDetected = true;
+        switch (hw) {
+            case 0: hw = 'ZX Spectrum 16k'; break; case 1: hw = 'ZX Spectrum 48k/+'; break;
+            case 2: hw = 'ZX Spectrum 128k'; break; case 3: hw = 'ZX Spectrum +2'; break;
+            case 4: hw = 'ZX Spectrum +2A/B'; break; case 5: hw = 'ZX Spectrum +3'; break;
+            case 6: hw = 'ZX Spectrum +3e'; break; case 7: hw = 'Pentagon 128'; break;
+            case 8: hw = 'Timex Sinclair TC-2048'; break; case 9: hw = 'Timex Sinclair TC-2068'; break;
+            case 0xA: hw = 'Scorpion ZS-256'; break; case 0xB: hw = 'ZX Spectrum SE'; break;
+            case 0xC: hw = 'Timex Sinclair TS-2068'; break; case 0xD: hw = 'Pentagon 512'; break;
+            case 0xE: hw = 'Pentagon 1024'; break; case 0xF: hw = 'ZX Spectrum 48k (NTSC)'; break;
+            case 0x10: hw = 'ZX Spectrum 128Ke'; break;
+            default: hw = '(unk.)'
+        }
+        sOption(hw, 'h/w:');
+        if (X.isVerbose()) {
+            var p = 8;
+            while (p < X.Sz()) {
+                var hkhd = X.SA(p, 4), hksz = X.U32(p + 4);
+                if (!hksz || hksz + p > X.Sz() || charStat(X.readBytes(p, 4), 1).indexOf('allxsc') < 0
+                    || hkhd.length < 2 || hkhd.toUpperCase() != hkhd) break;
+                p += 8;
+                switch (hkhd) {
+                    case 'CRTR': sOption(X.SA(p, 0x20), 'in:'); break;
                 }
-                sz = p; sOption(outSz(sz), 'sz:')
-            }
-        }
-
-        else if (/^C64S?\s*tape.*file/.test(X.SA(0, 0x20))) {
-            sName = "C64 cassette tape (.T64)"; bDetected = true;
-            sVersion = 'v' + X.U8(0x20) + "." + X.U8(0x21).padStart(2, '0');
-            if (X.isVerbose()) {
-                var files = [], totalent = X.U16(0x22, _LE), usedent = X.U16(0x24, _LE);
-                for (i = 0; i < totalent; i++)
-                    if (i < usedent) files[i] = X.SA(0x50 + i * 0x20, 0x20).trim();
-                sOption(usedent, " entries:");
-                for (i = 0; i < files.length; i++) sOptions = sOptions.appendS(files[i], " ");
-            }
-        }
-
-        else if (X.c("'XM7 TAPE IMAGE 0'")) {
-            //ref https://github.com/yas-sim/xm7-related-tools/blob/main/t77dec/t77dec.cpp
-            //& https://web.archive.org/web/20191207131958/http://xm7.la.coocan.jp:80/xm7/xm7.html
-            sName = "Fujitsu FM-7 emulator XM7 tape (.T77)"; bDetected = true
-        }
-
-        else if (X.c("'C64-TAPE-RAW'") && X.U8(0xC) < 2) {
-            bDetected = true;
-            sName = "C64 cassette tape (.TAP)"; sVersion = "v" + X.U8(0xC);
-            var sz = X.U32(0x10) + 0x14; if (!X.isVerbose()) { if (sz > X.Sz()) sVersion += '/malformed!short' }
-            else sOptions = "sz:" + outSz(sz)
-        }
-
-        else if (X.c("'ZXTape!'1A")) { // a bit large
-            // from https://www.alessandrogrussu.it/tapir/tzxform120.html
-            // & https://www.msx.org/wiki/Emulation_related_file_formats#.TSX
-            sVersion = 'v' + X.U8(8) + '.' + X.U8(9).padStart(2, '0'); bDetected = true;
-            var ismsx = end = false, x = 0;
-            var bad = '', title = '', publisher = '', auth = '', year = '', lang = '', apptype = '', price = '',
-                protload = '', org = '', cmt = '', hw = '', sel = '', fnames = [];
-            const types = ['B', 'N', 'S', 'C']
-            p = 10; while (!end && p < X.Sz()) {
-                switch (X.U8(p++)) {
-                    case 0x10:
-                        if (!X.U8(p + 4)) { //loading flag(?)
-                            if (charStat(t = X.readBytes(p + 6, 10), 1).indexOf('allasc') < 0) bad = bad.addIfNone('!nonASCIIfn');
-                            t = decEncoding(t, CPSpeccy).trim(); tp = X.U8(p + 5);
-                            if (!t && tp < 3) bad = bad.addIfNone('!emptyfn');
-                            fnames.push(t + '.' + types[tp])
-                        }
-                        p += 4 + X.U16(p + 2); break;
-                    case 0x11: p += 0x12 + X.U24(p + 0xF); break;
-                    case 0x12: p += 4; break;
-                    case 0x13: p += 1 + 2 * X.U8(p); break;
-                    case 0x14:
-                        if (!X.U8(p + 4) > 8) { end = true; bad = bad.addIfNone('!badnbitsin14') }
-                        else p += 0xA + X.U24(p + 7); break;
-                    case 0x15:
-                        if (!isWithin(X.U8(p + 4), 1, 8)) { end = true; bad = bad.addIfNone('!badnbitsin15') }
-                        else p += 8 + X.U24(p + 5); break;
-                    case 0x18: if (!isWithin(X.U8(p + 9), 1, 2)) { end = true; bad = bad.addIfNone('!badcomptypein18') }
-                    else p += 4 + X.U32(p); break;
-                    case 0x19: case 0x2A: p += 4 + X.U32(p); break;
-                    case 0x20: case 0x23: case 0x24: p += 2; break;
-                    case 0x21: p += 1 + X.U8(p); break;
-                    case 0x22: case 0x25: case 0x27: break;
-                    case 0x26: p += 2 + 2 * X.U16(p); break;
-                    case 0x28:
-                        var p1 = p + 2 + X.U16(p), n = X.U8(p + 2); p += 3;
-                        for (i = 0; i < n; i++) {
-                            var tl = X.U8(p + 2); p += 3;
-                            sel = sel.appendS(decAnsi(p, tl, CPSpeccy, 1, Chars0to1FSpeccy), '/'); p += tl
-                        }
-                        p = p1; break;
-                    case 0x2B: if (X.U8(p + 4) > 1) { end = true; bad = bad.addIfNone('!badsignalin2B'); }
-                    else p += 4 + X.U32(p); break;
-                    case 0x30: cmt = cmt.append('-' + decAnsi(p + 1, X.U8(p), CPSpeccy, 1, Chars0to1FSpeccy).trim() + '-');
-                        p += 1 + X.U8(p); break;
-                    case 0x31: p += 2 + X.U8(p + 1); break;
-                    case 0x32:
-                        var p1 = p + 2 + X.U16(p), n = X.U8(p + 2); p += 3;
-                        for (i = 0; i < n; i++) {
-                            var tp = X.U8(p++); t = X.SC(p + 1, Math.min(X.U8(p), p1 - p), 'CP1252').trim();
-                            switch (tp) {
-                                case 0: title = title.append(t); break; case 1: publisher = publisher.append(t); break;
-                                case 2: auth = auth.append(t); break; case 3: year = year.append(t); break;
-                                case 4: lang = lang.append(t); break; case 5: apptype = apptype.append(t); break;
-                                case 6: price = price.append(t); break; case 7: protload = protload.append(t); break;
-                                case 8: org = org.append(t); break; case 0xFF: cmt = cmt.appendS(t, ' / '); break;
-                                default: cmt = cmt.append(t, '\ninfo#' + tp.toString(16) + ':')
-                            }
-                            p += 1 + X.U8(p);
-                        }
-                        p = p1; break;
-                    case 0x33:
-                        var hwin = X.U8(p++);
-                        for (i = 0; i < hwin; i++) {
-                            var hwtp = X.U8(p++), hwid = X.U8(p++);
-                            switch (hwtp) {
-                                case 0: hwtp = '[PC]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'ZX Spectrum 16k'; break; case 1: hwid = 'ZX Spectrum 48k/+'; break;
-                                        case 2: hwid = 'ZX Spectrum 48k ISSUE 1'; break; case 3: hwid = 'ZX Spectrum 128k +(Sinclair)'; break;
-                                        case 4: hwid = 'ZX Spectrum 128k +2 (grey case)'; break; case 5: hwid = 'ZX Spectrum 128k +2A/+3'; break;
-                                        case 6: hwid = 'Timex Sinclair TC-2048'; break; case 7: hwid = 'Timex Sinclair TS-2068'; break;
-                                        case 8: hwid = 'Pentagon 128'; break; case 9: hwid = 'SAM Coupe'; break;
-                                        case 0xA: hwid = 'Didaktik M'; break; case 0xB: hwid = 'Didaktik Gama'; break;
-                                        case 0xC: hwid = 'ZX-80'; break; case 0xD: hwid = 'ZX-81'; break;
-                                        case 0xE: hwid = 'ZX Spectrum 128k Spanish version'; break;
-                                        case 0xF: hwid = 'ZX Spectrum Arabic version'; break;
-                                        case 0x10: hwid = 'Microdigital TK 90-X'; break; case 0x11: hwid = 'MicrodigitalTK 95'; break;
-                                        case 0x12: hwid = 'Byte'; break; case 0x13: hwid = 'Elwro 800-3'; break;
-                                        case 0x14: hwid = 'ZS Scorpion 256'; break; case 0x15: hwid = 'Amstrad CPC 464'; break;
-                                        case 0x16: hwid = 'Amstrad CPC 664'; break; case 0x17: hwid = 'Amstrad CPC 6128'; break;
-                                        case 0x18: hwid = 'Amstrad CPC 464+'; break; case 0x19: hwid = 'Amstrad CPC 6128+'; break;
-                                        case 0x1A: hwid = 'Jupiter ACE'; break; case 0x1B: hwid = 'Enterprise'; break;
-                                        case 0x1E: hwid = 'Inves Spectrum+'; break; case 0x1F: hwid = 'Profi'; break;
-                                        case 0x20: hwid = 'GrandRomMax'; break; case 0x21: hwid = 'Kay 1024'; break;
-                                        case 0x22: hwid = 'Ice Felix HC 91'; break; case 0x23: hwid = 'Ice Felix HC 2000'; break;
-                                        case 0x24: hwid = 'Amaterske RADIO Mistrum'; break; case 0x25: hwid = 'Quorum 128'; break;
-                                        case 0x26: hwid = 'MicroART ATM'; break; case 0x27: hwid = 'MicroART ATM Turbo 2'; break;
-                                        case 0x28: hwid = 'Chrome'; break; case 0x29: hwid = 'ZX Badaloc'; break;
-                                        case 0x2A: hwid = 'TS-1500'; break; case 0x2B: hwid = 'Lambda'; break;
-                                        case 0x2C: hwid = 'TK-65'; break; case 0x2D: hwid = 'ZX-97'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 1: hwtp = '[ext.storage]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'ZX Microdrive'; break; case 1: hwid = 'Opus Discovery'; break;
-                                        case 2: hwid = 'MGT DISCiPLE'; break; case 3: hwid = 'MGT +D'; break;
-                                        case 4: hwid = 'Rotronics Wafadrive'; break; case 5: hwid = 'TR-DOS (BetaDisk)'; break;
-                                        case 6: hwid = 'Byte Drive'; break; case 7: hwid = 'Watsford'; break;
-                                        case 8: hwid = 'FIZ'; break; case 9: hwid = 'Radofin'; break;
-                                        case 0xA: hwid = 'Didaktik disk drives'; break; case 0xB: hwid = 'BS-DOS (MB-02)'; break;
-                                        case 0xC: hwid = 'ZX Spectrum +3 disk drive'; break;
-                                        case 0xD: hwid = 'JLO (Oliger) disk interface'; break;
-                                        case 0xE: hwid = 'Timex FDD3000'; break; case 0xF: hwid = 'Zebra disk drive'; break;
-                                        case 0x10: hwid = 'Ramex Millenia'; break; case 0x11: hwid = 'Larken'; break;
-                                        case 0x12: hwid = 'Kempston disk interface'; break; case 0x13: hwid = 'Sandy'; break;
-                                        case 0x14: hwid = 'ZX Spectrum +3e hard disk'; break; case 0x15: hwid = 'ZXATASP'; break;
-                                        case 0x16: hwid = 'DivIDE'; break; case 0x17: hwid = 'ZXCF'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 2: hwtp = '[memory addon]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'Sam Ram'; break; case 1: hwid = 'Multiface ONE'; break;
-                                        case 2: hwid = 'Multiface 128k'; break; case 3: hwid = 'Multiface +3'; break;
-                                        case 4: hwid = 'MultiPrint'; break; case 5: hwid = 'MB-02 ROM/RAM exp.'; break;
-                                        case 6: hwid = 'SoftROM'; break; case 7: hwid = '1k'; break; case 8: hwid = '16k'; break;
-                                        case 9: hwid = '48k'; break; case 10: hwid = 'memory in 8-16k used'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 3: hwtp = '[sound device]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'classic 128k ZX-compatible AY hw'; break;
-                                        case 1: hwid = 'Fuller Box AY hw'; break; case 2: hwid = 'Currah microSpeech'; break;
-                                        case 3: hwid = 'SpecDrum'; break; case 4: hwid = 'AY ACB (L:A+C R:B+C) stereo/Melodik'; break;
-                                        case 5: hwid = 'AY ABC (L:A+B R:B+C) stereo/Melodik'; break;
-                                        case 6: hwid = 'RAM Music Machine'; break; case 7: hwid = 'Covox'; break;
-                                        case 8: hwid = 'General Sound'; break; case 9: hwid = 'Intec Electronic Digital Interface B8001'; break;
-                                        case 0xA: hwid = 'Zon-X AY'; break; case 0xB: hwid = 'QuickSilva AY'; break;
-                                        case 0xC: hwid = 'Jupiter ACE'; break; default: hwid = '(unk.)'
-                                    } break;
-                                case 4: hwtp = '[joystick]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'Kempston'; break; case 1: hwid = 'Cursor/Protek/AGF'; break;
-                                        case 2: hwid = 'Sinclair 2 Left (12345)'; break; case 3: hwid = 'Sinclair 1 Right (67890)'; break;
-                                        case 4: hwid = 'Fuller'; break; default: hwid = '(unk.)'
-                                    } break;
-                                case 5: hwtp = '[mouse]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'AMX mouse'; break; case 1: hwid = 'Kempston mouse'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 6: hwtp = '[controller]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'Trickstick'; break; case 1: hwid = 'ZX Light Gun'; break;
-                                        case 2: hwid = 'Zebra Graphics Tablet'; break; case 3: hwid = 'Defender Light Gun'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 7: hwtp = '[serial port]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'ZX Interface I'; break; case 1: hwid = 'ZX Spectrum 128k'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 8: hwtp = '[parallel port]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'Kempston S'; break; case 1: hwid = 'Kempston E'; break;
-                                        case 2: hwid = 'ZX Spectrum +3'; break; case 3: hwid = 'Tasman'; break;
-                                        case 4: hwid = "DK'Tronics"; break; case 5: hwid = 'Hilderbay'; break;
-                                        case 6: hwid = 'INES Printerface'; break; case 7: hwid = 'Z LPrint Interface 3'; break;
-                                        case 8: hwid = 'MultiPrint'; break; case 9: hwid = 'Opus Discovery'; break;
-                                        case 10: hwid = 'Standard 8255 chip with ports 31+63+95'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 9: hwtp = '[printer]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'ZX Printer/Alphacom 32 & compat.'; break;
-                                        case 1: hwid = 'Generic printer'; break; case 2: hwid = 'EPSON compat.'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 0xA: hwtp = '[modem]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'Prism VTX 5000'; break; case 1: hwid = 'T/S 2050/Westridge 2050'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 0xB: hwtp = '[digitizer]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'RD Digital Tracer'; break; case 1: hwid = "DK'Tronics Light Pen"; break;
-                                        case 2: hwid = 'British MicroGraph Pad'; break; case 3: hwid = 'Romantic Robot Videoface'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 0xC: hwtp = '[network adapter]';
-                                    if (hwid == 0) hwid = 'ZX Interface I'; else hwid = '(unk.)'; break;
-                                case 0xD: hwtp = '[keyboard]';
-                                    if (hwid == 0) hwid = 'Keypad for ZX Spectrum 128k'; else hwid = '(unk.)'; break;
-                                case 0xE: hwtp = '[AD/DA converter]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'Harley Systems ADC 8.2'; break;
-                                        case 1: hwid = 'Blackboard Electronics'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 0xF: hwtp = '[EEPROM programmer]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'Orme Electronics'; break; case 1: hwid = 'Blackboard Electronics'; break;
-                                        default: hwid = '(unk.)'
-                                    } break;
-                                case 0x10: hwtp = '[GPU]';
-                                    switch (hwid) {
-                                        case 0: hwid = 'WRX Hi-Res'; break; case 1: hwid = 'G007'; break; case 2: hwid = 'Memotech'; break;
-                                        case 3: hwid = 'Lambda Colour'; break; default: hwid = '(unk.)'
-                                    } break;
-                            }
-                            switch (X.U8(p++)) {
-                                case 0: hw = hw.append('runs on ' + hwtp + ' ' + hwid); break;
-                                case 1: hw = hw.append('uses ' + hwtp + ' ' + hwid); break;
-                                case 2: hw = hw.append('runs w/o specifics of ' + hwtp + ' ' + hwid); break;
-                                case 3: hw = hw.append("won't run on " + hwtp + ' ' + hwid); break; default: break
-                            }
-                        } break;
-                    case 0x35: p += 0x14 + X.U32(p + 0x10); break;
-                    case 0x5A: if (!X.c("'XTape!'1A", p)) { end = true; p-- } else { x++; p += 9 } break;
-                    case 0x16: case 0x17: p += X.U32(p); break;
-                    case 0x34: p += 8; break;
-                    case 0x40: sOption('snapshot'); p += 4 + X.U24(p + 1); break;
-                    case 0x4B: ismsx = true; p += 4 + X.U32(p); break; //Kansas City Standard
-                    default: end = true; p--;// ripper-ready! // bad = bad.addIfNone('!unkID')
-                }
-            }
-            if (ismsx) sName = "ZX Spectrum/MSX tape (.TSX)"; else sName = "ZX Spectrum tape (.TZX)";
-            if (bad.length) sVersion = sVersion.appendS('malformed' + bad, '/');
-            if (X.isVerbose()) {
-                sOptionT(title); if (x > 1) sOption(x, 'x'); sOptionT(auth, 'by:'); sOptionT(year, "'"); sOptionT(publisher, '(c) ');
-                sOptionT(lang, 'in:'); sOptionT(apptype, 'apptype:'); sOptionT(price, 'price:');
-                sOptionT(org, 'origin:'); sOptionT(protload, 'prot/ldr:'); sOption(hw);
-                sOptionT(addEllipsis(cmt, 0xA0)); sOptionT(addEllipsis(fnames.join(','), 0xA0), 'files:');
-                sOptionT(sel, 'choices:'); sOption(outSz(p), 'sz:')
-            }
-        }
-
-        else if (X.c("'UEF File!'00") && X.U8(0xB) <= 2) {
-            //ref http://electrem.emuunlim.com/UEFSpecs.html
-            sName = "Acorn PC Unified Emulator Format data (.UEF)"; bDetected = true;
-            sVersion = 'v' + X.U8(0xB) + '.' + X.U8(0xA);
-            var title = info = man = gear = kb = tp = '', interrupt = false;
-            for (p = 0xC; p < X.Sz();) {
-                var hkhd = X.U16(p), hksz = X.U32(p + 2);
-                if ([0, 1, 2, 3, 4, 0xFF].indexOf(hkhd >> 8) < 0) break; //unrelated info follows?
-                p += 6; switch (hkhd) {
-                    case 0x0000: info = info.appendS(X.SA(p, hksz), '/'); break;
-                    case 0x0001: man = man.appendS(X.SA(p, hksz), ' '); break;
-                    case 0x0005: gear = 'Acorn ';
-                        switch (X.U8(p) >> 4) {
-                            case 0: gear += 'BBC Model A'; break; case 1: gear += 'Electron'; break;
-                            case 2: gear += 'BBC Model B'; break; case 3: gear += 'BBC Master'; break;
-                            case 4: gear += 'Atom'; break
-                        }
-                        switch (X.U8(p) & 0xF) {
-                            case 0: kb = 'any'; break; case 1: kb = 'target PC'; break; case 2: kb = 'host PC'; break
-                        }
-                        break;
-                    case 0x0009: title = X.SA(p, hksz); break;
-                    case 0x0101: case 0x0102: case 0x0103: case 0x0104:
-                    case 0x0110: case 0x0111: case 0x0112: case 0x0113: case 0x0114: case 0x0115:
-                    case 0x0116: case 0x0117: case 0x0120: case 0x0131:
-                        tp = tp.addIfNone('#tape'); break;
-                    case 0x0130:
-                        switch (X.U8(p)) {
-                            case 0: t = 'unit'; break; case 1: t = 'tape'; break; case 2: t = 'disc'; break;
-                            case 3: t = 'vtape'; break; case 4: t = 'cartridge'; break; default: 'unk.media'
-                        }
-                        if (X.U8(p + 1) > 1) t += ' ×' + X.U8(p + 1);
-                        if (X.U8(p + 2) > 1) t += (X.U8(p) == 1 || X.U8(p) == 3) ? ' ch:' : X.U8(p) == 2 ? ' ' + X.U8(p + 2) + ' audiotracks' : '..?';
-                        info += ' #' + t; break;
-                    case 0x0200: case 0x0201: case 0x0202: tp = tp.addIfNone('#disc'); break;
-                    case 0x0300: tp = tp.addIfNone('#ROM');
-                        t = 'content:';
-                        switch (X.U8(p)) {
-                            case 0: t += 'generic'; break; case 1: t += 'OS'; break; case 2: t += 'BASIC'; break;
-                            case 3: t += 'language'; break; case 4: t += 'utility'; break; case 5: t += 'filing system'; break;
-                            case 6: t += 'h/w driver'; break; case 7: t += 'game'; break; default: t += 'unk'
-                        } info += ' #' + t; break;
-                    case 0x0301: tp = tp.addIfNone('#ROM'); break;
-                    case 0x0400: case 0x0401: case 0x0402: case 0x0403:
-                    case 0x0410: case 0x0411: case 0x0412: case 0x0420:
-                        tp = tp.addIfNone('#snapshot'); break;
-                    case 0xFF00: info += '#emu:' + X.SA(p, hksz); break;
-                    case 0x0100: break; //the "implicit data chunk"! eh?
-                    default:
-                        if (hkhd > 0xFF00) tp = tp.addIfNone('#customdata');
-                        else interrupt = true // unknown chunk = unrelated tailing data?
-                }
-                if (interrupt) { p -= 6; break }
-                //_log(Hex(p-6)+' > '+Hex(hkhd));
                 p += hksz
             }
-            sVersion += tp;
-            if (X.isVerbose()) {
-                sOption(title); sOptionT(info, 'info:'); sOptionT(man, 'manual:');
-                sOptionT(gear, 'gear:'); sOptionT(kb, 'layout:');
-                sOption(outSz(p), 'sz:')
-            }
+            sz = p; sOption(outSz(sz), 'sz:')
         }
+    }
 
-        else if (X.c("'UNIF'???????? 0000 0000 0000 0000 0000 0000 0000") && (X.Sz() > 32)) {
-            sName = "UNIF NES cartridge (.UNF)"; sVersion = "v" + X.U32(4, _LE); bDetected = true;
-            if (X.isVerbose()) {
-                p = 8;
-                t = ''; mapr = ''; tv = ''; ex = ''; fstorage = lastchunk = false;
-                while (p < X.Sz() && !lastchunk) {
-                    var hkhd = X.SA(p, 4), hksz = X.U32(p + 4); p += 0x08;
-                    switch (hkhd) {
-                        case "MAPR": mapr = X.SA(p, hksz); break;
-                        case "NAME": t = X.SA(p, hksz); break;
-                        case "TCVI": switch (X.U8(p)) {
-                            case 0: tv = "NTSC"; break;
-                            case 1: tv = "PAL"; break;
-                            case 2: tv = "NTSC/PAL"
-                        }
-                            break;
-                        case "CTRL":
-                            var exa = [], bm = X.U8(p);
-                            if (bm & 1) exa.push("Std. Controller");
-                            if (bm & 2) exa.push("Zapper");
-                            if (bm & 4) exa.push("R.O.B.");
-                            if (bm & 8) exa.push("Arkanoid Controller");
-                            if (bm & 0x10) exa.push("Power Pad");
-                            if (bm & 0x20) exa.push("Four Score");
-                            if (bm) ex = "#" + exa.join("+");
-                            break;
-                        case "BATR": fstorage = true; break;
-                        case "MIRR": lastchunk = true; break
+    else if (/^C64S?\s*tape.*file/.test(X.SA(0, 0x20))) {
+        sName = "C64 cassette tape (.T64)"; bDetected = true;
+        sVersion = 'v' + X.U8(0x20) + "." + X.U8(0x21).padStart(2, '0');
+        if (X.isVerbose()) {
+            var files = [], totalent = X.U16(0x22, _LE), usedent = X.U16(0x24, _LE);
+            for (i = 0; i < totalent; i++)
+                if (i < usedent) files[i] = X.SA(0x50 + i * 0x20, 0x20).trim();
+            sOption(usedent, " entries:");
+            for (i = 0; i < files.length; i++) sOptions = sOptions.appendS(files[i], " ");
+        }
+    }
+
+    else if (X.c("'XM7 TAPE IMAGE 0'")) {
+        //ref https://github.com/yas-sim/xm7-related-tools/blob/main/t77dec/t77dec.cpp
+        //& https://web.archive.org/web/20191207131958/http://xm7.la.coocan.jp:80/xm7/xm7.html
+        sName = "Fujitsu FM-7 emulator XM7 tape (.T77)"; bDetected = true
+    }
+
+    else if (X.c("'C64-TAPE-RAW'") && X.U8(0xC) < 2) {
+        bDetected = true;
+        sName = "C64 cassette tape (.TAP)"; sVersion = "v" + X.U8(0xC);
+        var sz = X.U32(0x10) + 0x14; if (!X.isVerbose()) { if (sz > X.Sz()) sVersion += '/malformed!short' }
+        else sOptions = "sz:" + outSz(sz)
+    }
+
+    else if (X.c("'ZXTape!'1A")) { // a bit large
+        // from https://www.alessandrogrussu.it/tapir/tzxform120.html
+        // & https://www.msx.org/wiki/Emulation_related_file_formats#.TSX
+        sVersion = 'v' + X.U8(8) + '.' + X.U8(9).padStart(2, '0'); bDetected = true;
+        var ismsx = end = false, x = 0;
+        var bad = '', title = '', publisher = '', auth = '', year = '', lang = '', apptype = '', price = '',
+            protload = '', org = '', cmt = '', hw = '', sel = '', fnames = [];
+        const types = ['B', 'N', 'S', 'C']
+        p = 10; while (!end && p < X.Sz()) {
+            switch (X.U8(p++)) {
+                case 0x10:
+                    if (!X.U8(p + 4)) { //loading flag(?)
+                        if (charStat(t = X.readBytes(p + 6, 10), 1).indexOf('allasc') < 0) bad = bad.addIfNone('!nonASCIIfn');
+                        t = decEncoding(t, CPSpeccy).trim(); tp = X.U8(p + 5);
+                        if (!t && tp < 3) bad = bad.addIfNone('!emptyfn');
+                        fnames.push(t + '.' + types[tp])
                     }
-                    p += hksz;
+                    p += 4 + X.U16(p + 2); break;
+                case 0x11: p += 0x12 + X.U24(p + 0xF); break;
+                case 0x12: p += 4; break;
+                case 0x13: p += 1 + 2 * X.U8(p); break;
+                case 0x14:
+                    if (!X.U8(p + 4) > 8) { end = true; bad = bad.addIfNone('!badnbitsin14') }
+                    else p += 0xA + X.U24(p + 7); break;
+                case 0x15:
+                    if (!isWithin(X.U8(p + 4), 1, 8)) { end = true; bad = bad.addIfNone('!badnbitsin15') }
+                    else p += 8 + X.U24(p + 5); break;
+                case 0x18: if (!isWithin(X.U8(p + 9), 1, 2)) { end = true; bad = bad.addIfNone('!badcomptypein18') }
+                else p += 4 + X.U32(p); break;
+                case 0x19: case 0x2A: p += 4 + X.U32(p); break;
+                case 0x20: case 0x23: case 0x24: p += 2; break;
+                case 0x21: p += 1 + X.U8(p); break;
+                case 0x22: case 0x25: case 0x27: break;
+                case 0x26: p += 2 + 2 * X.U16(p); break;
+                case 0x28:
+                    var p1 = p + 2 + X.U16(p), n = X.U8(p + 2); p += 3;
+                    for (i = 0; i < n; i++) {
+                        var tl = X.U8(p + 2); p += 3;
+                        sel = sel.appendS(decAnsi(p, tl, CPSpeccy, 1, Chars0to1FSpeccy), '/'); p += tl
+                    }
+                    p = p1; break;
+                case 0x2B: if (X.U8(p + 4) > 1) { end = true; bad = bad.addIfNone('!badsignalin2B'); }
+                else p += 4 + X.U32(p); break;
+                case 0x30: cmt = cmt.append('-' + decAnsi(p + 1, X.U8(p), CPSpeccy, 1, Chars0to1FSpeccy).trim() + '-');
+                    p += 1 + X.U8(p); break;
+                case 0x31: p += 2 + X.U8(p + 1); break;
+                case 0x32:
+                    var p1 = p + 2 + X.U16(p), n = X.U8(p + 2); p += 3;
+                    for (i = 0; i < n; i++) {
+                        var tp = X.U8(p++); t = X.SC(p + 1, Math.min(X.U8(p), p1 - p), 'CP1252').trim();
+                        switch (tp) {
+                            case 0: title = title.append(t); break; case 1: publisher = publisher.append(t); break;
+                            case 2: auth = auth.append(t); break; case 3: year = year.append(t); break;
+                            case 4: lang = lang.append(t); break; case 5: apptype = apptype.append(t); break;
+                            case 6: price = price.append(t); break; case 7: protload = protload.append(t); break;
+                            case 8: org = org.append(t); break; case 0xFF: cmt = cmt.appendS(t, ' / '); break;
+                            default: cmt = cmt.append(t, '\ninfo#' + tp.toString(16) + ':')
+                        }
+                        p += 1 + X.U8(p);
+                    }
+                    p = p1; break;
+                case 0x33:
+                    var hwin = X.U8(p++);
+                    for (i = 0; i < hwin; i++) {
+                        var hwtp = X.U8(p++), hwid = X.U8(p++);
+                        switch (hwtp) {
+                            case 0: hwtp = '[PC]';
+                                switch (hwid) {
+                                    case 0: hwid = 'ZX Spectrum 16k'; break; case 1: hwid = 'ZX Spectrum 48k/+'; break;
+                                    case 2: hwid = 'ZX Spectrum 48k ISSUE 1'; break; case 3: hwid = 'ZX Spectrum 128k +(Sinclair)'; break;
+                                    case 4: hwid = 'ZX Spectrum 128k +2 (grey case)'; break; case 5: hwid = 'ZX Spectrum 128k +2A/+3'; break;
+                                    case 6: hwid = 'Timex Sinclair TC-2048'; break; case 7: hwid = 'Timex Sinclair TS-2068'; break;
+                                    case 8: hwid = 'Pentagon 128'; break; case 9: hwid = 'SAM Coupe'; break;
+                                    case 0xA: hwid = 'Didaktik M'; break; case 0xB: hwid = 'Didaktik Gama'; break;
+                                    case 0xC: hwid = 'ZX-80'; break; case 0xD: hwid = 'ZX-81'; break;
+                                    case 0xE: hwid = 'ZX Spectrum 128k Spanish version'; break;
+                                    case 0xF: hwid = 'ZX Spectrum Arabic version'; break;
+                                    case 0x10: hwid = 'Microdigital TK 90-X'; break; case 0x11: hwid = 'MicrodigitalTK 95'; break;
+                                    case 0x12: hwid = 'Byte'; break; case 0x13: hwid = 'Elwro 800-3'; break;
+                                    case 0x14: hwid = 'ZS Scorpion 256'; break; case 0x15: hwid = 'Amstrad CPC 464'; break;
+                                    case 0x16: hwid = 'Amstrad CPC 664'; break; case 0x17: hwid = 'Amstrad CPC 6128'; break;
+                                    case 0x18: hwid = 'Amstrad CPC 464+'; break; case 0x19: hwid = 'Amstrad CPC 6128+'; break;
+                                    case 0x1A: hwid = 'Jupiter ACE'; break; case 0x1B: hwid = 'Enterprise'; break;
+                                    case 0x1E: hwid = 'Inves Spectrum+'; break; case 0x1F: hwid = 'Profi'; break;
+                                    case 0x20: hwid = 'GrandRomMax'; break; case 0x21: hwid = 'Kay 1024'; break;
+                                    case 0x22: hwid = 'Ice Felix HC 91'; break; case 0x23: hwid = 'Ice Felix HC 2000'; break;
+                                    case 0x24: hwid = 'Amaterske RADIO Mistrum'; break; case 0x25: hwid = 'Quorum 128'; break;
+                                    case 0x26: hwid = 'MicroART ATM'; break; case 0x27: hwid = 'MicroART ATM Turbo 2'; break;
+                                    case 0x28: hwid = 'Chrome'; break; case 0x29: hwid = 'ZX Badaloc'; break;
+                                    case 0x2A: hwid = 'TS-1500'; break; case 0x2B: hwid = 'Lambda'; break;
+                                    case 0x2C: hwid = 'TK-65'; break; case 0x2D: hwid = 'ZX-97'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 1: hwtp = '[ext.storage]';
+                                switch (hwid) {
+                                    case 0: hwid = 'ZX Microdrive'; break; case 1: hwid = 'Opus Discovery'; break;
+                                    case 2: hwid = 'MGT DISCiPLE'; break; case 3: hwid = 'MGT +D'; break;
+                                    case 4: hwid = 'Rotronics Wafadrive'; break; case 5: hwid = 'TR-DOS (BetaDisk)'; break;
+                                    case 6: hwid = 'Byte Drive'; break; case 7: hwid = 'Watsford'; break;
+                                    case 8: hwid = 'FIZ'; break; case 9: hwid = 'Radofin'; break;
+                                    case 0xA: hwid = 'Didaktik disk drives'; break; case 0xB: hwid = 'BS-DOS (MB-02)'; break;
+                                    case 0xC: hwid = 'ZX Spectrum +3 disk drive'; break;
+                                    case 0xD: hwid = 'JLO (Oliger) disk interface'; break;
+                                    case 0xE: hwid = 'Timex FDD3000'; break; case 0xF: hwid = 'Zebra disk drive'; break;
+                                    case 0x10: hwid = 'Ramex Millenia'; break; case 0x11: hwid = 'Larken'; break;
+                                    case 0x12: hwid = 'Kempston disk interface'; break; case 0x13: hwid = 'Sandy'; break;
+                                    case 0x14: hwid = 'ZX Spectrum +3e hard disk'; break; case 0x15: hwid = 'ZXATASP'; break;
+                                    case 0x16: hwid = 'DivIDE'; break; case 0x17: hwid = 'ZXCF'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 2: hwtp = '[memory addon]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Sam Ram'; break; case 1: hwid = 'Multiface ONE'; break;
+                                    case 2: hwid = 'Multiface 128k'; break; case 3: hwid = 'Multiface +3'; break;
+                                    case 4: hwid = 'MultiPrint'; break; case 5: hwid = 'MB-02 ROM/RAM exp.'; break;
+                                    case 6: hwid = 'SoftROM'; break; case 7: hwid = '1k'; break; case 8: hwid = '16k'; break;
+                                    case 9: hwid = '48k'; break; case 10: hwid = 'memory in 8-16k used'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 3: hwtp = '[sound device]';
+                                switch (hwid) {
+                                    case 0: hwid = 'classic 128k ZX-compatible AY hw'; break;
+                                    case 1: hwid = 'Fuller Box AY hw'; break; case 2: hwid = 'Currah microSpeech'; break;
+                                    case 3: hwid = 'SpecDrum'; break; case 4: hwid = 'AY ACB (L:A+C R:B+C) stereo/Melodik'; break;
+                                    case 5: hwid = 'AY ABC (L:A+B R:B+C) stereo/Melodik'; break;
+                                    case 6: hwid = 'RAM Music Machine'; break; case 7: hwid = 'Covox'; break;
+                                    case 8: hwid = 'General Sound'; break; case 9: hwid = 'Intec Electronic Digital Interface B8001'; break;
+                                    case 0xA: hwid = 'Zon-X AY'; break; case 0xB: hwid = 'QuickSilva AY'; break;
+                                    case 0xC: hwid = 'Jupiter ACE'; break; default: hwid = '(unk.)'
+                                } break;
+                            case 4: hwtp = '[joystick]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Kempston'; break; case 1: hwid = 'Cursor/Protek/AGF'; break;
+                                    case 2: hwid = 'Sinclair 2 Left (12345)'; break; case 3: hwid = 'Sinclair 1 Right (67890)'; break;
+                                    case 4: hwid = 'Fuller'; break; default: hwid = '(unk.)'
+                                } break;
+                            case 5: hwtp = '[mouse]';
+                                switch (hwid) {
+                                    case 0: hwid = 'AMX mouse'; break; case 1: hwid = 'Kempston mouse'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 6: hwtp = '[controller]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Trickstick'; break; case 1: hwid = 'ZX Light Gun'; break;
+                                    case 2: hwid = 'Zebra Graphics Tablet'; break; case 3: hwid = 'Defender Light Gun'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 7: hwtp = '[serial port]';
+                                switch (hwid) {
+                                    case 0: hwid = 'ZX Interface I'; break; case 1: hwid = 'ZX Spectrum 128k'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 8: hwtp = '[parallel port]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Kempston S'; break; case 1: hwid = 'Kempston E'; break;
+                                    case 2: hwid = 'ZX Spectrum +3'; break; case 3: hwid = 'Tasman'; break;
+                                    case 4: hwid = "DK'Tronics"; break; case 5: hwid = 'Hilderbay'; break;
+                                    case 6: hwid = 'INES Printerface'; break; case 7: hwid = 'Z LPrint Interface 3'; break;
+                                    case 8: hwid = 'MultiPrint'; break; case 9: hwid = 'Opus Discovery'; break;
+                                    case 10: hwid = 'Standard 8255 chip with ports 31+63+95'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 9: hwtp = '[printer]';
+                                switch (hwid) {
+                                    case 0: hwid = 'ZX Printer/Alphacom 32 & compat.'; break;
+                                    case 1: hwid = 'Generic printer'; break; case 2: hwid = 'EPSON compat.'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0xA: hwtp = '[modem]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Prism VTX 5000'; break; case 1: hwid = 'T/S 2050/Westridge 2050'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0xB: hwtp = '[digitizer]';
+                                switch (hwid) {
+                                    case 0: hwid = 'RD Digital Tracer'; break; case 1: hwid = "DK'Tronics Light Pen"; break;
+                                    case 2: hwid = 'British MicroGraph Pad'; break; case 3: hwid = 'Romantic Robot Videoface'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0xC: hwtp = '[network adapter]';
+                                if (hwid == 0) hwid = 'ZX Interface I'; else hwid = '(unk.)'; break;
+                            case 0xD: hwtp = '[keyboard]';
+                                if (hwid == 0) hwid = 'Keypad for ZX Spectrum 128k'; else hwid = '(unk.)'; break;
+                            case 0xE: hwtp = '[AD/DA converter]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Harley Systems ADC 8.2'; break;
+                                    case 1: hwid = 'Blackboard Electronics'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0xF: hwtp = '[EEPROM programmer]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Orme Electronics'; break; case 1: hwid = 'Blackboard Electronics'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0x10: hwtp = '[GPU]';
+                                switch (hwid) {
+                                    case 0: hwid = 'WRX Hi-Res'; break; case 1: hwid = 'G007'; break; case 2: hwid = 'Memotech'; break;
+                                    case 3: hwid = 'Lambda Colour'; break; default: hwid = '(unk.)'
+                                } break;
+                        }
+                        switch (X.U8(p++)) {
+                            case 0: hw = hw.append('runs on ' + hwtp + ' ' + hwid); break;
+                            case 1: hw = hw.append('uses ' + hwtp + ' ' + hwid); break;
+                            case 2: hw = hw.append('runs w/o specifics of ' + hwtp + ' ' + hwid); break;
+                            case 3: hw = hw.append("won't run on " + hwtp + ' ' + hwid); break; default: break
+                        }
+                    } break;
+                case 0x35: p += 0x14 + X.U32(p + 0x10); break;
+                case 0x5A: if (!X.c("'XTape!'1A", p)) { end = true; p-- } else { x++; p += 9 } break;
+                case 0x16: case 0x17: p += X.U32(p); break;
+                case 0x34: p += 8; break;
+                case 0x40: sOption('snapshot'); p += 4 + X.U24(p + 1); break;
+                case 0x4B: ismsx = true; p += 4 + X.U32(p); break; //Kansas City Standard
+                default: end = true; p--;// ripper-ready! // bad = bad.addIfNone('!unkID')
+            }
+        }
+        if (ismsx) sName = "ZX Spectrum/MSX tape (.TSX)"; else sName = "ZX Spectrum tape (.TZX)";
+        if (bad.length) sVersion = sVersion.appendS('malformed' + bad, '/');
+        if (X.isVerbose()) {
+            sOptionT(title); if (x > 1) sOption(x, 'x'); sOptionT(auth, 'by:'); sOptionT(year, "'"); sOptionT(publisher, '(c) ');
+            sOptionT(lang, 'in:'); sOptionT(apptype, 'apptype:'); sOptionT(price, 'price:');
+            sOptionT(org, 'origin:'); sOptionT(protload, 'prot/ldr:'); sOption(hw);
+            sOptionT(addEllipsis(cmt, 0xA0)); sOptionT(addEllipsis(fnames.join(','), 0xA0), 'files:');
+            sOptionT(sel, 'choices:'); sOption(outSz(p), 'sz:')
+        }
+    }
+
+    else if (X.c("'UEF File!'00") && X.U8(0xB) <= 2) {
+        //ref http://electrem.emuunlim.com/UEFSpecs.html
+        sName = "Acorn PC Unified Emulator Format data (.UEF)"; bDetected = true;
+        sVersion = 'v' + X.U8(0xB) + '.' + X.U8(0xA);
+        var title = info = man = gear = kb = tp = '', interrupt = false;
+        for (p = 0xC; p < X.Sz();) {
+            var hkhd = X.U16(p), hksz = X.U32(p + 2);
+            if ([0, 1, 2, 3, 4, 0xFF].indexOf(hkhd >> 8) < 0) break; //unrelated info follows?
+            p += 6; switch (hkhd) {
+                case 0x0000: info = info.appendS(X.SA(p, hksz), '/'); break;
+                case 0x0001: man = man.appendS(X.SA(p, hksz), ' '); break;
+                case 0x0005: gear = 'Acorn ';
+                    switch (X.U8(p) >> 4) {
+                        case 0: gear += 'BBC Model A'; break; case 1: gear += 'Electron'; break;
+                        case 2: gear += 'BBC Model B'; break; case 3: gear += 'BBC Master'; break;
+                        case 4: gear += 'Atom'; break
+                    }
+                    switch (X.U8(p) & 0xF) {
+                        case 0: kb = 'any'; break; case 1: kb = 'target PC'; break; case 2: kb = 'host PC'; break
+                    }
+                    break;
+                case 0x0009: title = X.SA(p, hksz); break;
+                case 0x0101: case 0x0102: case 0x0103: case 0x0104:
+                case 0x0110: case 0x0111: case 0x0112: case 0x0113: case 0x0114: case 0x0115:
+                case 0x0116: case 0x0117: case 0x0120: case 0x0131:
+                    tp = tp.addIfNone('#tape'); break;
+                case 0x0130:
+                    switch (X.U8(p)) {
+                        case 0: t = 'unit'; break; case 1: t = 'tape'; break; case 2: t = 'disc'; break;
+                        case 3: t = 'vtape'; break; case 4: t = 'cartridge'; break; default: 'unk.media'
+                    }
+                    if (X.U8(p + 1) > 1) t += ' ×' + X.U8(p + 1);
+                    if (X.U8(p + 2) > 1) t += (X.U8(p) == 1 || X.U8(p) == 3) ? ' ch:' : X.U8(p) == 2 ? ' ' + X.U8(p + 2) + ' audiotracks' : '..?';
+                    info += ' #' + t; break;
+                case 0x0200: case 0x0201: case 0x0202: tp = tp.addIfNone('#disc'); break;
+                case 0x0300: tp = tp.addIfNone('#ROM');
+                    t = 'content:';
+                    switch (X.U8(p)) {
+                        case 0: t += 'generic'; break; case 1: t += 'OS'; break; case 2: t += 'BASIC'; break;
+                        case 3: t += 'language'; break; case 4: t += 'utility'; break; case 5: t += 'filing system'; break;
+                        case 6: t += 'h/w driver'; break; case 7: t += 'game'; break; default: t += 'unk'
+                    } info += ' #' + t; break;
+                case 0x0301: tp = tp.addIfNone('#ROM'); break;
+                case 0x0400: case 0x0401: case 0x0402: case 0x0403:
+                case 0x0410: case 0x0411: case 0x0412: case 0x0420:
+                    tp = tp.addIfNone('#snapshot'); break;
+                case 0xFF00: info += '#emu:' + X.SA(p, hksz); break;
+                case 0x0100: break; //the "implicit data chunk"! eh?
+                default:
+                    if (hkhd > 0xFF00) tp = tp.addIfNone('#customdata');
+                    else interrupt = true // unknown chunk = unrelated tailing data?
+            }
+            if (interrupt) { p -= 6; break }
+            //_log(Hex(p-6)+' > '+Hex(hkhd));
+            p += hksz
+        }
+        sVersion += tp;
+        if (X.isVerbose()) {
+            sOption(title); sOptionT(info, 'info:'); sOptionT(man, 'manual:');
+            sOptionT(gear, 'gear:'); sOptionT(kb, 'layout:');
+            sOption(outSz(p), 'sz:')
+        }
+    }
+
+    else if (X.c("'UNIF'???????? 0000 0000 0000 0000 0000 0000 0000") && (X.Sz() > 32)) {
+        sName = "UNIF NES cartridge (.UNF)"; sVersion = "v" + X.U32(4, _LE); bDetected = true;
+        if (X.isVerbose()) {
+            p = 8;
+            t = ''; mapr = ''; tv = ''; ex = ''; fstorage = lastchunk = false;
+            while (p < X.Sz() && !lastchunk) {
+                var hkhd = X.SA(p, 4), hksz = X.U32(p + 4); p += 0x08;
+                switch (hkhd) {
+                    case "MAPR": mapr = X.SA(p, hksz); break;
+                    case "NAME": t = X.SA(p, hksz); break;
+                    case "TCVI": switch (X.U8(p)) {
+                        case 0: tv = "NTSC"; break;
+                        case 1: tv = "PAL"; break;
+                        case 2: tv = "NTSC/PAL"
+                    }
+                        break;
+                    case "CTRL":
+                        var exa = [], bm = X.U8(p);
+                        if (bm & 1) exa.push("Std. Controller");
+                        if (bm & 2) exa.push("Zapper");
+                        if (bm & 4) exa.push("R.O.B.");
+                        if (bm & 8) exa.push("Arkanoid Controller");
+                        if (bm & 0x10) exa.push("Power Pad");
+                        if (bm & 0x20) exa.push("Four Score");
+                        if (bm) ex = "#" + exa.join("+");
+                        break;
+                    case "BATR": fstorage = true; break;
+                    case "MIRR": lastchunk = true; break
                 }
-                sOptionT(t);
-                sOption(tv);
-                sOption(ex, 'expansion: ');
-                if (fstorage) sOption('battery-backed RAM');
-                if (lastchunk) sOption(outSz(p), 'sz:'); else sVersion += '/malformed!short'
+                p += hksz;
             }
+            sOptionT(t);
+            sOption(tv);
+            sOption(ex, 'expansion: ');
+            if (fstorage) sOption('battery-backed RAM');
+            if (lastchunk) sOption(outSz(p), 'sz:'); else sVersion += '/malformed!short'
         }
+    }
 
-        else if (X.c("'g GCE 198'..80")) {
-            sName = "GCE Vectrex cartridge (.VEC)"; bDetected = true;
-            if (X.isVerbose()) {
-                p = X.fSig(0x11, 0x20, "80"); if (p > 0) sOption(X.SA(0x11, p - 0x11))
-            }
+    else if (X.c("'g GCE 198'..80")) {
+        sName = "GCE Vectrex cartridge (.VEC)"; bDetected = true;
+        if (X.isVerbose()) {
+            p = X.fSig(0x11, 0x20, "80"); if (p > 0) sOption(X.SA(0x11, p - 0x11))
         }
+    }
 
-        else if (X.c("'VICE Snapshot File'1A")) {
-            sName = "C64 VICE emulator snapshot (.VSF)"; bDetected = 1;
-            sVersion = 'v' + X.U8(0x13) + '.' + X.U8(0x14).padStart(2, '0');
-            p = 0x25; bad = ''
-            while (p < X.Sz()) {
-                var hkhd = X.SA(p, 0x10), hksz = X.U32(p + 0x12, _BE);
-                if (!/([A-Z0-9-]{3,}|Acia1)/.test(hkhd) || !isAllZeroes(p + hkhd.length, 0x10 - hkhd.length)) {
-                    bad = bad.addIfNone('badchunk'); break
-                } else p += hksz;
-            }
-            if (X.isVerbose()) sOptions = X.SA(0x15, 0xF) + ' sz:' + outSz(sz);
-            else if (p > X.Sz()) bad = bad.addIfNone('!short');
-            if (bad != '') sVersion = sVersion.appendS('/malformed' + bad, '/')
+    else if (X.c("'VICE Snapshot File'1A")) {
+        sName = "C64 VICE emulator snapshot (.VSF)"; bDetected = 1;
+        sVersion = 'v' + X.U8(0x13) + '.' + X.U8(0x14).padStart(2, '0');
+        p = 0x25; bad = ''
+        while (p < X.Sz()) {
+            var hkhd = X.SA(p, 0x10), hksz = X.U32(p + 0x12, _BE);
+            if (!/([A-Z0-9-]{3,}|Acia1)/.test(hkhd) || !isAllZeroes(p + hkhd.length, 0x10 - hkhd.length)) {
+                bad = bad.addIfNone('badchunk'); break
+            } else p += hksz;
         }
+        if (X.isVerbose()) sOptions = X.SA(0x15, 0xF) + ' sz:' + outSz(sz);
+        else if (p > X.Sz()) bad = bad.addIfNone('!short');
+        if (bad != '') sVersion = sVersion.appendS('/malformed' + bad, '/')
+    }
 
     function isWAD() {
         //ref https://doomwiki.org/wiki/WAD
