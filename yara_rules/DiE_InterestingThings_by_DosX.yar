@@ -133,6 +133,17 @@ rule Packer__SimplePack {
         )
 }
 
+rule Packer__BoxedApp {
+    condition:
+        IsPE and
+        IsNative and (
+            for any i in (0..pe.number_of_sections - 1) : (
+                pe.sections[i].name == ".bxpck" and
+                pe.sections[i + 1].name == ".main"
+            )
+        )
+}
+
 rule Packer__py2exe {
     condition:
         IsPE and
