@@ -719,9 +719,9 @@ function funSampleName(n, ctx) {
 	n = n.toString();
 	if(n.trim() == '') return false;
 	if(n.endsWithCI('.wav') || n.endsWithCI('.smp') || n.endsWithCI('.iff')) bore++;
-	if(n.beginsWithCI('ST-') || n.beginsWithCI('df0:')) bore++;
+	if(n.startsWithCI('ST-') || n.startsWithCI('df0:')) bore++;
 	if(/^\d+$/.test(n)) bore++;
-	if(n.beginsWithCI('#')) fun += 5;
+	if(n.startsWithCI('#')) fun += 5;
 	if(/^\s*(unnamed|dr[u]?m\d*|loop\s*\d*|strings?\s*\d*|bass\s*\d*|guitar\s*\d*|snare\s*\d*|piano)\s*$/i.test(n)
 	|| /^\s*(trumpet\s*\d*|bells\s*|synth\s*[0-9iv]*|shaker|banjo|lead|syn\d+|\w*\s*hihat|organ\s*\d*)\s*$/i.test(n)
 	|| /^\s*(voice\s*\d+|crash|cymbal\s*\d*|wonderpad\s*[0-9iv]+|tambourine\s*[0-9iv]*|tamb\d+)\s*$/i.test(n)
@@ -825,6 +825,33 @@ function _logIt(msg) {
     	lineMatch = callerLine.match(/:(\d+)(?!.*:)/),
     	lineNum = lineMatch ? lineMatch[1] : "?";
     _log(fnName + (lineNum == "?" ? "" : ": " + lineNum) + (!msg.length ? "" : ": " + msg));
+}
+
+/** A class that'll help profile overly long scripts until Qt offers better tools!
+ * Counts timings between the timer.next calls, outputs if too many milliseconds passed.
+ * @example
+ * var timer = new CheckpointTimer();
+ * timer.init(100);
+ * heavycode1();
+ * timer.next('after heavycode1:');
+ * heavycode2();
+ * timer.next('after heavycode2:')
+*/
+function CheckpointTimer() {
+	this.last = 0;
+	this.min = 100; // milliseconds
+
+	this.init = function(min) {
+		this.last = new Date().getTime();
+		if (typeof min == 'number' && min >= 0) this.min = min;
+	}
+
+	this.next = function(msg) {
+		var now = new Date().getTime();
+		var delta = now - this.last;
+		if (delta >= this.min) _setResult('prof', msg, '', delta + " ms passed");
+		this.last = now;
+	}
 }
 
 /* beautify ignore:end */

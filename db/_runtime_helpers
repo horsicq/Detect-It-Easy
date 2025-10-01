@@ -56,59 +56,32 @@ String.prototype.addIfNone = function (substring) {
 
 
 // Some ECMA6 functions that should be removed if DIE transitions to it
-String.prototype.beginsWith = function (searchString, position) {
-    var str = String(this);
-    var pos = (typeof position === "number") ? Math.min(searchString.length, position) : 0;
-
-    if (searchString.length > str.length - pos) {
-        return false;
-    }
-
-    return str.slice(pos, pos + searchString.length) === searchString;
+if(!String.prototype.startsWith) String.prototype.startsWith = function (s, min) {
+    // the default case-sensitive version of startsWith
+    var m = (typeof min == "number") ? Math.min(s.length, min) : 0;
+    if (s.length > this.length - m) return false; else return this.slice(m, s.length) == s;
 }
 
-
-String.prototype.beginsWithCI = function (searchString, position) {
-    var str = String(this).toLowerCase();
-    var search = String(searchString).toLowerCase();
-    return str.beginsWith(search, position);
+String.prototype.startsWithCI = function (s, min) {
+    // case-insensitive version of startsWith
+    return this.toLowerCase().startsWith(s.toLowerCase(), min);
 }
 
-
-String.prototype.endsWith = function (searchString, length) {
-    var str = String(this);
-    var len = (typeof length === "number") ? Math.min(str.length, length) : str.length;
-
-    if (searchString.length > len) {
-        return false;
-    }
-
-    return str.slice(len - searchString.length, len) === searchString;
+if(!String.prototype.endsWith) String.prototype.endsWith = function (s, max) {
+    // the default case-sensitive version of endsWith
+    var m = (typeof max == "number") ? Math.min(this.length, max) : this.length;
+    if (s.length > m) return false; else return this.slice(m - s.length, m) == s;
 }
 
-
-String.prototype.endsWithCI = function (searchString, length) {
-    var str = String(this).toLowerCase();
-    var search = String(searchString).toLowerCase();
-    return str.endsWith(search, length);
+String.prototype.endsWithCI = function (s, max) {
+    // the case-insensitive version of endsWith
+    return this.toLowerCase().endsWith(s.toLowerCase(), max);
 }
 
-
-String.prototype.repeat = function (count) {
-    if (typeof count !== "number" || count < 1) {
-        return String(this);
-    }
-
-    var str = String(this);
-    var result = str;
-
-    for (var i = 1; i < count; i++) {
-        result += str;
-    }
-
-    return result;
+if (!String.prototype.repeat) String.prototype.repeat = function (num) {
+    if (typeof num !== "number") return this;
+    var s = this; for (var i = 1; i < num; i++) s += this; return s;
 }
-
 
 /**
  * Pad the start of a line with spaces or the character given.
@@ -119,94 +92,75 @@ String.prototype.repeat = function (count) {
  * @example
  * var a = 12; ...; if("aba12" === a.padStart(5,"ab")) ...
  */
-String.prototype.padStart = function (targetLength, padString) {
-    var str = String(this);
+if (!String.prototype.padStart) String.prototype.padStart = function (targetLength, padString) {
+    var s = this.valueOf();
 
-    // Normalize targetLength to integer >= 0
-    var desiredLength = parseInt(targetLength, 10) || 0;
-    if (desiredLength <= str.length) return str;
+    targetLength >>= 0; // truncate if number or convert non-number to 0;
+    padString = String(padString || ' ');
 
-    var pad = (typeof padString === 'string') ? padString : ' ';
-    if (pad === '') return str; // nothing to pad with
-
-    var fillCount = desiredLength - str.length;
-
-    // Build padding by repeating pad until long enough (efficient doubling)
-    var repeatedPad = pad;
-    while (repeatedPad.length < fillCount) {
-        repeatedPad += repeatedPad;
+    if (s.length >= targetLength) {
+        return String(s);
     }
 
-    return repeatedPad.slice(0, fillCount) + str;
-}
-
-
-Number.prototype.padStart = function (targetLength, padString) {
-    // Convert number to string and reuse String.padStart implementation
-    return String.prototype.padStart.call(this.valueOf().toString(), targetLength, padString);
-}
-
-
-Number.prototype.clamp = function (min, max) {
-    return Math.min(Math.max(this.valueOf(), min), max);
-}
-
-
-String.prototype.replaceAll = function (searchValue, replaceValue) {
-    // keep legacy behavior when types are not strings
-    if (typeof searchValue !== 'string' || typeof replaceValue !== 'string') return '?' + searchValue;
-
-    var source = String(this);
-    // if searchValue is empty string, return original string (avoid infinite loop / splitting into chars)
-    if (searchValue === '') return source;
-
-    // simple and efficient implementation using split/join
-    return source.split(searchValue).join(replaceValue);
-}
-
-
-// ES2016 Array.prototype.includes polyfill (handles NaN with SameValueZero comparison)
-Array.prototype.includes = function (searchElement, fromIndex) {
-    if (this == null) {
-        return false;
+    targetLength -= s.length;
+    if (targetLength > padString.length) {
+        padString += padString.repeat(Math.ceil(targetLength / padString.length));
+        // append to original to ensure we are longer than needed
     }
 
-    var array = Object(this);
-    var length = array.length >>> 0;
+    return padString.slice(0, targetLength) + String(s);
+}
 
-    if (length === 0) {
-        return false;
+if (!Number.prototype.padStart) Number.prototype.padStart = function (targetLength, padString) {
+    var s = this.valueOf().toString();
+
+    targetLength >>= 0; // truncate if number or convert non-number to 0;
+    padString = String(padString || ' ');
+
+    if (s.length >= targetLength) return s;
+
+    targetLength -= s.length;
+    if (targetLength > padString.length) {
+        padString += padString.repeat(Math.ceil(targetLength / padString.length));
+        // append to original to ensure we are longer than needed
     }
 
-    var startIndex = fromIndex | 0; // convert to integer
-    var index = startIndex >= 0 ? startIndex : Math.max(length + startIndex, 0);
+    return padString.slice(0, targetLength) + s;
+}
 
-    for (; index < length; index++) {
-        var currentElement = array[index];
+if(!Number.prototype.clamp) Number.prototype.clamp = function (min, max) { return Math.min(Math.max(this, min), max) }
 
-        // SameValueZero comparison: treats NaN as equal to NaN
-        if (searchElement === currentElement ||
-            (searchElement !== searchElement && currentElement !== currentElement)) {
-            return true;
-        }
+if(!String.prototype.replaceAll) String.prototype.replaceAll = function (s, r) {
+    if (typeof s != 'string' || typeof r != 'string') return '?' + s;
+    var o = '';
+    for (var i = 0; i < this.length; i++) {
+        if (this.slice(i, i + s.length) == s) { o += r; i += s.length - 1 } else o += this[i];
     }
+    return o;
+}
 
+if (!Array.prototype.includes) { Array.prototype.includes = function (searchElement, fromIndex) {
+    if (this == null) throw new TypeError('"this" is null or not defined');
+    var o = Object(this);
+    var len = o.length >>> 0;
+    if (len === 0) return false;
+
+    var n = fromIndex | 0;
+    var k = Math.max(n >= 0 ? n : len - Math.abs(n), 0);
+
+    while (k < len) {
+      var element = o[k];
+      if (element === searchElement || (typeof element === 'number' && typeof searchElement === 'number' && isNaN(element) && isNaN(searchElement))) {
+        return true;
+      }
+      k++;
+    }
     return false;
+  };
 }
 
-
-// String.prototype.includes: ES2015 polyfill using indexOf
-String.prototype.includes = function (searchString, position) {
-    if (typeof searchString !== 'string') {
-        return false;
-    }
-
-    var str = String(this);
-    var pos = 0;
-
-    if (position !== undefined && !isNaN(position)) {
-        pos = Math.max(0, Number(position));
-    }
-
-    return str.indexOf(searchString, pos) !== -1;
-}
+if (!String.prototype.includes) String.prototype.includes = function (search, start) {
+    if (typeof start !== 'number') start = 0;
+    if (start + search.length > this.length) return false;
+    return this.indexOf(search, start) !== -1;
+  };
