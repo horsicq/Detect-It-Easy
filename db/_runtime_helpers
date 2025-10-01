@@ -1,0 +1,212 @@
+// Detect It Easy: DiE-JS framework file
+// Don't change anything unless you're sure about what you're doing
+
+/**
+ * Attaches new strings to `this`, separating everything with a comma and no space.
+ * @param {String...} the open list of strings to append.
+ */
+String.prototype.append = function () {
+    var str = String(this);
+    var separator = ", ";
+
+    if (arguments.length > 0) {
+        if (str.length > 0) {
+            str += separator;
+        }
+        str += Array.prototype.join.call(arguments, separator);
+    }
+
+    return str;
+}
+
+
+/**
+ * Append a string with a custom separator.
+ * @param {String} stringToAppend - String to append.
+ * @param {String} [separator=", "] - Separator string.
+ * @returns {String} The new string.
+ * @global
+ * @example
+ * sOptions = sOptions.appendS("debug","::");
+ */
+String.prototype.appendS = function (stringToAppend, separator) {
+    var str = String(this);
+    var sep = (typeof separator === "string") ? separator : ", ";
+
+    if (stringToAppend) {
+        if (str.length > 0) {
+            str += sep;
+        }
+        str += stringToAppend;
+    }
+
+    return str;
+}
+
+
+String.prototype.addIfNone = function (substring) {
+    var str = String(this);
+
+    if (substring && str.indexOf(substring) < 0) {
+        str += substring;
+    }
+
+    return str;
+}
+
+
+// Some ECMA6 functions that should be removed if DIE transitions to it
+String.prototype.beginsWith = function (searchString, position) {
+    var str = String(this);
+    var pos = (typeof position === "number") ? Math.min(searchString.length, position) : 0;
+
+    if (searchString.length > str.length - pos) {
+        return false;
+    }
+
+    return str.slice(pos, pos + searchString.length) === searchString;
+}
+
+
+String.prototype.beginsWithCI = function (searchString, position) {
+    var str = String(this).toLowerCase();
+    var search = String(searchString).toLowerCase();
+    return str.beginsWith(search, position);
+}
+
+
+String.prototype.endsWith = function (searchString, length) {
+    var str = String(this);
+    var len = (typeof length === "number") ? Math.min(str.length, length) : str.length;
+
+    if (searchString.length > len) {
+        return false;
+    }
+
+    return str.slice(len - searchString.length, len) === searchString;
+}
+
+
+String.prototype.endsWithCI = function (searchString, length) {
+    var str = String(this).toLowerCase();
+    var search = String(searchString).toLowerCase();
+    return str.endsWith(search, length);
+}
+
+
+String.prototype.repeat = function (count) {
+    if (typeof count !== "number" || count < 1) {
+        return String(this);
+    }
+
+    var str = String(this);
+    var result = str;
+
+    for (var i = 1; i < count; i++) {
+        result += str;
+    }
+
+    return result;
+}
+
+
+/**
+ * Pad the start of a line with spaces or the character given.
+ * @param {String or Number} The width desired.
+ * @param {Number} [nPad=" "] The padding string. Loops.
+ * @returns {String} The new string.
+ * @global
+ * @example
+ * var a = 12; ...; if("aba12" === a.padStart(5,"ab")) ...
+ */
+String.prototype.padStart = function (targetLength, padString) {
+    var str = String(this);
+
+    // Normalize targetLength to integer >= 0
+    var desiredLength = parseInt(targetLength, 10) || 0;
+    if (desiredLength <= str.length) return str;
+
+    var pad = (typeof padString === 'string') ? padString : ' ';
+    if (pad === '') return str; // nothing to pad with
+
+    var fillCount = desiredLength - str.length;
+
+    // Build padding by repeating pad until long enough (efficient doubling)
+    var repeatedPad = pad;
+    while (repeatedPad.length < fillCount) {
+        repeatedPad += repeatedPad;
+    }
+
+    return repeatedPad.slice(0, fillCount) + str;
+}
+
+
+Number.prototype.padStart = function (targetLength, padString) {
+    // Convert number to string and reuse String.padStart implementation
+    return String.prototype.padStart.call(this.valueOf().toString(), targetLength, padString);
+}
+
+
+Number.prototype.clamp = function (min, max) {
+    return Math.min(Math.max(this.valueOf(), min), max);
+}
+
+
+String.prototype.replaceAll = function (searchValue, replaceValue) {
+    // keep legacy behavior when types are not strings
+    if (typeof searchValue !== 'string' || typeof replaceValue !== 'string') return '?' + searchValue;
+
+    var source = String(this);
+    // if searchValue is empty string, return original string (avoid infinite loop / splitting into chars)
+    if (searchValue === '') return source;
+
+    // simple and efficient implementation using split/join
+    return source.split(searchValue).join(replaceValue);
+}
+
+
+// ES2016 Array.prototype.includes polyfill (handles NaN with SameValueZero comparison)
+Array.prototype.includes = function (searchElement, fromIndex) {
+    if (this == null) {
+        return false;
+    }
+
+    var array = Object(this);
+    var length = array.length >>> 0;
+
+    if (length === 0) {
+        return false;
+    }
+
+    var startIndex = fromIndex | 0; // convert to integer
+    var index = startIndex >= 0 ? startIndex : Math.max(length + startIndex, 0);
+
+    for (; index < length; index++) {
+        var currentElement = array[index];
+
+        // SameValueZero comparison: treats NaN as equal to NaN
+        if (searchElement === currentElement ||
+            (searchElement !== searchElement && currentElement !== currentElement)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+// String.prototype.includes: ES2015 polyfill using indexOf
+String.prototype.includes = function (searchString, position) {
+    if (typeof searchString !== 'string') {
+        return false;
+    }
+
+    var str = String(this);
+    var pos = 0;
+
+    if (position !== undefined && !isNaN(position)) {
+        pos = Math.max(0, Number(position));
+    }
+
+    return str.indexOf(searchString, pos) !== -1;
+}
