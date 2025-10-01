@@ -133,6 +133,14 @@ rule Packer__SimplePack {
         )
 }
 
+rule Packer__py2exe {
+    condition:
+        IsPE and
+        IsNative and
+        not IsDll and
+        pe.exports("PyArg_ParseTuple")
+}
+
 rule Protection__obfus_h {
     condition:
         IsPE and
