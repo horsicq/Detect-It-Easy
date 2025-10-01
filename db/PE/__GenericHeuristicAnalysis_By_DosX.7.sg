@@ -3673,6 +3673,22 @@ function scanForObfuscations_Native() {
 
 
 
+    // Check for TLS (Thread Local Storage) with a bad entry point (like INT3 or RET). Trick to hide the real EP. (like BoxedApp)
+
+    var isTlsWithBadEpPresent = false;
+
+    if (PE.isTLSPresent() && (
+        /^INT( )?3$/.test(getAsmOpCode(getFirstEpAsmInstruction())) || // INT3 (0xCC) / INT 3 (0xCD 0x03)
+        /^RET( \d+)?/.test(getAsmOpCode(getFirstEpAsmInstruction())) // All types of RET
+    )) {
+        isTlsWithBadEpPresent = true;
+    }
+
+    if (isTlsWithBadEpPresent) options += (options ? " + " : String()) + "TLS hidden EP";
+
+
+
+
     // Check for multiple JMPs leading to each other
 
     var proxyJumpsAtEpPresent = false;
