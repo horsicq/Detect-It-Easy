@@ -4052,7 +4052,7 @@ function getInstructionsAsmPattern(instruction) {
  * @returns {string} The disassembled string of the first instruction at the entry point.
  */
 function getFirstEpAsmInstruction() {
-    return PE.getAsmInstructionByIndex(0);
+    return getAsmInstructionByIndex(0);
     // return PE.getDisasmString(PE.OffsetToVA(PE.getEntryPointOffset()));
 }
 
@@ -4096,7 +4096,8 @@ function isItemMangled(itemPattern) {
     return (
         (itemPattern[0] === '?' && (itemPattern.indexOf("@@") !== -1 || itemPattern[1] === '?')) || // MSVC mangling: starts with '?' and contains "@@" or has double '?'
         (itemPattern.substring(0, 2) === "_Z") ||                                                   // GNU mangling: starts with "_Z"
-        (itemPattern[0] === '@' && itemPattern.indexOf('$') !== -1)                                 // Borland C++ mangling: starts with '@' and contains '$'
+        (itemPattern[0] === '@' && itemPattern.indexOf('$') !== -1) ||                              // Borland C++ mangling: starts with '@' and contains '$'
+        (itemPattern[0] === '$' && (itemPattern[1] === 's' || itemPattern[1] === 'S'))              // Swift mangling: starts with '$s' or '$S'
     );
 }
 
@@ -4128,6 +4129,11 @@ function getManglerNameByMangledItem(itemPattern) {
         return "Borland C++";
     }
 
+    // Swift
+    if (itemPattern[0] === '$' && (itemPattern[1] === 's' || itemPattern[1] === 'S')) {
+        return "Swift";
+    }
+
     return undefined;
 }
 
@@ -4139,6 +4145,7 @@ function getManglerNameByMangledItem(itemPattern) {
  * This function handles both Microsoft Visual C++ (MSVC) and GNU C++ (GCC) name mangling schemes:
  * - MSVC mangled names start with '?' and include patterns for functions, constructors, destructors, operators, and templates
  * - GCC mangled names start with '_Z' and include patterns for STL functions, namespaced functions, and regular functions
+ * - Swift mangled names start with '$s' or '$S' and include patterns for types, functions, properties, and protocols
  * 
  * @param {string} itemPattern - The mangled symbol name to decode
  * @returns {string} The unmangled function/symbol name, or the original pattern if it's not mangled or cannot be decoded
@@ -4160,6 +4167,12 @@ function getManglerNameByMangledItem(itemPattern) {
  * getNameOfMangledItem('@func$qi') // returns 'func'
  * getNameOfMangledItem('@Class@method$qpc') // returns 'method'
  * getNameOfMangledItem('@Class@$bctr$qi') // returns 'Class' (constructor)
+ * 
+ * @example
+ * // Swift examples
+ * getNameOfMangledItem('$s11MaskStorages4SIMDPTl') // returns 'SIMD'
+ * getNameOfMangledItem('$ss9_IndexBoxC6_unboxqd__SgySLRd__lF') // returns '_unbox'
+ * getNameOfMangledItem('$sSn11descriptionSSvpMV') // returns 'description'
  */
 function getNameOfMangledItem(itemPattern) {
     if (!isItemMangled(itemPattern)) {
@@ -4314,6 +4327,120 @@ function getNameOfMangledItem(itemPattern) {
 
             // Regular method
             return methodName;
+        }
+    }
+
+    // Swift mangled names start with '$s' or '$S'
+    if (itemPattern[0] === '$' && (itemPattern[1] === 's' || itemPattern[1] === 'S')) {
+        var pos = 2,
+            identifiers = [];
+
+        // Parse length-prefixed identifier
+        function parseIdentifier(str, startPos) {
+            if (startPos >= str.length || !/^\d/.test(str[startPos])) {
+                return null;
+            }
+
+            var match = str.substring(startPos).match(/^(\d+)/);
+            if (!match) return null;
+
+            var len = parseInt(match[1], 10),
+                digitLen = match[1].length;
+
+            if (startPos + digitLen + len > str.length) {
+                return null;
+            }
+
+            return {
+                name: str.substring(startPos + digitLen, startPos + digitLen + len),
+                nextPos: startPos + digitLen + len
+            };
+        }
+
+        // Parse ALL length-prefixed identifiers, skipping markers/types/substitutions
+        // We want to collect ALL readable names and return the last one
+        var loopLimit = 50; // Safety limit to prevent infinite loops
+
+        while (pos < itemPattern.length && loopLimit-- > 0) {
+            var char = itemPattern[pos];
+
+            // Try to parse length-prefixed identifier
+            if (/^\d/.test(char)) {
+                var result = parseIdentifier(itemPattern, pos);
+                if (result) {
+                    identifiers.push(result.name);
+                    pos = result.nextPos;
+                    continue;
+                }
+            }
+
+            // Skip substitution references (x, q, y, z and combinations like qd__, yz, etc.)
+            if (/^[xqyz]/.test(char)) {
+                pos++;
+                // Skip additional substitution characters
+                while (pos < itemPattern.length && /^[xqyzd_0-9]/.test(itemPattern[pos])) {
+                    pos++;
+                }
+                continue;
+            }
+
+            // Skip single-letter markers if followed by digit or known pattern
+            if (/^[a-zA-Z]$/.test(char)) {
+                var nextChar = pos + 1 < itemPattern.length ? itemPattern[pos + 1] : '';
+
+                // Check for stdlib type codes (2 letters starting with S)
+                if (char === 'S' && /^[a-zA-Z]/.test(nextChar)) {
+                    var afterStdlib = pos + 2 < itemPattern.length ? itemPattern[pos + 2] : '';
+                    // If after stdlib type there's a marker + digit, skip stdlib and continue
+                    if (/^[a-z]$/.test(afterStdlib)) {
+                        var afterMarker = pos + 3 < itemPattern.length ? itemPattern[pos + 3] : '';
+                        if (/^\d/.test(afterMarker)) {
+                            pos += 3; // Skip Sx + marker
+                            continue;
+                        }
+                    }
+                    // If directly followed by digit, skip stdlib type
+                    if (/^\d/.test(afterStdlib)) {
+                        pos += 2;
+                        continue;
+                    }
+                }
+
+                // Single letter followed by digit - skip it
+                if (/^\d/.test(nextChar)) {
+                    pos++;
+                    continue;
+                }
+            }
+
+            // Can't parse further - stop
+            break;
+        }
+
+        // Return the last identifier (most specific name)
+        if (identifiers.length > 0) {
+            return identifiers[identifiers.length - 1];
+        }
+
+        // Fallback: check for stdlib type codes at current position
+        if (pos < itemPattern.length && itemPattern[pos] === 'S' && pos + 1 < itemPattern.length) {
+            var typeCode = itemPattern.substring(pos, pos + 2);
+            var stdlibTypes = {
+                'Sa': 'Array', 'Sb': 'Bool', 'Sc': 'UnicodeScalar', 'Sd': 'Double',
+                'Sf': 'Float', 'Sg': 'Optional', 'Sh': 'Set', 'Si': 'Int',
+                'SL': 'Collection', 'Sl': 'Slice', 'Sm': 'Mirror', 'Sn': 'Numeric',
+                'So': 'ObjectiveC', 'Sp': 'UnsafePointer', 'Sq': 'Optional',
+                'SR': 'Sequence', 'Sr': 'UnsafeRawPointer', 'Ss': 'String',
+                'SS': 'String', 'St': 'Range', 'ST': 'Equatable', 'Su': 'UInt',
+                'Sv': 'UnsafeRawBufferPointer', 'Sw': 'UnsafeBufferPointer',
+                'Sx': 'Strideable', 'SY': 'RawRepresentable', 'Sy': 'RawRepresentable',
+                'Sz': 'BinaryInteger', 'SD': 'Dictionary', 'SE': 'Encodable',
+                'SH': 'Hashable', 'Sk': 'KeyPath', 'SK': 'KeyPath'
+            };
+
+            if (stdlibTypes[typeCode]) {
+                return stdlibTypes[typeCode];
+            }
         }
     }
 
