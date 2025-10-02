@@ -2032,11 +2032,11 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isStrangeCallOrJmpPresent = false;
 
-    var firstOpCode = getAsmOpCode(getAsmInstructionByIndex(0));
+    var firstOpCode = getAsmOpCode(getFirstEpAsmInstruction());
 
     if (!PE.isDll()) {
         if (isLastSectionEP && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
-            log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + getAsmInstructionByIndex(0).split(" ")[1].toLowerCase());
+            log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + getFirstEpAsmInstruction().split(" ")[1].toLowerCase());
 
             isStrangeCallOrJmpPresent = true;
         }
@@ -3979,6 +3979,8 @@ function getEpAsmPattern(onlyOpCodes, numberOf) {
 
 
 
+var epAsmInstructions = [];
+
 /**
  * Retrieves the assembly instruction at the specified index from the entry point of a PE file.
  *
@@ -3986,6 +3988,11 @@ function getEpAsmPattern(onlyOpCodes, numberOf) {
  * @returns {string} The assembly instruction at the specified index.
  */
 function getAsmInstructionByIndex(index) {
+    // Check if the instruction is already cached
+    if (epAsmInstructions[index] !== undefined) {
+        return epAsmInstructions[index];
+    }
+
     // Get the address of the entry point
     var disasmAddress = PE.getAddressOfEntryPoint();
 
@@ -3997,10 +4004,15 @@ function getAsmInstructionByIndex(index) {
             disasmAddress = PE.getDisasmNextAddress(disasmAddress);
         }
 
+        // Cache the instruction if it hasn't been cached yet
+        if (epAsmInstructions[i] === undefined) {
+            epAsmInstructions[i] = PE.getDisasmString(disasmAddress);
+        }
+
         // If the current iteration matches the specified index, retrieve the instruction
         if (i === index) {
-            // Return the assembly instruction
-            return PE.getDisasmString(disasmAddress);
+            // Return the assembly instruction from cache
+            return epAsmInstructions[index];
         }
     }
 }
