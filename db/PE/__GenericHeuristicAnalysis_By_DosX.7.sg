@@ -2203,7 +2203,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Crunch", "2.0", "BitArts"],
         ["CrypToCrack", null, ".ccp3p"],
         ["DxPack", "1.0", "coderpub"],
-        ["Enigma", null, /^\.enigma[1-2]$/], // https://enigmaprotector.com/
+        ["Enigma", null, /^\.enigma[12]$/], // https://enigmaprotector.com/
         ["Epack", null, "!EPack"],
         ["Eronana", null, ".packer"],
         ["FishPE Shield", null, ".FishPE"],
@@ -2212,13 +2212,13 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["JDPack", null, ".jdpack"],
         ["Krypton", null, "YADO"],
         ["MEW", null, "MEW"],
-        ["MPRESS", null, /^\.MPRESS[1-2]$/], // https://www.autohotkey.com/mpress/mpress_web.htm
+        ["MPRESS", null, /^\.MPRESS[12]$/], // https://www.autohotkey.com/mpress/mpress_web.htm
         ["MaskPE", null, ".MaskPE"],
         ["Morphnah", "1.0.X", ".nah"],
-        ["NakedPacker", null, /^\.naked[1-2]$/],
+        ["NakedPacker", null, /^\.naked[12]$/],
         ["NativeCryptor", null, /^(NATIVES|CONFIG|(F)?CRYPT)~$/],
         ["NeoLite", null, ".neolite"],
-        ["NsPack", null, [/^(\.)?nsp[0-1]$/, ".Packer!"]], // https://nspack.apponic.com/
+        ["NsPack", null, [/^(\.)?nsp[01]$/, /^PE[Pp][01]$/, ".Packer!"]], // https://nspack.apponic.com/
         ["PE Diminisher", null, ".teraphy"], // https://web.archive.org/web/20060111104142/http://www.exetools.com/files/compressors/win/ped.zip
         ["PE-PACK", "1.0", "PEPACK!!"],
         ["PE-SHiELD", null, "PESHiELD"], // https://webscene.ir/tools/show/PE-SHIELD-0.25
@@ -3597,10 +3597,9 @@ function scanForObfuscations_Native() {
         isStartsWithNop = true;
     } else {
         // Then check for all functional NOP equivalents that have different opcodes
-        for (var i = 0; i < nopEquivalents.length; i++) {
+        for (var i = 0; i < nopEquivalents.length && !isStartsWithNop; i++) {
             if (getFirstEpAsmInstruction() === nopEquivalents[i]) {
                 isStartsWithNop = true;
-                break;
             }
         }
     }
@@ -3617,7 +3616,7 @@ function scanForObfuscations_Native() {
     // Check first 30 instructions for "Stack-push address near EP"
     // This trick uses "CALL $+5" (E8 00 00 00 00) to push next instruction address on stack
     if (!PE.isDll()) {
-        for (var i = 0; i < 30; i++) {
+        for (var i = 0; i < 30 && !isAddrToStackTrickPresent; i++) {
             var asmInstruction = getAsmInstructionByIndex(i);
 
             if (!asmInstruction) break; // Safety check
@@ -3636,8 +3635,8 @@ function scanForObfuscations_Native() {
                 // Check if machine code matches E8 00 00 00 00 pattern
                 if (PE.compare("E8 00 00 00 00", currentOffset)) {
                     log(logType.any, "Stack-push address near EP found at offset: 0x" + currentOffset.toString(16));
+
                     isAddrToStackTrickPresent = true;
-                    break;
                 }
             }
         }
@@ -4104,34 +4103,34 @@ function isItemMangled(itemPattern) {
 
 
 /**
- * Determines the name of the C++/Swift name mangler based on the given mangled item pattern.
+ * Returns information about the compiler and language based on a mangled symbol pattern.
  *
- * @param {string} itemPattern - The mangled item pattern to analyze.
- * @returns {string|undefined} The name of the detected mangler ("Visual C++", "MinGW", "Borland C++", "Swift"), or undefined if not recognized or not mangled.
+ * @param {string} itemPattern - The mangled symbol pattern to analyze.
+ * @returns {{compiler: string, language: string} | undefined} An object containing the compiler and language if recognized, otherwise undefined.
  */
-function getManglerNameByMangledItem(itemPattern) {
+function getManglerInfoByMangledItem(itemPattern) {
     if (!isItemMangled(itemPattern)) {
         return undefined;
     }
 
     // Visual C++ (MSVC)
     if (itemPattern[0] === '?') {
-        return "Microsoft Visual C++";
+        return { compiler: "Microsoft Visual C++", language: "C++" };
     }
 
     // MinGW (GNU)
     if (itemPattern.substring(0, 2) === "_Z") {
-        return "MinGW";
+        return { compiler: "MinGW", language: "C++" };
     }
 
     // Borland C++
     if (itemPattern[0] === '@' && itemPattern.indexOf('$') !== -1) {
-        return "Borland C++";
+        return { compiler: "Borland C++", language: "C++" };
     }
 
     // Swift
     if (itemPattern[0] === '$' && (itemPattern[1] === 's' || itemPattern[1] === 'S')) {
-        return "Swift";
+        return { compiler: "Swift", language: "Swift" };
     }
 
     return undefined;
@@ -4644,16 +4643,20 @@ function scanForLanguages_NET_and_Native() {
             if (isItemMangled(functionName)) {
                 log(logType.any, "Mangler detected -> \"" + libraryName + "\", at function \"" + getNameOfMangledItem(functionName) + "\"");
 
-                if (!isCompilerDetected()) {
-                    var manglerName = getManglerNameByMangledItem(functionName);
+                var isNotCpp = false;
 
-                    if (manglerName) {
-                        _setResult("~compiler", manglerName, String(), String());
+                if (!isCompilerDetected()) {
+                    var manglerInfo = getManglerInfoByMangledItem(functionName);
+
+                    if (manglerInfo) {
+                        _setResult("~compiler", manglerInfo.compiler, String(), String());
+                        if (!_isLangDetected()) _setLangByHeur(manglerInfo.language);
+
+                        if (manglerInfo.language !== "C++") isNotCpp = true;
                     }
                 }
 
-                // if (!_isLangDetected()) 
-                isPpLibraryPresent = true; // if language is unknown
+                isPpLibraryPresent = !isNotCpp; // if language is unknown
             }
         }
 
@@ -4689,15 +4692,20 @@ function scanForLanguages_NET_and_Native() {
         if (exportName && isItemMangled(exportName)) {
             log(logType.any, "Mangler detected in exported item \"" + getNameOfMangledItem(exportName) + "\"");
 
-            if (!isCompilerDetected()) {
-                var manglerName = getManglerNameByMangledItem(exportName);
+            var isNotCpp = false;
 
-                if (manglerName) {
-                    _setResult("~compiler", manglerName, String(), String());
+            if (!isCompilerDetected()) {
+                var manglerInfo = getManglerInfoByMangledItem(exportName);
+
+                if (manglerInfo) {
+                    _setResult("~compiler", manglerInfo.compiler, String(), String());
+                    if (!_isLangDetected()) _setLangByHeur(manglerInfo.language);
+
+                    if (manglerInfo.language !== "C++") isNotCpp = true;
                 }
             }
 
-            isPpLibraryPresent = true;
+            isPpLibraryPresent = !isNotCpp;
         }
     }
 
