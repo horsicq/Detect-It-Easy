@@ -1,0 +1,38 @@
+// Detect It Easy: detection rule file
+
+// Author: DosX
+// E-Mail: collab@kay-software.ru
+// GitHub: https://github.com/DosX-dev
+// Telegram: @DosX_dev
+
+// https://n10info.blogspot.com/2018/03/xvolkolak-010.html
+meta("tool", "XVolkolak");
+
+function detect() {
+    if (PE.isNet()) return; // Doesn't support .NET
+
+    var xvlkSectionsCounter = 0,
+        resourceSectionsCounter = 0,
+        isRwxSectionPresent = false;
+
+    for (var i = 0; i < PE.getNumberOfSections(); i++) {
+        var sectionToCheck = PE.section[i];
+
+        if (sectionToCheck.Name === ".xvlk") {
+            xvlkSectionsCounter++;
+
+            if (sectionToCheck.Characteristics & 0xe0000020) {
+                isRwxSectionPresent = true;
+            }
+        } else if (/rsrc/i.test(sectionToCheck.Name)) {
+            resourceSectionsCounter++;
+        }
+    }
+
+    if (isRwxSectionPresent && xvlkSectionsCounter >= 2 && PE.getNumberOfSections() === (xvlkSectionsCounter + resourceSectionsCounter)) {
+        sOptions = "unpacked";
+        bDetected = true;
+    }
+
+    return result();
+}
