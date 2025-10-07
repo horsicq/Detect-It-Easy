@@ -152,6 +152,14 @@ rule Packer__py2exe {
         pe.exports("PyArg_ParseTuple")
 }
 
+rule Protector__SecuROM {
+    condition:
+        IsPE and
+        IsNative and
+        pe.sections[pe.number_of_sections - 1].name == ".securom"
+
+}
+
 rule Protection__obfus_h {
     condition:
         IsPE and
