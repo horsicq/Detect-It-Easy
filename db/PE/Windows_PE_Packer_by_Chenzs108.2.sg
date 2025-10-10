@@ -9,7 +9,27 @@
 meta("packer", "Windows PE Packer by Chenzs108");
 
 function detect() {
-    bDetected = (PE.getNumberOfImports() === 1 && PE.getImportLibraryName(0) === "Kernel32.dll" && PE.isSectionNamePresent(".shell"));
+    if (!PE.is64() && !PE.isNet() &&
+        PE.getNumberOfSections() > 2 &&
+        PE.getNumberOfImports() === 1 &&
+        PE.isImportPositionHashPresent(0, 0x1272f45b)) {
+        if (PE.compareEP("60E8E10000002E0002000000000000")) {
+            var shellSectionByIndex = PE.section[PE.nLastSection];
+
+            if (shellSectionByIndex.Characteristics & 0xe0000040) { // R/W/X
+                bDetected = true;
+
+                if (shellSectionByIndex.Name !== ".shell") {
+                    sOptions = "modified sections";
+                }
+                if (PE.getImportLibraryName(0) !== "Kernel32.dll") {
+                    sOptions += (sOptions ? " and " : "modified ") + "IAT";
+                }
+            }
+        }
+
+    }
+
 
     return result();
 }
