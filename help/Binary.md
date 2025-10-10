@@ -43,6 +43,7 @@ Text may be matched using single quotes: **"01'Test'01"**
 | `??`      | Represent any byte                               |
 | `**`      | Not null                                         |
 | `%%`      | ANSI character                                   |
+| `%&`      | ANSI number                                      |
 | `!%`      | Not ANSI character                               |
 | `_%`      | Not ANSI and not null                            |
 
@@ -507,6 +508,8 @@ if (Binary.compare("FFD8FFE0....'JFIF'00")) {
 
 **`bool isHeuristicScan()`** - Check if heuristic scan mode is enabled.
 
+**`bool isRecursiveScan()`** - Check if recursive scan mode is enabled.
+
 **`bool isAggressiveScan()`** - Check if aggressive scan mode is enabled.
 
 **`bool isVerbose()`** - Check if verbose mode is enabled.
@@ -517,6 +520,8 @@ if (Binary.compare("FFD8FFE0....'JFIF'00")) {
 **`qint64 startTiming()`** - Start performance timing.
 
 **`qint64 endTiming(qint64 nHandle, const QString &sInfo)`** - End performance timing.
+
+**`qint64 getStartOffset()`** - Get physical offset in file.
 
 **Example:**
 ```javascript
