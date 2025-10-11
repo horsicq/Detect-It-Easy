@@ -3,14 +3,16 @@
 
 meta("protector", "Enigma");
 
-function getVersion() {
+function getEnigmaVersion() {
     var nSection = PE.nLastSection,
         nOffset = PE.section[nSection].FileOffset,
         nSize = PE.section[nSection].FileSize;
+
     if (nSize == 0) {
         nOffset = PE.section[nSection - 1].FileOffset;
         nSize = PE.section[nSection - 1].FileSize;
     }
+
     var nVersionOffset = PE.findSignature(nOffset, nSize, "000000'ENIGMA'");
     if (nVersionOffset != -1) {
 
@@ -24,7 +26,7 @@ function getVersion() {
             bSec = PE.readWord(nVersionOffset + 21);
 
         sVersion = sMajor + "." + sMinor + " build " + bYear + "." + bMonth + "." + bDay + " " + bHour + ":" + bMin + ":" + bSec;
-        return 1;
+        return true;
     }
     nVersionOffset = PE.findSignature(nOffset, nSize, "'Enigma Protector'");
     if (nVersionOffset != -1) {
@@ -35,11 +37,13 @@ function getVersion() {
     return false;
 }
 
-function getVersion4x() {
+function getEnigmaVersion4x() {
     var nSection = PE.nLastSection,
         nOffset = PE.section[nSection - 1].FileOffset,
         nSize = PE.section[nSection - 1].FileSize;
+
     var nVersionOffset = PE.findSignature(nOffset, nSize, "000000'ENIGMA'");
+
     if (nVersionOffset != -1) {
 
         var sMajor = PE.readByte(nVersionOffset + 9),
@@ -52,12 +56,13 @@ function getVersion4x() {
             bSec = PE.readWord(nVersionOffset + 21);
 
         sVersion = sMajor + "." + sMinor + " build " + bYear + "." + bMonth + "." + bDay + " " + bHour + ":" + bMin + ":" + bSec;
-        return 1;
+        return true;
     }
-    return 0;
+
+    return false;
 }
 
-function getVersion_old1x() {
+function getEnigmaVersion_old1x() {
     var nSection = PE.nLastSection;
 
     var nVersionOffset = PE.findSignature(PE.section[nSection].FileOffset, PE.section[nSection].FileSize, "'ENIGMA'07' PROT'");
@@ -70,11 +75,13 @@ function getVersion_old1x() {
     return false;
 }
 
-function getVersion_old() {
-    if (PE.section[".data"]) {
+function getEnigmaVersion_old() {
+    var dataSection = PE.section[".data"];
 
-        var nOffset = PE.section[".data"].FileOffset,
-            nOffset = PE.findString(nOffset, PE.section[".data"].FileSize, "Enigma protector v");
+    if (dataSection) {
+
+        var nOffset = dataSection.FileOffset,
+            nOffset = PE.findString(nOffset, dataSection.FileSize, "Enigma protector v");
 
         if (nOffset != -1) {
             sVersion = PE.getString(nOffset + 18, 4);
@@ -86,62 +93,60 @@ function getVersion_old() {
 }
 
 function detect() {
-    if (PE.isNet()) return; // Native stub only
-
-    if (!PE.is64()) {
-        if (PE.compareEP("558bec83c4..b8........e8........9a............e9$$$$$$$$60e8000000005d..ed")) {
-            getVersion();
-            bDetected = true;
-        } else if (PE.compareEP("60e8000000005d81ed........81ed........e9")) {
-            getVersion();
-            bDetected = true;
-        } else if (PE.compareEP("68........e8$$$$$$$$eb$$83c4..e9$$$$$$$$60e8000000005d81ed")) {
-            getVersion();
-            bDetected = true;
-        } else if (PE.compareEP("eb$$e9$$$$$$$$60e8000000005d81ed........81ed........e9")) {
-            getVersion();
-            bDetected = true;
-        } else if (PE.compareEP("e8$$$$$$$$83c4..e9$$$$$$$$60e8000000005d81ed........81ed........e9")) {
-            getVersion();
-            bDetected = true;
-        } else if (PE.compareEP("60e8000000005d83....81ed")) //first versions
-        {
-            getVersion_old();
-            bDetected = true;
-        } else if (PE.compareEP("eb$$e9$$$$$$$$60e8000000005d83....81ed")) //1.14
-        {
-            getVersion_old1x();
-            getVersion_old();
+    if (PE.isNet()) {
+        if (PE.isSignatureInSectionPresent(0, "000000'ENIGMA'")) {
             bDetected = true;
         }
-    } else if (PE.compareEP("5051525355565741504151415241534154415541564157489C4881EC080000000FAE1C24E8000000005D")) {
-        getVersion();
-        bDetected = true;
-    } else if (PE.compareEP("eb$$60e8000000005d81ed........81ed........e9")) {
-        getVersion();
-        bDetected = true;
-    }
+    } else {
+        if (!PE.is64()) {
+            if (PE.compareEP("558bec83c4..b8........e8........9a............e9$$$$$$$$60e8000000005d..ed")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("60e8000000005d81ed........81ed........e9")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("68........e8$$$$$$$$eb$$83c4..e9$$$$$$$$60e8000000005d81ed")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("eb$$e9$$$$$$$$60e8000000005d81ed........81ed........e9")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("e8$$$$$$$$83c4..e9$$$$$$$$60e8000000005d81ed........81ed........e9")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("60e8000000005d83....81ed")) { // first versions
+                getEnigmaVersion_old();
+                bDetected = true;
+            } else if (PE.compareEP("eb$$e9$$$$$$$$60e8000000005d83....81ed")) {  // 1.14
+                getEnigmaVersion_old1x();
+                getEnigmaVersion_old();
+                bDetected = true;
+            }
+        } else if (PE.compareEP("5051525355565741504151415241534154415541564157489C4881EC080000000FAE1C24E8000000005D")) {
+            getEnigmaVersion();
+            bDetected = true;
+        } else if (PE.compareEP("eb$$60e8000000005d81ed........81ed........e9")) {
+            getEnigmaVersion();
+            bDetected = true;
+        }
 
-    if (!bDetected) {
-        if (PE.getNumberOfImports() > 1 &&
-            PE.getNumberOfImportThunks(1) == 1 &&
-            PE.getImportFunctionName(1, 0) == "MessageBoxA" &&
-            PE.getSectionCharacteristics(0) == 0xe0000040 &&
-            getVersion()) {
-            bDetected = true;
-        } else if (PE.getSectionNameCollision("1", "2") == "enigma") {
-            bDetected = true;
-        } else if (PE.isNet()) {
-            if (PE.isSignatureInSectionPresent(0, "000000'ENIGMA'")) {
+        if (!bDetected) {
+            if (PE.getNumberOfImports() > 1 &&
+                PE.getNumberOfImportThunks(1) == 1 &&
+                PE.getImportFunctionName(1, 0) == "MessageBoxA" &&
+                PE.getSectionCharacteristics(0) == 0xe0000040 &&
+                getEnigmaVersion()) {
+                bDetected = true;
+            } else if (PE.getSectionNameCollision("1", "2") == "enigma") {
                 bDetected = true;
             }
         }
-    }
 
-    if (PE.compareEP("60648b2d........3e8b6d..3e8b6d..e8........bb........c3")) {
-        getVersion4x();
-        bDetected = true;
-    }
+        if (PE.compareEP("60648b2d........3e8b6d..3e8b6d..e8........bb........c3")) {
+            getEnigmaVersion4x();
+            bDetected = true;
+        }
 
+    }
     return result();
 }
