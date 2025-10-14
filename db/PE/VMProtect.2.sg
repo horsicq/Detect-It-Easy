@@ -1,9 +1,5 @@
 // Detect It Easy: detection rule file
-
-// 16:27 26.01.2013 detect improved //ajax
-//  2:30 27.01.2013 bugfixes
-// 14:14 27.01.2013 bugfixes
-// 2022/10 new detect hypn0 <hypn0@mail.ru>
+// Authors: ajax, hypn0, DosX
 
 // https://vmpsoft.com/
 meta("protector", "VMProtect");
@@ -74,7 +70,7 @@ function detect() {
 
         if (sVMPSectionName) {
             if (sVMPSectionName.substr(sVMPSectionName.length - 1) == "0") {
-                sOptions = "Min protection";
+                sOptions = "min protection";
             }
         }
 
@@ -82,7 +78,7 @@ function detect() {
             sVersion = "1.70";
         } else if (PE.isImportPositionHashPresent(-1, 0x0c16df2d)) {
             sVersion = "1.70";
-            sOptions = "Max protection";
+            sOptions = "max protection";
         } else if (PE.isImportPositionHashPresent(-1, 0x9d12b153)) {
             sVersion = "2.0.3-2.13";
         } else if (PE.isImportPositionHashPresent(-1, 0x1e5500c1)) {
@@ -158,11 +154,13 @@ function detect() {
         if (PE.getImportLibraryName(i) === "KERNEL32.dll") {
             kernel32Count++;
         }
+
         if (kernel32Count >= 2) {
             if (PE.is64() && PE.compare("4D 5A ?? 00 ?? 00 00 00 04 00 ?? 00 FF FF 00 00 B8 00 00 00 00 00 00 00 40 00 ?? 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 80 00 00 00 ?? ?? ?? 0E ?? B4 09 CD 21 B8 01 4C CD")) {
                 bDetected = true;
-                sOptions += (sOptions.length == 0 ? "" : ", ") + "packed";
+                sOptions = sOptions.append("packed");
             }
+
             break;
         }
     }
@@ -170,7 +168,7 @@ function detect() {
     return result();
 }
 
-function detectVMP(sSectionName) {
+function detectVmp(sSectionName) {
     if (PE.section[sSectionName]) {
         var nCharacteristics = PE.section[sSectionName].Characteristics;
         if (nCharacteristics == 0x60000060 ||
@@ -178,13 +176,13 @@ function detectVMP(sSectionName) {
             nCharacteristics == 0xE0000040 ||
             nCharacteristics == 0x68000060 ||
             nCharacteristics == 0xe2000060)
-            return 1;
+            return true;
     }
 
-    return 0;
+    return false;
 }
 
-function detectVMP2() {
+function detectVmp2() {
     if (PE.section.length > 7) {
         var nCount = 5,
             nResource = PE.getResourceSection(),
@@ -209,14 +207,13 @@ function detectVMP2() {
 
             if (PE.section[nSection].FileSize != 0 && PE.section[nSection].FileOffset != 0)
                 nLastVMPSection = nSection;
-
         }
 
         if (nDetectCount >= 3) {
             if (PE.getEntryPointSection() == nLastVMPSection) {
                 if (PE.section[nLastVMPSection].Characteristics == 0xE0000060) {
                     if (PE.calculateEntropy(PE.section[nLastVMPSection].FileOffset, PE.section[nLastVMPSection].FileSize) > 7.6) {
-                        return 1;
+                        return true;
                     }
                 } else if (PE.section[nLastVMPSection].Characteristics & 0x20000000) { // Fix sent Deniskore
                     var nSectionOffset = PE.section[nLastVMPSection].FileOffset,
@@ -234,7 +231,7 @@ function detectVMP2() {
                         nOffset = nSignatureOffset + 3;
                         nSize = nSectionSize - (nSignatureOffset - nSectionOffset);
                         if (nCount >= 2) {
-                            return 1;
+                            return true;
                         }
                     }
                 }
@@ -242,16 +239,14 @@ function detectVMP2() {
         }
     }
 
-    return 0;
+    return false;
 }
 
-function detect_old() {
-    var collision = "";
-
+/* function detect_old() {
     if (PE.section[".vmp0"] && (PE.compareEP("68........E9") || PE.compareEP("68........E8"))) {
         sVersion = "1.60-2.05";
         bDetected = true;
-    } else if (detectVMP(".vmp0") || detectVMP(".vmp1") || detectVMP(".vmp2")) {
+    } else if (detectVmp(".vmp0") || detectVmp(".vmp1") || detectVmp(".vmp2")) {
         bDetected = true;
     } else if (PE.compareEP("54c70424........9c60c74424..........c64424....887424..60")) {
         sVersion = "2.06";
@@ -269,7 +264,7 @@ function detect_old() {
         sVersion = "3.0X";
         bDetected = true;
     } else {
-        collision = PE.getSectionNameCollision("0", "1");
+        var collision = PE.getSectionNameCollision("0", "1");
 
         if (collision) {
             if (PE.compareEP("68........E9") || PE.compareEP("68........E8")) {
@@ -278,11 +273,11 @@ function detect_old() {
             } else if (PE.compareEP("9cE9") || PE.compareEP("9cFF")) {
                 sVersion = "2.X";
                 bDetected = true;
-            } else if (detectVMP(collision + "0") && detectVMP(collision + "1")) {
+            } else if (detectVmp(collision + "0") && detectVmp(collision + "1")) {
                 bDetected = true;
             }
         }
-        if (!bDetected && detectVMP2()) {
+        if (!bDetected && detectVmp2()) {
             sVersion = "2.X";
             bDetected = true;
         }
@@ -293,4 +288,4 @@ function detect_old() {
             bDetected = false;
         }
     }
-}
+} */
