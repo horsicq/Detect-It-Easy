@@ -107,7 +107,7 @@ function main() {
         scanForMaliciousCode_NET_and_Native();
 
         if (PE.isVerbose()) {
-            scanForLanguages_NET_and_Native();
+            scanForLanguagesAndCompilers_NET_and_Native();
         }
 
         // >> Happy end <<
@@ -2256,6 +2256,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["EXECryptor", "1.4-1.5", -1, 0xd1de53b5, 1],
         ["EXECryptor", "2.X", -1, 0xf51b2817, 1],
         ["Amber", null, -1, 0x97c72051, 1],
+        ["Lumy", null, -1, 0x821669d5, 1],
         // protectors
         ["ASProtect", "1.XX-2.XX", 0, 0x1272f45b, 2], // https://www.asprotect.ru/
         ["Shrinker", "3.2", 0, [0xb2a64858, 0x158af2d0, 0x49e8aa1f], 2],
@@ -2459,7 +2460,10 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Xenocode Postbuild", null, ".xcpad"],
         ["XComp", null, /^\.XComp(0)?$/], // http://www.soft-lab.de/JoKo/
         ["XVolkolak", null, ".xvlk"], // unpacker & reconstructor
-        ["NetShield", null, "!Sugar"] // https://github.com/AdvDebug/NetShield_Protector
+        ["NetShield", null, "!Sugar"], // https://github.com/AdvDebug/NetShield_Protector
+        ["KeySec", null, ".ksec"],
+        ["Lumy", null, ".lumy"],
+        ["TomatoX", null, ".tomato"]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDict.concat(
@@ -2526,7 +2530,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         var sectionName = PE.getSectionName(i);
         sectionNamesDict[sectionName] = (sectionNamesDict[sectionName] || 0) + 1;
         if (sectionNamesDict[sectionName] > 1) {
-            log(logType.nothing, "Section names repeating: '" + clearSectionName(sectionName) + "'");
+            log(logType.nothing, "Section names repeating: \"" + clearSectionName(sectionName) + "\"");
 
             isSectionNamesRepeatingPresent = true;
         }
@@ -3932,9 +3936,9 @@ function scanForObfuscations_Native() {
 
     const
         SECTION_FLAGS_EXECUTE = 0x20000000, // IMAGE_SCN_MEM_EXECUTE
-        SECTION_FLAGS_READ = 0x40000000, // IMAGE_SCN_MEM_READ
-        SECTION_FLAGS_WRITE = 0x80000000, // IMAGE_SCN_MEM_WRITE
-        SECTION_FLAGS_CODE = 0x00000020; // IMAGE_SCN_CNT_CODE
+        SECTION_FLAGS_READ = 0x40000000,    // IMAGE_SCN_MEM_READ
+        SECTION_FLAGS_WRITE = 0x80000000,   // IMAGE_SCN_MEM_WRITE
+        SECTION_FLAGS_CODE = 0x00000020;    // IMAGE_SCN_CNT_CODE
 
     const
         RWX_MASK = SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ | SECTION_FLAGS_WRITE,
@@ -4022,7 +4026,7 @@ function scanForObfuscations_Native() {
 
     var isUnusedExceptionSectionPresent = false;
 
-    if (PE.isSectionNamePresent(".pdata") || PE.isSectionNamePresent(".xdata")) {
+    if (PE.isSectionNamePresentExp(/^\.[xp]data$/)) {
 
         // Offset of the exception directory (12 is the number of IMAGE_DIRECTORY_ENTRY_ entries, 8 is the size of each entry)
         var exceptionDirOffset = getOptHeaderOffset() + (PE.is64() ? 0x88 : 0x78);
@@ -4790,7 +4794,7 @@ function isLinkerDetected() {
 
 
 
-function scanForLanguages_NET_and_Native() {
+function scanForLanguagesAndCompilers_NET_and_Native() {
     log(logType.nothing, "Scanning for programming language...");
 
     var c_cpp = _isLangPresent("C/C++"); // Unknown; C or C++
@@ -5021,6 +5025,7 @@ function scanForLanguages_NET_and_Native() {
                 generateUnicodeSignatureMask("Visual C++"))) {
 
             log(logType.any, "Embedded Visual C++ Runtime detected.");
+
             isPpLibraryPresent = true; // Visual C++ Runtime library in resources
         }
     }
