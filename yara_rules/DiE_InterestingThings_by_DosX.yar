@@ -157,7 +157,6 @@ rule Protector__SecuROM {
         IsPE and
         IsNative and
         pe.sections[pe.number_of_sections - 1].name == ".securom"
-
 }
 
 rule Protection__obfus_h {
