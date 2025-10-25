@@ -2506,6 +2506,40 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    // Check for packers and protections by resource names
+
+    var isResourceNameLikePacker = false;
+
+    // [{Name}, {Version}, {ResourceNameSignature}]
+
+    var dbCollectionOfResourceNamesDict = [
+        ["Fatpack", null, "FPACK"],
+        ["Quick Batch File Compiler", null, "PLATFORMTARGETS"],
+        ["ScriptCryptor", null, "AOPT"],
+        ["ExeStealth", null, "TN"],
+        [".NET Reactor", null, "__"]
+    ];
+
+    const resourceNamesValidatingResult = validateResourceNames(dbCollectionOfResourceNamesDict);
+
+    var versionByResourceDetected;
+
+    if (resourceNamesValidatingResult != null) {
+        versionByResourceDetected = resourceNamesValidatingResult[1];
+
+        log(logType.nothing, "Resources like " + resourceNamesValidatingResult[0] + (versionByResourceDetected ? " (v" + versionByResourceDetected + ")" : String()));
+
+        isResourceNameLikePacker = true;
+    }
+
+    // Clean up: release the dictionary
+    dbCollectionOfResourceNamesDict = undefined;
+
+    if (isResourceNameLikePacker) options = addOption(options, "Resources like " + resourceNamesValidatingResult[0] + (versionByResourceDetected ? " (v" + versionByResourceDetected + ")" : String()));
+
+
+
+
     // Check if there is a collision in sections
 
     var isCollisionInSectionsPresent = false;
@@ -4447,7 +4481,7 @@ function getNameOfMangledItem(itemPattern) {
                     // Global operator (single character)
                     if (nameWithPrefix.length === 1 && /[0-9A-D]/.test(nameWithPrefix[0])) {
                         var operatorNames = {
-                            '2': 'operator_new', '3': 'operator_delete', '4': 'operator_assign',
+                            '2': 'operator_new', '3': 'operator_delete', '4': 'operator_assigтгn',
                             '5': 'operator_shift_left', '6': 'operator_shift_right', '8': 'operator_equal',
                             '9': 'operator_not_equal', 'A': 'operator_subscript', 'B': 'operator_not',
                             'C': 'operator_cast', 'D': 'operator_cast_const'
@@ -4710,6 +4744,34 @@ function validateSectionNames(dbCollection) {
             }
         } else if ((typeof sectionSignature === "string" && PE.isSectionNamePresent(sectionSignature)) ||
             (sectionSignature instanceof RegExp && PE.isSectionNamePresentExp(sectionSignature))) {
+            return dbCollection[i];
+        }
+    }
+
+    return null;
+}
+
+
+
+/**
+ * Validates resource names within a database collection against known PE resource names or regular expressions.
+ * Iterates through the collection and checks if any resource signature matches a known resource name or passes a regular expression test.
+ *
+ * @param {Array} dbCollection - The database collection to validate, where each item is expected to have a resource signature at index 2.
+ * @returns {Array|null} The first matching item from the collection, or null if no match is found.
+ */
+function validateResourceNames(dbCollection) {
+    for (var i = 0; i < dbCollection.length; i++) {
+        var resourceSignature = dbCollection[i][2];
+        if (Array.isArray(resourceSignature)) {
+            for (var j = 0; j < resourceSignature.length; j++) {
+                if ((typeof resourceSignature[j] === "string" && PE.isResourceNamePresent(resourceSignature[j])) ||
+                    (resourceSignature[j] instanceof RegExp && PE.isResourceNamePresentExp(resourceSignature[j]))) {
+                    return dbCollection[i];
+                }
+            }
+        } else if ((typeof resourceSignature === "string" && PE.isResourceNamePresent(resourceSignature)) ||
+            (resourceSignature instanceof RegExp && PE.isResourceNamePresentExp(resourceSignature))) {
             return dbCollection[i];
         }
     }
