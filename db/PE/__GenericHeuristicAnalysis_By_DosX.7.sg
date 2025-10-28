@@ -5048,12 +5048,15 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
         minorLinkerVersion = PE.getMinorLinkerVersion();
 
     if (!isCompilerDetected() && !isLinkerDetected() && !PE.isNet()) {
+        var ehFrameSection = PE.section[".eh_frame"],
+            buildIdSection = PE.section[".build-id"];
 
-        if (PE.isRichSignaturePresent() ||
+        if (!ehFrameSection && !buildIdSection && (
+            PE.isRichSignaturePresent() ||
             PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000") ||
             PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") ||
-            PE.isSectionNamePresent(".00cfg")) {
-
+            PE.isSectionNamePresent(".00cfg")
+        )) {
             if (PE.isSectionNamePresent(".gfids") || PE.isSectionNamePresent(".giats") || PE.isSectionNamePresent(".gljmp")) {
                 _setResult("~tool", "Microsoft Visual Studio", String(), String())
             }
@@ -5068,8 +5071,11 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
                     _setLangByHeur("C/C++");
                 }
             }
-        } else if (PE.isSectionNamePresent(".CRT") && PE.isSectionNamePresent(".rdata") && PE.isSectionNamePresent(".xdata") && PE.isSectionNamePresent(".idata") &&
-            (PE.isSectionNamePresent(".tls") || PE.isSectionNamePresent(".bss")) || PE.isSectionNamePresent(".buildid") || PE.isSectionNamePresent(".build-id")) {
+        } else if (
+            ehFrameSection || buildIdSection || (
+                PE.isSectionNamePresent(".CRT") && PE.isSectionNamePresent(".rdata") && PE.isSectionNamePresent(".xdata") && PE.isSectionNamePresent(".idata") &&
+                (PE.isSectionNamePresent(".tls") || PE.isSectionNamePresent(".bss")) || PE.isSectionNamePresent(".buildid")
+            )) {
 
             _setResult("~compiler", "MinGW", String(), String());
 
