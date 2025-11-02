@@ -58,6 +58,16 @@ rule Library__Qt_Framework {
         $core_module_name and $qstring
 }
 
+rule Tool__XVolkolak {
+    condition:
+        IsPE and
+        IsNative and (
+            for any i in (0..pe.number_of_sections - 1) : (
+                pe.sections[i].name == ".xvlk"
+            )
+        )
+}
+
 rule Packer__UPX {
     strings: $magicVerId = "UPX!"
     condition:
