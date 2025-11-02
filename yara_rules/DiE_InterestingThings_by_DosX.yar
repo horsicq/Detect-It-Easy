@@ -29,6 +29,11 @@ private rule IsRichSignPresent {
     condition: for any i in (0x40..0x400) : (@rich_pe == i)
 }
 
+rule Linker__Microsoft_Linker {
+    condition:
+        IsRichSignPresent
+}
+
 rule Compiler__NET_Native__debug {
     condition:
         IsPE and
