@@ -66,7 +66,7 @@ function processFile(srcFile, dstFile) {
             var legacyCompatibleCode =
                 replaceArrowFunctions( // replace arrow functions with regular functions
                     replaceLetWithVarSafe( // replace `let` with `var` to ensure compatibility with older engines
-                        result.code
+                        result.code.trim()
                     )
                 );
 
