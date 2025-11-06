@@ -10,26 +10,28 @@ meta("protector", "VMProtect");
 
 function detect() {
 
-    if (PE.isNet() && PE.getNumberOfSections() >= 3 && PE.isNetObjectPresent("SuppressIldasmAttribute") && PE.isNetObjectPresent("kernel32") && PE.isNetGlobalCctorPresent()) {
+    if (PE.isNet() &&
+        PE.isNetGlobalCctorPresent() &&
+        PE.getNumberOfSections() >= 3 &&
+        PE.isNetObjectPresent("SuppressIldasmAttribute") &&
+        PE.isNetObjectPresent("kernel32") &&
+        PE.isNetObjectPresent("get_IsAttached") &&
+        PE.isNetObjectPresent("OpCodes")) {
 
-        const chunk = "%% %% %% %% %% %% %% %% 00", // chunk size is 8 bytes
+        const
+            chunk = "%% %% %% %% %% %% %% %% 00", // chunk size is 8 bytes
             scanBytes = PE.getSize() - PE.getOverlaySize();
 
-        var patternFromCctor = "'<Module>'00",
-            globalBigPattern = "00";
+        var globalBigPattern = "00";
 
-        for (var t = 0; t < 4; t++) {
-            patternFromCctor += chunk;
-
-            for (var i = 0; i < 2; i++) {
-                globalBigPattern += chunk;
-            }
+        for (var i = 0; i < 12; i++) {
+            globalBigPattern += chunk;
         }
 
         var firstSection = PE.section[0];
 
-        if (PE.findSignature(firstSection.FileOffset, scanBytes, patternFromCctor) != -1 ||
-            PE.findSignature(firstSection.FileOffset, scanBytes, globalBigPattern) != -1) {
+        if (PE.isSignaturePresent(firstSection.FileOffset, scanBytes, "'<Module>' 00" + chunk) &&
+            PE.isSignaturePresent(firstSection.FileOffset, scanBytes, globalBigPattern)) {
             sVersion = "3.X";
             bDetected = true;
         }
