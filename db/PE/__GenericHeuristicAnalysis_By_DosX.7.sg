@@ -439,8 +439,8 @@ function scanForObfuscations_NET() {
             ]
         ) &&
         (
-            PE.isNetObjectPresent("Ldarg_0") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
-            PE.isNetObjectPresent("CreateDelegate") // MSIL: 'System.Delegate.CreateDelegate'
+            validateNetObject("Ldarg_0") || // MSIL: 'System.Reflection.Emit.OpCodes.Ldarg_0'
+            validateNetObject("CreateDelegate") // MSIL: 'System.Delegate.CreateDelegate'
         ) && !isFrameworkComponent()
     ) {
         log(logType.net, "Virtualization-like behavior detected!");
@@ -705,7 +705,7 @@ function scanForObfuscations_NET() {
 
         const currentStringPattern = patternsToExplore[i];
 
-        if (PE.isNetObjectPresent("<PrivateImplementationDetails>") && currentStringPattern.length === 40) {
+        if (validateNetObject("<PrivateImplementationDetails>") && currentStringPattern.length === 40) {
             break;
         }
 
@@ -841,7 +841,7 @@ function scanForObfuscations_NET() {
     var isStringsEncryptionPresent = false;
 
     if (isVbNet && !isFrameworkComponent()) {
-        if (PE.isNetObjectPresent("Resources") && !validateGlobalUnicodeString(".Resources")) {
+        if (validateNetObject("Resources") && !validateGlobalUnicodeString(".Resources")) {
             log(logType.net, "It appears that the strings are hidden/encrypted and can be loaded dynamically.");
 
             isStringsEncryptionPresent = true;
@@ -941,8 +941,8 @@ function scanForObfuscations_NET() {
             runtimeLibraryName = runtimeInfo.lib,
             protectorName = runtimeInfo.name;
 
-        if (PE.isNetObjectPresent(runtimeLibraryName) || // "runtime.dll"
-            PE.isNetObjectPresent(runtimeLibraryName.substring(0, runtimeLibraryName.length - 4))) { // "runtime"
+        if (validateNetObject(runtimeLibraryName) || // "runtime.dll"
+            validateNetObject(runtimeLibraryName.substring(0, runtimeLibraryName.length - 4))) { // "runtime"
             log(logType.net, protectorName + " runtime detected!");
 
             isProtectionRuntimePresent = true;
@@ -1976,15 +1976,15 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         var isRunPePresent = false;
 
-        if (PE.isNetObjectPresent("RunPE") ||
-            PE.isNetObjectPresent("PELoader") || // https://github.com/nettitude/RunPE/blob/main/RunPE/Internals/PELoader.cs
-            PE.isNetObjectPresent("CMemoryExecute") || // https://github.com/wojciech-kulik/Sample-Projects/blob/master/Windows%20Desktop/WIN32_MemoryAppLoader/MemoryAppLoader/CMemoryExecute.cs
-            (PE.isNetObjectPresent("GetProcAddress") && PE.isNetUStringPresent("WriteProcessMemory") && PE.isNetUStringPresent("VirtualAllocEx") && PE.isNetUStringPresent("ZwUnmapViewOfSection")) ||
+        if (validateNetObject("RunPE") ||
+            validateNetObject("PELoader") || // https://github.com/nettitude/RunPE/blob/main/RunPE/Internals/PELoader.cs
+            validateNetObject("CMemoryExecute") || // https://github.com/wojciech-kulik/Sample-Projects/blob/master/Windows%20Desktop/WIN32_MemoryAppLoader/MemoryAppLoader/CMemoryExecute.cs
+            (validateNetObject("GetProcAddress") && validateNetUnicodeString("WriteProcessMemory") && validateNetUnicodeString("VirtualAllocEx") && validateNetUnicodeString("ZwUnmapViewOfSection")) ||
             (
-                (PE.isNetObjectPresent("WriteProcessMemory") || PE.isNetObjectPresent("NtWriteVirtualMemory")) &&
-                (PE.isNetObjectPresent("ZwUnmapViewOfSection") || PE.isNetObjectPresent("NtUnmapViewOfSection")) &&
-                (PE.isNetObjectPresent("CreateProcess") || PE.isNetObjectPresent("NtCreateProcess") || PE.isNetObjectPresent("CreateProcessA") || PE.isNetObjectPresent("CreateProcessW")) &&
-                PE.isNetObjectPresent("VirtualAllocEx"))
+                (validateNetObject("WriteProcessMemory") || validateNetObject("NtWriteVirtualMemory")) &&
+                (validateNetObject("ZwUnmapViewOfSection") || validateNetObject("NtUnmapViewOfSection")) &&
+                (validateNetObject("CreateProcess") || validateNetObject("NtCreateProcess") || validateNetObject("CreateProcessA") || validateNetObject("CreateProcessW")) &&
+                validateNetObject("VirtualAllocEx"))
         ) {
             log(logType.net, "RunPE-like behavior detected!");
 
@@ -2865,7 +2865,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
         var isLicenseCheckingPresent = false;
 
-        if (PE.isNetObjectPresent("CheckLicense") || PE.isNetObjectPresent("set_License") || PE.isNetObjectPresent("Licensing")) {
+        if (validateNetObject("CheckLicense") || validateNetObject("set_License") || validateNetObject("Licensing")) {
             isLicenseCheckingPresent = true;
         }
 
@@ -2878,7 +2878,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
         var isLicenseProviderPresent = false;
 
-        if (PE.isNetObjectPresent("LicenseProviderAttribute")) {
+        if (validateNetObject("LicenseProviderAttribute")) {
             isLicenseProviderPresent = true;
         }
 
@@ -2891,7 +2891,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
         var isLicenseManagerPresent = false;
 
-        if (PE.isNetObjectPresent("LicenseManager")) {
+        if (validateNetObject("LicenseManager")) {
             isLicenseManagerPresent = true;
         }
 
@@ -3216,7 +3216,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     var isCosturaEmbeddedDebugData = false;
 
-    if (PE.isNet() && PE.isNetObjectPresent("costura.costura.pdb.compressed")) {
+    if (PE.isNet() && validateNetObject("costura.costura.pdb.compressed")) {
         log(logType.any, "Costura embedded PDB detected");
 
         isCosturaEmbeddedDebugData = true;
@@ -3332,7 +3332,7 @@ function validateNetByteCode(byteCode) {
 
 
 /**
- * Validates if the given object is a .NET object.
+ * Validates if the given .NET object is present in the PE file.
  *
  * @param {Object} object - The object to be validated.
  * @returns {boolean} - Returns true if the object is a .NET object, otherwise false.
