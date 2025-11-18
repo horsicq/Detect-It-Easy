@@ -5239,19 +5239,22 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if (PE.isNet()) {
 
-        var requiredDotNetImports = ["System.Net.Sockets", "System.IO.Compression"],
-            allRequiredImportsFound = true,
+        var requiredDotNetImports = [
+            "System.Diagnostics",
+            "System.IO.Compression",
+            "user32", "kernel32", "ntdll" // no ext
+        ],
+            foundImportsCount = 0,
             importSignature, pattern, allPatternImportsFound;
 
         for (var i = 0; i < requiredDotNetImports.length; i++) {
             importSignature = "00'" + requiredDotNetImports[i] + "'00";
-            if (!PE.isSignatureInSectionPresent(0, importSignature)) {
-                allRequiredImportsFound = false;
-                break;
+            if (PE.isSignatureInSectionPresent(0, importSignature)) {
+                foundImportsCount++;
             }
         }
 
-        if (allRequiredImportsFound) {
+        if (PE.isSignatureInSectionPresent(0, "00'System.Net.Sockets'00") && foundImportsCount >= 2) {
             var maliciousImportPatterns = [
                 {
                     type: "NjRAT",
@@ -5383,7 +5386,7 @@ function scanForMaliciousCode_NET_and_Native() {
                 pattern = maliciousImportPatterns[j];
                 allPatternImportsFound = true;
 
-                for (var k = 0; k < pattern.references.length && !allPatternImportsFound; k++) {
+                for (var k = 0; k < pattern.references.length && allPatternImportsFound; k++) {
                     importSignature = "00'" + pattern.references[k] + "'00";
                     if (!PE.isSignatureInSectionPresent(0, importSignature)) {
                         allPatternImportsFound = false;
