@@ -229,3 +229,28 @@ chmod a+x configure
 ./configure
 make -j4
 ```
+
+# How to build with WSL
+
+- Activate Windows Subsystem for Linux
+- Download from the Microsoft Store any distribution
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+### Install libaries
+
+```bash
+sudo apt-get install --quiet --assume-yes build-essential qtbase5-dev qttools5-dev-tools qtscript5-dev libqt5svg5-dev
+```
+
+#### Build
+
+```bash
+chmod a+x build_dpkg.sh
+./build_dpkg.sh
+```
