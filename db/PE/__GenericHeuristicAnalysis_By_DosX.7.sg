@@ -1273,6 +1273,13 @@ function scanForAntiAnalysis_NET() {
 
 
 
+    const isGetModuleHandleDetected = validateSignature("'GetModuleHandle'"); // from 'kernel32.dll'
+
+
+
+
+    // https://en.wikipedia.org/wiki/Sandboxie
+
     const sbieVariants = [
         "sbiedll.",
         "SbieDll.",
@@ -1281,8 +1288,7 @@ function scanForAntiAnalysis_NET() {
 
     var isAntiSbiePresent = false;
 
-    // Check if the signature for 'GetModuleHandle' is present
-    if (validateSignature("'GetModuleHandle'")) { // from 'kernel32.dll'
+    if (isGetModuleHandleDetected) {
         // Iterate through Sandboxie variants
         for (var l = 0; l < sbieVariants.length; l++) {
             if (!isAntiSbiePresent) {
@@ -1290,6 +1296,7 @@ function scanForAntiAnalysis_NET() {
 
                 // Check if the signature for Sandboxie variant is valid using Unicode signature mask or the original signature
                 if (
+                    PE.isNetObjectPresent("IsSandboxiePresent") || // https://github.com/AdvDebug/AntiCrack-DotNet/blob/f3cd8104e952580e0edf298101139d15befe008e/AntiCrack-DotNet/AntiVirtualization.cs#L53
                     validateGlobalUnicodeString(sbieLib) ||
                     validateSignature("'" + sbieLib + "'")
                 ) {
@@ -1300,6 +1307,40 @@ function scanForAntiAnalysis_NET() {
     }
 
     if (isAntiSbiePresent) options = addOption(options, "Anti-SandBoxie");
+
+
+
+
+    // https://help.comodo.com/topic-394-1-767-9229-the-sandbox.html
+
+    const comodoVariants = [
+        "cmdvrt32.",
+        "cmdvrt64.",
+        "CMDVRT32.",
+        "CMDVRT64."
+    ];
+
+    var isAntiComodoPresent = false;
+
+    if (isGetModuleHandleDetected) {
+        // Iterate through Comodo Sandbox variants
+        for (var l = 0; l < comodoVariants.length; l++) {
+            if (!isAntiComodoPresent) {
+                const comodoLib = comodoVariants[l];
+
+                // Check if the signature for Comodo Sandbox variant is valid using Unicode signature mask or the original signature
+                if (
+                    PE.isNetObjectPresent("IsComodoSandboxPresent") || // https://github.com/AdvDebug/AntiCrack-DotNet/blob/f3cd8104e952580e0edf298101139d15befe008e/AntiCrack-DotNet/AntiVirtualization.cs#L64
+                    validateGlobalUnicodeString(comodoLib) ||
+                    validateSignature("'" + comodoLib + "'")
+                ) {
+                    isAntiComodoPresent = true;
+                }
+            }
+        }
+    }
+
+    if (isAntiComodoPresent) options = addOption(options, "Anti-Comodo");
 
 
 
