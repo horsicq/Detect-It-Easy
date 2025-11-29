@@ -67,13 +67,15 @@
 
 "use strict";
 
-const logType = {
-    warning: -2,
-    about: -1,
-    nothing: 0,
-    any: 1,
-    net: 2
-},
+const
+    PE_Cached = {},
+    logType = {
+        warning: -2,
+        about: -1,
+        nothing: 0,
+        any: 1,
+        net: 2
+    },
     heurLabel = "HEUR";
 
 var lastOffsetDetected = "0x00";
@@ -86,6 +88,8 @@ function detect() {
 }
 
 function main() {
+    initializeCache();
+
     if (PE.isHeuristicScan()) {
         if (!PE.isVerbose()) {
             log(logType.warning, "To get the full heuristic scan result use \"--verbose\"");
@@ -96,19 +100,31 @@ function main() {
         log(logType.nothing, "Scanning has begun!");
 
         if (PE.isNet()) {
+            // Detection obfuscation and anti-analysis techniques specific to .NET
             scanForObfuscations_NET();
             scanForAntiAnalysis_NET();
         } else {
+            // Detection of anomalies specific to Native
             scanForObfuscations_Native();
         }
 
+        // Detection of anomalies most commonly found in packers, cryptors, protectors...
         scanForPackersAndCryptors_NET_and_Native();
+
+        // Detection licensing information (detecting possible DRM systems or licensing strings)
         scanForLicensingSystems_NET_and_Native();
+
+        // A cursory checks of the file format integrity
         scanForBadFileFormat_NET_and_Native();
+
+        // Detection of debug information (headers, sections, strings...)
         scanForDebugData_NET_and_Native();
+
+        // Detection for suspicious or potentially malicious patterns
         scanForMaliciousCode_NET_and_Native();
 
         if (PE.isVerbose()) {
+            // Detection of programming language, compiler, linker
             scanForLanguagesAndCompilers_NET_and_Native();
         }
 
@@ -157,6 +173,7 @@ function stubForWrongEnvironment() {
  * - Throw an error if none of the above conditions are met.
  *
  * @param {string} stringToOut - The warning message to output.
+ * @returns {void} No return value;
  */
 function stdout(stringToOut) {
     if (typeof console === "object") {
@@ -169,6 +186,37 @@ function stdout(stringToOut) {
         } else {
             throw stringToOut;
         }
+    }
+}
+
+
+
+/**
+ * Initialize the PE-related cache by reading values from the PE API and storing them
+ * into the global PE_Cached object.
+ *
+ * The function constructs a temporary map containing typed entries sourced from the PE
+ * interface, then copies each entry into PE_Cached.
+ *
+ * Side effects:
+ *  - Mutates the global PE_Cached object by adding/updating the keys listed above.
+ *
+ * @function initializeCache
+ * @returns {void} No return value; updates PE_Cached as a side effect.
+ */
+function initializeCache() {
+    var cacheMap = {
+       /* Number */ numberOfSections: PE.getNumberOfSections(),
+       /* Number */ numberOfRichIDs: PE.getNumberOfRichIDs(),
+       /* Number */ numberOfUnmanagedResources: PE.getNumberOfResources(),
+       /* Number */ numberOfUnmanagedImports: PE.getNumberOfImports(),
+       /* Number */ numberOfUnmanagedExports: PE.getNumberOfExports(),
+       /* String */ nameOfNetAssemblyName: PE.getNetAssemblyName(),
+       /* String */ nameOfNetModuleName: PE.getNetModuleName()
+    };
+
+    for (var key in cacheMap) {
+        PE_Cached[key] = cacheMap[key];
     }
 }
 
@@ -260,7 +308,7 @@ function scanForObfuscations_NET() {
     const defaultNetSection = 0;
 
     // Check conditions for a strange entry point position (not for CLR apps)
-    if (!PE.isDll() && PE.getNumberOfSections() > 1 && !isCppClrLikeApp()) {
+    if (!PE.isDll() && PE_Cached.numberOfSections > 1 && !isCppClrLikeApp()) {
         // Iterate through .NET metadata headers
         for (var s = 0; s < netMetaHeaders.length; s++) {
             const headerName = netMetaHeaders[s];
@@ -329,9 +377,9 @@ function scanForObfuscations_NET() {
 
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
 
-    if (PE.getNumberOfSections() > (!isCppClrLikeApp() ? 6 : 10) || !PE.section[".text"]) { isStrangeSectionsPresent = true; } else {
+    if (PE_Cached.numberOfSections > (!isCppClrLikeApp() ? 6 : 10) || !PE.section[".text"]) { isStrangeSectionsPresent = true; } else {
         // Iterate through each section
-        for (var i = 0; i < PE.getNumberOfSections() && !isStrangeSectionsPresent; i++) {
+        for (var i = 0; i < PE_Cached.numberOfSections && !isStrangeSectionsPresent; i++) {
             const sectionName = PE.getSectionName(i);
 
             // Check if the first character is not "." and the length of name is less than 3
@@ -363,7 +411,7 @@ function scanForObfuscations_NET() {
 
     var isStrangeUnmanagedResourcesPresent = false;
 
-    for (var i = 0; i < PE.getNumberOfResources() && !isStrangeUnmanagedResourcesPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isStrangeUnmanagedResourcesPresent; i++) {
         const unmanagedResourceName = PE.getResourceNameByNumber(i);
 
         if (unmanagedResourceName && (!isAsciiString(unmanagedResourceName) || isNameObfuscated(unmanagedResourceName))) {
@@ -382,7 +430,7 @@ function scanForObfuscations_NET() {
 
     var tooManySectionsPresent = false;
 
-    if (PE.getNumberOfSections() > 10) {
+    if (PE_Cached.numberOfSections > 10) {
         tooManySectionsPresent = true;
     }
 
@@ -1051,8 +1099,8 @@ function scanForObfuscations_NET() {
 
     var isBuildInfoModified = false;
 
-    var buildAssemblyName = PE.getNetAssemblyName(),
-        buildModuleName = PE.getNetModuleName();
+    var buildAssemblyName = PE_Cached.nameOfNetAssemblyName,
+        buildModuleName = PE_Cached.nameOfNetModuleName;
 
     if (buildAssemblyName.indexOf("Interop.") === 0) {
         buildAssemblyName = buildAssemblyName.substring(8, buildAssemblyName.length);
@@ -2013,7 +2061,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         var isAssemblyInvokeFound = false;
 
-        if (!isFrameworkComponent() && PE.getNetModuleName !== "System.dll" && isAllNetReferencesPresent( // TODO: update [!!!]
+        if (!isFrameworkComponent() && PE_Cached.nameOfNetModuleName !== "System.dll" && isAllNetReferencesPresent( // TODO: update [!!!]
             [
                 "System.Reflection", // System.Reflection.dll
                 "get_EntryPoint", // MSIL: '*.Assembly::get_EntryPoint()'
@@ -2290,7 +2338,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var isLastSectionEP = false;
 
     if (!PE.isDll()) {
-        if (PE.getNumberOfSections() > 1) {
+        if (PE_Cached.numberOfSections > 1) {
             // Get addresses of the last section and entry point
 
             var lastSectionAddress = -1,
@@ -2299,7 +2347,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
             // Get last section with non -1 address
             for (var i = 1; lastSectionAddress == -1; i++) {
-                lastSectionAddress = PE.OffsetToVA(PE.getSectionFileOffset(PE.getNumberOfSections() - i));
+                lastSectionAddress = PE.OffsetToVA(PE.getSectionFileOffset(PE_Cached.numberOfSections - i));
             }
 
             entryPointAddress = PE.getAddressOfEntryPoint();
@@ -2723,7 +2771,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var sectionNamesDict = {};
 
-    for (var i = 0; i < PE.getNumberOfSections() && !isSectionNamesRepeatingPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfSections && !isSectionNamesRepeatingPresent; i++) {
         var sectionName = PE.getSectionName(i);
         sectionNamesDict[sectionName] = (sectionNamesDict[sectionName] || 0) + 1;
         if (sectionNamesDict[sectionName] > 1) {
@@ -2747,7 +2795,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var compressedSectionIndex = -1;
 
-    for (var t = 0; t < PE.getNumberOfSections() && !isCompressedSectionPresent; t++) {
+    for (var t = 0; t < PE_Cached.numberOfSections && !isCompressedSectionPresent; t++) {
         compressedSectionIndex = t;
         if (PE.calculateEntropy(PE.getSectionFileOffset(compressedSectionIndex), PE.getSectionFileSize(compressedSectionIndex)) > 7.4) {
             log(logType.any, "Section #" + compressedSectionIndex + " (\"" + clearSectionName(PE.getSectionName(compressedSectionIndex)) + "\") entropy: " + PE.calculateEntropy(PE.getSectionFileOffset(compressedSectionIndex), PE.getSectionFileSize(compressedSectionIndex)));
@@ -2775,7 +2823,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var wrongOffset = false,
         wrongSize = false;
 
-    for (var t = 0; t < PE.getNumberOfSections() && !isSectionHasWrongOffsetOrSize; t++) {
+    for (var t = 0; t < PE_Cached.numberOfSections && !isSectionHasWrongOffsetOrSize; t++) {
         sectionWithWrongOffsetOrSizeIndex = t;
         if (standardSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(sectionWithWrongOffsetOrSizeIndex)) === -1) {
             const currentSection = PE.section[sectionWithWrongOffsetOrSizeIndex];
@@ -2817,7 +2865,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var sectionOffsetsDict = {};
 
-    for (var i = 0; i < PE.getNumberOfSections() && !isSectionHasDuplicateOffset; i++) {
+    for (var i = 0; i < PE_Cached.numberOfSections && !isSectionHasDuplicateOffset; i++) {
         currentSectionIndex = i;
         if (standardSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(currentSectionIndex)) === -1) {
             var currentSectionOffset = PE.section[currentSectionIndex].FileOffset;
@@ -2891,7 +2939,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isPeInResourcesPresent = false;
 
-    for (var i = 0; i < PE.getNumberOfResources() && !isPeInResourcesPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isPeInResourcesPresent; i++) {
         const resourceOffset = PE.getResourceOffsetByNumber(i);
 
         if (PE.compare("'MZ'", resourceOffset)) {
@@ -2928,7 +2976,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var importNamesDict = {};
 
     if (!_isResultPresent("linker", "Turbo Linker")) { // Ignore Delphi
-        for (var i = 0; i < PE.getNumberOfImports() && !recurringImports; i++) {
+        for (var i = 0; i < PE_Cached.numberOfUnmanagedImports && !recurringImports; i++) {
             var name = PE.getImportLibraryName(i);
             importNamesDict[name] = (importNamesDict[name] || 0) + 1;
             if (importNamesDict[name] >= 3) {
@@ -3205,7 +3253,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
     var isNetImportsCorrupted = false;
 
-    if (!PE.isNet() && isNetMetaDataPresent() && PE.getNumberOfImports() == 0) {
+    if (!PE.isNet() && isNetMetaDataPresent() && PE_Cached.numberOfUnmanagedImports == 0) {
         isNetImportsCorrupted = true;
     }
 
@@ -3251,7 +3299,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     var debugSectionIndex = -1;
 
-    for (var i = 0; i < PE.getNumberOfSections() && !isDebugSectionPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfSections && !isDebugSectionPresent; i++) {
         debugSectionIndex = i;
 
         const currentSectionName = PE.getSectionName(i);
@@ -3417,8 +3465,8 @@ function isFrameworkComponent() {
     }
 
     const
-        buildAssemblyName = PE.getNetAssemblyName(),
-        buildModuleName = PE.getNetModuleName();
+        buildAssemblyName = PE_Cached.nameOfNetAssemblyName,
+        buildModuleName = PE_Cached.nameOfNetModuleName;
 
     if (buildAssemblyName.length >= 6 && buildAssemblyName.substring(0, 6) === "System" && buildModuleName === (buildAssemblyName + ".dll")) {
         return true;
@@ -3461,7 +3509,7 @@ function validateSignature(pattern) {
  * @returns {boolean} True if the byte code is found in any section, otherwise false.
  */
 function validateNetByteCode(byteCode) {
-    for (var s = 0; s < PE.getNumberOfSections(); s++) {
+    for (var s = 0; s < PE_Cached.numberOfSections; s++) {
         const
             sectionOffset = PE.getSectionFileOffset(s),
             sectionSize = PE.getSectionFileSize(s);
@@ -3730,7 +3778,7 @@ function scanForObfuscations_Native() {
     const badSectionChars = '-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<> ';
 
     // Iterate through sections and characters to check for forbidden characters
-    for (var i = 0; i < PE.getNumberOfSections() && !isStrangeSectionsPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfSections && !isStrangeSectionsPresent; i++) {
         var sectionName = PE.getSectionName(i);
 
         if (sectionName.length < 3 || (/^.\d.+/.test(sectionName) && sectionName !== ".00cfg") || sectionName[0] === " ") {
@@ -3816,7 +3864,7 @@ function scanForObfuscations_Native() {
 
     var isContainsNoExtensionLibrary = false;
 
-    for (var i = 0; i < PE.getNumberOfImports() && !isContainsNoExtensionLibrary; i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedImports && !isContainsNoExtensionLibrary; i++) {
         const libraryName = PE.getImportLibraryName(i).toLowerCase();
 
         if (libraryName.length > 4) {
@@ -3837,7 +3885,7 @@ function scanForObfuscations_Native() {
 
     var exeInImports = false;
 
-    for (var i = 0; i < PE.getNumberOfImports() && !exeInImports; i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedImports && !exeInImports; i++) {
         const libraryName = PE.getImportLibraryName(i).toLowerCase();
 
         if (libraryName.length > 4) {
@@ -3856,7 +3904,7 @@ function scanForObfuscations_Native() {
 
     var isUnreadableResourcesPresent = false;
 
-    for (var i = 0; i < PE.getNumberOfResources() && !isUnreadableResourcesPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isUnreadableResourcesPresent; i++) {
         if (PE.getResourceOffsetByNumber(i) === -1) {
             isUnreadableResourcesPresent = true;
         }
@@ -3886,7 +3934,7 @@ function scanForObfuscations_Native() {
 
     var isTextSectionNotFirst = false;
 
-    if (PE.getNumberOfSections() > 0 && (PE.section[0].Name !== ".text" && PE.section[0].Name !== ".textbss") && (PE.isSectionNamePresent(".text") || PE.isSectionNamePresent(".textbss")) && PE.section[0] === ".code") {
+    if (PE_Cached.numberOfSections > 0 && (PE.section[0].Name !== ".text" && PE.section[0].Name !== ".textbss") && (PE.isSectionNamePresent(".text") || PE.isSectionNamePresent(".textbss")) && PE.section[0] === ".code") {
         isTextSectionNotFirst = true;
     }
 
@@ -3902,7 +3950,7 @@ function scanForObfuscations_Native() {
 
     if (PE.getImportSection() === -1 && !PE.isDll()) { // DLLs can be resource-only
         isIatMissing = true;
-    } else if (PE.getImportSection() !== -1 && !PE.getNumberOfImports()) {
+    } else if (PE.getImportSection() !== -1 && !PE_Cached.numberOfUnmanagedImports) {
         isEmptyIatPresent = true;
     }
 
@@ -3920,7 +3968,7 @@ function scanForObfuscations_Native() {
     if (PE.isDll()) {
         if (PE.getExportSection() === -1 && PE.getAddressOfEntryPoint()) { // DLL without exports and with EP (not a resource-only DLL)
             isDllEatMissing = true;
-        } else if (PE.getExportSection() !== -1 && !PE.getNumberOfExports()) { // DLL with empty exports
+        } else if (PE.getExportSection() !== -1 && PE_Cached.numberOfUnmanagedExports === 0) { // DLL with empty exports
             isDllEmptyEatPresent = true;
         }
     }
@@ -4156,7 +4204,7 @@ function scanForObfuscations_Native() {
         RWX_CODE_MASK = RWX_MASK | SECTION_FLAGS_CODE;
 
 
-    for (var i = 0; i < PE.getNumberOfSections() && !isRwxSectionPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfSections && !isRwxSectionPresent; i++) {
         var currentSectionCharacteristics = PE.section[i].Characteristics;
 
         if ((currentSectionCharacteristics & RWX_MASK) === RWX_MASK ||
@@ -4180,7 +4228,7 @@ function scanForObfuscations_Native() {
     // Find the section that contains the entry point
     const entryPointRva = PE.getAddressOfEntryPoint() - PE.getImageBase();
 
-    for (var i = 0; i < PE.getNumberOfSections() && !isEpSectionZeroPaddingPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfSections && !isEpSectionZeroPaddingPresent; i++) {
         const
             sectionVirtualAddress = PE.getSectionVirtualAddress(i),
             sectionVirtualSize = PE.getSectionVirtualSize(i);
@@ -4206,7 +4254,7 @@ function scanForObfuscations_Native() {
 
     var tooManySectionsPresent = false;
 
-    if (PE.getNumberOfSections() > 20) {
+    if (PE_Cached.numberOfSections > 20) {
         tooManySectionsPresent = true;
     }
 
@@ -4256,8 +4304,8 @@ function scanForObfuscations_Native() {
 
     var isStrangeExportsPresent = false;
 
-    if (PE.getNumberOfExports() > 0) {
-        for (var i = 0; i < PE.getNumberOfExports() && !isStrangeExportsPresent; i++) {
+    if (PE_Cached.numberOfUnmanagedExports > 0) {
+        for (var i = 0; i < PE_Cached.numberOfUnmanagedExports && !isStrangeExportsPresent; i++) {
             const functionName = PE.getExportFunctionName(i);
 
             if (functionName && (
@@ -4283,7 +4331,7 @@ function scanForObfuscations_Native() {
 
     const badImportChars = '=~!@#$%^&*()"№;%:?*():;,|\'`<> ';
 
-    for (var i = 0; i < PE.getNumberOfImports() && !isStrangeImportsPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedImports && !isStrangeImportsPresent; i++) {
         const libraryName = PE.getImportLibraryName(i);
 
         if (isAsciiString(libraryName)) {
@@ -4306,7 +4354,7 @@ function scanForObfuscations_Native() {
 
     var isStrangeResourcesPresent = false;
 
-    for (var i = 0; i < PE.getNumberOfResources() && !isStrangeResourcesPresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isStrangeResourcesPresent; i++) {
         const resourceName = PE.getResourceNameByNumber(i);
 
         if (resourceName && (!isAsciiString(resourceName) || isNameObfuscated(resourceName))) {
@@ -4338,7 +4386,7 @@ function scanForObfuscations_Native() {
 
     var isNetMetaDataInNativePresent = false;
 
-    if (isNetMetaDataPresent() && PE.getNumberOfImports() > 0) {
+    if (isNetMetaDataPresent() && PE_Cached.numberOfUnmanagedImports > 0) {
         isNetMetaDataInNativePresent = true;
     }
 
@@ -5086,7 +5134,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
     }
 
 
-    for (var i = 0; i < PE.getNumberOfResources(); i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources; i++) {
         var resourceOffset = PE.getResourceOffsetByNumber(i);
 
         if (resourceOffset !== -1) {
@@ -5105,7 +5153,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
     var isPpLibraryPresent = false,
         isCLibraryPresent = false;
 
-    for (var i = 0; i < PE.getNumberOfImports(); i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedImports; i++) {
         const libraryName = PE.getImportLibraryName(i).toLowerCase();
 
         // Detect mangler in imported libraries
@@ -5159,7 +5207,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
 
 
     // Detect mangler in exports
-    for (var e = 0; e < PE.getNumberOfExportFunctions() && !isPpLibraryPresent; e++) {
+    for (var e = 0; e < PE_Cached.numberOfUnmanagedExports && !isPpLibraryPresent; e++) {
         var exportName = PE.getExportFunctionName(e);
         if (exportName && isItemMangled(exportName)) {
             log(logType.any, "Mangler detected at exported item \"" + getNameOfMangledItem(exportName) + "\"");
@@ -5187,7 +5235,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
     // Detect compilers by Rich signature
 
     if (!isCompilerDetected() && PE.isRichSignaturePresent()) {
-        for (var j = 0; j < PE.getNumberOfRichIDs(); j++) {
+        for (var j = 0; j < PE_Cached.numberOfRichIDs; j++) {
             const
                 richId = PE.getRichID(j),
                 richVersion = PE.getRichVersion(j),
@@ -5586,8 +5634,8 @@ function scanForMaliciousCode_NET_and_Native() {
 
         // NjRAT Generic: Detect NjRAT via requests-separator or assembly name
         if (verdicts.length === 0 && (
-            PE.getNetAssemblyName() === "w" || PE.getNetModuleName() === "w.exe" ||
-            PE.getNetAssemblyName() === "k" || PE.getNetModuleName() === "k.exe" ||
+            PE_Cached.nameOfNetAssemblyName === "w" || PE_Cached.nameOfNetModuleName === "w.exe" ||
+            PE_Cached.nameOfNetAssemblyName === "k" || PE_Cached.nameOfNetModuleName === "k.exe" ||
             PE.isNetObjectPresent("njLogger") || PE.isNetUStringPresent("|PWD| ") || PE.isSignatureInSectionPresent(0, separatorToSearch))) {
             verdicts.push({
                 type: "NjRAT",
@@ -5609,7 +5657,7 @@ function scanForMaliciousCode_NET_and_Native() {
         // https://malpedia.caad.fkie.fraunhofer.de/details/win.asyncrat
 
         if (verdicts.length === 0 && (
-            PE.getNetAssemblyName() === "AsyncClient" || PE.getNetModuleName() === "AsyncClient.exe" ||
+            PE_Cached.nameOfNetAssemblyName === "AsyncClient" || PE_Cached.nameOfNetModuleName === "AsyncClient.exe" ||
             PE.isNetObjectPresent("Pastebin")
         )) {
             verdicts.push({
@@ -5622,7 +5670,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
         // https://malpedia.caad.fkie.fraunhofer.de/details/win.nanocore
 
-        if (verdicts.length === 0 && (PE.isNetObjectPresent("ClientLoaderForm") || PE.getNetAssemblyName() === "NanoCore Client")) {
+        if (verdicts.length === 0 && (PE.isNetObjectPresent("ClientLoaderForm") || PE_Cached.nameOfNetAssemblyName === "NanoCore Client")) {
             verdicts.push({
                 type: "NanoCore RAT",
                 version: String(),
@@ -5633,7 +5681,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
         // https://malpedia.caad.fkie.fraunhofer.de/details/win.orcus_rat
 
-        if (verdicts.length === 0 && (PE.getNetModuleName() === "Orcus.exe" || PE.isNetObjectPresent("Orcus.Connections"))) {
+        if (verdicts.length === 0 && (PE_Cached.nameOfNetModuleName === "Orcus.exe" || PE.isNetObjectPresent("Orcus.Connections"))) {
             verdicts.push({
                 type: "Orcus RAT",
                 version: "1.3-1.9.1",
@@ -5642,7 +5690,9 @@ function scanForMaliciousCode_NET_and_Native() {
         }
 
 
-        if (verdicts.length === 0 && (PE.getNetModuleName() === "Client.exe" && PE.isNetObjectPresent("System.Security.Cryptography.X509Certificates"))) {
+        // https://www.broadcom.com/support/security-center/protection-bulletin/liberium-rat-malware
+
+        if (verdicts.length === 0 && (PE_Cached.nameOfNetModuleName === "Client.exe" && PE.isNetObjectPresent("System.Security.Cryptography.X509Certificates"))) {
             verdicts.push({
                 type: "Liberium RAT",
                 version: String(),
@@ -5660,7 +5710,7 @@ function scanForMaliciousCode_NET_and_Native() {
         }
 
 
-        if (verdicts.length === 0 && PE.getNetModuleName() === "Kheir.exe") {
+        if (verdicts.length === 0 && PE_Cached.nameOfNetModuleName === "Kheir.exe") {
             verdicts.push({
                 type: "jnRAT",
                 version: String(),
@@ -5669,7 +5719,7 @@ function scanForMaliciousCode_NET_and_Native() {
         }
 
 
-        if (verdicts.length === 0 && PE.getNetModuleName() === "QatarC.exe") {
+        if (verdicts.length === 0 && PE_Cached.nameOfNetModuleName === "QatarC.exe") {
             verdicts.push({
                 type: "Qatar RAT",
                 version: "1.2",
@@ -5680,7 +5730,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
         // https://malpedia.caad.fkie.fraunhofer.de/details/win.darkrat
 
-        if (verdicts.length === 0 && (PE.getNetModuleName() === "Client.exe" && PE.isNetObjectPresent("fusion"))) {
+        if (verdicts.length === 0 && (PE_Cached.nameOfNetModuleName === "Client.exe" && PE.isNetObjectPresent("fusion"))) {
             verdicts.push({
                 type: "DarkRAT",
                 version: String(),
@@ -5873,7 +5923,7 @@ function scanForMaliciousCode_NET_and_Native() {
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.bit_rat
 
     if (verdicts.length === 0 &&
-        PE.getNumberOfImports() === 1 && (
+        PE_Cached.numberOfUnmanagedImports === 1 && (
             // stub.bin
             PE.isImportPositionHashPresent(0, 0x202c6668) ||
             // stub_tor.bin
@@ -5917,8 +5967,8 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
     if (verdicts.length === 0 &&
-        (PE.getNumberOfImports() === 1 && PE.isImportPositionHashPresent(0, 0x06a04d16)) ||
-        (PE.getNumberOfImports() > 4 && PE.isImportPositionHashPresent(0, 0xa719918b) && PE.isImportPositionHashPresent(-1, 0x9f8ccfc6))
+        (PE_Cached.numberOfUnmanagedImports === 1 && PE.isImportPositionHashPresent(0, 0x06a04d16)) ||
+        (PE_Cached.numberOfUnmanagedImports > 4 && PE.isImportPositionHashPresent(0, 0xa719918b) && PE.isImportPositionHashPresent(-1, 0x9f8ccfc6))
     ) {
         verdicts.push({
             type: "Biorante",
@@ -5945,7 +5995,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
     if (verdicts.length === 0 &&
-        PE.getNumberOfImports() === 1 && PE.isImportPositionHashPresent(0, 0x1b62aa20)) {
+        PE_Cached.numberOfUnmanagedImports === 1 && PE.isImportPositionHashPresent(0, 0x1b62aa20)) {
         verdicts.push({
             type: "Ace RAT",
             version: "1.X",
@@ -5957,7 +6007,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
     if (verdicts.length === 0 &&
-        PE.getNumberOfImports() === 1 &&
+        PE_Cached.numberOfUnmanagedImports === 1 &&
         PE.isRichSignaturePresent() &&
         PE.isImportPositionHashPresent(0, 0x2d6f7e88)) {
         verdicts.push({
@@ -6107,7 +6157,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if (verdicts.length === 0 &&
         !PE.isRichSignaturePresent() &&
-        PE.getNumberOfImports() === 31 &&
+        PE_Cached.numberOfUnmanagedImports === 31 &&
         PE.isImportPositionHashPresent(0, 0xcf603a7d) &&
         PE.isImportPositionHashPresent(-1, 0x0201b2be) &&
         PE.isImportPositionHashPresent(-1, 0x3ca208f6)) {
@@ -6157,13 +6207,13 @@ function scanForMaliciousCode_NET_and_Native() {
     // Check for obfuscated names and anomalous signs in .NET and native assemblies
 
     if (PE.isNet() && (
-        PE.getNetAssemblyName().toLowerCase() === "stub" ||
-        PE.getNetModuleName().toLowerCase().indexOf("stub.") === 0 ||
-        PE.getNetAssemblyName().toLowerCase().indexOf("crypted") !== -1 ||
-        PE.getNetModuleName().toLowerCase().indexOf("crypted") !== -1 ||
-        isNameObfuscated(PE.getNetAssemblyName()) ||
-        isNameObfuscated(PE.getNetModuleName()) ||
-        /(^tmp|\.tmp$)/.test(PE.getNetModuleName())
+        PE_Cached.nameOfNetAssemblyName.toLowerCase() === "stub" ||
+        PE_Cached.nameOfNetModuleName.toLowerCase().indexOf("stub.") === 0 ||
+        PE_Cached.nameOfNetAssemblyName.toLowerCase().indexOf("crypted") !== -1 ||
+        PE_Cached.nameOfNetModuleName.toLowerCase().indexOf("crypted") !== -1 ||
+        isNameObfuscated(PE_Cached.nameOfNetAssemblyName) ||
+        isNameObfuscated(PE_Cached.nameOfNetModuleName) ||
+        /(^tmp|\.tmp$)/.test(PE_Cached.nameOfNetModuleName)
     ) ||
         PE.getVersionStringInfo("OriginalFilename").toLowerCase().indexOf("stub.") === 0 ||
         PE.getVersionStringInfo("InternalName").toLowerCase().indexOf("stub.") === 0 ||
