@@ -695,6 +695,7 @@ function scanForObfuscations_NET() {
         PE.compare("00****00**00", afterCtorOffset) ||
         PE.compare("00**00****00", afterCtorOffset)) {
         log(logType.net, "Short names detected! (mask)");
+
         isShortNamesPresent = true;
     }
 
@@ -703,16 +704,15 @@ function scanForObfuscations_NET() {
 
         const chars = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm";
 
-        for (var i in chars) {
-            if (i > 0 && !isShortNamesPresent) {
-                if (PE.isNetObjectPresent(chars[i])) {
-                    shortNamesFound++;
-                    log(logType.net, "Short name found: \"" + chars[i] + "\" (" + shortNamesFound + "/20)");
-                }
+        for (var i = 1; i < chars.length && !isShortNamesPresent; i++) {
+            if (PE.isNetObjectPresent(chars[i])) {
+                log(logType.net, "Short name found: \"" + chars[i] + "\" (" + shortNamesFound + "/20)");
 
-                if (shortNamesFound === 20) {
-                    isShortNamesPresent = true;
-                }
+                shortNamesFound++;
+            }
+
+            if (shortNamesFound === 20) {
+                isShortNamesPresent = true;
             }
         }
     }
@@ -865,22 +865,18 @@ function scanForObfuscations_NET() {
         opCodes.ldc_i4 + opCodes.ldc_i4 + "%s" + opCodes.br_s // samples by: [Unknown protector, only samples]
     ];
 
-    for (var y in mathTemplates) {
-        if (!isMutationsPresent) {
-            const template = mathTemplates[y];
+    for (var y = 0; y < mathTemplates.length && !isMutationsPresent; y++) {
+        const template = mathTemplates[y];
 
-            for (var e in mathOpCodes) {
-                if (!isMutationsPresent) {
-                    if (e == 0 && !validateNetByteCode(replaceAllInString(template, "%s", opCodes._unknown))) break; // No math mutations
+        for (var e = 0; e < mathOpCodes.length && !isMutationsPresent; e++) {
+            if (e === 0 && !validateNetByteCode(replaceAllInString(template, "%s", opCodes._unknown))) break; // No math mutations
 
-                    const pattern = replaceAllInString(template, "%s", mathOpCodes[e]);
+            const pattern = replaceAllInString(template, "%s", mathOpCodes[e]);
 
-                    if (validateNetByteCode(pattern)) {
-                        log(logType.net, "Math mutations detected! Offset: " + lastOffsetDetected);
+            if (validateNetByteCode(pattern)) {
+                log(logType.net, "Math mutations detected! Offset: " + lastOffsetDetected);
 
-                        isMutationsPresent = true;
-                    }
-                }
+                isMutationsPresent = true;
             }
         }
     }
@@ -1052,17 +1048,14 @@ function scanForObfuscations_NET() {
     var obfuscatorAttributeFound = String();
 
     // Iterate through obfuscators attributes
-    for (var t in obfuscatorsAttributes) {
-        if (!isFakeSignaturesPresent) {
-            if (validateNetObject(obfuscatorsAttributes[t])) {
-                obfuscatorAttributeFound = obfuscatorsAttributes[t];
-                signaturesCounter++;
-            }
+    for (var t = 0; t < obfuscatorsAttributes.length; t++) {
+        if (validateNetObject(obfuscatorsAttributes[t])) {
+            obfuscatorAttributeFound = obfuscatorsAttributes[t];
+            signaturesCounter++;
 
-            // Check if the number of detected signatures exceeds 1
             if (signaturesCounter > 1) {
-                // Set flag indicating the presence of fake signatures
                 isFakeSignaturesPresent = true;
+                break;
             }
         }
     }
@@ -1156,17 +1149,17 @@ function scanForObfuscations_NET() {
     // Волки делают АУФ 🐺☝️
 
     if (isFakeSignaturesPresent) {
-        for (var d in protectorsLabelsToRemove) {
-            _removeResult("protector", protectorsLabelsToRemove[d]);
+        for (var i = 0; i < protectorsLabelsToRemove.length; i++) {
+            _removeResult("protector", protectorsLabelsToRemove[i]);
         }
 
-        for (var d in packersLabelsToRemove) {
-            _removeResult("cryptor", packersLabelsToRemove[d]);
-            _removeResult("packer", packersLabelsToRemove[d]);
+        for (var i = 0; i < packersLabelsToRemove.length; i++) {
+            _removeResult("cryptor", packersLabelsToRemove[i]);
+            _removeResult("packer", packersLabelsToRemove[i]);
         }
 
-        for (var d in protectionsLabelsToRemove) {
-            _removeResult("protection", protectionsLabelsToRemove[d]);
+        for (var i = 0; i < protectionsLabelsToRemove.length; i++) {
+            _removeResult("protection", protectionsLabelsToRemove[i]);
         }
     }
 
@@ -2235,7 +2228,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 isSfx = true;
             }
 
-            for (var k in sfxEntries) {
+            for (var k = 0; k < sfxEntries.length; k++) {
                 if (PE.compareEP(sfxEntries[k])) {
                     log(logType.nothing, "EP like SFX: \"" + sfxEntries[k] + "\"");
 
@@ -3843,11 +3836,9 @@ function scanForObfuscations_Native() {
         isCustomDosPresent = true;
 
         // Iterate through messages to check for custom DOS
-        for (var d in messages) {
-            if (isCustomDosPresent) {
-                if (PE.isSignaturePresent(PE.getDosStubOffset(), PE.getDosStubSize(), "'" + messages[d] + "'")) {
-                    isCustomDosPresent = false;
-                }
+        for (var d = 0; d < messages.length && isCustomDosPresent; d++) {
+            if (PE.isSignaturePresent(PE.getDosStubOffset(), PE.getDosStubSize(), "'" + messages[d] + "'")) {
+                isCustomDosPresent = false;
             }
         }
     }
@@ -6229,8 +6220,8 @@ function scanForMaliciousCode_NET_and_Native() {
                 "InternalName"
             ];
 
-            for (var fieldToCheck in fieldsToCheck) {
-                if (isNameObfuscated(PE.getVersionStringInfo(fieldToCheck))) return true;
+            for (var i = 0; i < fieldsToCheck.length; i++) {
+                if (isNameObfuscated(PE.getVersionStringInfo(fieldsToCheck[i]))) return true;
             }
 
             return false;
