@@ -156,10 +156,12 @@ function detect() {
             PE.isRichSignaturePresent() &&
             PE.getExportSection() !== -1 && // EAT always present
             PE.getNumberOfSections() >= 6) { // PE.isLibraryPresentExp(/^api-ms-win-crt-.*\.dll$/)
-
-            if (isDotNetRuntimeDebugBuild ||
-                PE.isSignatureInSectionPresent(secondSection.Number, "'DOTNET_' %%") && // .rdata, release
-                PE.isSignatureInSectionPresent(secondSection.Number, "'System.' %% %% %% %% %% %%")) { // .rdata, release
+            if (isDotNetRuntimeDebugBuild || (
+                PE.isSignatureInSectionPresent(secondSection.Number, "'System.' %% %% %% %% %% %%") && (
+                    PE.isSignatureInSectionPresent(secondSection.Number, "'DOTNET_' %%") || // .rdata, release
+                    PE.isSignatureInSectionPresent(secondSection.Number, "'D'00'O'00'T'00'N'00'E'00'T'00'_'") // .rdata, release (.NET 10)
+                )
+            )) {
                 isNetNative = true;
 
                 if (isDotNetRuntimeDebugBuild) {
@@ -177,7 +179,7 @@ function detect() {
                 }
             }
 
-            // TODO: Improve (!!!!!!)
+            // TODO: Improve & add .NET 10 support (!!!!!!)
             const netCoreConfigPattern = findNetCoreConfigOffset();
 
             if (netCoreConfigPattern != -1) dotNetLibraryVersion = getNetConfigStringByOffset(netCoreConfigPattern);
