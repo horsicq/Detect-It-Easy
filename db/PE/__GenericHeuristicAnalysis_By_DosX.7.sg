@@ -3704,15 +3704,11 @@ function isNameObfuscated(name) {
  * 
  * The function checks for:
  * - Tokens shorter than 7 characters are automatically considered clean
+ * - Common legitimate patterns (dates, versions, UUIDs, etc.)
  * - Hexadecimal strings (8+ chars) like 'd3adc0de'
- * - Regular expression patterns indicating mixed alphanumeric sequences with:
- *   - Minimum 4 digits
- *   - Letter-digit-letter pattern
- * - Statistical character analysis requiring either:
- *   - 7+ digits (absolute count)
- *   - High digit density (>35% of total characters)
- *   - Balanced mix (5+ digits, 3+ lowercase AND 3+ uppercase)
- *   - Digit-heavy with lowercase (5+ digits, 5+ lowercase)
+ * - Regular expression patterns indicating mixed alphanumeric sequences
+ * - Statistical character analysis with entropy detection
+ * - Repetitive pattern detection
  *
  * @param {string} token - The string token to analyze
  * @returns {boolean} True if token matches obfuscation patterns, false otherwise
@@ -3720,37 +3716,90 @@ function isNameObfuscated(name) {
 function isTokenObfuscated(token) {
     if (!token || token.length < 7) return false;
 
-    // Exclude common date patterns: YYYY-YYYY, YYYY/YYYY, DD.MM.YYYY, etc.
-    if (token.match(/^\d{4}[-\/\.]\d{4}$/) ||  // 1996-2025, 2020/2025
-        token.match(/^\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4}$/) ||  // 01.12.2025, 1/12/25
-        token.match(/^\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}$/)) return false;  // 2025-12-01, 2025/12/1
+    // === WHITELIST: Common legitimate patterns ===
 
-    if (token.match(/^(?=\d|[a-z])(?=.*[a-z]\d[a-z])(?=(?:.*\d){4,})/i)) {
-        return true;
-    }
+    // Date patterns: YYYY-YYYY, DD.MM.YYYY, YYYY-MM-DD
+    if (token.match(/^\d{4}[-\/\.]\d{4}$/) ||
+        token.match(/^\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4}$/) ||
+        token.match(/^\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}$/)) return false;
 
-    var stats = { digits: 0, lower: 0, upper: 0 };
+    // Version numbers: v1.2.3, 1.0.0.0, 10.15.7
+    if (token.match(/^v?\d+(\.\d+){1,4}$/i)) return false;
+
+    // UUIDs: 550e8400-e29b-41d4-a716-446655440000
+    if (token.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) return false;
+
+    // Common hex prefixes: 0x1234ABCD, 0X1A2B3C4D
+    if (token.match(/^0x[0-9a-f]+$/i)) return false;
+
+    // File sizes with units: 123KB, 45.6MB, 1.5GB
+    if (token.match(/^\d+(\.\d+)?(bytes?|[kmgt]b)$/i)) return false;
+
+    // IP addresses: 192.168.1.1
+    if (token.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) return false;
+
+    // Common abbreviations/acronyms (all caps with digits): DX11, OpenGL3, Win32
+    if (token.match(/^[A-Z]{2,}[0-9]{1,3}$/)) return false;
+
+    // === OBFUSCATION DETECTION ===
+
+    var stats = { digits: 0, lower: 0, upper: 0, special: 0, transitions: 0 };
+    var charTypes = [];
 
     for (var i = 0; i < token.length; i++) {
         var char = token[i];
+        var prevType = charTypes[charTypes.length - 1];
+        var currType;
+
         if (char >= '0' && char <= '9') {
             stats.digits++;
+            currType = 'digit';
         } else if (char >= 'a' && char <= 'z') {
             stats.lower++;
+            currType = 'lower';
         } else if (char >= 'A' && char <= 'Z') {
             stats.upper++;
+            currType = 'upper';
+        } else {
+            stats.special++;
+            currType = 'special';
+        }
+
+        charTypes.push(currType);
+        if (prevType && prevType !== currType) {
+            stats.transitions++;
         }
     }
 
-    if (token.match(/^[0-9a-f]{8,}$/i)) return true;  // Detects hashes like d3adc0de
+    const
+        totalChars = token.length,
+        alphaChars = stats.lower + stats.upper;
 
-    const totalChars = token.length;
+    // Detect excessive character type transitions (obfuscation indicator)
+    const transitionRatio = stats.transitions / totalChars;
+    if (transitionRatio > 0.6 && stats.digits >= 4) return true;
 
+    // Detect repetitive patterns (e.g., "a1b2c3d4e5")
+    if (token.match(/^(?:[a-z]\d){4,}$/i)) return true;
+
+    // Pattern: letter-digit-letter with 4+ total digits
+    if (token.match(/^(?=\d|[a-z])(?=.*[a-z]\d[a-z])(?=(?:.*\d){4,})/i)) return true;
+
+    // Detect pure hex strings (8+ chars) - likely hashes
+    if (token.match(/^[0-9a-f]{8,}$/i)) {
+        // Exception: common words that are hex-valid (like "decade", "faded")
+        if (!token.match(/^(dead|beef|cafe|babe|fade|deed|feed|face|decade|deface)$/i)) {
+            return true;
+        }
+    }
+
+    // Statistical thresholds for obfuscation
     return (
-        (stats.digits >= 7) ||
-        (stats.digits >= 4 && stats.digits / totalChars > 0.35) ||
-        (stats.digits >= 5 && stats.lower >= 3 && stats.upper >= 3) ||
-        (stats.digits >= 6 && stats.lower >= 5)
+        (stats.digits >= 7) ||  // Too many digits
+        (stats.digits >= 4 && stats.digits / totalChars > 0.4) ||  // High digit density (raised from 0.35)
+        (stats.digits >= 5 && stats.lower >= 3 && stats.upper >= 3) ||  // Balanced mix (suspicious)
+        (stats.digits >= 6 && stats.lower >= 5) ||  // Many digits + lowercase
+        (alphaChars >= 5 && stats.digits >= 5 && stats.upper === 0 && stats.lower === alphaChars)  // No uppercase variation
     );
 }
 
