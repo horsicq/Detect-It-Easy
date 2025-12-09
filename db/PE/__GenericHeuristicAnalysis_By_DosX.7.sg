@@ -3720,6 +3720,11 @@ function isNameObfuscated(name) {
 function isTokenObfuscated(token) {
     if (!token || token.length < 7) return false;
 
+    // Exclude common date patterns: YYYY-YYYY, YYYY/YYYY, DD.MM.YYYY, etc.
+    if (token.match(/^\d{4}[-\/\.]\d{4}$/) ||  // 1996-2025, 2020/2025
+        token.match(/^\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4}$/) ||  // 01.12.2025, 1/12/25
+        token.match(/^\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}$/)) return false;  // 2025-12-01, 2025/12/1
+
     if (token.match(/^(?=\d|[a-z])(?=.*[a-z]\d[a-z])(?=(?:.*\d){4,})/i)) {
         return true;
     }
@@ -6239,7 +6244,9 @@ function scanForMaliciousCode_NET_and_Native() {
             ];
 
             for (var i = 0; i < fieldsToCheck.length; i++) {
-                if (isNameObfuscated(PE.getVersionStringInfo(fieldsToCheck[i]))) return true;
+                if (isNameObfuscated(PE.getVersionStringInfo(fieldsToCheck[i]))) {
+                    return true;
+                }
             }
 
             return false;
