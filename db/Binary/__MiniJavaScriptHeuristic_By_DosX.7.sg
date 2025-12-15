@@ -21,19 +21,82 @@ function main() {
                     if (Binary.getSize() > 3000) {
                         var scriptContent = Binary.getString(0x00, Binary.getSize());
 
-                        var unquotedContent = String(),
-                            inQuotes = false;
+                        // Split the code into segments that are outside of string literals.
+                        // Handle escaping (\", \\', \`) — escaped quotes are not treated as string delimiters.
+                        // Also include expressions inside template literals `${...}` as code (they will be scanned).
+                        var segments = [],
+                            currentSegment = String(),
+                            insideString = false,
+                            stringDelimiter = String(),
+                            isEscaped = false;
 
                         for (var i = 0; i < scriptContent.length; i++) {
-                            if (scriptContent[i] === '"' || scriptContent[i] === "'" || scriptContent[i] === '`') {
-                                inQuotes = !inQuotes;
-                            } else if (!inQuotes) {
-                                unquotedContent += scriptContent[i];
+                            var currChar = scriptContent[i];
+
+                            if (insideString) {
+                                if (isEscaped) {
+                                    isEscaped = false;
+                                    continue;
+                                }
+                                if (currChar === '\\') {
+                                    isEscaped = true;
+                                    continue;
+                                }
+
+                                // For template literals: when encountering `${` include nested expression into current segment
+                                if (stringDelimiter === '`' && currChar === '$' && i + 1 < scriptContent.length && scriptContent[i + 1] === '{') {
+                                    // skip '{' and start accumulating the expression content
+                                    i++; // now scriptContent[i] === '{'
+                                    var braceDepth = 1;
+                                    // Inside the expression, handle escaping as well
+                                    while (i + 1 < scriptContent.length && braceDepth > 0) {
+                                        i++;
+                                        var innerChar = scriptContent[i];
+                                        if (innerChar === '\\') {
+                                            // capture escaped char and the next one
+                                            currentSegment += innerChar;
+                                            if (i + 1 < scriptContent.length) {
+                                                i++; currentSegment += scriptContent[i];
+                                            }
+                                            continue;
+                                        }
+                                        if (innerChar === '{') { braceDepth++; currentSegment += innerChar; continue; }
+                                        if (innerChar === '}') { braceDepth--; if (braceDepth === 0) break; currentSegment += innerChar; continue; }
+                                        currentSegment += innerChar;
+                                    }
+                                    continue;
+                                }
+
+                                if (currChar === stringDelimiter) {
+                                    insideString = false;
+                                    stringDelimiter = String();
+                                }
+                                // do not copy characters that are inside strings
+                            } else {
+                                // not inside a string
+                                if (currChar === '"' || currChar === "'" || currChar === '`') {
+                                    // start of string — finish current segment
+                                    if (currentSegment.length > 0) { segments.push(currentSegment); currentSegment = String(); }
+                                    insideString = true;
+                                    stringDelimiter = currChar;
+                                } else {
+                                    currentSegment += currChar;
+                                }
                             }
                         }
 
-                        if (/\s{2}/.test(unquotedContent)) {
-                            options = "minified/compiled";
+                        if (currentSegment.length > 0) segments.push(currentSegment);
+
+                        for (var segIndex = 0; segIndex < segments.length; segIndex++) {
+                            var tokenToProcess = segments[segIndex];
+                            _debug("seg: " + tokenToProcess + "; formatted? " + /(  |\t)/.test(tokenToProcess));
+                            if (!/(  |\t)/.test(tokenToProcess) && (
+                                /(((var|let|const)[\t ]|\())\b[a-zA-Z](?:,[a-zA-Z]){3,}\b/.test(tokenToProcess) ||
+                                /[a-zA-Z]=?=?=![01][;,})]/.test(tokenToProcess)
+                            )) {
+                                options = "minified/compiled";
+                                break;
+                            }
                         }
                     }
                 }
