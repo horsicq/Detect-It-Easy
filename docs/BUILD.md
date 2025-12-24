@@ -23,10 +23,10 @@ sudo apt-get install qtbase5-dev qtscript5-dev qttools5-dev-tools libqt5svg5-dev
 sudo apt-get install qt5-default -y
 ```
 
-- Ubuntu 21.04-25.04
+- Ubuntu 21.04-25.10
 
 ```bash
-sudo apt-get install qtchooser qt5-qmake -y
+sudo apt-get install qtchooser qt5-qmake pkg-config -y
 ```
 
 #### Clone this repo recursively:
@@ -254,3 +254,4 @@ sudo apt-get install --quiet --assume-yes build-essential qtbase5-dev qttools5-d
 chmod a+x build_dpkg.sh
 ./build_dpkg.sh
 ```
+
