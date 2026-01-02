@@ -4,17 +4,26 @@
 meta("tool", "Nero Burning ROM");
 
 function detect() {
-    if (ISO9660.getString(0x823E, 21) == "NERO BURNING ROM VER ") {
-        sVersion = ISO9660.getString(0x8253, 9);
-        // Convert version "12,0,20,0" -> "12.0.20000"
-        var versionParts = sVersion.split(",");
-        if (versionParts.length >= 3) {
-            var major = versionParts[0];
-            var minor = versionParts[1];
-            var build = parseInt(versionParts[2], 10) * 1000;
-            sVersion = major + "." + minor + "." + build.toString();
-        }
+    var sAppId = ISO9660.getApplicationIdentifier();
+    
+	if (sAppId.indexOf("NERO___BURNING_ROM") !== -1) {
+	    bDetected = true;
+	} else if (sAppId.indexOf("NERO BURNING ROM") !== -1) {
         bDetected = true;
+        
+        // Try to extract version if present
+        var nVerPos = sAppId.indexOf("VER ");
+        if (nVerPos !== -1) {
+            var sVersionRaw = sAppId.substring(nVerPos + 4, nVerPos + 13).trim();
+            // Convert version "12,0,20,0" -> "12.0.20000"
+            var versionParts = sVersionRaw.split(",");
+            if (versionParts.length >= 3) {
+                var major = versionParts[0];
+                var minor = versionParts[1];
+                var build = parseInt(versionParts[2], 10) * 1000;
+                sVersion = major + "." + minor + "." + build.toString();
+            }
+        }
     }
 
     return result();
