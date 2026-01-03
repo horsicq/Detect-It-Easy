@@ -1,21 +1,42 @@
 // Detect It Easy: detection rule file
 
+// Author: DosX
+// E-Mail: collab@kay-software.ru
+// GitHub: https://github.com/DosX-dev
+// Telegram: @DosX_dev
+// ---------------------------------
+// Author of original rule: BJNFNE
+
 // https://en.wikipedia.org/wiki/Program_database
 meta("format", "Microsoft Program Database (.PDB)");
 
 function detect() {
-    if (Binary.compare("'Microsoft C/C++ program database 2.00\r\n\'1A4A470000")) {
+    if (Binary.compare("'BSJB'0100")) {
+        sVersion = "1.0";
+        bDetected = true;
+    } else if (Binary.compare("'Microsoft C/C++ program database 2.00\r\n\'1A4A470000")) {
         sVersion = "2.0";
-        sLang = "C++";
         bDetected = true;
     } else if (Binary.compare("'Microsoft C/C++ MSF 7.00\r\n'1A4453000000")) {
         sVersion = "7.0";
-        sLang = "C++";
         bDetected = true;
-    } else if (Binary.compare("'BSJB'0100")) {
-        sVersion = "1.0";
-        sLang = "MSIL"; // todo: upgrade detection 
-        bDetected = true;
+    }
+
+    if (bDetected) {
+        var refs = {
+            "'$'11'@P:Microsoft.VisualBasic'00": "VB.NET",
+            "%%%%%%%%%%'.cs'00": "C#",
+            "'$'11'@P:FSharp.Core'00": "F#",
+            "'std::'%%%%%%": "C++"
+            // todo
+        };
+
+        for (var key in refs) {
+            if (Binary.isSignaturePresent(0, 0x900000, key)) {
+                sLang = refs[key];
+                break;
+            }
+        }
     }
 
     return result();
