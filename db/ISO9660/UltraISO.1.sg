@@ -2,12 +2,33 @@
 // Author: BJNFNE <bjnfne@web.de>
 
 // https://www.ultraiso.com/
-meta("iso", "UltraISO");
+meta("tool", "UltraISO");
 
 function detect() {
-    if (Binary.compare("'9.2.0.2536'", 0x0000837c)) {
-        sVersion = "9.2.0.2536";
+    if (ISO9660.getString(0x8373) == "ULTRAISO") {
+        sVersion = ISO9660.getString(0x837c);
         bDetected = true;
+    }
+    
+    if (!bDetected) {
+        var sAppId = ISO9660.getApplicationIdentifier();
+        
+        if (sAppId.indexOf("UltraISO") !== -1) {
+            bDetected = true;
+            
+            // Try to extract version if present
+            // Format: "UltraISO V7.2 CD & DVD Image Creator, Copyright (c)2002-2004 EZB Systems, Inc."
+            var nVerPos = sAppId.indexOf("UltraISO");
+            if (nVerPos !== -1) {
+                var sVersionPart = sAppId.substring(nVerPos + 9).trim();
+                if (sVersionPart.charAt(0) === 'V') {
+                    var nSpacePos = sVersionPart.indexOf(" ");
+                    if (nSpacePos !== -1) {
+                        sVersion = sVersionPart.substring(1, nSpacePos);
+                    }
+                }
+            }
+        }
     }
 
     return result();
