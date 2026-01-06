@@ -10,25 +10,22 @@ on:
       - master
 
 jobs:
-  format: 
+  format:
     runs-on: ubuntu-latest
     
     permissions:
-      contents:  write
+      contents:   write
     
-    steps: 
-      - name:  Checkout repository
-        uses: actions/checkout@v4
-        with:
+    steps:  
+      - name: Checkout repository
+        uses:   actions/checkout@v4
+        with: 
           token: ${{ secrets. RELEASE_TOKEN }}
       
-      - name: Setup Node. js
-        uses:  actions/setup-node@v4
-        with:
-          node-version: '20'
-      
-      - name:  Install Prettier
-        run:  npm install -g prettier
+      - name:  Configure git to preserve line endings
+        run: |
+          git config --local core.autocrlf false
+          git config --local core.eol lf
       
       - name: Format JavaScript files in db directories
         run: |
@@ -36,13 +33,13 @@ jobs:
             !  -path '*/.vscode/*' \
             ! -path '*/_icons/*' \
             ! -name '*.txt' \
-            ! -name '*.md' \
-            ! -name '*.png' \
-            ! -name '*.ico' \
-            ! -name '*.svg' \
+            !  -name '*.md' \
+            !  -name '*.png' \
+            !  -name '*.ico' \
+            !  -name '*.svg' \
             -print0 2>/dev/null | while IFS= read -r -d '' file; do
-              # Skip files with beautify ignore comment
-              if grep -q 'beautify ignore: start' "$file" 2>/dev/null; then
+              # Skip files with beautify ignore comment (with or without spaces)
+              if grep -qE 'beautify ignore:\s*start' "$file" 2>/dev/null; then
                 echo "Skipping (beautify ignore): $file"
                 continue
               fi
@@ -51,24 +48,25 @@ jobs:
               if head -c 1000 "$file" 2>/dev/null | grep -qE '(function|var |if\s*\(|for\s*\(|return |includeScript)'; then
                 echo "Formatting: $file"
                 
-                # Check if file ends with newline
-                if [ -s "$file" ] && [ "$(tail -c 1 "$file" | od -An -tx1 | tr -d ' ')" = "0a" ]; then
-                  HAS_NEWLINE=true
+                # Save original file for comparison
+                cp "$file" "$file.orig"
+                
+                # Remove trailing whitespace only (preserve everything else)
+                perl -pi -e 's/[ \t]+$//' "$file"
+                
+                # Convert tabs to 4 spaces
+                perl -pi -e 's/\t/    /g' "$file"
+                
+                # If file is unchanged, restore original to avoid any byte differences
+                if cmp -s "$file" "$file.orig"; then
+                  mv "$file.orig" "$file"
                 else
-                  HAS_NEWLINE=false
-                fi
-                
-                # Format with prettier
-                prettier --write "$file" --parser babel || true
-                
-                # Restore original ending if file had no trailing newline
-                if [ "$HAS_NEWLINE" = false ] && [ -s "$file" ]; then
-                  truncate -s -1 "$file" 2>/dev/null || perl -pi -e 'chomp if eof' "$file"
+                  rm "$file.orig"
                 fi
               fi
             done
       
-      - name: Check for changes
+      - name:  Check for changes
         id: check_changes
         run:  |
           if git diff --quiet; then
@@ -78,9 +76,9 @@ jobs:
           fi
       
       - name:  Commit and push changes
-        if: steps.check_changes. outputs.has_changes == 'true'
+        if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply. github.com"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add -A
           git commit -m "style: auto-format JavaScript files in db directories"
