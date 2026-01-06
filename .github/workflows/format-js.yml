@@ -10,21 +10,21 @@ on:
       - master
 
 jobs:
-  format:
+  format: 
     runs-on: ubuntu-latest
     
     permissions:
       contents:  write
     
     steps: 
-      - name: Checkout repository
+      - name:  Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets. RELEASE_TOKEN }}
       
       - name: Setup Node. js
         uses:  actions/setup-node@v4
-        with:  
+        with:
           node-version: '20'
       
       - name:  Install Prettier
@@ -32,17 +32,14 @@ jobs:
       
       - name: Format JavaScript files in db directories
         run: |
-          # Find all files (excluding .vscode, _icons, and binary files)
-          # Format files that contain JavaScript-like syntax
-          
           find db db_custom db_extra -type f \
             !  -path '*/.vscode/*' \
             ! -path '*/_icons/*' \
             ! -name '*.txt' \
-            !  -name '*.md' \
-            !  -name '*.png' \
-            !  -name '*.ico' \
-            !  -name '*.svg' \
+            ! -name '*.md' \
+            ! -name '*.png' \
+            ! -name '*.ico' \
+            ! -name '*.svg' \
             -print0 2>/dev/null | while IFS= read -r -d '' file; do
               # Skip files with beautify ignore comment
               if grep -q 'beautify ignore: start' "$file" 2>/dev/null; then
@@ -53,11 +50,25 @@ jobs:
               # Check if file contains JavaScript-like syntax
               if head -c 1000 "$file" 2>/dev/null | grep -qE '(function|var |if\s*\(|for\s*\(|return |includeScript)'; then
                 echo "Formatting: $file"
-                prettier --write "$file" --parser babel --tab-width 4 --print-width 80 || true
+                
+                # Check if file ends with newline
+                if [ -s "$file" ] && [ "$(tail -c 1 "$file" | od -An -tx1 | tr -d ' ')" = "0a" ]; then
+                  HAS_NEWLINE=true
+                else
+                  HAS_NEWLINE=false
+                fi
+                
+                # Format with prettier
+                prettier --write "$file" --parser babel || true
+                
+                # Restore original ending if file had no trailing newline
+                if [ "$HAS_NEWLINE" = false ] && [ -s "$file" ]; then
+                  truncate -s -1 "$file" 2>/dev/null || perl -pi -e 'chomp if eof' "$file"
+                fi
               fi
             done
       
-      - name:  Check for changes
+      - name: Check for changes
         id: check_changes
         run:  |
           if git diff --quiet; then
@@ -67,7 +78,7 @@ jobs:
           fi
       
       - name:  Commit and push changes
-        if: steps.check_changes.outputs.has_changes == 'true'
+        if: steps.check_changes. outputs.has_changes == 'true'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply. github.com"
           git config --local user.name "github-actions[bot]"
