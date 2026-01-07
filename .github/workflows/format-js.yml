@@ -8,50 +8,68 @@ on:
       - 'db_extra/**'
     branches: 
       - master
+      
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   format:
     runs-on: ubuntu-latest
     
     permissions:
-      contents:  write
+      contents:   write
     
-    steps:
+    steps:  
       - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
+        uses:   actions/checkout@v4
+        with: 
           token: ${{ secrets. RELEASE_TOKEN }}
       
-      - name:  Setup Node.js
-        uses: actions/setup-node@v4
-        with: 
-          node-version:  '20'
-      
-      - name:  Install Prettier
-        run:  npm install -g prettier
+      - name:  Configure git to preserve line endings
+        run: |
+          git config --local core.autocrlf false
+          git config --local core.eol lf
       
       - name: Format JavaScript files in db directories
         run: |
-          # Find all files (excluding . vscode, _icons, and binary files)
-          # Format files that contain JavaScript-like syntax
-          
           find db db_custom db_extra -type f \
             !  -path '*/.vscode/*' \
             ! -path '*/_icons/*' \
-            !  -name '*.txt' \
+            ! -name '*.txt' \
             !  -name '*.md' \
             !  -name '*.png' \
             !  -name '*.ico' \
             !  -name '*.svg' \
             -print0 2>/dev/null | while IFS= read -r -d '' file; do
+              # Skip files with beautify ignore comment (with or without spaces)
+              if grep -qE 'beautify ignore:\s*start' "$file" 2>/dev/null; then
+                echo "Skipping (beautify ignore): $file"
+                continue
+              fi
+              
               # Check if file contains JavaScript-like syntax
               if head -c 1000 "$file" 2>/dev/null | grep -qE '(function|var |if\s*\(|for\s*\(|return |includeScript)'; then
-                echo "Formatting:  $file"
-                prettier --write "$file" --parser babel --tab-width 4 --print-width 120 || true
+                echo "Formatting: $file"
+                
+                # Save original file for comparison
+                cp "$file" "$file.orig"
+                
+                # Remove trailing whitespace only (preserve everything else)
+                perl -pi -e 's/[ \t]+$//' "$file"
+                
+                # Convert tabs to 4 spaces
+                perl -pi -e 's/\t/    /g' "$file"
+                
+                # If file is unchanged, restore original to avoid any byte differences
+                if cmp -s "$file" "$file.orig"; then
+                  mv "$file.orig" "$file"
+                else
+                  rm "$file.orig"
+                fi
               fi
             done
       
-      - name: Check for changes
+      - name:  Check for changes
         id: check_changes
         run:  |
           if git diff --quiet; then
@@ -63,7 +81,7 @@ jobs:
       - name:  Commit and push changes
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          git config --local user.email "github-actions[bot]@users. noreply.github.com"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add -A
           git commit -m "style: auto-format JavaScript files in db directories"
