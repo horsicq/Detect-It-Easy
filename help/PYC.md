@@ -1,4 +1,4 @@
-###This is a description of the PYC class.
+# PYC Class Reference
 
 * You could use all functions from Binary class but with PYC prefix (Binary.compare -> PYC.compare)
 
