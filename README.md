@@ -39,6 +39,7 @@ Detect It Easy supports a wide range of executable and archive types, including:
 -   **IPA** (iOS Application Package)
 -   **JAR** (Java Archive)
 -   **ZIP** (Compressed archives)
+-   **ISO9660** (Optical media format)
 -   **DEX** (Dalvik Executable for Android)
 -   **MS-DOS** (MS-DOS executable files)
 -   **COM** (Simple executable format for DOS)
