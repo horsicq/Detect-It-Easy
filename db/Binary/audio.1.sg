@@ -12,7 +12,21 @@ includeScript("soundchips");
 includeScript("bytecodeparsers");
 const debug = 0; //verbosity up to 3, where every note/command is shown. Overrides the debug() function; use _l2r()
 
+function isWinCert() {
+	// I'll skip WIN_CERTIFICATE+bCertificate things for overlay scans to save time :)
+	if(X.Sz() >= (_wcsz=X.U32(0,_LE)) && X.c('00 02 02 00 30', 4)) { // assuming the tag's just present immediately
+		_wcp = 9; _wca = X.U8(_wcp++);
+		if(_wca < 0x80) {} else if(_wca > 0x80) {
+			_wcc = _wca ^ 0x80; for(_wci=_wca=0; _wci < _wcc; _wci++) _wca = (_wca << 8) + X.U8(_wcp++); //big-endian here
+		}  else _wca = -1;
+		if(_wca > 0 && _wca+_wcp <= _wcsz && X.c("06 09 2A 86 48 86 F7 0D 01 07 02",_wcp)) return true; //handoff to other decectors
+	}
+	return false
+}
+
 function detect() {
+
+	if(isWinCert()) { return; }
 
 	// this C-like pre-declaration is here because lol Qt6
 	var p = 0, i = 0, j = 0, k = 0, l = 0, r = 0, t = 0, x = 0, sz = -1,
