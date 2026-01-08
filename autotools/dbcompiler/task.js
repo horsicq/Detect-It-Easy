@@ -34,6 +34,12 @@ function replaceArrowFunctions(text) {
     return text;
 }
 
+function fixDeleteStatements(text) {
+    // Replace "delete varName" with "varName = undefined" to avoid strict mode errors
+    return text.replace(/\bdelete\s+([a-zA-Z_$][\w$]*)\s*;/g, (match, varName) => {
+        return varName + '=undefined;';
+    });
+}
 
 function processFile(srcFile, dstFile) {
     stats.total++;
@@ -50,10 +56,15 @@ function processFile(srcFile, dstFile) {
 
     if (shouldMinify(srcFile)) {
         try {
+            // Pre-process to fix strict mode issues
+            text = fixDeleteStatements(text);
 
             const result = UglifyJS.minify(text, {
                 compress: true,
                 mangle: true,
+                parse: {
+                    bare_returns: true,
+                },
                 output: {
                     beautify: false,
                     comments: false,
