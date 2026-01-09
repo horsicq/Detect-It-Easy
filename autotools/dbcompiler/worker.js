@@ -8,7 +8,7 @@ function shouldMinify(filePath) {
     return ext === ".sg" || ext === "";
 }
 
-function replaceLetWithVarSafe(text) {
+function parseJSCodeSafe(text, replacer) {
     let result = '';
     let i = 0;
 
@@ -25,18 +25,15 @@ function replaceLetWithVarSafe(text) {
             while (i < text.length) {
                 const c = text[i];
                 result += c;
+                i++;
 
-                if (c === '\\' && i + 1 < text.length) {
+                if (c === '\\' && i < text.length) {
                     // Skip escaped character
-                    i++;
                     result += text[i];
                     i++;
                 } else if (c === quote) {
                     // Found closing quote
-                    i++;
                     break;
-                } else {
-                    i++;
                 }
             }
             continue;
@@ -58,45 +55,32 @@ function replaceLetWithVarSafe(text) {
                 while (i < text.length) {
                     const c = text[i];
                     result += c;
+                    i++;
 
-                    if (c === '\\' && i + 1 < text.length) {
+                    if (c === '\\' && i < text.length) {
                         // Skip escaped character
-                        i++;
                         result += text[i];
                         i++;
                     } else if (c === '/') {
                         // Found closing /, now read flags
-                        i++;
                         while (i < text.length && /[gimsuvy]/.test(text[i])) {
                             result += text[i];
                             i++;
                         }
                         break;
-                    } else {
-                        i++;
                     }
                 }
                 continue;
             }
         }
 
-        // Regular code - safe to replace 'let'
-        // Accumulate word
-        if (/[a-zA-Z_$]/.test(char)) {
-            let word = '';
-            let wordStart = i;
+        // Regular code - apply replacer callback
+        const remaining = text.substring(i);
+        const replaceResult = replacer(remaining, i, text);
 
-            while (i < text.length && /[a-zA-Z0-9_$]/.test(text[i])) {
-                word += text[i];
-                i++;
-            }
-
-            // Replace 'let' with 'var'
-            if (word === 'let') {
-                result += 'var';
-            } else {
-                result += word;
-            }
+        if (replaceResult && replaceResult.replacement !== null && replaceResult.offset > 0) {
+            result += replaceResult.replacement;
+            i += replaceResult.offset;
         } else {
             result += char;
             i++;
@@ -106,8 +90,32 @@ function replaceLetWithVarSafe(text) {
     return result;
 }
 
+function replaceLetWithVarSafe(text) {
+    return parseJSCodeSafe(text, (codeFragment, index, fullText) => {
+        // Check if current position starts with a word
+        if (/^[a-zA-Z_$]/.test(codeFragment)) {
+            let word = '';
+            let offset = 0;
+
+            while (offset < codeFragment.length && /[a-zA-Z0-9_$]/.test(codeFragment[offset])) {
+                word += codeFragment[offset];
+                offset++;
+            }
+
+            // Replace 'let' with 'var'
+            if (word === 'let') {
+                return { replacement: 'var', offset: offset };
+            } else {
+                return { replacement: word, offset: offset };
+            }
+        }
+
+        return null;
+    });
+}
+
 function replaceArrowFunctions(text) {
-    text = text.replace(/(\([^()]*\))\s*=>\s*\{/g, (m, args) => 'function' + args + ' {');
+    text = text.replace(/(\([^()]*\))\s*=>\s*\{/g, (m, args) => 'function' + args + '{');
     text = text.replace(/\(\)\s*=>\s*\{/g, 'function(){');
     text = text.replace(/([a-zA-Z_$][\w$]*)\s*=>\s*\{/g, (m, param) => 'function(' + param + '){');
     return text;
@@ -117,6 +125,23 @@ function fixDeleteStatements(text) {
     // Replace "delete varName" with "varName = undefined" to avoid strict mode errors
     return text.replace(/\bdelete\s+([a-zA-Z_$][\w$]*)\s*;/g, (match, varName) => {
         return varName + '=undefined;';
+    });
+}
+
+function replaceBDetectedSafe(text) {
+    return parseJSCodeSafe(text, (codeFragment) => {
+        // Check for bDetected=!0 or bDetected=!1 patterns
+        const match = codeFragment.match(/^bDetected\s*=\s*!\s*([01])/);
+
+        if (match) {
+            const newValue = match[1] === '0' ? '1' : '0';
+            return {
+                replacement: 'bDetected=' + newValue,
+                offset: match[0].length
+            };
+        }
+
+        return null;
     });
 }
 
@@ -153,8 +178,10 @@ try {
 
             if (uglifyResult.error) throw uglifyResult.error;
 
-            const legacyCompatibleCode = replaceArrowFunctions(
-                replaceLetWithVarSafe(uglifyResult.code.trim())
+            const legacyCompatibleCode = replaceBDetectedSafe(
+                replaceArrowFunctions(
+                    replaceLetWithVarSafe(uglifyResult.code.trim())
+                )
             );
 
             fs.mkdirSync(path.dirname(dstFile), { recursive: true });
