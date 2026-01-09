@@ -80,6 +80,8 @@ const
 
 var lastOffsetDetected = "0x00";
 
+
+
 function detect() {
     if (stubForWrongEnvironment()) return null; // 'PE' is undefined
     if (stubForLegacyEngines()) return null; // old DIE version
@@ -135,6 +137,8 @@ function main() {
     } else {
         log(logType.warning, "Heuristic scan is disabled. Use '--heuristicscan' to enable");
     }
+
+    unloadCache();
 }
 
 
@@ -208,18 +212,25 @@ function stdout(stringToOut) {
  */
 function initializeCache() {
     var cacheMap = {
-       /* Number */ numberOfSections: PE.getNumberOfSections(),
-       /* Number */ numberOfRichIDs: PE.getNumberOfRichIDs(),
-       /* Number */ numberOfUnmanagedResources: PE.getNumberOfResources(),
-       /* Number */ numberOfUnmanagedImports: PE.getNumberOfImports(),
-       /* Number */ numberOfUnmanagedExports: PE.getNumberOfExports(),
-       /* String */ nameOfNetAssemblyName: PE.getNetAssemblyName(),
-       /* String */ nameOfNetModuleName: PE.getNetModuleName()
+       /* Boolean */ isRichSignaturePresent: PE.isRichSignaturePresent(),
+       /* Number  */ numberOfSections: PE.getNumberOfSections(),
+       /* Number  */ numberOfRichIDs: PE.getNumberOfRichIDs(),
+       /* Number  */ numberOfUnmanagedResources: PE.getNumberOfResources(),
+       /* Number  */ numberOfUnmanagedImports: PE.getNumberOfImports(),
+       /* Number  */ numberOfUnmanagedExports: PE.getNumberOfExports(),
+       /* String  */ nameOfNetAssemblyName: PE.getNetAssemblyName(),
+       /* String  */ nameOfNetModuleName: PE.getNetModuleName()
     };
 
     for (var key in cacheMap) {
         PE_Cached[key] = cacheMap[key];
     }
+}
+
+
+
+function unloadCache() {
+    PE_Cached = undefined;
 }
 
 
@@ -5286,7 +5297,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
 
     // Detect compilers by Rich signature
 
-    if (!isCompilerDetected() && PE.isRichSignaturePresent()) {
+    if (!isCompilerDetected() && PE_Cached.isRichSignaturePresent) {
         for (var j = 0; j < PE_Cached.numberOfRichIDs; j++) {
             const
                 richId = PE.getRichID(j),
@@ -5342,7 +5353,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
             buildIdSection = PE.section[".build-id"];
 
         if (!ehFrameSection && !buildIdSection && (
-            PE.isRichSignaturePresent() ||
+            PE_Cached.isRichSignaturePresent ||
             PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000") ||
             PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") ||
             PE.isSectionNamePresent(".00cfg")
@@ -5977,17 +5988,24 @@ function scanForMaliciousCode_NET_and_Native() {
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.bit_rat
 
     if (verdicts.length === 0 &&
-        PE_Cached.numberOfUnmanagedImports === 1 && (
-            // stub.bin
-            PE.isImportPositionHashPresent(0, 0x202c6668) ||
-            // stub_tor.bin
-            PE.isImportPositionHashPresent(0, 0x249e9ed3)
-        )) {
-        verdicts.push({
-            type: "BitRAT",
-            version: String(),
-            details: String()
-        });
+        PE_Cached.numberOfUnmanagedImports === 1) {
+        var isBitRatDetected = false,
+            isBitRatTorStubVersion = false;
+
+        if (PE.isImportPositionHashPresent(0, 0x202c6668)) {
+            isBitRatDetected = true;
+        } else if (PE.isImportPositionHashPresent(0, 0x249e9ed3)) {
+            isBitRatDetected = true;
+            isBitRatTorStubVersion = true;
+        }
+
+        if (isBitRatDetected) {
+            verdicts.push({
+                type: "BitRAT",
+                version: String(),
+                details: isBitRatTorStubVersion ? "Tor" : String()
+            });
+        }
     }
 
 
@@ -6062,7 +6080,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if (verdicts.length === 0 &&
         PE_Cached.numberOfUnmanagedImports === 1 &&
-        PE.isRichSignaturePresent() &&
+        PE_Cached.isRichSignaturePresent &&
         PE.isImportPositionHashPresent(0, 0x2d6f7e88)) {
         verdicts.push({
             type: "Aquates RAT",
@@ -6089,7 +6107,7 @@ function scanForMaliciousCode_NET_and_Native() {
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.bozok
 
     if (verdicts.length === 0 &&
-        !PE.isRichSignaturePresent() &&
+        !PE_Cached.isRichSignaturePresent &&
         PE.isImportPositionHashPresent(0, 0xbd365a2a)) { // kernel32.dll->ExitProcess
         var bozokRatVersion = String();
 
@@ -6113,7 +6131,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
-    if (verdicts.length === 0 && !PE.isRichSignaturePresent()) { // VB5
+    if (verdicts.length === 0 && !PE_Cached.isRichSignaturePresent) { // VB5
         var aquaRatVersion = String();
 
         if (PE.isImportPositionHashPresent(0, 0xfc2095af)) {
@@ -6207,10 +6225,28 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
+    // https://web.archive.org/web/20260108153947/https://indetectables.net/viewtopic.php?t=20716
+
+    if (verdicts.length === 0 &&
+        !PE_Cached.isRichSignaturePresent &&
+        PE_Cached.numberOfUnmanagedImports === 20 &&
+        PE.isImportPositionHashPresent(9, 0x5206612e) &&
+        PE.isImportPositionHashPresent(16, 0xf3b2674d) &&
+        PE.isImportPositionHashPresent(19, 0xabde73fb)) {
+        verdicts.push({
+            type: "Daleth RAT",
+            version: "1.0",
+            details: String()
+        });
+    }
+
+
+
+
     // https://web.archive.org/web/20090902161812/http://synsecurity.net/index.php?page=downloads
 
     if (verdicts.length === 0 &&
-        !PE.isRichSignaturePresent() &&
+        !PE_Cached.isRichSignaturePresent &&
         PE_Cached.numberOfUnmanagedImports === 31 &&
         PE.isImportPositionHashPresent(0, 0xcf603a7d) &&
         PE.isImportPositionHashPresent(-1, 0x0201b2be) &&
@@ -6226,7 +6262,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
     if (verdicts.length === 0 &&
-        !PE.isRichSignaturePresent() && PE.isTLSPresent() && (
+        !PE_Cached.isRichSignaturePresent && PE.isTLSPresent() && (
             (PE.isImportPositionHashPresent(18, 0xc3df3568) && PE.isSignatureInSectionPresent(0, "'lock_text'00")) ||
             (PE.isImportPositionHashPresent(4, 0xc3df3568) && PE.isImportPositionHashPresent(5, 0x622ae906)) // UPX packed
         )) {
