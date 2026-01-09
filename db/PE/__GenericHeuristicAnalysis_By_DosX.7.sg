@@ -212,6 +212,7 @@ function stdout(stringToOut) {
  */
 function initializeCache() {
     var cacheMap = {
+       /* Boolean */ isCppClrLikeApp: isCppClrLikeApp(),
        /* Boolean */ isRichSignaturePresent: PE.isRichSignaturePresent(),
        /* Number  */ numberOfSections: PE.getNumberOfSections(),
        /* Number  */ numberOfRichIDs: PE.getNumberOfRichIDs(),
@@ -295,7 +296,7 @@ function scanForObfuscations_NET() {
 
     var isNetCctorPresent = false;
 
-    if (PE.isNetGlobalCctorPresent() && !isCppClrLikeApp()) {
+    if (PE.isNetGlobalCctorPresent() && !PE_Cached.isCppClrLikeApp) {
         log(logType.net, "Global constructor detected!");
 
         isNetCctorPresent = true;
@@ -322,7 +323,7 @@ function scanForObfuscations_NET() {
     const defaultNetSection = 0;
 
     // Check conditions for a strange entry point position (not for CLR apps)
-    if (!PE.isDll() && PE_Cached.numberOfSections > 1 && !isCppClrLikeApp()) {
+    if (!PE.isDll() && PE_Cached.numberOfSections > 1 && !PE_Cached.isCppClrLikeApp) {
         // Iterate through .NET metadata headers
         for (var s = 0; s < netMetaHeaders.length; s++) {
             const headerName = netMetaHeaders[s];
@@ -344,7 +345,7 @@ function scanForObfuscations_NET() {
 
     var isNativeEntryPointModified = false;
 
-    if (!PE.isDll() && !isCppClrLikeApp()) { // not for CLR apps
+    if (!PE.isDll() && !PE_Cached.isCppClrLikeApp) { // not for CLR apps
         if (!PE.is64()) {
             // FF2500????00: jmp dword ptr [ ... ]
             const firstOpCode = getFirstEpAsmOpCode();
@@ -391,7 +392,7 @@ function scanForObfuscations_NET() {
 
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
 
-    if (PE_Cached.numberOfSections > (!isCppClrLikeApp() ? 6 : 10) || !PE.section[".text"]) { isStrangeSectionsPresent = true; } else {
+    if (PE_Cached.numberOfSections > (!PE_Cached.isCppClrLikeApp ? 6 : 10) || !PE.section[".text"]) { isStrangeSectionsPresent = true; } else {
         // Iterate through each section
         for (var i = 0; i < PE_Cached.numberOfSections && !isStrangeSectionsPresent; i++) {
             const sectionName = PE.getSectionName(i);
