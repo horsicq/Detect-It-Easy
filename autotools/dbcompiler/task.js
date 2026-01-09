@@ -1,9 +1,10 @@
 const fs = require("fs");
 const path = require("path");
-const UglifyJS = require("uglify-js");
+const { Worker } = require("worker_threads");
 
 const inputDirs = ["db", "db_custom", "db_extra"];
 const outputDir = "dbs_min";
+const MAX_PARALLEL = 16;
 
 var stats = {
     total: 0,
@@ -15,209 +16,114 @@ var stats = {
 const failedFiles = [];
 const copiedFiles = [];
 
-function shouldMinify(filePath) {
-    const ext = path.extname(filePath).toLowerCase();
-    return ext === ".sg" || ext === "";
-}
-
-function replaceLetWithVarSafe(text) {
-    let result = '';
-    let i = 0;
-
-    while (i < text.length) {
-        const char = text[i];
-
-        // Handle string literals: ", ', `
-        if (char === '"' || char === "'" || char === '`') {
-            const quote = char;
-            result += char;
-            i++;
-
-            // Read until closing quote, respecting escapes
-            while (i < text.length) {
-                const c = text[i];
-                result += c;
-
-                if (c === '\\' && i + 1 < text.length) {
-                    // Skip escaped character
-                    i++;
-                    result += text[i];
-                    i++;
-                } else if (c === quote) {
-                    // Found closing quote
-                    i++;
-                    break;
-                } else {
-                    i++;
-                }
+function processFile(srcFile, dstFile) {
+    return new Promise((resolve) => {
+        const worker = new Worker(path.join(__dirname, 'worker.js'), {
+            workerData: { srcFile, dstFile },
+            resourceLimits: {
+                maxOldGenerationSizeMb: 2048,
+                maxYoungGenerationSizeMb: 512
             }
-            continue;
-        }
+        });
 
-        // Handle regex literals: /...../flags
-        if (char === '/') {
-            // Check if this looks like a regex (not division)
-            const before = text.substring(Math.max(0, i - 30), i).trim();
-            const isLikelyRegex = /[\(=,;:!&|?{}\[\]]\s*$/.test(before) ||
-                /^(return|throw|=>)\s*$/.test(before) ||
-                before === '';
+        worker.on('message', (result) => {
+            stats.total++;
 
-            if (isLikelyRegex) {
-                result += char;
-                i++;
-
-                // Read until closing /, respecting escapes
-                while (i < text.length) {
-                    const c = text[i];
-                    result += c;
-
-                    if (c === '\\' && i + 1 < text.length) {
-                        // Skip escaped character
-                        i++;
-                        result += text[i];
-                        i++;
-                    } else if (c === '/') {
-                        // Found closing /, now read flags
-                        i++;
-                        while (i < text.length && /[gimsuvy]/.test(text[i])) {
-                            result += text[i];
-                            i++;
-                        }
-                        break;
-                    } else {
-                        i++;
-                    }
-                }
-                continue;
-            }
-        }
-
-        // Regular code - safe to replace 'let'
-        // Accumulate word
-        if (/[a-zA-Z_$]/.test(char)) {
-            let word = '';
-            let wordStart = i;
-
-            while (i < text.length && /[a-zA-Z0-9_$]/.test(text[i])) {
-                word += text[i];
-                i++;
-            }
-
-            // Replace 'let' with 'var'
-            if (word === 'let') {
-                result += 'var';
+            if (result.type === 'minified') {
+                stats.minified++;
+                console.log("[MINIFIED] " + result.srcFile);
+            } else if (result.type === 'copied') {
+                stats.copied++;
+                copiedFiles.push(result.srcFile);
+                console.log("[COPIED] " + result.srcFile);
+            } else if (result.type === 'failed') {
+                stats.failed++;
+                failedFiles.push({ file: result.srcFile, reason: result.error });
+                console.warn("[FAILED] " + result.srcFile + " — " + result.error);
             } else {
-                result += word;
+                stats.failed++;
+                failedFiles.push({ file: result.srcFile, reason: "Read error: " + result.error });
+                console.warn("[ERROR/READ] " + result.srcFile + " — " + result.error);
             }
-        } else {
-            result += char;
-            i++;
-        }
-    }
 
-    return result;
-}
+            resolve();
+        });
 
-function replaceArrowFunctions(text) {
-    text = text.replace(/(\([^()]*\))\s*=>\s*\{/g, (m, args) => 'function' + args + ' {');
+        worker.on('error', (err) => {
+            stats.failed++;
+            failedFiles.push({ file: srcFile, reason: err.message });
+            console.warn("[ERROR] " + srcFile + " — " + err.message);
+            resolve();
+        });
 
-    text = text.replace(/\(\)\s*=>\s*\{/g, 'function(){');
-
-    text = text.replace(/([a-zA-Z_$][\w$]*)\s*=>\s*\{/g, (m, param) => 'function(' + param + '){');
-
-    return text;
-}
-
-function fixDeleteStatements(text) {
-    // Replace "delete varName" with "varName = undefined" to avoid strict mode errors
-    return text.replace(/\bdelete\s+([a-zA-Z_$][\w$]*)\s*;/g, (match, varName) => {
-        return varName + '=undefined;';
+        worker.on('exit', (code) => {
+            if (code !== 0) {
+                stats.failed++;
+                failedFiles.push({ file: srcFile, reason: `Worker stopped with exit code ${code}` });
+                console.warn("[ERROR] " + srcFile + " — Worker stopped with exit code " + code);
+                resolve();
+            }
+        });
     });
 }
 
-function processFile(srcFile, dstFile) {
-    stats.total++;
+// Process files in parallel with concurrency limit
+async function processFilesInParallel(files) {
+    let currentIndex = 0;
+    const workers = [];
 
-    let text;
-    try {
-        text = fs.readFileSync(srcFile, "utf8");
-    } catch (err) {
-        stats.failed++;
-        failedFiles.push({ file: srcFile, reason: "Read error: " + err.message });
-        console.warn("[ERROR/READ] " + srcFile + " — " + err.message);
-        return;
+    for (let i = 0; i < MAX_PARALLEL; i++) {
+        workers.push(
+            (async () => {
+                while (currentIndex < files.length) {
+                    const index = currentIndex++;
+                    if (index < files.length) {
+                        const fileTask = files[index];
+                        await processFile(fileTask.src, fileTask.dst);
+                    }
+                }
+            })()
+        );
     }
 
-    if (shouldMinify(srcFile)) {
-        try {
-            // Pre-process to fix strict mode issues
-            text = fixDeleteStatements(text);
-
-            const result = UglifyJS.minify(text, {
-                compress: true,
-                mangle: true,
-                parse: {
-                    bare_returns: true,
-                },
-                output: {
-                    beautify: false,
-                    comments: false,
-                    semicolons: false,
-                },
-            });
-
-            if (result.error) throw result.error;
-
-            var legacyCompatibleCode =
-                replaceArrowFunctions( // replace arrow functions with regular functions
-                    replaceLetWithVarSafe( // replace `let` with `var` to ensure compatibility with older engines
-                        result.code.trim()
-                    )
-                );
-
-            fs.mkdirSync(path.dirname(dstFile), { recursive: true });
-            fs.writeFileSync(dstFile, legacyCompatibleCode, "utf8");
-            stats.minified++;
-            console.log("[MINIFIED] " + srcFile);
-        } catch (e) {
-            fs.mkdirSync(path.dirname(dstFile), { recursive: true });
-            fs.writeFileSync(dstFile, text, "utf8");
-            stats.failed++;
-            failedFiles.push({ file: srcFile, reason: e.message });
-            console.warn("[FAILED] " + srcFile + " — " + e.message);
-        }
-    } else {
-        fs.mkdirSync(path.dirname(dstFile), { recursive: true });
-        fs.writeFileSync(dstFile, text, "utf8");
-        stats.copied++;
-        copiedFiles.push(srcFile);
-        console.log("[COPIED] " + srcFile);
-    }
+    await Promise.all(workers);
 }
 
-function walk(srcDir, relBase, dstBase) {
+function collectFiles(srcDir, relBase, dstBase, fileList = []) {
     const items = fs.readdirSync(srcDir);
     for (const item of items) {
         const srcPath = path.join(srcDir, item);
 
         const stat = fs.statSync(srcPath);
         if (stat.isDirectory()) {
-            walk(srcPath, relBase, dstBase);
+            collectFiles(srcPath, relBase, dstBase, fileList);
         } else {
-            processFile(srcPath, path.join(dstBase, path.relative(relBase, srcPath)));
+            fileList.push({
+                src: srcPath,
+                dst: path.join(dstBase, path.relative(relBase, srcPath))
+            });
         }
     }
+    return fileList;
 }
 
 (async () => {
+    console.log(`[i] Processing with ${MAX_PARALLEL} parallel workers...\n`);
+
+    const allFiles = [];
+
     for (const dir of inputDirs) {
         if (fs.existsSync(dir)) {
             const dstSubdir = path.join(outputDir, path.basename(dir));
-            walk(dir, dir, dstSubdir);
+            collectFiles(dir, dir, dstSubdir, allFiles);
         } else {
             console.warn("[SKIP] Dir not found: " + dir);
         }
     }
+
+    console.log(`[i] Found ${allFiles.length} files to process\n`);
+
+    await processFilesInParallel(allFiles);
 
     let report = "\n[V] Done!\n" +
         `— Total:     ${stats.total}\n` +
