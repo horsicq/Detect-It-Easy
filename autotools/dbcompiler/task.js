@@ -21,59 +21,101 @@ function shouldMinify(filePath) {
 }
 
 function replaceLetWithVarSafe(text) {
-    const parts = [];
-    let inRegex = false;
-    let current = '';
+    let result = '';
     let i = 0;
 
     while (i < text.length) {
         const char = text[i];
-        const prevChar = i > 0 ? text[i - 1] : String();
 
-        // Detect regex start/end (simplified - handles most cases)
-        if (char === '/' && prevChar !== '\\' && !inRegex) {
-            // Check if this is likely a regex (not division)
-            const before = text.substring(Math.max(0, i - 20), i).trim();
-            if (/[\(=,;:!&|?{}\[\]]$/.test(before) || before === String()) {
-                inRegex = true;
-            }
-        } else if (char === '/' && prevChar !== '\\' && inRegex) {
-            // End of regex
-            current += char;
-            parts.push({ text: current, isRegex: true });
-            current = String();
-            inRegex = false;
+        // Handle string literals: ", ', `
+        if (char === '"' || char === "'" || char === '`') {
+            const quote = char;
+            result += char;
             i++;
-            // Skip regex flags
-            while (i < text.length && /[gimsuvy]/.test(text[i])) {
-                parts[parts.length - 1].text += text[i];
-                i++;
+
+            // Read until closing quote, respecting escapes
+            while (i < text.length) {
+                const c = text[i];
+                result += c;
+
+                if (c === '\\' && i + 1 < text.length) {
+                    // Skip escaped character
+                    i++;
+                    result += text[i];
+                    i++;
+                } else if (c === quote) {
+                    // Found closing quote
+                    i++;
+                    break;
+                } else {
+                    i++;
+                }
             }
             continue;
         }
 
-        if (!inRegex && current && char.match(/[\(=,;:!&|?{}\[\]\n]/)) {
-            // Process accumulated non-regex text
-            parts.push({ text: current, isRegex: false });
-            current = char;
+        // Handle regex literals: /...../flags
+        if (char === '/') {
+            // Check if this looks like a regex (not division)
+            const before = text.substring(Math.max(0, i - 30), i).trim();
+            const isLikelyRegex = /[\(=,;:!&|?{}\[\]]\s*$/.test(before) ||
+                /^(return|throw|=>)\s*$/.test(before) ||
+                before === '';
+
+            if (isLikelyRegex) {
+                result += char;
+                i++;
+
+                // Read until closing /, respecting escapes
+                while (i < text.length) {
+                    const c = text[i];
+                    result += c;
+
+                    if (c === '\\' && i + 1 < text.length) {
+                        // Skip escaped character
+                        i++;
+                        result += text[i];
+                        i++;
+                    } else if (c === '/') {
+                        // Found closing /, now read flags
+                        i++;
+                        while (i < text.length && /[gimsuvy]/.test(text[i])) {
+                            result += text[i];
+                            i++;
+                        }
+                        break;
+                    } else {
+                        i++;
+                    }
+                }
+                continue;
+            }
+        }
+
+        // Regular code - safe to replace 'let'
+        // Accumulate word
+        if (/[a-zA-Z_$]/.test(char)) {
+            let word = '';
+            let wordStart = i;
+
+            while (i < text.length && /[a-zA-Z0-9_$]/.test(text[i])) {
+                word += text[i];
+                i++;
+            }
+
+            // Replace 'let' with 'var'
+            if (word === 'let') {
+                result += 'var';
+            } else {
+                result += word;
+            }
         } else {
-            current += char;
+            result += char;
+            i++;
         }
-
-        i++;
     }
 
-    if (current) {
-        parts.push({ text: current, isRegex: inRegex });
-    }
-
-    // Replace 'let' only in non-regex parts
-    return parts.map(part => {
-        if (part.isRegex) {
-            return part.text;
-        }
-        return part.text.replace(/\blet\b/g, 'var');
-    }).join(String());
+    return result;
 }
 
 function replaceArrowFunctions(text) {
