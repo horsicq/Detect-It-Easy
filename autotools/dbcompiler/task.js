@@ -21,7 +21,59 @@ function shouldMinify(filePath) {
 }
 
 function replaceLetWithVarSafe(text) {
-    return text.replace(/(?<!["'`])\blet\b(?!["'`])/g, "var");
+    const parts = [];
+    let inRegex = false;
+    let current = '';
+    let i = 0;
+
+    while (i < text.length) {
+        const char = text[i];
+        const prevChar = i > 0 ? text[i - 1] : String();
+
+        // Detect regex start/end (simplified - handles most cases)
+        if (char === '/' && prevChar !== '\\' && !inRegex) {
+            // Check if this is likely a regex (not division)
+            const before = text.substring(Math.max(0, i - 20), i).trim();
+            if (/[\(=,;:!&|?{}\[\]]$/.test(before) || before === String()) {
+                inRegex = true;
+            }
+        } else if (char === '/' && prevChar !== '\\' && inRegex) {
+            // End of regex
+            current += char;
+            parts.push({ text: current, isRegex: true });
+            current = String();
+            inRegex = false;
+            i++;
+            // Skip regex flags
+            while (i < text.length && /[gimsuvy]/.test(text[i])) {
+                parts[parts.length - 1].text += text[i];
+                i++;
+            }
+            continue;
+        }
+
+        if (!inRegex && current && char.match(/[\(=,;:!&|?{}\[\]\n]/)) {
+            // Process accumulated non-regex text
+            parts.push({ text: current, isRegex: false });
+            current = char;
+        } else {
+            current += char;
+        }
+
+        i++;
+    }
+
+    if (current) {
+        parts.push({ text: current, isRegex: inRegex });
+    }
+
+    // Replace 'let' only in non-regex parts
+    return parts.map(part => {
+        if (part.isRegex) {
+            return part.text;
+        }
+        return part.text.replace(/\blet\b/g, 'var');
+    }).join(String());
 }
 
 function replaceArrowFunctions(text) {
