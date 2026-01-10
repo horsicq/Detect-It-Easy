@@ -212,7 +212,12 @@ function stdout(stringToOut) {
  */
 function initializeCache() {
     var cacheMap = {
+       /* Local functions */
        /* Boolean */ isCppClrLikeApp: isCppClrLikeApp(),
+       /* Boolean */ isVbNetStandardLibraryPresent: isVbNetStandardLibraryPresent(),
+       /* Boolean */ isJscriptNetStandardLibraryPresent: isJscriptNetStandardLibraryPresent(),
+       /* Native functions */
+       /* Boolean */ isNetGlobalCctorPresent: PE.isNetGlobalCctorPresent(),
        /* Boolean */ isRichSignaturePresent: PE.isRichSignaturePresent(),
        /* Number  */ numberOfSections: PE.getNumberOfSections(),
        /* Number  */ numberOfRichIDs: PE.getNumberOfRichIDs(),
@@ -253,13 +258,6 @@ function scanForObfuscations_NET() {
 
 
 
-    const
-        isVbNet = isVbNetStandardLibraryPresent(),
-        isJscriptNet = isJscriptNetStandardLibraryPresent();
-
-
-
-
     // Is managed entry point modified? Let's check it using default .NET EP names
 
     var isEntryPointModified = false;
@@ -280,7 +278,7 @@ function scanForObfuscations_NET() {
     ]
 
     if (!PE.isDll()) {
-        if (isVbNet) {
+        if (PE_Cached.isVbNetStandardLibraryPresent) {
             if (isAllNetReferencesMissing(vbNetEntries)) {
                 isEntryPointModified = true;
             }
@@ -302,7 +300,7 @@ function scanForObfuscations_NET() {
 
     var isNetCctorPresent = false;
 
-    if (PE.isNetGlobalCctorPresent() && !PE_Cached.isCppClrLikeApp) {
+    if (PE_Cached.isNetGlobalCctorPresent && !PE_Cached.isCppClrLikeApp) {
         log(logType.net, "Global constructor detected!");
 
         isNetCctorPresent = true;
@@ -912,7 +910,7 @@ function scanForObfuscations_NET() {
 
     var isStringsEncryptionPresent = false;
 
-    if (isVbNet && !isFrameworkComponent()) {
+    if (PE_Cached.isVbNetStandardLibraryPresent && !isFrameworkComponent()) {
         if (validateNetObject("Resources") && !validateGlobalUnicodeString(".Resources")) {
             log(logType.net, "It appears that the strings are hidden/encrypted and can be loaded dynamically.");
 
@@ -1124,7 +1122,7 @@ function scanForObfuscations_NET() {
     if (buildAssemblyName !== getFileNameWithoutExtension(buildModuleName) || buildAssemblyName === buildModuleName) {
         isBuildInfoModified = true;
 
-        if (isJscriptNet && buildModuleName === "JScript Module") {
+        if (PE_Cached.isJscriptNetStandardLibraryPresent && buildModuleName === "JScript Module") {
             isBuildInfoModified = false;
         }
     }
@@ -1522,7 +1520,7 @@ function scanForAntiAnalysis_NET() {
  * @returns {boolean} True if the PE file matches the C++/CLR .NET application heuristics, otherwise false.
  */
 function isCppClrLikeApp() {
-    return PE.isNet() && PE.isLibraryPresent("KERNEL32.DLL") && PE.isNetGlobalCctorPresent();
+    return PE.isNet() && PE_Cached.isRichSignaturePresent && PE.isLibraryPresent("KERNEL32.DLL") && PE_Cached.isNetGlobalCctorPresent;
 }
 
 
@@ -3469,7 +3467,7 @@ function isJscriptNetStandardLibraryPresent() {
  * @returns {boolean} Returns true if the PE file is identified as a .NET component, otherwise false.
  */
 function isFrameworkComponent() {
-    if (!PE.isNet() || !PE.isDll() || PE.isNetGlobalCctorPresent()) {
+    if (!PE.isNet() || !PE.isDll() || PE_Cached.isNetGlobalCctorPresent) {
         return false;
     }
 
