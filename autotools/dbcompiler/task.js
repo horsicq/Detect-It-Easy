@@ -4,7 +4,7 @@ const { Worker } = require("worker_threads");
 
 const inputDirs = ["db", "db_custom", "db_extra"];
 const outputDir = "dbs_min";
-const MAX_PARALLEL = 16;
+const MAX_PARALLEL = 6; // Reduced from 16 to prevent resource exhaustion
 
 var stats = {
     total: 0,
@@ -26,6 +26,16 @@ function processFile(srcFile, dstFile) {
             }
         });
 
+        let isResolved = false;
+
+        const cleanup = () => {
+            if (!isResolved) {
+                isResolved = true;
+                worker.terminate().catch(() => { });
+                resolve();
+            }
+        };
+
         worker.on('message', (result) => {
             stats.total++;
 
@@ -46,23 +56,23 @@ function processFile(srcFile, dstFile) {
                 console.warn("[ERROR/READ] " + result.srcFile + " — " + result.error);
             }
 
-            resolve();
+            cleanup();
         });
 
         worker.on('error', (err) => {
             stats.failed++;
             failedFiles.push({ file: srcFile, reason: err.message });
             console.warn("[ERROR] " + srcFile + " — " + err.message);
-            resolve();
+            cleanup();
         });
 
         worker.on('exit', (code) => {
-            if (code !== 0) {
+            if (code !== 0 && !isResolved) {
                 stats.failed++;
                 failedFiles.push({ file: srcFile, reason: `Worker stopped with exit code ${code}` });
                 console.warn("[ERROR] " + srcFile + " — Worker stopped with exit code " + code);
-                resolve();
             }
+            cleanup();
         });
     });
 }
