@@ -1,0 +1,78 @@
+// Detect It Easy: detection rule file
+
+// Author: DosX
+// E-Mail: collab@kay-software.ru
+// GitHub: https://github.com/DosX-dev
+// Telegram: @DosX_dev
+
+meta("packer", "PyInstaller"); // python = 💩
+
+includeScript("python");
+
+function detect() {
+    if (PE.isNet()) return; // Doesn't support .NET files
+
+    const overlaySignatureDetected = PE.compareOverlay("78da");
+
+    if (overlaySignatureDetected) {
+        const rdata = PE.section[".rdata"];
+
+        if (rdata &&
+            PE.findString(
+                rdata.FileOffset,
+                rdata.FileSize,
+                "PyInstaller: FormatMessageW failed."
+            ) != -1) {
+            bDetected = true;
+        }
+    }
+
+    for (var i = 0; i < PE.getNumberOfResources() && !bDetected; i++) {
+        const resSize = PE.getResourceSizeByNumber(i);
+        if ((
+            resSize == 0x909b && // black
+            PE.calculateMD5(PE.getResourceOffsetByNumber(i), resSize) == "20d36c0a435caad0ae75d3e5f474650c"
+        ) || (
+                resSize == 0x952c && // white
+                PE.calculateMD5(PE.getResourceOffsetByNumber(i), resSize) == "f6fbada22d6a6c07ef8fdaa504f117d5"
+            )) {
+
+            if (!overlaySignatureDetected) {
+                sOptions = "custom";
+            } else {
+                sOptions = PE.section[".rdata"] ? "modified" : "packed";
+            }
+
+            bDetected = true;
+        }
+    }
+
+    if (!bDetected && overlaySignatureDetected && PE.findSignature(
+        PE.getOverlayOffset(),
+        PE.getOverlaySize(),
+        "4d45490c0b0a0b0e"
+    ) != -1) {
+        sOptions = "overlay";
+        bDetected = true;
+    }
+
+    var version;
+
+    if (bDetected) {
+        for (var i = 0; i < 2 && !version; i++) {
+            var sign = PE.findSignature(
+                PE.getOverlayOffset(),
+                PE.getOverlaySize(),
+                "70 79 74 68 6F 6E'" + [2, 3][i] + "'");
+
+            if (sign && PE.findString(sign, 15, ".") != -1) {
+                version = getPythonVersionByDll(PE.getString(sign - 1, 15));
+            }
+        }
+    }
+
+    sLang = "Python";
+    sLangVersion = version;
+
+    return result();
+}

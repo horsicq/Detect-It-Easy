@@ -1,0 +1,35 @@
+// Detect It Easy: detection rule file
+
+// Author: DosX
+// E-Mail: collab@kay-software.ru
+// GitHub: https://github.com/DosX-dev
+// Telegram: @DosX_dev
+
+// https://github.com/DosX-dev/UPX-Patcher
+meta("tool", "UPX-Patcher");
+
+function detect() {
+    var dosxSection = PE.section[".dosx"],
+        fishSectionByIndex = dosxSection ? PE.section[dosxSection + 1] : undefined;
+
+    if (PE.getNumberOfSections() > 2 &&
+        fishSectionByIndex && dosxSection &&
+        fishSectionByIndex.Name === ".fish") {
+        bDetected = true;
+
+        var is64 = PE.is64();
+
+        if (!PE.isDll()) {
+            if (PE.compareEP(is64 ?
+                "53" : // push rbx (x64)
+                "55"   // push ebp (x86)
+            )) {
+                sOptions = (is64 ? "x64" : "x86") + " mode"; // Custom EP
+            } else {
+                bDetected = false;
+            }
+        }
+    }
+
+    return result();
+}

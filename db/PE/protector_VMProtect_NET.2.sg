@@ -1,0 +1,66 @@
+// Detect It Easy: detection rule file
+
+// Author: DosX
+// E-Mail: collab@kay-software.ru
+// GitHub: https://github.com/DosX-dev
+// Telegram: @DosX_dev
+
+// https://vmpsoft.com/
+meta("protector", "VMProtect");
+
+function detect() {
+
+    if (PE.isNet() &&
+        PE.isNetGlobalCctorPresent() &&
+        PE.getNumberOfSections() >= 3 &&
+        PE.isNetObjectPresent("SuppressIldasmAttribute") &&
+        PE.isNetObjectPresent("kernel32") &&
+        PE.isNetObjectPresent("get_IsAttached") &&
+        PE.isNetObjectPresent("OpCodes")) {
+
+        const
+            chunk = "%% %% %% %% %% %% %% %% 00", // chunk size is 8 bytes
+            scanBytes = PE.getSize() - PE.getOverlaySize();
+
+        var globalBigPattern = "00";
+
+        for (var i = 0; i < 12; i++) {
+            globalBigPattern += chunk;
+        }
+
+        var firstSection = PE.section[0];
+
+        if (PE.isSignaturePresent(firstSection.FileOffset, scanBytes, "'<Module>' 00" + chunk) &&
+            PE.isSignaturePresent(firstSection.FileOffset, scanBytes, globalBigPattern)) {
+            sVersion = "3.X";
+            bDetected = true;
+        }
+
+
+        if (bDetected) {
+            if (PE.isSignaturePresent(firstSection.FileOffset, scanBytes, generateUnicodeSignatureMask("Program will be terminated."))) { // Unicode [global] string
+                sOptions = "Resources protection";
+            }
+
+            var sectionNameCollision = PE.getSectionNameCollision("0", "1");
+
+            if (sectionNameCollision === ".vmp") {
+                sVersion = "2.X-3.X";
+            } else if (sectionNameCollision) {
+                sOptions += (sOptions.length != 0 ? " + " : "") + "Custom sections";
+            }
+
+            bDetected = bDetected && !PE.isNetObjectPresent("VMProtect"); // fake signature
+        }
+    }
+
+    return result();
+}
+
+function generateUnicodeSignatureMask(inputString) {
+    var output = "";
+    for (var c = 0; c < inputString.length; c++) { output += (c != 0 ? "00" : "") + "'" + inputString[c] + "'"; }
+    return output;
+}
+
+// Hello Ivan Permyakov and thanks for your contribution to Open Source!

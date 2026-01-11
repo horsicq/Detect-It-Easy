@@ -1,0 +1,56 @@
+// Detect It Easy: detection rule file
+// Author: hypn0 <hypn0@mail.ru>
+// Enhanced by: DosX
+
+meta("protector", "PELock");
+
+function detect() {
+    if (PE.isNet() || PE.is64()) return; // Doesn't support .NET or AMD64 files
+
+    var bEnableNewEngine = true; // Need more researches
+
+    if (bEnableNewEngine) {
+        var da = "",
+            clc = 0,
+            stc = 0,
+            movsx = 0,
+            movzx = 0,
+            sub = 0,
+            imul = 0,
+            bt = 0,
+            bsf = 0;
+
+        var ep = PE.OffsetToVA(PE.getEntryPointOffset()),
+            count = 0;
+
+        while (count < 1000) {
+            count++;
+            var da = PE.getDisasmString(ep);
+            if (da.indexOf(' ') != -1) {
+                da = da.slice(0, da.indexOf(' '));
+            }
+            if (da == "CLC") { clc++; }
+            if (da == "STC") { stc++; }
+            if (da == "MOVSX") { movsx++; }
+            if (da == "MOVZX") { movzx++; }
+            if (da == "SUB") { sub++; }
+            if (da == "IMUL") { imul++; }
+            if (da == "BT" || da == "BTR" || da == "BTS" || da == "BTC") { bt++; }
+            if (da == "BSF" || da == "BSR" || da == "BSWAP") { bsf++; }
+            ep = PE.getDisasmNextAddress(ep);
+        }
+
+        if (clc > 0 && stc > 0 && movzx != 0 && (sub > imul || sub == 0 && imul == 0) && bt == 0 && bsf == 0) {
+            bDetected = true;
+        }
+    }
+
+    if (!bDetected) {
+        if (PE.compareEP("6A6068........E8........BF94") || PE.isImportPositionHashPresent(0, 0xe1689d7c)) {
+            sVersion = "2.X";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}
