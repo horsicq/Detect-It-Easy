@@ -1,0 +1,96 @@
+// Detect It Easy: detection rule file
+
+// http://www.aspack.com/
+meta("packer", "ASPack");
+
+function getASPackVersion(nOffset) {
+    if (PE.compare("60E8000000005D81ED........B8........03C5", nOffset)) {
+        sVersion = "1.00b-1.07b";
+    } else if (PE.compare("60EB..5DEB..FF..........E9", nOffset)) {
+        sVersion = "1.08.00-1.08.02";
+    } else if (PE.compare("60E8000000005D............BB........03DD", nOffset)) {
+        sVersion = "1.08.03";
+    } else if (PE.compare("60E8000000005D81ed........BB........01eb", nOffset)) {
+        sVersion = "1.08.X";
+        sOptions = "possibly";
+    } else if (PE.compare("60E841060000EB41", nOffset)) {
+        sVersion = "1.08.04";
+    } else if (PE.compare("60EB..5DFFE5E8........81ED........BB........03DD2B9D", nOffset)) {
+        sVersion = "1.08.X";
+    } else if (PE.compare("60E870050000EB4C", nOffset)) {
+        sVersion = "2.000";
+    } else if (PE.compare("60E872050000EB4C", nOffset)) {
+        sVersion = "2.001";
+    } else if (PE.compare("60E872050000EB3387DB9000", nOffset)) {
+        sVersion = "2.1";
+    } else if (PE.compare("60E93D040000", nOffset)) {
+        sVersion = "2.11";
+    } else if (PE.compare("60E802000000EB095D5581ED39394400C3E93D040000", nOffset)) {
+        sVersion = "2.11b";
+    } else if (PE.compare("60E802000000EB095D5581ED39394400C3E959040000", nOffset)) {
+        sVersion = "2.11c-2.11d";
+    } else if (PE.compare("60E802000000EB095D55", nOffset)) {
+        sVersion = "2.11d";
+    } else if (PE.compare("60E803000000E9EB045D4555C3E801", nOffset)) {
+        sVersion = "2.12-2.42";
+    } else if (PE.compare("9060E8$$$$$$$$5D4555C3", nOffset)) {
+        sVersion = "2.12b";
+    } else if (PE.compare("60e8$$$$$$$$8b2c2481ed........c3", nOffset)) {
+        sVersion = "2.1X-2.39";
+    } else if (PE.compare("9060e8$$$$$$$$8b2c2481ed........c3", nOffset)) {
+        sVersion = "2.1X-2.39";
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+function detect() {
+    var nOffset = PE.getEntryPointOffset();
+    if (nOffset != -1) {
+        if (!getASPackVersion(nOffset)) {
+            if (PE.compareEP("7500E9")) {
+                nOffset += 3;
+                bDetected = true;
+            } else if (PE.compareEP("907500E9")) {
+                nOffset += 4;
+                bDetected = true;
+            } else if (PE.compareEP("90907500E9")) {
+                nOffset += 5;
+                bDetected = true;
+            } else if (PE.compareEP("90750190E9")) {
+                nOffset += 5;
+                bDetected = true;
+            } else if (PE.compareEP("907501FFE9")) {
+                nOffset += 5;
+                bDetected = true;
+            } else if (PE.compareEP("9090907500E9")) {
+                nOffset += 6;
+                bDetected = true;
+            } else if (PE.compareEP("9090750190E9")) {
+                nOffset += 6;
+                bDetected = true;
+            } else if (PE.compareEP("909090750190E9")) {
+                nOffset += 7;
+                bDetected = true;
+            }
+            if (bDetected) {
+                // Can't simply adjust the offset, as the destination may be in a different section.
+                nOffset = PE.RVAToOffset(PE.OffsetToRVA(nOffset) + 4 + ~~PE.readDword(nOffset));
+                bDetected = getASPackVersion(nOffset);
+            }
+        } else {
+            bDetected = true;
+        }
+    }
+
+    if (!bDetected) {
+        if (PE.section[".aspack"] && PE.section[".adata"]) {
+            sVersion = "2.12-2.XX";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}
