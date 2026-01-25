@@ -1,0 +1,57 @@
+// Detect It Easy: detection rule file
+
+meta("packer", "UPX");
+
+function getUPXOptions(nOffset) {
+    var nMethod = ELF.readByte(nOffset + 2);
+    var nLevel = ELF.readByte(nOffset + 3);
+    var sCompression = "";
+    switch (nMethod) // From http://sourceforge.net/p/upx/code/ci/default/tree/src/conf.h
+    {
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10:
+            sCompression = "NRV";
+            break;
+        case 14:
+            sCompression = "LZMA";
+            break;
+        case 15:
+            sCompression = "zlib";
+            break;
+    }
+
+    if (sCompression) {
+        sOptions = sOptions.append(sCompression);
+        if (nLevel == 8) {
+            sOptions = sOptions.append("best");
+        } else {
+            sOptions = sOptions.append("brute");
+        }
+    }
+}
+
+function detect() {
+    var nSize = ELF.getSize();
+    if (ELF.compare("'UPX!'", nSize - 0x24)) {
+        getUPXOptions(nSize - 0x20);
+        bDetected = true;
+    } else if (ELF.compareEP("E8........EB0E5A585997608A542420E9........60")) {
+        sVersion = "3.X";
+        bDetected = true;
+    }
+
+    var nOffset = ELF.findString(0, nSize, "$Id: UPX");
+    if (nOffset != -1) {
+        sVersion = ELF.getString(nOffset + 9, 4);
+        bDetected = true;
+    }
+
+    return result();
+}

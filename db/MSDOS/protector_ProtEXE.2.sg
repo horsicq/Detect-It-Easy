@@ -1,0 +1,58 @@
+// Detect It Easy: detection rule file
+// Author: hypn0 <hypn0@mail.ru>
+
+meta("protector", "ProtEXE");
+
+function detect() {
+
+    // new algo
+
+    var ep_off = MSDOS.getEntryPointOffset();
+    var i = 0;
+
+    while (i < 20) {
+        i++;
+        switch (MSDOS.readByte(ep_off)) {
+            case 0xE9:
+                {
+                    var addr = MSDOS.readWord(ep_off + 1);
+                    if (addr > 0x7fff) { ep_off = ep_off - (0xffff - addr) + 2 } else { ep_off = ep_off + addr + 3 }
+                    break;
+                }
+            case 0xE8:
+                {
+                    var addr = MSDOS.readWord(ep_off + 1);
+                    if (addr > 0x7fff) { ep_off = ep_off - (0xffff - addr) + 2 } else { ep_off = ep_off + addr + 3 }
+                    break;
+                }
+            case 0xEB:
+                {
+                    var addr = MSDOS.readByte(ep_off + 1);
+                    if (addr > 0x7f) { ep_off = ep_off - (0xff - addr) + 1 } else { ep_off = ep_off + addr + 2 }
+                    break;
+                }
+        }
+        var a = MSDOS.readByte(ep_off);
+        if ((a == 0xbb || a == 0xbe || a == 0xbf) && MSDOS.compare("0600", ep_off + 1)) {
+            sVersion = "3.10-3.11";
+            bDetected = true;
+            break;
+        }
+        if (a != 0xbb && a != 0xbe && a != 0xbf && a != 0xe9 && a != 0xe8 && a != 0xeb) {
+            break;
+        }
+    }
+
+    // some old sigs
+
+    if (MSDOS.compareEP("9c9c5825....509d9c5825....3d....74..9c5825....0d....509d9c5825....74..ba....b0..eb")) {
+        sVersion = "2.11";
+        bDetected = true;
+    } else if (MSDOS.compareEP("9c505351525657551e06fcb8....cd2184c075..cd20a8..04..eb$$eb$$ba....ec0c..eb")) {
+        sVersion = "3.0";
+        sOptions = "by T.Torfs";
+        bDetected = true;
+    }
+
+    return result();
+}

@@ -1,0 +1,59 @@
+// Detect It Easy: detection rule file
+// Authors: Jason Hood <jadoxa@yahoo.com.au>, Kae <TG@kaens>
+
+meta("image", "Windows Icon");
+
+includeScript("CurIcoBPP");
+
+function detect() {
+    if (X.c("00000100")) {
+        // Find the biggest, assuming square.
+        var nCount = X.U16(4, _LE),
+            sz = 6 + nCount * 16;
+        if (!nCount || sz > X.Sz()) return false;
+        var nWMax = 0,
+            nHMax = 0,
+            nBPPM = 0,
+            nWMin = 0xFFFFFFFFF,
+            nHMin = 0xFFFFFFFFF,
+            nBPPm = 0xFFFFFFFFF,
+            w,
+            h,
+            b;
+        for (var i = 0; i < nCount; i++) {
+            if (X.U8(9 + i * 16) || X.U16(10 + i * 16, _LE) > 8 || !isWithin(X.U16(12 + i * 16, _LE), 1, 32)) return false;
+            w = X.U8(6 + i * 16);
+            b = getCurIcoBPP(6 + i * 16);
+            sz_ = X.U32(14 + i * 16, _LE);
+            if (!sz_ || sz_ > X.Sz() - 22) return false;
+            sz += sz_;
+            if (w === 0) {
+                var nOffset = X.U32(18 + i * 16, _LE);
+                if (X.c("89'PNG\r\n'1A0A........'IHDR'", nOffset)) {
+                    w = X.I32(nOffset + 16, _BE);
+                    h = X.I32(nOffset + 20, _BE);
+                } else if (X.c("28000000", nOffset)) {
+                    w = Math.abs(X.I32(nOffset + 4, _LE));
+                    h = Math.abs(X.I32(nOffset + 8, _LE)); // abs for top-down and otherwise weird BMPs
+                } else return false // unknown format after all
+            } else {
+                // _log("bmp, ht @ " + Hex(i * 16 + 7));
+                h = X.U8(7 + i * 16);
+            }
+            nWMin = Math.min(w, nWMin);
+            nHMin = Math.min(h, nHMin);
+            nBPPm = Math.min(b, nBPPm);
+            nWMax = Math.max(w, nWMax);
+            nHMax = Math.max(h, nHMax);
+            nBPPM = Math.max(b, nBPPM);
+        }
+        if (!nWMax || !nHMax) return false;
+        sOption((nWMin != nWMax || nHMin != nHMax ? nWMin + 'x' + nHMin + ' ~ ' : '') + nWMax + "x" + nHMax);
+        sOption((nBPPm != nBPPM ? nBPPm + '~' : '') + nBPPM + "bpp");
+        if (nCount > 1) sOption(nCount + " icons");
+        sOption("sz: " + sz)
+        bDetected = true;
+    }
+
+    return result();
+}

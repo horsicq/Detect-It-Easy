@@ -1,0 +1,152 @@
+// Detect It Easy: detection rule file
+// 07.12.2014 detect x64, build date added //ajax
+
+meta("protector", "Enigma");
+
+function getEnigmaVersion() {
+    var nSection = PE.nLastSection,
+        nOffset = PE.section[nSection].FileOffset,
+        nSize = PE.section[nSection].FileSize;
+
+    if (nSize == 0) {
+        nOffset = PE.section[nSection - 1].FileOffset;
+        nSize = PE.section[nSection - 1].FileSize;
+    }
+
+    var nVersionOffset = PE.findSignature(nOffset, nSize, "000000'ENIGMA'");
+    if (nVersionOffset != -1) {
+
+        var sMajor = PE.readByte(nVersionOffset + 9),
+            sMinor = PE.readByte(nVersionOffset + 10),
+            bYear = PE.readWord(nVersionOffset + 11),
+            bMonth = PE.readWord(nVersionOffset + 13),
+            bDay = PE.readWord(nVersionOffset + 15),
+            bHour = PE.readWord(nVersionOffset + 17),
+            bMin = PE.readWord(nVersionOffset + 19),
+            bSec = PE.readWord(nVersionOffset + 21);
+
+        sVersion = sMajor + "." + sMinor + " build " + bYear + "." + bMonth + "." + bDay + " " + bHour + ":" + bMin + ":" + bSec;
+        return true;
+    }
+    nVersionOffset = PE.findSignature(nOffset, nSize, "'Enigma Protector'");
+    if (nVersionOffset != -1) {
+        sVersion = "5.X";
+        return true;
+    }
+
+    return false;
+}
+
+function getEnigmaVersion4x() {
+    var nSection = PE.nLastSection,
+        nOffset = PE.section[nSection - 1].FileOffset,
+        nSize = PE.section[nSection - 1].FileSize;
+
+    var nVersionOffset = PE.findSignature(nOffset, nSize, "000000'ENIGMA'");
+
+    if (nVersionOffset != -1) {
+
+        var sMajor = PE.readByte(nVersionOffset + 9),
+            sMinor = PE.readByte(nVersionOffset + 10),
+            bYear = PE.readWord(nVersionOffset + 11),
+            bMonth = PE.readWord(nVersionOffset + 13),
+            bDay = PE.readWord(nVersionOffset + 15),
+            bHour = PE.readWord(nVersionOffset + 17),
+            bMin = PE.readWord(nVersionOffset + 19),
+            bSec = PE.readWord(nVersionOffset + 21);
+
+        sVersion = sMajor + "." + sMinor + " build " + bYear + "." + bMonth + "." + bDay + " " + bHour + ":" + bMin + ":" + bSec;
+        return true;
+    }
+
+    return false;
+}
+
+function getEnigmaVersion_old1x() {
+    var nSection = PE.nLastSection;
+
+    var nVersionOffset = PE.findSignature(PE.section[nSection].FileOffset, PE.section[nSection].FileSize, "'ENIGMA'07' PROT'");
+
+    if (nVersionOffset != -1) {
+        sVersion = 'v1.14';
+        return true;
+    }
+
+    return false;
+}
+
+function getEnigmaVersion_old() {
+    var dataSection = PE.section[".data"];
+
+    if (dataSection) {
+
+        var nOffset = dataSection.FileOffset,
+            nOffset = PE.findString(nOffset, dataSection.FileSize, "Enigma protector v");
+
+        if (nOffset != -1) {
+            sVersion = PE.getString(nOffset + 18, 4);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function detect() {
+    if (PE.isNet()) {
+        if (PE.isSignatureInSectionPresent(0, "000000'ENIGMA'")) {
+            bDetected = true;
+        }
+    } else {
+        if (!PE.is64()) {
+            if (PE.compareEP("558bec83c4..b8........e8........9a............e9$$$$$$$$60e8000000005d..ed")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("60e8000000005d81ed........81ed........e9")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("68........e8$$$$$$$$eb$$83c4..e9$$$$$$$$60e8000000005d81ed")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("eb$$e9$$$$$$$$60e8000000005d81ed........81ed........e9")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("e8$$$$$$$$83c4..e9$$$$$$$$60e8000000005d81ed........81ed........e9")) {
+                getEnigmaVersion();
+                bDetected = true;
+            } else if (PE.compareEP("60e8000000005d83....81ed")) { // first versions
+                getEnigmaVersion_old();
+                bDetected = true;
+            } else if (PE.compareEP("eb$$e9$$$$$$$$60e8000000005d83....81ed")) {  // 1.14
+                getEnigmaVersion_old1x();
+                getEnigmaVersion_old();
+                bDetected = true;
+            }
+        } else if (PE.compareEP("5051525355565741504151415241534154415541564157489C4881EC080000000FAE1C24E8000000005D")) {
+            getEnigmaVersion();
+            bDetected = true;
+        } else if (PE.compareEP("eb$$60e8000000005d81ed........81ed........e9")) {
+            getEnigmaVersion();
+            bDetected = true;
+        }
+
+        if (!bDetected) {
+            if (PE.getNumberOfImports() > 1 &&
+                PE.getNumberOfImportThunks(1) == 1 &&
+                PE.getImportFunctionName(1, 0) == "MessageBoxA" &&
+                PE.getSectionCharacteristics(0) == 0xe0000040 &&
+                getEnigmaVersion()) {
+                bDetected = true;
+            } else if (PE.getSectionNameCollision("1", "2") == "enigma") {
+                bDetected = true;
+            }
+        }
+
+        if (PE.compareEP("60648b2d........3e8b6d..3e8b6d..e8........bb........c3")) {
+            getEnigmaVersion4x();
+            bDetected = true;
+        }
+
+    }
+    return result();
+}

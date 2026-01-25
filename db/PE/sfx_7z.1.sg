@@ -1,0 +1,43 @@
+// Detect It Easy: detection rule file
+
+meta("sfx", "7-Zip");
+
+function detect() {
+    if (PE.compareOverlay("';!@Install@!UTF-8!'")) {
+        sType = "installer";
+        var sManifest = PE.getManifest();
+        var aVersion = sManifest.match(/(\n?)version="(.*?)"/);
+        if (aVersion) {
+            sVersion = aVersion[2];
+            if (aVersion[1]) {
+                sOptions = "new";
+            }
+        } else if (aVersion = sManifest.match(/Archive v(\d.*?)<\/desc/)) {
+            sVersion = aVersion[1];
+        }
+        bDetected = true;
+    } else if (PE.compareOverlay("'7z'BCAF271C")) {
+        bDetected = true;
+    } else if (PE.compareOverlay("efbbbf';!@Install@!UTF-8!'")) {
+        sType = "installer";
+        bDetected = true;
+    }
+
+    if (bDetected) {
+        if (PE.getVersionStringInfo("InternalName") == "7z.sfx" || PE.getVersionStringInfo("InternalName") == "7zS2.sfx") {
+            sVersion = PE.getVersionStringInfo("FileVersion");
+            if (!sVersion) {
+                sVersion = PE.getFileVersion().replace(/\.0\.0$/, "");
+            }
+        }
+
+        if (!sVersion && PE.section[".rdata"]) {
+            var nVersionOffset = PE.findString(PE.section[".rdata"].FileOffset, PE.section[".rdata"].FileSize, "7-Zip version:");
+            if (nVersionOffset != -1) {
+                sVersion = PE.getString(nVersionOffset + 16, 4);
+            }
+        }
+    }
+
+    return result();
+}

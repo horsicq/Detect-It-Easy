@@ -1,0 +1,1419 @@
+// Detect It Easy: detection rule file
+// Covers cartridge, tape, or CD-delivered software, such as ROM images for various
+//videogame systems, and/or for their emulators.
+//Also includes snapshots like VSF or SNA, and resource packs like WAD.
+// Authors:
+//   Kaens TG@kaens
+//   (...yes I'm looking at you, you obviously want to add something so go ahead)
+
+meta("ROM", "");
+
+/* beautify ignore:start */
+function detect() {
+
+    // this C-like pre-declaration is here because lol Qt6
+    var p = 0, i = 0, j = 0, k = 0, l = 0, r = 0, t = 0, x = 0, n = 0, trk = 0, files = 0, sz = -1, fl = -1, sides = -1, ro = -1,
+        title = '', tl = '', a = '', c = '', msg = '', artist = '', hw = '', soption = '', bad = '',
+        fnames = [];
+
+    if ((X.c("'A2R1'FF0A0D0A ................'DATA'")) || X.c("'A2R'..FF0A0D0A 'INFO'") && isWithin(X.U8(3), 0x32, 0x33)) {
+        //ref https://applesaucefdc.com/a2r/ & https://applesaucefdc.com/a2r2-reference/
+        sName = "Apple II Applesauce disk archival image (.A2R)"; sVersion = 'v' + X.SA(3, 1);
+        if (v1 = X.c("'1'", 3)) { bDetected = true; p = 0x10 } else p = 8;
+        meta = bad = '';
+        while (p < X.Sz()) {
+            var hkhd = X.SA(p, 4), hksz = X.U32(p + 4, v1 ? _BE : _LE); p += 8;
+            switch (hkhd) {
+                case 'INFO':
+                    if (v1) meta = X.SC(p, hksz, 'UTF8').replace(/\x0A/g, ",").replace(/\x09/g, ":"); else {
+                        iV = X.U8(p); bDetected = true;
+                        switch (X.U8(p + 33)) {
+                            case 1: dim = '5¼" SS 40trk 0.25 step'; break;
+                            case 2: dim = '3½" DS 80trk Apple CLV'; break;
+                            case 3: dim = '5¼" DS 40trk'; break;
+                            case 4: dim = '5¼" DS 80trk'; break;
+                            case 5: dim = '3½" DS 80trk'; break;
+                            case 6: dim = '8" DS'; break;
+                            case 7: dim = '3" DS 80trk'; break;
+                            case 8: dim = '3" DS 40trk'; break;
+                            default: dim = '?'
+                        }
+                        sOption('disk:' + dim);
+                        if (X.U8(p + 34) == 1) sOption('write-protected');
+                        if (iV >= 2) {
+                            if (t = X.U8(p + 42)) sOption(t, 'min.RAM:', 'k');
+                            t = ''; fl = X.U16(p + 40); if (!fl) t = '?'; if (fl & (1 << 0)) t = t.append('][');
+                            if (fl & (1 << 1)) t = t.append('][ Plus'); if (fl & (1 << 2)) t = t.append('//e');
+                            if (fl & (1 << 3)) t = t.append('//c'); if (fl & (1 << 4)) t = t.append('//e Enhanced');
+                            if (fl & (1 << 5)) t = t.append('IIgs'); if (fl & (1 << 6)) t = t.append('//c Plus');
+                            if (fl & (1 << 7)) t = t.append('///'); if (fl & (1 << 8)) t = t.append('/// Plus');
+                            sOption(t, 'for Apple ');
+                        }
+                    }
+                    break;
+                case 'DATA': case 'STRM': case 'RWCP': case 'SLVD': break;
+                case 'META': meta = X.SC(p, hksz, 'UTF8').replace(/\x0A/g, ",").replace(/\x09/g, ":"); break
+            }
+            p += hksz;
+        }
+        if (p > X.Sz()) bad = bad.addIfNone('!short');
+        //if(X.isDeepScan() && X.calculateCRC32(12,sz-12) != X.U32(8)) bad = bad.addIfNone('!badcrc');
+        if (bad != '') sVersion = sVersion.appendS('/malformed' + bad, '/')
+        if (X.isVerbose()) {
+            sOptionT(addEllipsis(meta), 'info:"', '"');
+            sOption(outSz(p), 'sz:');
+        }
+    }
+
+    else if (X.c("'AT8X'") && isWithin(t0p = X.U32(0x1C), 0x24, 0x40) && X.c("0000", t0p + 4)
+        && isWithin(t0sz = X.U32(t0p), (t0hdsz = X.U32(t0p + 0x14)) + X.U32(t0p + t0hdsz), 0x1000)
+        && isWithin(t0sec = X.U16(t0p + 0xA), 1, 40) && X.U32(t0p + t0hdsz) == 8 + 8 * t0sec) {
+        //ref http://www.whizzosoftware.com/sio2arduino/vapi.html
+        sName = "Atari VAPI/ATX disk image (.ATX)"; sVersion = 'v' + X.U16(4); bDetected = true;
+        if (X.isVerbose()) {
+            for (trk = 0, p = t0p, sec = 0; trk < 40 && p < X.Sz(); trk++, p += X.U32(p))
+                sec += X.U16(p + 0xA);
+            sOption('trk:' + trk + ' sec.total:' + sec + ' sz:' + outSz(p))
+        }
+    }
+
+    else if (X.c("'<BALLY format=1>'") && X.c("'</BALLY>'", (sz = X.U16(0x11, _LE)) - 8)) {
+        sName = "Bally Arcade/Astrocade BASIC tape (.BIN)"; bDetected = true; if (X.isVerbose()) sOption(outSz(sz), 'sz:')
+    }
+
+    else if (X.c("0E0000800E..FFFE........FFFFFFFF020000000200..FFFFFFFFFE")
+        && [0x1F, 0x2F].indexOf(X.U8(5)) >= 0 && [0x1F, 0x7F].indexOf(X.U8(0x161)) >= 0) {
+        sName = "Casio Loopy (big-endian) cartridge (.BIN)"; bDetected = true
+    }
+
+    else if (X.c("4C....4C....01'CBM::::::::'") && X.c("FF", 0x333E) && X.c("FF", 0x3980)) {
+        sName = "Commodore Plus/4 cartridge (.BIN)"; bDetected = true
+    }
+
+    else if (X.c("000003", 0x08) && X.c("'DMC '", 0x100) && X.c("'                                GM 00000000-00'", 0x160)) {
+        sName = "AtGames/中娛/愛勝 Firecore digital media cartridge (.BIN)"; bDetected = true
+    }
+
+    // else if([0x1F,0x20].indexOf(X.U8(0) >= 0) &&
+    //   (X.fSig(1,0x200,"929376..7702") > 0) || X.fSig(1,0x200,"9276..937702") > 0) { // quite a few ROMs mismatch it
+    // 	// 2560 is a pretty unique CPU, may be possible to statistically analyse the instructions and go from there
+    // 	sName = "Emerson Arcadia 2001 cartridge (.BIN)"; bDetected = true
+    // }
+
+    else if (X.c("F50400") && X.c("04", 0x800) && X.c("8383", 0x808) && F.Sz() == 0x1000) {
+        sName = "Entex Adventure Vision cartridge (.BIN)"; bDetected = true
+    }
+
+    else if ((X.c("55..40..40....00") || X.c("5512521252B0")) && X.U8(1) == X.U8(3)
+        && (X.Sz() == 0x2000 || X.Sz() == 0x4000)) {
+        sName = "Epoch ゲームポケコン/Game Pocket Computer cartridge (.BIN)"; bDetected = true
+    }
+
+    else if (X.c("BBA56EB3E9C5A7A4CCB3D7B2CFA8CEA5CCAAA3A46FB1EFB9BBA56EB3E9C569B6E6A6F4A5F3A6CFA456A675A47BB5'r(vereese gnniee)rB'A1CFA4D5B2B6C442A1CFA473BDB6C4CEA9F3A7EFA7BBA56EB3E9C5ECAD6CA97BB5A1A65DB370AD57A4EFB96EB3E9C5BAAAEAC277A950BBD1B8A3B0EAC277A9'rTdamera kybU inet diMrceoeltcorinscC ro.pa dnF nuethcE tnreatniemtnC ro.pA llr gith seresvrde .iLecsn esip reimttde'002E", 0x2000)
+        || X.c("1E00E32AE401E501 E601E7011B48E801 E901EAC401300EEB 01B426ECEED26401 EF26F00108604E30 F201F301F4010128")) {
+        sName = "Funtech Super Acan cartridge (.BIN)"; bDetected = true
+    }
+
+    else if ((X.c("AA04FFFF68FF") || X.c("AA4E840D196900") || X.c("AA544E85706A90")
+        || X.c("AA54E9A7640202") || X.c("AAC0BA69004DCC") || X.c("AA694169146914"))
+        && isWithin(X.Sz(), 0x2000, 0x8000) && !(X.Sz() & 0xFFF)) {
+        sName = "Hartung Game Master cartridge (.BIN)"; bDetected = true
+    }
+
+    else if (X.c("'ZPJ'") && X.c("0003....0003", 0x18) && charStat(X.SA(3, 3)) == 'allnum'
+        && charStat(X.SA(6, 13), true).indexOf('allasc' >= 0)) {
+        // name db: https://github.com/libretro/libretro-database/blob/master/metadat/no-intro/Konami%20-%20Picno.dat
+        sName = "Konami Picno image (.BIN)"; bDetected = true;
+        sOption(charStat(X.SA(3, 3)))
+        if (X.isVerbose()) {
+            var t = X.SA(3, 13); while (t.length && t[t.length - 1] == '+') t = t.slice(0, t.length - 1)
+            sOption(t)
+        }
+    }
+
+    else if (X.c("'Copyright LeapFrog     '00..01010000000080", 0x100)) {
+        sName = "Leapfrog Leapster Learning Game System image (.BIN)"; bDetected = true;
+        if (X.fSig(1, 0x1000, "'Lil ducked.  The jet zipped past her head.  Dust flew, Lil sneezed, and Leap turned red.  Then Lil got up, about to yell.  Leap gasped, \"Look, Lil!  Your tooth!  It fell!\"'"))
+            sVersion = 'Approved Content'; else sVersion = 'unapproved content' //what a way to show something so useless
+    }
+
+    else if (!(X.Sz() & 7) && (t = X.fSig(0, 0x1000, "1FA6DEBACC137D74")) >= 0 && !(t & 7)) {
+        sName = "Microsoft MSX tape image (.CAS)"; bDetected = true
+    }
+
+    else if (X.c("00000000'Root-CPCA00000108-CP00000110'00000000000000000000000000000000000000000000000000000000000000000000000000", 0x2854)) {
+        sName = "iQue (N64 for China) CMD (.CMD)"; bDetected = true
+    }
+    else if (X.c("803712400000000F80....00000014") && X.c("AD0000", 0x1010) && X.c("FF", 0x101E)) {
+        sName = "iQue (N64 for China) Z64 image (.Z64)"; bDetected = true
+    }
+
+    else if (X.c("'C64 CARTRIDGE   '") && (p = X.U32(0x10, _BE)) >= 0x40 && X.c("'CHIP'", p)) {
+        //ref 64copy / formats.zip/CRT.TXT
+        bDetected = true; sName = "Commodore 64 cartridge (.CRT)";
+        sVersion = "v" + X.U8(0x14) + "." + X.U8(0x15).padStart(2, '0'); bad = '';
+        while (p < X.Sz()) {
+            if (!X.c("'CHIP'", p)) break;
+            var hksz = X.U32(p + 4, _BE), romsz = X.U16(0x0E, _BE);
+            if (romsz > hksz - 0x10) bad = bad.addIfNone('!badchipsz');
+            if (p + hksz > X.Sz())
+                if (p + 0x10 + romsz <= X.Sz()) { //ignore the weird chunk length, use the ROM length
+                    p += romsz + 0x10; bad = bad.addIfNone('!badchunk'); continue
+                }
+                else if (!X.isVerbose() && p + hksz > X.Sz()) { bad = bad.addIfNone('!short') }
+            p += hksz
+        }
+        if (bad != '') sVersion = sVersion.appendS('malformed' + bad, '/');
+        if (X.isVerbose()) {
+            sOption(X.SC(0x20, 0x20, "Shift_JIS"));
+            switch (X.U16(0x16, _BE)) {
+                case 0: hw = "normal cartridge"; break;
+                case 1: hw = "Action Replay"; break;
+                case 2: hw = "KCS Power Cartridge"; break;
+                case 3: hw = "Final Cartridge III"; break;
+                case 4: hw = "Simons Basic"; break;
+                case 5: hw = "Ocean type 1"; break;
+                case 6: hw = "Expert Cartridge"; break;
+                case 7: hw = "Fun Play, Power Play"; break;
+                case 8: hw = "Super Games"; break;
+                case 9: hw = "Atomic Power"; break;
+                case 10: hw = "Epyx Fastload"; break;
+                case 11: hw = "Westermann Learning"; break;
+                case 12: hw = "Rex Utility"; break;
+                case 13: hw = "Final Cartridge I"; break;
+                case 14: hw = "Magic Formel"; break;
+                case 15: hw = "C64 Game System/System 3"; break;
+                case 16: hw = "WarpSpeed"; break;
+                case 17: hw = "Dinamic"; break;
+                case 18: hw = "Zaxxon, Super Zaxxon (SEGA)"; break;
+                case 19: hw = "Magic Desk/Domark/HES Australia"; break;
+                case 20: hw = "Super Snapshot 5"; break;
+                case 21: hw = "Comal-80"; break;
+                case 22: hw = "Structured Basic"; break;
+                case 23: hw = "Ross"; break;
+                case 24: hw = "Dela EP64"; break;
+                case 25: hw = "Dela EP7x8"; break;
+                case 26: hw = "Dela EP256"; break;
+                case 27: hw = "Rex EP256"; break;
+                case 28: hw = "Mikro Assembler"; break;
+                case 29: hw = "reserved"; break;
+                case 30: hw = "Action Replay 4"; break;
+                case 31: hw = "StarDOS"; break;
+                case 32: hw = "EasyFlash"; break;
+                default: hw = "?";
+            }
+            sOption('hw.type: ' + hw + ' /EXROM:' + (X.U8(0x18) ? 'inactive' : 'active')
+                + ' /GAME:' + (X.U8(0x19) ? 'inactive' : 'active') + ' sz:' + outSz(p));
+        }
+    }
+
+    function isDC42() {
+        //ref https://www.discferret.com/wiki/Apple_DiskCopy_4.2
+        if (X.Sz() < 0x32000 || !X.c("0100", 0x52) || !isWithin(tl = X.U8(0), 1, 0x3F)) return false;
+        title = X.SC(1, tl, 'CP1252'); var tcs = charStat(title, true); if (tcs.indexOf('allxsc') < 0) return false;
+        if (tl != X.U8(0x478) || title != X.SC(0x479, X.U8(0x478), 'CP1252')) return false; //the volume label, I presume
+        var discsz = X.U32(0x40, _BE), tagsz = X.U32(0x44, _BE);
+        if (!isWithin(discsz, 0x32000, 0x200000) || (tagsz && discsz * 12 / 512 != tagsz)) return false;
+        if (!tagsz && X.U32(0x4C, _BE)) return false;
+        sz = 0x54 + discsz + X.U32(0x44, _BE); discszt = Util.divu64(discsz, 1024) + 'k';
+        switch (X.U8(0x50)) {
+            case 0: discszt += ' GCR CLV ssdd'; break; case 1: discszt += ' GCR CLV dsdd'; break;
+            case 2: discszt += ' MFM CAV dsdd'; break; case 3: discszt += ' MFM CAV dshd'; break;
+            default: discszt += ' unk.type'
+        }
+        return true
+    }
+    if (!bDetected && isDC42()) {
+        sName = "Apple DiskCopy 4.2 disk image (.DC42)"; sVersion = discszt; bDetected = true;
+        if (X.isVerbose()) {
+            sOption(title); sOption(outSz(sz), 'sz:')
+        }
+    }
+
+    if (!bDetected) if (X.c("'ACT Apricot disk image'1A04") && isAllZeroes(0x18, 0x58)) {
+        //ref https://github.com/latchdevel/HxCFloppyImageConverter/blob/master/libhxcfe/trunk/sources/loaders/apridisk_loader/apridisk_format.h
+        sName = "Jonathan Marsters's ACT/Apricot PC ApriDisk image (.DSK)"; bDetected = true;
+        var cyl = sec = 0, interrupt = false, cmt = by = '';
+        for (p = 0x80; p < X.Sz();) {
+            var hkhd = X.U32(p), hdsz = X.U16(p + 6), hksz = X.U32(p + 8);
+            switch (hkhd) {
+                case 0xE31D0000: break; //del
+                case 0xE31D0001: //sec
+                    if ((t = X.U8(p + 13)) > sec) sec = t; if ((t = X.U16(p + 14) + 1) > cyl) cyl = t;
+                    break;
+                case 0xE31D0002: cmt = X.SA(p + hdsz, hksz); break;
+                case 0xE31D0003: by = X.SA(p + hdsz, hksz); break;
+                default: interrupt = true
+            }
+            if (interrupt) break;
+            p += hdsz + hksz;
+            if (hkhd == 0xE31D0002) break
+        }
+        if (X.isVerbose()) {
+            sOption(cmt); sOption(by, 'by: '); sOption('cyl:' + cyl + ' sec:' + sec + ' sz:' + outSz(p))
+        } else if (p > X.Sz()) sVersion = 'malformed!short'
+    }
+
+    else if ((X.c("'EXTENDED CPC DSK File'0D0A'Disk-Info'0D0A") || X.c("'MV - CPCEMU Disk-File'0D0A'Disk-Info'0D0A")
+        || X.c("'MV - CPC'")) && isWithin(trk = X.U8(0x30), 20, 84) && isWithin(sd = X.U8(0x31), 1, 2)
+        && X.c("'Track-Info'0D0A000000", 0x100)) {
+        //ref https://github.com/latchdevel/HxCFloppyImageConverter/blob/master/libhxcfe/trunk/sources/loaders/cpcdsk_loader/*
+        sName = "Amstrad CPC disk image (.DSK)"; bDetected = true;
+        if (X.c("'E'")) { trksz = 0; sVersion = 'extended' } else trksz = X.U16(0x32) + 1;
+        if (X.isVerbose()) {
+            sOption(X.SA(0x22, 0xE)); sOption('trk:' + trk + (trksz ? ' trksz:' + trksz : '') + ' sides:' + sd)
+        }
+    }
+
+    function isEALIB() {
+        //from https://aluigi.altervista.org/bms/ealib.bms
+        if (!X.c("'EALIB'")) return false;
+        n = X.U16(5); var oldp = p = 7;
+        for (var i = 0; i < n && p < X.Sz(); i++) {
+            p += 0xD; var z = X.U8(p++), ofs = X.U32(p); p += 4;
+            if (z > 4 || !isWithin(ofs, p, X.Sz())) return false;
+        }
+        return true
+    }
+    if (!bDetected && isEALIB()) {
+        sName = "Electronic Arts Library resource pack"; bDetected = true;
+        if (X.isVerbose()) sOption(n, 'files:')
+    }
+
+    if (!bDetected)
+        if (X.c("'FCSX'") && X.U32(4) > X.U32(8) && X.U32(8) <= X.Sz()) { //found this one in a collection of NES ROMs
+            sName = "FCSX zlib format (.FCS)"; bDetected = true;
+            if (X.isVerbose()) sOptions = 'Zlib @10h, unp.sz:' + X.U32(4) + ' sz:' + outSz(X.U32(8))
+        }
+
+    function isPC98FDI() {
+        if (!X.c("00000000")) return false;
+        var id = X.U32(4), hdrsz = X.U32(8), datasz = X.U32(0xC), bpsec = X.U32(0x10),
+            sec = X.U32(0x14), heads = X.U32(0x18), cyl = X.U32(0x1C);
+        if ([0x10, 0x30, 0x90].indexOf(id) < 0 || bpsec * sec * heads * cyl != datasz
+            || (sz = hdrsz + datasz) > X.Sz() || hdrsz < 0x20) return false;
+        if (id == 0x10 && !isWithin(datasz, 0x80000, 0xB6000) //let's allow some space for stupid formatting
+            || id == 0x30 && !isWithin(datasz, 0x160000, 0x300000)
+            || id == 0x90 && !isWithin(datasz, 0x120000, 0x140000)) return false;
+        info = 'disc:' + (id == 0x10 ? "640/720k" : id == 0x30 ? "1.44M" : id == 0x90 ? "1.2M" : '?')
+            + ' (' + (datasz / 0x400).toFixed(1) + 'k)';
+        info = info.append('hd:' + heads + ' cyl:' + cyl + ' sec:' + sec + ' sz:' + outSz(sz))
+        return true
+    }
+    if (isPC98FDI()) {
+        sName = "EPSON's PC-98 disk image (.FDI)"; bDetected = true;
+        if (X.isVerbose()) sOption(info)
+    }
+
+    //.GG has no clear header...
+
+    if (!bDetected) if (X.c("EB0A9090'IPL1'0000001EA08405B48ECD1BA8", 0x1000) && //empirical and may be incorrect!
+        X.c("E9D102'                                                                                NEC 'CADFB0BFC5D9BADDCBDFADB0C08CC592E8836683428358834E8B4E93AE8381836A8385815B8376838D834F8389838020CADEB0BCDEAEDD' 2.'....' Copyright (C) NEC Corporation 1985,'", 0x1400)) {
+        sName = "NEC PS-98 hard disk image (.HDI)"; bDetected = true
+    }
+
+    else if ((X.c("EB1C904E") || X.c("EB2790B1") || X.c("EB279028") || X.c("EB3C9027") || X.c("EB3C904E"))
+        && X.c("000401010002C000D004FE0200080002000000", 0xB)
+        || (X.c("EB..90") && X.Sz() == 0x134000)) { // and no real way to detect user disks
+        sName = "NEC PC-98 disk image (.HDM)"; bDetected = true
+    }
+
+    function isHOBETA() {
+        if(X.Sz() < 0x111) return;
+        var chk = 0; for (var i=0; i < 0xF; ++i) { if(i < 9 && X.U8(i) < 0x20) return;  chk += X.U8(i) }
+        chk = (105+0x101*chk) & 0xFFFF; if(chk != X.U16(0xF)) return;
+        sz = X.U16(0xB); addr = X.U16(9); alsz = X.U16(0xD);
+        if(!isWithin(alsz, 0x100,0xFF00) || !isWithin(sz, 0x100,0xFF00)
+            || addr < 0x4000 /*ROM*/ || addr+sz > 0x10000) return;
+        if(sz+(sz%0x100? (0x100-sz%0x100): 0) != alsz) return;
+        var tp = X.U8(8);
+        return true;
+    }
+    if(isHOBETA()) {
+        sName = 'ZX Spectrum HOBETA wrapper (.HOB)'; bDetected = true;
+        sOptions = decAnsi(0,  8, CPSpeccy).trim()+'.'+X.SA(8,1);
+        if(X.isVerbose()) sOption('data @11h['+Hex(sz)+'] RAM$'+addr.toString(16)+' sz:'+outSz(0x11+alsz));
+        else if(0x11+alsz > X.Sz()) sVersion = 'malformed!short';
+    }
+
+    if(!bDetected) if (X.c("'HXCPICFE'") && isWithin(sides = X.U8(0xA), 1, 2)
+        && isWithin(baud = X.U16(0xC) * 1000, 150000, 3000000) && (ro = X.U8(0x11)) <= 1) {
+        //ref https://github.com/latchdevel/HxCFloppyImageConverter/blob/master/libhxcfe/trunk/sources/loaders/hfe_loader/hfe_format.h
+        // & hfe_writer.c & hfe_loader.c
+        sName = "HxC PIC/HFE disk image (.HFE)"; sVersion = 'rev.' + X.U8(8); bDetected = true;
+        if (X.isVerbose()) {
+            const trkencs = ["ISO IBM MFM", "Amiga MFM", "ISO IBM FM", "emulated FM", "unk."],
+                ifmodes = ["IBM PC DD", "IBM PC HD", "Atari ST DD", "Atari ST HD", "Amiga DD", "Amiga HD",
+                    "Amstrad CPC DD", "generic Shugart DD", "IBM PC ED", "MSX2 DD", "Commodore 64 DD",
+                    "emulated Shugart"];
+            var trk = X.U8(9), ifmode = X.U8(0x10), tofs = [], t = X.U8(0xB), sz = 0x200, datasz = 0;
+            p = 0x200; trkenc = t > 3 ? trkencs[4] : trkencs[t] & 3; ifmode = ifmode <= 0xB ? ifmodes[ifmode] : 'unk.';
+            for (i = 0; i < trk && p < X.Sz(); i++, p += 4) {
+                datasz += t = X.U16(p + 2)
+            }
+            t = t & 0x1FF ? 0x200 + (t & 0xFFFFFE00) : t; sz = X.U16(p - 4) * 0x200 + t;
+            sOption('trk:' + trk + (sides == 2 ? ' DS' : ' SS'));
+            sOption(trkenc, 'trkenc:'); sOption(ifmode, 'floppy mode:'); sOption(ro ? 'write-protected' : '');
+            sOption(baud + ' baud = ' + (baud / 8192).toFixed(1) + 'k/s');
+            sOption('datasz:' + datasz + ' sz:' + outSz(sz))
+        }
+    }
+
+    else if (X.c("'CHKH'........00000000") && X.c("'CHKH'........01000000", X.U32(4)) && X.Sz() > 12) {
+        //ref https://github.com/latchdevel/HxCFloppyImageConverter/blob/11ee45a77f237846eebdf1c6f1c732e5c0505be5/libhxcfe/trunk/sources/loaders/hxcstream_loader/hxcstream.c#L143
+        sName = "HxC Stream Loader disk track (.hxcstream)"; bDetected = true;
+    }
+
+    else if (X.c("'CAPS'0000000C1CD573BA'INFO'00000060") && X.c("'IMGE'", 0x6C)) {
+        //ref http://info-coach.fr/atari/documents/_mydoc/IPF-Documentation.pdf
+        sName = "SPS's KryoFlux Interchangeable Preservation Format disk image (.IPF)"; bDetected = true;
+        switch (X.U32(0x048, _BE)) {
+            case 0: sVersion = 'no-platform'; break; case 1: sVersion = 'Amiga'; break;
+            case 2: sVersion = 'Atari ST'; break; case 3: sVersion = 'PC'; break; case 4: sVersion = 'Amstrad CPC'; break;
+            case 5: sVersion = 'ZX Spectrum'; break; case 6: sVersion = 'SAM Coupe'; break;
+            case 7: sVersion = 'Acorn Archimedes'; break; case 8: sVersion = 'C64'; break;
+            case 9: sVersion = 'Atari 8-bit'; break; default: sVersion = 'unk.'
+        }
+        sVersion += X.U32(0x18, _BE) == 1 ? ' floppy' : ' unk.media';
+        if (X.isVerbose()) {
+            for (p = 0x6C, density = '', densities = []; p < X.Sz();) {
+                hkhd = X.SA(p, 4); if (!/[A-Z]{4}/.test(hkhd) || !X.c("0000", p + 4)/*a floppy block can't be this long*/) break;
+                hksz = X.U32(p + 4, _BE);
+                if (hkhd === 'IMGE') {
+                    switch (X.U32(p + 20)) {
+                        case 3: density = 'Copylock Amiga'; break; case 4: density = 'Copylock Amiga new'; break;
+                        case 5: density = 'Copylock ST'; break; case 6: density = 'Speedlock Amiga'; break;
+                        case 7: density = 'Speedlock Amiga old'; break; case 8: density = 'Adam Brierley Amiga'; break;
+                        case 9: density = 'Adam Brierley & density key Amiga'; break;
+                    }
+                    if (densities.indexOf(density) < 0) densities.push(density);
+                }
+                else if (hkhd === 'DATA') p += X.U32(p + 12, _BE);
+                p += hksz
+            }
+            sOption(X.U32(0x28, _BE), 'rev.');
+            sOption('tracks:' + X.U32(0x30, _BE) + '-' + X.U32(0x34, _BE) + ' sides:' + (1 + X.U32(0x3C, _BE)));
+            sOption(X.U32(0x1C, _BE) == 1 ? 'CAPS' : X.U32(0x1C, _BE) == 2 ? 'SPS' : 'unk.', 'encoder:', ' rev.' + X.U32(0x20, _BE));
+            sOption(Hex(X.U32(0x24, _BE), 8), 'cat.ID:'); sOption(densities.join(' + '), 'copy protection:'); sOption('sz:' + outSz(p))
+        }
+    }
+
+    else if (X.c("'JFDI'") && isWithin(tt = X.U32(0x18), 0x130, X.Sz()) && isWithin(st = X.U32(0x1C), tt, X.Sz())
+        && isWithin(dt = X.U32(0x20), st, X.Sz()) && X.c("FFFFFFFF", st - 4) && X.c("FFFFFFFF", dt - 8)
+        && (!(dtt = X.U32(0x24)) || isWithin(dtt, dt, X.Sz())) && (!(dst = X.U32(0x28)) || isWithin(dst, dt, X.Sz()))
+        && (!(ddt = X.U32(0x2C)) || isWithin(ddt, dt, X.Sz()))) {
+        //ref https://gist.github.com/Kaens/a139d96dc429b49788e47ea57e55017d
+        sName = "Acorn Archimedes ADFFS JFD disk image (.JFD)"; bDetected = true;
+        nV = Util.divu64(nv = X.U32(4, _LE), 100); nv %= 100; sVersion = 'v' + nV + '.' + nv;
+        +'+/img v' + ((iv = X.U8(0x14)) >> 5) + '.' + (iv & 0x1F);
+        if (X.isVerbose()) {
+            sOption('tt:' + Hex(tt) + ' st:' + Hex(st) + ' dt:' + Hex(dt))
+            sOption(addEllipsis(decAnsi(0x30, 0x100, CPRISCOS).trim(), 0xC0, 0xA0));
+            if ((ds = X.U16(0xE)) > 1) sOptions += ' (' + X.U16(0xC) + '/' + ds + ')';
+            sOption('trk:' + Util.divu64(st - tt, 4) + ' sec:' + (Util.divu64(dt - st - tt * 4, 8)));
+            if (X.U32(4) >= 204) {
+                fl = X.U32(0x130);
+                if (fl & (1 << 0)) sOption('write-protected'); if (fl & (1 << 2)) sOption('Protect CMOS req.');
+                if (fl & (1 << 3)) sOption('Protect Modules req.'); if (fl & (1 << 5)) sOption('Shift+Break to load');
+                sOption('for:');
+                if (fl & (1 << 8)) sOption('ARM3'); if (fl & (1 << 9)) sOption('ARM250');
+                if (fl & (1 << 10)) sOption('ARM610/710'); if (fl & (1 << 11)) sOption('ARM7500');
+                if (fl & (1 << 12)) sOption('StrongArm'); if (fl & (1 << 13)) sOption('ARMv5/v6/v7');
+                if (fl & (1 << 16)) sOption('RiscOS 2'); if (fl & (1 << 17)) sOption('RiscOS 3.1');
+                if (fl & (1 << 18)) sOption('RiscOS 3.5'); if (fl & (1 << 19)) sOption('RiscOS 3.7');
+                if (fl & (1 << 20)) sOption('RiscOS 3.8/4.x'); if (fl & (1 << 21)) sOption('RiscOS 5.x');
+                if (fl & (1 << 22)) sOption('RiscOS 6.x');
+                if (X.U8(0x134)) sOption('fps:' + (X.U8(0x134) / 2)); if (X.U32(0x138)) sOption('Obey file sz:' + X.U32(0x138));
+                sOption('datasz:' + X.U32(8)); if (ddt) sOption('delta data')
+            }
+        }
+    }
+
+    else if ((X.c("'SEGA 32X '", 0x100) || X.c("'SEGA GENESIS'", 0x100)) && X.c("'(C)'", 0x110)) {
+        sName = "Sega MD/Genesis/32X (.MD,.32X)"; bDetected = true
+    }
+
+    function isMGT() {
+        //ref https://sinclair.wiki.zxnet.co.uk/wiki/MGT_filesystem
+        //TODO test on SAM with subdirs, +D, HDD...
+        if ([0x32000, 0x64000, 0xC8000].indexOf(X.Sz()) < 0) return false; // single-sided 40-cylinder, ds40/ss80, ds80
+        subdir = 0; erased = 0; files = 0;
+        var p = 0, ds = X.Sz() > 0x64000, msz = Math.min(X.Sz(), 0xC8000);
+        var xroot = X.U8(0xFF); if (xroot > 35) return false; //betaDOS/MasterDOS extra tracks for root
+        var zx = [0, 'ZX Spectrum'], sam = [0, 'SAM Coupé'], dd = [0, 'DISCiPLE/+D'], hd = [0, 'HDD'];
+        var samboot = X.c("'BOOT'", 0x100); if (samboot) sam[0] += 20;
+        var allocmap = []; for (i = 0; i < 195; i++) allocmap.push(0);
+        soption = ''; fnames = []; label = ''; sus = 0;
+        if (!extIs('mgt')) sus++; //could be gzipped which removes the extension as far as DiE is concerned
+        if (X.Sz() != 0xC8000) sus++; //in practice, only ds 80-cyl is seen around
+        const fts = [/*0*/'erased', 'ZXBASIC', 'ZXnum.array', 'ZXstr.array', 'ZXcode', 'ZX48ksnap', 'ZXMD', 'ZXscr', 'special',
+		/*9*/'ZX128ksnap', 'Opentype', 'ZXexec', 'UNI-DOSdir', 'UNI-DOScreate', '14?', '15?', 'SAMBASIC', 'SAMnum.array',
+		/*18*/'SAMstr.array', 'SAMcode', 'SAMscr', 'MasterDOSdir', 'SAMDriverapp', 'SAMDriverbootstrap', 'EDOSNOMEN',
+            'EDOSsys', 'EDOSovl', '27?', 'HDOSHdos', 'HDOSHdir', 'HDOSHdisk', 'HDOSHfree/Htmp'];
+        if ((X.U8(0) & 0x3F) != 19 && charStat(X.readBytes(0xD2, 10), 1).indexOf('allasc') >= 0) {
+            sam[0] += 10; label = X.SA(0xD2, 10).trim()
+        }
+        //if(xroot) _l2r('mgt',0xFF,xroot+' xroot found!'); if(samboot) _l2r('mgt',0x100,'SAM BOOT found!')
+        for (p = _sec = _side = _trk = 0, end = false; _trk < 4 + xroot && p < X.Sz();) {
+            for (s = 0; s < 2; s++) { //go through the 2 records per sector
+                if (samboot && files == 1) { files++; continue }
+                //_l2r('mgt',p,'looking at rec #'+files+'"'+X.SA(p+1,10)+'": T'+_trk+'S'+_side+'s'+_sec+' type '+X.U8(p))
+                if (!X.U8(p + 1)) { end = true; continue }
+                if (end) sus++; files++;
+                var fname1 = X.readBytes(p + 2, 9); if (charStat(fname1, 1).indexOf('allasc') < 0) return false; //space-padded
+                var ft = (X.U8(p) & 0x3F); if (ft > 0x1F) return false; //file type
+                if (!ft) erased++; else if (isWithin(ft, 1, 11)) zx[0]++; else if (isWithin(ft, 12, 13)) dd[0]++;
+                else if (isWithin(ft, 16, 23)) sam[0]++; else hd[0]++;
+                var fsecsz = X.U16(p + 0xB, _BE); if (!fsecsz) return false;  //sectors used by the file
+                var ftrk0 = X.U8(p + 0xD), fside0 = ftrk0 >> 7; ftrk0 &= 0x7F; if (!isWithin(ftrk0, 0, 79)) return false;
+                var fsec0 = X.U8(p + 0xE); if (!isWithin(fsec0, 1, 10)) return false;
+                if (!ds) ds = fside0; //double-sided disc. there must be a better way to tell...
+                if (!files) { if (ft == 0) sus++; if (X.U8(p) & 0x80) sus++ } //super unlikely the first file's erased or hidden
+                for (i = 0; i < 195; i++) { t = X.U8(p + 0xF + i); if (allocmap[i] & t) return false; allocmap[i] |= t }
+                if (firstNotOf(p + 0xDC, 11, [0x20, 0xFF]) < 0) sam[0] += 10;
+                if (firstNotOf(p + 0xE8, 4, [0xFF]) < 0) sam[0] += 4;
+                if (X.U8(p + 0xFA) == 0xFF) sam[0]++; if (X.U8(p + 0xFB) == 0xFF) sam[0]++;
+                fnames.push(X.SA(p + 1, 10).trim()
+                    + ':' + fts[ft] //file type briefly explained
+                    //+'@'+Hex((fsec0+(fside0+ftrk0*2)*10)*0x200) //just the 1st sector address won't be too useful
+                );
+                if (ft == 21) { subdir++; t = ((fsec0 + (fside0 + ftrk0 * 2) * 10) * 0x200) + 1; if (X.U8(t)) fnames.push('/' + X.SA(t, 10) + '...') }
+                if (!s) p += 0x100
+            }
+            _sec++; if (_sec > 9) { _sec = 0; _side++; if (_side == 1) { _side = 0; _trk++ } }
+            p = (_sec + (_side + _trk * 2) * 10) * 0x200;
+        }
+        if (sus > 5 || !files) return false;
+        function am0max() {
+            if (!arguments.length) return '';
+            var i, r = arguments[0]; for (i = 1; i < arguments.length; i++) if (arguments[i][0] > r[0]) r = arguments[i];
+            return r
+        }
+        sv = am0max(zx, sam, dd, hd)[1] + '/' + (ds ? 'DS' : 'SS');
+        return true
+    }
+    if (!bDetected && isMGT()) {
+        sName = "Miles Gordon Technology floppy image (.MGT,.SAD)";
+        sVersion = sv; bDetected = 1;
+        if (X.isVerbose()) {
+            sOption((subdir ? '≈' : '') + (files - erased - subdir) + (erased ? '+' + erased + ' erased' : '') + (subdir ? '+' + subdir + 'subdirs' : ''), 'files:');
+            if (files) sOption('(' + addEllipsis(fnames.join('; ')) + ')');
+            if (sus) sOption('possibly malformed (level ' + sus + ')');
+        }
+    }
+
+
+    if (!bDetected) if (X.c("'NES'1A") && (X.Sz() > 15)) {
+            //ref https://www.nesdev.org/wiki/INES & https://www.nesdev.org/wiki/NES_2.0
+            sName = "NES ROM image (.nes)"; bDetected = true; malformed = false;
+            szprg = X.U8(4) * 16384; szchr = X.U8(5) * 8192;
+            flg9 = X.U8(9); //v1.0: ROMs don't use it; v2.0: sz*msb
+            flg6 = X.U8(6);
+            //fmirroring = (flg6&1)>0; //0 for hrz 1 for vrt, tons of fallout though so better to ignore this
+            fstorage = (flg6 & 2) > 0; trainer = (flg6 & 4) * 0x80; f4scrvram = (flg6 & 8) > 0; flg7 = X.U8(7);
+            mapper = ((flg6 & 0xF0) >> 4) + (flg7 & 0xF0); fvsunisystem = (flg7 & 1) > 0; fplaychoice10 = (flg7 & 2) > 0;
+            fv20_ = ((flg7 & 0x0C) == 8); fv20 = false; szprgmsb = ((flg9 & 0x0F) << 8) * 16384;
+            szchrmsb = ((flg9 & 0xF0) << 4) * 8192; ex = region = tv = "";
+            sz = 16 + trainer + szprg + szprgmsb + szchr + szchrmsb;
+            if (fv20_) fv20 = sz < X.Sz();
+            if (fv20) {
+                szprg += szprgmsb; szchr += szchrmsb; flg8 = X.U8(8); flg11 = X.U8(11); flg12 = X.U8(12);
+                flg13 = X.U8(13); flg14 = X.U8(14); flg15 = X.U8(15); sVersion = "NES v2.0";
+                mapper += (flg8 & 0x0F) << 8; submapper = (flg8 & 0xF0) >> 4;
+                switch (flg7 & 2) {
+                    case 0: sVersion += " #NES/Famicom/Dendy"; break;
+                    case 1:
+                        sVersion += " #Nintendo Vs. System (";
+                        switch (flg13 & 0x0F) {
+                            case 0: sVersion += "RP2C03B)"; break; case 1: sVersion += "RP2C03G)"; break;
+                            case 2: sVersion += "RP2C04-0001)"; break; case 3: sVersion += "RP2C04-0002)"; break;
+                            case 4: sVersion += "RP2C04-0003)"; break; case 5: sVersion += "RP2C04-0004)"; break;
+                            case 6: sVersion += "RC2C03B)"; break; case 7: sVersion += "RC2C03C)"; break;
+                            case 8: sVersion += "RC2C05-01)"; break; case 9: sVersion += "RC2C05-02)"; break;
+                            case 0x0A: sVersion += "RC2C05-03)"; break; case 0x0B: sVersion += "RC2C05-04)"; break;
+                            case 0x0C: sVersion += "RC2C05-05)"; break; default: sVersion += "unk.PPU)"
+                        }
+                        break;
+                    case 2: sVersion += " #Nintendo Playchoice 10"; break;
+                    default:
+                        switch (flg13 & 0x0F) {
+                            case 0: sVersion += " #NES/Famicom/Dendy"; break;
+                            case 1: sVersion += " #Nintendo Vs. System"; break;
+                            case 2: sVersion += " #Nintendo Playchoice 10"; break;
+                            case 3: sVersion += " #Famiclone+DecimalMode"; break;
+                            case 4: sVersion += " #NES/Famicom+EPSM/plug-through"; break;
+                            case 5: sVersion += " #V.R. VT01 red/cyan"; break;
+                            case 6: sVersion += " #V.R. Technology VT02"; break;
+                            case 7: sVersion += " #V.R. Technology VT03"; break;
+                            case 8: sVersion += " #V.R. Technology VT09"; break;
+                            case 9: sVersion += " #V.R. Technology VT32"; break;
+                            case 0x0A: sVersion += " #V.R. Technology VT369"; break;
+                            case 0x0B: sVersion += " #UMC UM6578"; break;
+                            case 0x0C: sVersion += " #Famicom Network System"; break;
+                            default: sVersion += " #(reserved)"
+                        }
+                }
+                switch (flg12 & 3) {
+                    case 0: region = "NA/JP/SK/TW: NTSC NES"; break; case 1: region = "WE/AU: Licenced PAL NES"; break;
+                    case 2: region = "Multiple"; break; default: region = "EU/RU/ZH/IN/AF: Dendy"
+                }
+                switch (flg15 & 0x3F) {
+                    case 0x00: break;
+                    case 0x01: ex = "Std. Sontrollers"; break;
+                    case 0x02: ex = "NES Four Score/Satellite + 2 Std. Controllers"; break;
+                    case 0x03: ex = "Famicom 4P Adapter"; break;
+                    case 0x04: ex = "Vs. System (1P via $4016)"; break;
+                    case 0x05: ex = "Vs. System (1P via $4017)"; break;
+                    case 0x06: ex = "(obsolete MAME behaviour)"; break;
+                    case 0x07: ex = "Vs. Zapper"; break;
+                    case 0x08: ex = "Zapper ($4017)"; break;
+                    case 0x09: ex = "2 Zappers"; break;
+                    case 0x0A: ex = "Bandai Hyper Shot Lightgun"; break;
+                    case 0x0B: ex = "Power Pad Side A"; break;
+                    case 0x0C: ex = "Power Pad Side B"; break;
+                    case 0x0D: ex = "Family Trainer Side A"; break;
+                    case 0x0E: ex = "Family Trainer Side B"; break;
+                    case 0x0F: ex = "Arkanoid Vaus Controller (NES)"; break;
+                    case 0x10: ex = "Arkanoid Vaus Controller (Famicom)"; break;
+                    case 0x11: ex = "2 Vaus Controllers + Famicom Data Recorder"; break;
+                    case 0x12: ex = "Konami Hyper Shot Controller"; break;
+                    case 0x13: ex = "Coconuts Pachinko Controller"; break;
+                    case 0x14: ex = "Exciting Boxing Punching Bag (Blowup Doll)"; break;
+                    case 0x15: ex = "Jissen Mahjong Controller"; break;
+                    case 0x16: ex = "Party Tap"; break;
+                    case 0x17: ex = "Oeka Kids Tablet"; break;
+                    case 0x18: ex = "Sunsoft Barcode Battler"; break;
+                    case 0x19: ex = "Miracle Piano Keyboard"; break;
+                    case 0x1A: ex = "Pokkun Moguraa (Whack-a-Mole Mat & Mallet)"; break;
+                    case 0x1B: ex = "Top Rider (Inflatable Bicycle)"; break;
+                    case 0x1C: ex = "Double-Fisted"; break;
+                    case 0x1D: ex = "Famicom 3D System"; break;
+                    case 0x1E: ex = "Doremikko Keyboard"; break;
+                    case 0x1F: ex = "R.O.B. Gyro Set"; break;
+                    case 0x20: ex = 'Famicom Data Recorder ("silent" keyboard)'; break;
+                    case 0x21: ex = "ASCII Turbo File"; break;
+                    case 0x22: ex = "IGS Storage Battle Box"; break;
+                    case 0x23: ex = "Family BASIC Keyboard + Famicom Data Recorder"; break;
+                    case 0x24: ex = "Dongda PEC-586 Keyboard"; break;
+                    case 0x25: ex = "Bit Corp. Bit-79 Keyboard"; break;
+                    case 0x26: ex = "Subor Keyboard"; break;
+                    case 0x27: ex = "Subor Keyboard + Mouse (3x8-bit)"; break;
+                    case 0x28: ex = "Subor Keyboard + Mouse (24-bit)"; break;
+                    case 0x29: ex = "SNES Mouse ($4017.d0)"; break;
+                    case 0x2A: ex = "Multicart"; break;
+                    case 0x2B: ex = "2 SNES Controllers"; break;
+                    case 0x2C: ex = "RacerMate Bicycle"; break;
+                    case 0x2D: ex = "U-Force"; break;
+                    case 0x2E: ex = "R.O.B. Stack-Up"; break;
+                    case 0x2F: ex = "City Patrolman Lightgun"; break;
+                    case 0x30: ex = "Sharp C1 Cassette Interface"; break;
+                    case 0x31: ex = "Std. Controller w/swapped ←→/↑↓/BA"; break;
+                    case 0x32: ex = "Excalibor Sudoku Pad"; break;
+                    case 0x33: ex = "ABL Pinball"; break;
+                    case 0x34: ex = "Golden Nugget Casino extra buttons"; break;
+                    default: ex = "(unknown)"
+                }
+                sz = 16 + trainer + szprg + szprgmsb + szchr + szchrmsb
+            }
+            else {
+                if (!(flg7 & 0x0C) && X.c("0000 0000", 12)) sVersion = "iNES";
+                else if ((flg7 & 0x0C) == 4) sVersion = "archaic iNES";
+                else sVersion = "iNES v0.7 or archaic";
+
+                szprgram = X.U8(8) * 8192; if (!szprgram) szprgram = 8192; //PRG RAM size
+                flg10 = X.U8(10);
+                switch (flg10 & 3) {
+                    case 0: tv = "NTSC"; break;
+                    case 2: tv = "PAL"; break;
+                    default: tv = "NTSC/PAL"
+                }
+                if (X.c("0000 0000", X.Sz() - 4)) { fprgram = (flg10 & 0x10) > 0; fbusconflicts = (flg10 & 0x20) > 0 }
+                else { fprgram = false; fbusconflicts = false; }
+                region = "n/a";
+            }
+            if (X.isVerbose()) {
+                sOption(tv, "tv: "); sOption(region, "region: "); sOption(mapper, "mapper: "); sOption(ex, "expansion: ");
+                if (fplaychoice10) sOption("PlayChoice-10"); if (trainer) sOption("trainer");
+                if (fstorage) sOption("battery-backed RAM"); sOption(outSz(sz), 'sz:')
+            }
+        }
+
+        else if (X.c("'MNIB-1541-RAW'..000002..04..06..08..0A")) {
+            bDetected = true; sVersion = 'v' + X.U8(0xD);
+            sName = "Markus Brenner's MNIB/Peter Rittwage's C64PP NIBTools disk image (.NIB)"
+        }
+
+        else if (X.c("01'CD001'01''", 0x53000)) {
+            n = X.c("'NERO'", X.Sz() - 8) ? 1 : X.c("'NER5'", X.Sz() - 12) ? 2 : 0;
+            sName = (n ? "Nero AG's " : '') + "optical disc image (.NRG)"; if (n) sVersion = "Nero AG/v" + n;
+            if (X.isVerbose()) sOptions = X.SA(0x53028, 0x20).trim(); bDetected = true;
+        }
+
+        else if (X.c("0D04..00'host_date='") && X.fSig(0, 0x80, "'KryoFlux DiskSystem'")) {
+            sName = "SPS's KryoFlux DiskSystem disk sector (.RAW)"; bDetected = true
+        }
+
+        else if (X.c("'CAPS'0000000C1CD573BA'DATA'") && X.c("'PACK'", X.U32(0x10, _BE) + 0x14)) {
+            //ref https://www.kryoflux.com/download/spsdeclib_5.1_source.zip / Codec/CapsDefinitions.h
+            sName = "SPS's KryoFlux CT Raw disk image (.RAW)"; bDetected = true;
+            if (X.isVerbose()) {
+                for (p = 0xC, trk = unpsz = 0; p < X.Sz();) {
+                    hkhd = X.SA(p, 4); if (!/[A-Z]{4}/.test(hkhd) || !X.c("0000", p + 4)/*a floppy block can't be this long*/) break;
+                    hksz = X.U32(p + 4, _BE);
+                    switch (hkhd) {
+                        case 'DATA': hksz += X.U32(p + 12, _BE); break;
+                        case 'PACK': unpsz += hksz; hksz = X.U32(p + 12, _BE) + 0x18; break;
+                        case 'TRCK': trk++; break
+                    }
+                    p += hksz
+                }
+                sOption('trk:' + trk + ' sz:' + outSz(p))
+            }
+        }
+
+    function isSCL() {
+        if (!X.c("'SINCLAIR'") || !isWithin(n = X.U8(8), 1, 128) || X.Sz() < 9 + 14 * n) return false;
+        fnames = [], p = 9, i = c = 0; sz = 9 + 14 * n;
+        sec = 0; bad = '';
+        for (; i < n && sz < X.Sz(); i++, p += 14) {
+            var fn = decAnsi(p, 8, CPSpeccy); if (fn.length < 8) return false; fn = fn.trim();
+            if (fn[0] === '\x01') fn[0] = '*'; //deleted file
+            var ext = decAnsi(p + 8, 1, CPSpeccy); if (!ext.length) return false;
+            //I'd test the filenames for sanity but some copyprots are quite insane...
+            fnames.push(fn + '.$' + ext); t = X.U8(p + 0xD); sec += t; sz += t << 8;
+        }
+        if (sz > X.Sz() || sz > 655364) return false; //max available size is 835600-ish so not much of a constraint
+        if (X.Sz() >= sz + 4) { // despite the barebones specs there seems to be a CRC at the very end
+            for (i = 0; i < sz; c += X.U8(i++)) { } sz += 4;
+            if (c != X.U32(i)) bad = '!badcrc' //not returning false; it's not guaranteed that all SCL will have this
+        } else bad = '!nocrc'; //...but it is common enough to mark it as malformed if it's absent
+        fnames = fnames.join(';'); return true
+    }
+    if (!bDetected && isSCL()) {
+        sName = 'ZX Spectrum floppy disk image (.SCL)'; bDetected = true;
+        if (bad.length) sVersion = 'malformed' + bad;
+        if (X.isVerbose()) {
+            sOption(addEllipsis(fnames, 0xA0)); sOption('sec:' + sec + ' sz:' + outSz(sz))
+        }
+    }
+
+
+    function isSCP() {
+        if (!X.c("'SCP'") || X.U8(6) > 165 || X.U8(7) > 165 || X.U8(0xA) > 2) return false;
+        var p, mtdp = mtdsz = 0, r = X.U8(5), bitw = X.U8(9);
+        sz = 0x2B0; if (!bitw) bitw = 2; else bitw >>= 3;
+        for (p = 0x10; p < 0x2B0; p += 4) {
+            var tdhp = X.U32(p); if (!tdhp) continue; if (!X.c("'TRK'", tdhp)) return false;
+            var i = 0; for (q = tdhp + 4; i < r; i++) {
+                var tdsz = X.U32(q + 4) * bitw, tdp = X.U32(q + 8) + tdhp;
+                if (tdp > mtdp) { mtdp = tdp; mtdsz = tdsz }
+                q += 12
+            }
+        }
+        if (mtdp) if (mtdp > X.Sz()) return false; else sz = mtdp + mtdsz;
+        return true
+    }
+    if (!bDetected && isSCP()) {
+        sName = "SuperCard Pro disk image (.SCP)"; bDetected = true;
+        var v = X.U8(3); if (v) v = 'v' + (v >> 4) + ' rev.' + (v & 0xF); else v = 'v.?';
+        var tp = X.U8(4), revolutions = X.U8(5), sttrk = X.U8(6), edtrk = X.U8(7), fl = X.U8(8),
+            tpi5in = fl & 2 ? '96' : '48', rpm = fl & 1 ? (fl & 4 ? '360' : '300') : '300/360',
+            quality = fl & 8 ? 'normalised' : 'preservation', ro = fl & 0x10 ? 'read/write' : 'read-only', ext = fl & 0x20,
+            side = !X.U8(0xA) ? 'double' : (X.U8(0xA) == 1 ? 'bottom' : 'top'), made, dtp;
+        if (ext) {
+            v = 'app v' + (X.U8(sz + 0x28) >> 4) + '.' + (X.U8(sz + 0x28) & 0xF) +
+                'h/w v' + (X.U8(sz + 0x29) >> 4) + '.' + (X.U8(sz + 0x29) & 0xF);
+            if (!X.c("'FPCS'", sz + 0x2C)) v += '/malformed!noendtag'; sz += 0x30
+        }
+        sVersion = v;
+        if (X.isVerbose()) {
+            switch (tp & 0xF) {
+                case 0: dtp = 'CBM'; break; case 1: dtp = 'Amiga'; break; case 2: dtp = 'Apple ]['; break;
+                case 3: dtp = 'Atari ST'; break; case 4: dtp = 'Atari 800'; break; case 5: dtp = 'Mac 800'; break;
+                case 6: dtp = '360k/720k'; break; case 7: dtp = '1.44M'; break; default: dtp = 'unk.'
+            }
+            switch (tp >> 4) {
+                case 0: made = 'Commodore'; break; case 1: made = 'Atari'; break; case 2: made = 'Apple'; break;
+                case 3: made = 'PC'; break; case 4: made = 'Tandy'; break; case 5: made = 'Texas Inst.'; break;
+                case 6: made = 'Roland'; break; case 8: made = '(other)'; break; default: made = 'unk.'
+            }
+            sOption('type ' + dtp + ' by ' + made); sOption('trk:' + sttrk + '-' + edtrk + ' side:' + side);
+            sOption(ro); sOption(quality, 'quality:'); sOption(rpm, '', ' rpm');
+            sOption(outSz(sz), 'sz:');
+        }
+    }
+
+    if (!bDetected) if (X.c("EC..A50000") && X.c("EC00", 0x100) && X.c("55AA55AA55AA55AAFFFFFFFFFFFFFFFF0000", 0x110)
+        && X.c("FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF", 0x400)
+        && X.c("4199015564F0FFFF 201B0C824118EA61 F00107F60301EE1B 0C834118EA617001 07760301EE15140500", 0X4630)) {
+        sName = "GamePark GP32 SmartMedia card (.SMC)"; bDetected = true //may not catch all options, but the official games are there
+    }
+
+    else if (X.c("'RSY'000300")) {
+        //ref http://info-coach.fr/atari/documents/_mydoc/Pasti-documentation.pdf
+        sName = "Jorge 'Ijor' Cwik's Pasti disk image (.STX)"; bDetected = true;
+        sVersion = 'v3' + (X.U8(11) == 2 ? ' new' : X.U8(11) == 0 ? ' old' : '');
+        if (X.isVerbose()) {
+            sOption(X.U8(10), 'trk.total:');
+            for (i = 0, p = 0x10; i < X.U8(10) && p < X.Sz(); i++, p += X.U32(p)) { }
+            sOption(outSz(p), 'sz:')
+        }
+    }
+
+    else if (X.c("'ZXST'") && charStat(X.readBytes(0x10 + X.U32(0xC), 4), 1).indexOf('allxsc') >= 0
+        && X.fSig(8, 0x200, "'Z80R'") > 0 && X.fSig(0x20, 0x200, "'SPCR'") > 0
+        && isWithin(V = X.U8(4), 1, 1) && (v = X.U8(5)) <= 5 && (hw = X.U8(6)) <= 16 && (fl = X.U8(7)) <= 1) {
+        //ref https://sinclair.wiki.zxnet.co.uk/wiki/ZX-State_format
+        sName = 'Spectaculator zx-state file (.SZX)'; sVersion = 'v' + V + '.' + v; bDetected = true;
+        switch (hw) {
+            case 0: hw = 'ZX Spectrum 16k'; break; case 1: hw = 'ZX Spectrum 48k/+'; break;
+            case 2: hw = 'ZX Spectrum 128k'; break; case 3: hw = 'ZX Spectrum +2'; break;
+            case 4: hw = 'ZX Spectrum +2A/B'; break; case 5: hw = 'ZX Spectrum +3'; break;
+            case 6: hw = 'ZX Spectrum +3e'; break; case 7: hw = 'Pentagon 128'; break;
+            case 8: hw = 'Timex Sinclair TC-2048'; break; case 9: hw = 'Timex Sinclair TC-2068'; break;
+            case 0xA: hw = 'Scorpion ZS-256'; break; case 0xB: hw = 'ZX Spectrum SE'; break;
+            case 0xC: hw = 'Timex Sinclair TS-2068'; break; case 0xD: hw = 'Pentagon 512'; break;
+            case 0xE: hw = 'Pentagon 1024'; break; case 0xF: hw = 'ZX Spectrum 48k (NTSC)'; break;
+            case 0x10: hw = 'ZX Spectrum 128Ke'; break;
+            default: hw = '(unk.)'
+        }
+        sOption(hw, 'h/w:');
+        if (X.isVerbose()) {
+            var p = 8;
+            while (p < X.Sz()) {
+                var hkhd = X.SA(p, 4), hksz = X.U32(p + 4);
+                if (!hksz || hksz + p > X.Sz() || charStat(X.readBytes(p, 4), 1).indexOf('allxsc') < 0
+                    || hkhd.length < 2 || hkhd.toUpperCase() != hkhd) break;
+                p += 8;
+                switch (hkhd) {
+                    case 'CRTR': sOption(X.SA(p, 0x20), 'in:'); break;
+                }
+                p += hksz
+            }
+            sz = p; sOption(outSz(sz), 'sz:')
+        }
+    }
+
+    else if (/^C64S?\s*tape.*file/.test(X.SA(0, 0x20))) {
+        sName = "C64 cassette tape (.T64)"; bDetected = true;
+        sVersion = 'v' + X.U8(0x20) + "." + X.U8(0x21).padStart(2, '0');
+        if (X.isVerbose()) {
+            var files = [], totalent = X.U16(0x22, _LE), usedent = X.U16(0x24, _LE);
+            for (i = 0; i < totalent; i++)
+                if (i < usedent) files[i] = X.SA(0x50 + i * 0x20, 0x20).trim();
+            sOption(usedent, " entries:");
+            for (i = 0; i < files.length; i++) sOptions = sOptions.appendS(files[i], " ");
+        }
+    }
+
+    else if (X.c("'XM7 TAPE IMAGE 0'")) {
+        //ref https://github.com/yas-sim/xm7-related-tools/blob/main/t77dec/t77dec.cpp
+        //& https://web.archive.org/web/20191207131958/http://xm7.la.coocan.jp:80/xm7/xm7.html
+        sName = "Fujitsu FM-7 emulator XM7 tape (.T77)"; bDetected = true
+    }
+
+    else if (X.c("'C64-TAPE-RAW'") && X.U8(0xC) < 2) {
+        bDetected = true;
+        sName = "C64 cassette tape (.TAP)"; sVersion = "v" + X.U8(0xC);
+        var sz = X.U32(0x10) + 0x14; if (!X.isVerbose()) { if (sz > X.Sz()) sVersion += '/malformed!short' }
+        else sOptions = "sz:" + outSz(sz)
+    }
+
+    else if (X.c("'ZXTape!'1A")) { // a bit large
+        // from https://www.alessandrogrussu.it/tapir/tzxform120.html
+        // & https://www.msx.org/wiki/Emulation_related_file_formats#.TSX
+        sVersion = 'v' + X.U8(8) + '.' + X.U8(9).padStart(2, '0'); bDetected = true;
+        var ismsx = end = false, x = 0;
+        var bad = '', title = '', publisher = '', auth = '', year = '', lang = '', apptype = '', price = '',
+            protload = '', org = '', cmt = '', hw = '', sel = '', fnames = [];
+        const types = ['B', 'N', 'S', 'C']
+        p = 10; while (!end && p < X.Sz()) {
+            switch (X.U8(p++)) {
+                case 0x10:
+                    if (!X.U8(p + 4)) { //loading flag(?)
+                        if (charStat(t = X.readBytes(p + 6, 10), 1).indexOf('allasc') < 0) bad = bad.addIfNone('!nonASCIIfn');
+                        t = decEncoding(t, CPSpeccy).trim(); tp = X.U8(p + 5);
+                        if (!t && tp < 3) bad = bad.addIfNone('!emptyfn');
+                        fnames.push(t + '.' + types[tp])
+                    }
+                    p += 4 + X.U16(p + 2); break;
+                case 0x11: p += 0x12 + X.U24(p + 0xF); break;
+                case 0x12: p += 4; break;
+                case 0x13: p += 1 + 2 * X.U8(p); break;
+                case 0x14:
+                    if (!X.U8(p + 4) > 8) { end = true; bad = bad.addIfNone('!badnbitsin14') }
+                    else p += 0xA + X.U24(p + 7); break;
+                case 0x15:
+                    if (!isWithin(X.U8(p + 4), 1, 8)) { end = true; bad = bad.addIfNone('!badnbitsin15') }
+                    else p += 8 + X.U24(p + 5); break;
+                case 0x18: if (!isWithin(X.U8(p + 9), 1, 2)) { end = true; bad = bad.addIfNone('!badcomptypein18') }
+                else p += 4 + X.U32(p); break;
+                case 0x19: case 0x2A: p += 4 + X.U32(p); break;
+                case 0x20: case 0x23: case 0x24: p += 2; break;
+                case 0x21: p += 1 + X.U8(p); break;
+                case 0x22: case 0x25: case 0x27: break;
+                case 0x26: p += 2 + 2 * X.U16(p); break;
+                case 0x28:
+                    var p1 = p + 2 + X.U16(p), n = X.U8(p + 2); p += 3;
+                    for (i = 0; i < n; i++) {
+                        var tl = X.U8(p + 2); p += 3;
+                        sel = sel.appendS(decAnsi(p, tl, CPSpeccy, 1, Chars0to1FSpeccy), '/'); p += tl
+                    }
+                    p = p1; break;
+                case 0x2B: if (X.U8(p + 4) > 1) { end = true; bad = bad.addIfNone('!badsignalin2B'); }
+                else p += 4 + X.U32(p); break;
+                case 0x30: cmt = cmt.append('-' + decAnsi(p + 1, X.U8(p), CPSpeccy, 1, Chars0to1FSpeccy).trim() + '-');
+                    p += 1 + X.U8(p); break;
+                case 0x31: p += 2 + X.U8(p + 1); break;
+                case 0x32:
+                    var p1 = p + 2 + X.U16(p), n = X.U8(p + 2); p += 3;
+                    for (i = 0; i < n; i++) {
+                        var tp = X.U8(p++); t = X.SC(p + 1, Math.min(X.U8(p), p1 - p), 'CP1252').trim();
+                        switch (tp) {
+                            case 0: title = title.append(t); break; case 1: publisher = publisher.append(t); break;
+                            case 2: auth = auth.append(t); break; case 3: year = year.append(t); break;
+                            case 4: lang = lang.append(t); break; case 5: apptype = apptype.append(t); break;
+                            case 6: price = price.append(t); break; case 7: protload = protload.append(t); break;
+                            case 8: org = org.append(t); break; case 0xFF: cmt = cmt.appendS(t, ' / '); break;
+                            default: cmt = cmt.append(t, '\ninfo#' + tp.toString(16) + ':')
+                        }
+                        p += 1 + X.U8(p);
+                    }
+                    p = p1; break;
+                case 0x33:
+                    var hwin = X.U8(p++);
+                    for (i = 0; i < hwin; i++) {
+                        var hwtp = X.U8(p++), hwid = X.U8(p++);
+                        switch (hwtp) {
+                            case 0: hwtp = '[PC]';
+                                switch (hwid) {
+                                    case 0: hwid = 'ZX Spectrum 16k'; break; case 1: hwid = 'ZX Spectrum 48k/+'; break;
+                                    case 2: hwid = 'ZX Spectrum 48k ISSUE 1'; break; case 3: hwid = 'ZX Spectrum 128k +(Sinclair)'; break;
+                                    case 4: hwid = 'ZX Spectrum 128k +2 (grey case)'; break; case 5: hwid = 'ZX Spectrum 128k +2A/+3'; break;
+                                    case 6: hwid = 'Timex Sinclair TC-2048'; break; case 7: hwid = 'Timex Sinclair TS-2068'; break;
+                                    case 8: hwid = 'Pentagon 128'; break; case 9: hwid = 'SAM Coupe'; break;
+                                    case 0xA: hwid = 'Didaktik M'; break; case 0xB: hwid = 'Didaktik Gama'; break;
+                                    case 0xC: hwid = 'ZX-80'; break; case 0xD: hwid = 'ZX-81'; break;
+                                    case 0xE: hwid = 'ZX Spectrum 128k Spanish version'; break;
+                                    case 0xF: hwid = 'ZX Spectrum Arabic version'; break;
+                                    case 0x10: hwid = 'Microdigital TK 90-X'; break; case 0x11: hwid = 'MicrodigitalTK 95'; break;
+                                    case 0x12: hwid = 'Byte'; break; case 0x13: hwid = 'Elwro 800-3'; break;
+                                    case 0x14: hwid = 'ZS Scorpion 256'; break; case 0x15: hwid = 'Amstrad CPC 464'; break;
+                                    case 0x16: hwid = 'Amstrad CPC 664'; break; case 0x17: hwid = 'Amstrad CPC 6128'; break;
+                                    case 0x18: hwid = 'Amstrad CPC 464+'; break; case 0x19: hwid = 'Amstrad CPC 6128+'; break;
+                                    case 0x1A: hwid = 'Jupiter ACE'; break; case 0x1B: hwid = 'Enterprise'; break;
+                                    case 0x1E: hwid = 'Inves Spectrum+'; break; case 0x1F: hwid = 'Profi'; break;
+                                    case 0x20: hwid = 'GrandRomMax'; break; case 0x21: hwid = 'Kay 1024'; break;
+                                    case 0x22: hwid = 'Ice Felix HC 91'; break; case 0x23: hwid = 'Ice Felix HC 2000'; break;
+                                    case 0x24: hwid = 'Amaterske RADIO Mistrum'; break; case 0x25: hwid = 'Quorum 128'; break;
+                                    case 0x26: hwid = 'MicroART ATM'; break; case 0x27: hwid = 'MicroART ATM Turbo 2'; break;
+                                    case 0x28: hwid = 'Chrome'; break; case 0x29: hwid = 'ZX Badaloc'; break;
+                                    case 0x2A: hwid = 'TS-1500'; break; case 0x2B: hwid = 'Lambda'; break;
+                                    case 0x2C: hwid = 'TK-65'; break; case 0x2D: hwid = 'ZX-97'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 1: hwtp = '[ext.storage]';
+                                switch (hwid) {
+                                    case 0: hwid = 'ZX Microdrive'; break; case 1: hwid = 'Opus Discovery'; break;
+                                    case 2: hwid = 'MGT DISCiPLE'; break; case 3: hwid = 'MGT +D'; break;
+                                    case 4: hwid = 'Rotronics Wafadrive'; break; case 5: hwid = 'TR-DOS (BetaDisk)'; break;
+                                    case 6: hwid = 'Byte Drive'; break; case 7: hwid = 'Watsford'; break;
+                                    case 8: hwid = 'FIZ'; break; case 9: hwid = 'Radofin'; break;
+                                    case 0xA: hwid = 'Didaktik disk drives'; break; case 0xB: hwid = 'BS-DOS (MB-02)'; break;
+                                    case 0xC: hwid = 'ZX Spectrum +3 disk drive'; break;
+                                    case 0xD: hwid = 'JLO (Oliger) disk interface'; break;
+                                    case 0xE: hwid = 'Timex FDD3000'; break; case 0xF: hwid = 'Zebra disk drive'; break;
+                                    case 0x10: hwid = 'Ramex Millenia'; break; case 0x11: hwid = 'Larken'; break;
+                                    case 0x12: hwid = 'Kempston disk interface'; break; case 0x13: hwid = 'Sandy'; break;
+                                    case 0x14: hwid = 'ZX Spectrum +3e hard disk'; break; case 0x15: hwid = 'ZXATASP'; break;
+                                    case 0x16: hwid = 'DivIDE'; break; case 0x17: hwid = 'ZXCF'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 2: hwtp = '[memory addon]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Sam Ram'; break; case 1: hwid = 'Multiface ONE'; break;
+                                    case 2: hwid = 'Multiface 128k'; break; case 3: hwid = 'Multiface +3'; break;
+                                    case 4: hwid = 'MultiPrint'; break; case 5: hwid = 'MB-02 ROM/RAM exp.'; break;
+                                    case 6: hwid = 'SoftROM'; break; case 7: hwid = '1k'; break; case 8: hwid = '16k'; break;
+                                    case 9: hwid = '48k'; break; case 10: hwid = 'memory in 8-16k used'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 3: hwtp = '[sound device]';
+                                switch (hwid) {
+                                    case 0: hwid = 'classic 128k ZX-compatible AY hw'; break;
+                                    case 1: hwid = 'Fuller Box AY hw'; break; case 2: hwid = 'Currah microSpeech'; break;
+                                    case 3: hwid = 'SpecDrum'; break; case 4: hwid = 'AY ACB (L:A+C R:B+C) stereo/Melodik'; break;
+                                    case 5: hwid = 'AY ABC (L:A+B R:B+C) stereo/Melodik'; break;
+                                    case 6: hwid = 'RAM Music Machine'; break; case 7: hwid = 'Covox'; break;
+                                    case 8: hwid = 'General Sound'; break; case 9: hwid = 'Intec Electronic Digital Interface B8001'; break;
+                                    case 0xA: hwid = 'Zon-X AY'; break; case 0xB: hwid = 'QuickSilva AY'; break;
+                                    case 0xC: hwid = 'Jupiter ACE'; break; default: hwid = '(unk.)'
+                                } break;
+                            case 4: hwtp = '[joystick]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Kempston'; break; case 1: hwid = 'Cursor/Protek/AGF'; break;
+                                    case 2: hwid = 'Sinclair 2 Left (12345)'; break; case 3: hwid = 'Sinclair 1 Right (67890)'; break;
+                                    case 4: hwid = 'Fuller'; break; default: hwid = '(unk.)'
+                                } break;
+                            case 5: hwtp = '[mouse]';
+                                switch (hwid) {
+                                    case 0: hwid = 'AMX mouse'; break; case 1: hwid = 'Kempston mouse'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 6: hwtp = '[controller]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Trickstick'; break; case 1: hwid = 'ZX Light Gun'; break;
+                                    case 2: hwid = 'Zebra Graphics Tablet'; break; case 3: hwid = 'Defender Light Gun'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 7: hwtp = '[serial port]';
+                                switch (hwid) {
+                                    case 0: hwid = 'ZX Interface I'; break; case 1: hwid = 'ZX Spectrum 128k'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 8: hwtp = '[parallel port]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Kempston S'; break; case 1: hwid = 'Kempston E'; break;
+                                    case 2: hwid = 'ZX Spectrum +3'; break; case 3: hwid = 'Tasman'; break;
+                                    case 4: hwid = "DK'Tronics"; break; case 5: hwid = 'Hilderbay'; break;
+                                    case 6: hwid = 'INES Printerface'; break; case 7: hwid = 'Z LPrint Interface 3'; break;
+                                    case 8: hwid = 'MultiPrint'; break; case 9: hwid = 'Opus Discovery'; break;
+                                    case 10: hwid = 'Standard 8255 chip with ports 31+63+95'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 9: hwtp = '[printer]';
+                                switch (hwid) {
+                                    case 0: hwid = 'ZX Printer/Alphacom 32 & compat.'; break;
+                                    case 1: hwid = 'Generic printer'; break; case 2: hwid = 'EPSON compat.'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0xA: hwtp = '[modem]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Prism VTX 5000'; break; case 1: hwid = 'T/S 2050/Westridge 2050'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0xB: hwtp = '[digitizer]';
+                                switch (hwid) {
+                                    case 0: hwid = 'RD Digital Tracer'; break; case 1: hwid = "DK'Tronics Light Pen"; break;
+                                    case 2: hwid = 'British MicroGraph Pad'; break; case 3: hwid = 'Romantic Robot Videoface'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0xC: hwtp = '[network adapter]';
+                                if (hwid == 0) hwid = 'ZX Interface I'; else hwid = '(unk.)'; break;
+                            case 0xD: hwtp = '[keyboard]';
+                                if (hwid == 0) hwid = 'Keypad for ZX Spectrum 128k'; else hwid = '(unk.)'; break;
+                            case 0xE: hwtp = '[AD/DA converter]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Harley Systems ADC 8.2'; break;
+                                    case 1: hwid = 'Blackboard Electronics'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0xF: hwtp = '[EEPROM programmer]';
+                                switch (hwid) {
+                                    case 0: hwid = 'Orme Electronics'; break; case 1: hwid = 'Blackboard Electronics'; break;
+                                    default: hwid = '(unk.)'
+                                } break;
+                            case 0x10: hwtp = '[GPU]';
+                                switch (hwid) {
+                                    case 0: hwid = 'WRX Hi-Res'; break; case 1: hwid = 'G007'; break; case 2: hwid = 'Memotech'; break;
+                                    case 3: hwid = 'Lambda Colour'; break; default: hwid = '(unk.)'
+                                } break;
+                        }
+                        switch (X.U8(p++)) {
+                            case 0: hw = hw.append('runs on ' + hwtp + ' ' + hwid); break;
+                            case 1: hw = hw.append('uses ' + hwtp + ' ' + hwid); break;
+                            case 2: hw = hw.append('runs w/o specifics of ' + hwtp + ' ' + hwid); break;
+                            case 3: hw = hw.append("won't run on " + hwtp + ' ' + hwid); break; default: break
+                        }
+                    } break;
+                case 0x35: p += 0x14 + X.U32(p + 0x10); break;
+                case 0x5A: if (!X.c("'XTape!'1A", p)) { end = true; p-- } else { x++; p += 9 } break;
+                case 0x16: case 0x17: p += X.U32(p); break;
+                case 0x34: p += 8; break;
+                case 0x40: sOption('snapshot'); p += 4 + X.U24(p + 1); break;
+                case 0x4B: ismsx = true; p += 4 + X.U32(p); break; //Kansas City Standard
+                default: end = true; p--;// ripper-ready! // bad = bad.addIfNone('!unkID')
+            }
+        }
+        if (ismsx) sName = "ZX Spectrum/MSX tape (.TSX)"; else sName = "ZX Spectrum tape (.TZX)";
+        if (bad.length) sVersion = sVersion.appendS('malformed' + bad, '/');
+        if (X.isVerbose()) {
+            sOptionT(title); if (x > 1) sOption(x, 'x'); sOptionT(auth, 'by:'); sOptionT(year, "'"); sOptionT(publisher, '(c) ');
+            sOptionT(lang, 'in:'); sOptionT(apptype, 'apptype:'); sOptionT(price, 'price:');
+            sOptionT(org, 'origin:'); sOptionT(protload, 'prot/ldr:'); sOption(hw);
+            sOptionT(addEllipsis(cmt, 0xA0)); sOptionT(addEllipsis(fnames.join(','), 0xA0), 'files:');
+            sOptionT(sel, 'choices:'); sOption(outSz(p), 'sz:')
+        }
+    }
+
+    else if (X.c("'UEF File!'00") && X.U8(0xB) <= 2) {
+        //ref http://electrem.emuunlim.com/UEFSpecs.html
+        sName = "Acorn PC Unified Emulator Format data (.UEF)"; bDetected = true;
+        sVersion = 'v' + X.U8(0xB) + '.' + X.U8(0xA);
+        var title = info = man = gear = kb = tp = '', interrupt = false;
+        for (p = 0xC; p < X.Sz();) {
+            var hkhd = X.U16(p), hksz = X.U32(p + 2);
+            if ([0, 1, 2, 3, 4, 0xFF].indexOf(hkhd >> 8) < 0) break; //unrelated info follows?
+            p += 6; switch (hkhd) {
+                case 0x0000: info = info.appendS(X.SA(p, hksz), '/'); break;
+                case 0x0001: man = man.appendS(X.SA(p, hksz), ' '); break;
+                case 0x0005: gear = 'Acorn ';
+                    switch (X.U8(p) >> 4) {
+                        case 0: gear += 'BBC Model A'; break; case 1: gear += 'Electron'; break;
+                        case 2: gear += 'BBC Model B'; break; case 3: gear += 'BBC Master'; break;
+                        case 4: gear += 'Atom'; break
+                    }
+                    switch (X.U8(p) & 0xF) {
+                        case 0: kb = 'any'; break; case 1: kb = 'target PC'; break; case 2: kb = 'host PC'; break
+                    }
+                    break;
+                case 0x0009: title = X.SA(p, hksz); break;
+                case 0x0101: case 0x0102: case 0x0103: case 0x0104:
+                case 0x0110: case 0x0111: case 0x0112: case 0x0113: case 0x0114: case 0x0115:
+                case 0x0116: case 0x0117: case 0x0120: case 0x0131:
+                    tp = tp.addIfNone('#tape'); break;
+                case 0x0130:
+                    switch (X.U8(p)) {
+                        case 0: t = 'unit'; break; case 1: t = 'tape'; break; case 2: t = 'disc'; break;
+                        case 3: t = 'vtape'; break; case 4: t = 'cartridge'; break; default: 'unk.media'
+                    }
+                    if (X.U8(p + 1) > 1) t += ' ×' + X.U8(p + 1);
+                    if (X.U8(p + 2) > 1) t += (X.U8(p) == 1 || X.U8(p) == 3) ? ' ch:' : X.U8(p) == 2 ? ' ' + X.U8(p + 2) + ' audiotracks' : '..?';
+                    info += ' #' + t; break;
+                case 0x0200: case 0x0201: case 0x0202: tp = tp.addIfNone('#disc'); break;
+                case 0x0300: tp = tp.addIfNone('#ROM');
+                    t = 'content:';
+                    switch (X.U8(p)) {
+                        case 0: t += 'generic'; break; case 1: t += 'OS'; break; case 2: t += 'BASIC'; break;
+                        case 3: t += 'language'; break; case 4: t += 'utility'; break; case 5: t += 'filing system'; break;
+                        case 6: t += 'h/w driver'; break; case 7: t += 'game'; break; default: t += 'unk'
+                    } info += ' #' + t; break;
+                case 0x0301: tp = tp.addIfNone('#ROM'); break;
+                case 0x0400: case 0x0401: case 0x0402: case 0x0403:
+                case 0x0410: case 0x0411: case 0x0412: case 0x0420:
+                    tp = tp.addIfNone('#snapshot'); break;
+                case 0xFF00: info += '#emu:' + X.SA(p, hksz); break;
+                case 0x0100: break; //the "implicit data chunk"! eh?
+                default:
+                    if (hkhd > 0xFF00) tp = tp.addIfNone('#customdata');
+                    else interrupt = true // unknown chunk = unrelated tailing data?
+            }
+            if (interrupt) { p -= 6; break }
+            //_log(Hex(p-6)+' > '+Hex(hkhd));
+            p += hksz
+        }
+        sVersion += tp;
+        if (X.isVerbose()) {
+            sOption(title); sOptionT(info, 'info:'); sOptionT(man, 'manual:');
+            sOptionT(gear, 'gear:'); sOptionT(kb, 'layout:');
+            sOption(outSz(p), 'sz:')
+        }
+    }
+
+    else if (X.c("'UNIF'???????? 0000 0000 0000 0000 0000 0000 0000") && (X.Sz() > 32)) {
+        sName = "UNIF NES cartridge (.UNF)"; sVersion = "v" + X.U32(4, _LE); bDetected = true;
+        if (X.isVerbose()) {
+            p = 8;
+            t = ''; mapr = ''; tv = ''; ex = ''; fstorage = lastchunk = false;
+            while (p < X.Sz() && !lastchunk) {
+                var hkhd = X.SA(p, 4), hksz = X.U32(p + 4); p += 0x08;
+                switch (hkhd) {
+                    case "MAPR": mapr = X.SA(p, hksz); break;
+                    case "NAME": t = X.SA(p, hksz); break;
+                    case "TCVI": switch (X.U8(p)) {
+                        case 0: tv = "NTSC"; break;
+                        case 1: tv = "PAL"; break;
+                        case 2: tv = "NTSC/PAL"
+                    }
+                        break;
+                    case "CTRL":
+                        var exa = [], bm = X.U8(p);
+                        if (bm & 1) exa.push("Std. Controller");
+                        if (bm & 2) exa.push("Zapper");
+                        if (bm & 4) exa.push("R.O.B.");
+                        if (bm & 8) exa.push("Arkanoid Controller");
+                        if (bm & 0x10) exa.push("Power Pad");
+                        if (bm & 0x20) exa.push("Four Score");
+                        if (bm) ex = "#" + exa.join("+");
+                        break;
+                    case "BATR": fstorage = true; break;
+                    case "MIRR": lastchunk = true; break
+                }
+                p += hksz;
+            }
+            sOptionT(t);
+            sOption(tv);
+            sOption(ex, 'expansion: ');
+            if (fstorage) sOption('battery-backed RAM');
+            if (lastchunk) sOption(outSz(p), 'sz:'); else sVersion += '/malformed!short'
+        }
+    }
+
+    else if (X.c("'g GCE 198'..80")) {
+        sName = "GCE Vectrex cartridge (.VEC)"; bDetected = true;
+        if (X.isVerbose()) {
+            p = X.fSig(0x11, 0x20, "80"); if (p > 0) sOption(X.SA(0x11, p - 0x11))
+        }
+    }
+
+    else if (X.c("'VICE Snapshot File'1A")) {
+        sName = "C64 VICE emulator snapshot (.VSF)"; bDetected = 1;
+        sVersion = 'v' + X.U8(0x13) + '.' + X.U8(0x14).padStart(2, '0');
+        p = 0x25; bad = ''
+        while (p < X.Sz()) {
+            var hkhd = X.SA(p, 0x10), hksz = X.U32(p + 0x12, _BE);
+            if (!/([A-Z0-9-]{3,}|Acia1)/.test(hkhd) || !isAllZeroes(p + hkhd.length, 0x10 - hkhd.length)) {
+                bad = bad.addIfNone('badchunk'); break
+            } else p += hksz;
+        }
+        if (X.isVerbose()) sOptions = X.SA(0x15, 0xF) + ' sz:' + outSz(sz);
+        else if (p > X.Sz()) bad = bad.addIfNone('!short');
+        if (bad != '') sVersion = sVersion.appendS('/malformed' + bad, '/')
+    }
+
+    function isWAD() {
+        //ref https://doomwiki.org/wiki/WAD
+        if (!X.c("'IWAD'") && !X.c("'PWAD'")) return false;
+        var susBE = 0, en = _LE; // Atari Jaguar port has special stuff: big-endian, the final lump tag
+        lumpn = X.I32(4, en); if (lumpn < 0 || lumpn > X.I32(4, _BE)) {
+            lumpn = X.I32(4, _BE); if (lumpn > 0) { susBE++; en = _BE } else return false;
+        }
+        var i = 0, msz = 0, dirp = X.I32(8, en), p = dirp; if (!isWithin(dirp, 12, X.Sz())) return false; else susBE++;
+        var lumps = [], maxlump = Math.min(lumpn, 0x40); //a bit too many lumps in a doom2.wad file, too slow
+        for (; i < maxlump; i++, p += 0x10) {
+            if (p + 0x10 > X.Sz()) return false;
+            var ofs = X.I32(p, en), sz = X.I32(p + 4, en); if (ofs < 0 || sz < 0 || !isWithin(ofs, 12, X.Sz())) return false;
+            if (X.c("'ENDOFWAD'", p + 8)) susBE++; lumps.push([ofs, sz, X.readBytes(p + 8, 8)]);
+        }
+        lumps = lumps.sort(function (a, b) { return a[0] - b[0] });
+        for (i = 0; i < maxlump; i++) {
+            var co = (lumps[i][2][0] & 0x80) > 0; lumps[i][2][0] = lumps[i][2][0] & 0x7F;
+            if (charStat(lumps[i][2], true).indexOf('allxsc') < 0) return false;
+            if (!co && i < maxlump - 2 && lumps[i][0] + lumps[i][1] > lumps[i + 1][0]) return false
+        }
+        v = susBE >= 2 ? 'Atari Jaguar' : 'PC';
+        return true
+    }
+    if (!bDetected && isWAD()) {
+        sName = "iD Software's Where's All the Data resource pack (.WAD)"; bDetected = true;
+        sVersion = X.c("'I'") ? 'initial' : 'patch'; sVersion += '#' + v;
+    }
+
+    if (!bDetected) if (X.c("'WOZ'..FF0A0D0A ........ 'INFO'") && isWithin(X.U8(3), 0x31, 0x32)) {
+        //ref https://applesaucefdc.com/woz/reference2/
+        sName = "Apple II Applesauce disk image (.WOZ)"; sVersion = 'v' + X.SA(3, 1);
+        p = 0xC; meta = bad = '';
+        while (p < X.Sz()) {
+            var hkhd = X.SA(p, 4), hksz = X.U32(p + 4); p += 8;
+            switch (hkhd) {
+                case 'INFO':
+                    iV = X.U8(p); bDetected = true;
+                    dim = X.U8(p + 1) == 1 ? '5¼"' : X.U8(p + 1) == 2 ? '3½"' : '?';
+                    if (iV >= 2) ds = X.U8(p + 37) == 1 ? ' SS' : X.U8(p + 37) == 2 ? ' DS' : ' ?'; else ds = '';
+                    sOption('disk:' + dim + ds);
+                    if (X.U8(p + 2) == 1) sOption('write-protected');
+                    if (iV >= 2) {
+                        if (t = X.U8(p + 42)) sOption(t, 'min.RAM:', 'k');
+                        t = ''; fl = X.U16(p + 40); if (!fl) t = '?'; if (fl & (1 << 0)) t = t.append('][');
+                        if (fl & (1 << 1)) t = t.append('][ Plus'); if (fl & (1 << 2)) t = t.append('//e');
+                        if (fl & (1 << 3)) t = t.append('//c'); if (fl & (1 << 4)) t = t.append('//e Enhanced');
+                        if (fl & (1 << 5)) t = t.append('IIgs'); if (fl & (1 << 6)) t = t.append('//c Plus');
+                        if (fl & (1 << 7)) t = t.append('///'); if (fl & (1 << 8)) t = t.append('/// Plus');
+                        sOption(t, 'for Apple ');
+                    }
+                    break;
+                case 'TMAP': case 'TRKS': case 'FLUX': case 'WRIT': break;
+                case 'META': meta = X.SC(p, hksz, 'UTF8').replace(/\x0A/g, ",").replace(/\x09/g, ":"); break
+            }
+            p += hksz;
+        }
+        if (p > X.Sz()) bad = bad.addIfNone('!short');
+        //if(X.isDeepScan() && X.calculateCRC32(12,sz-12) != X.U32(8)) bad = bad.addIfNone('!badcrc');
+        if (bad != '') sVersion = sVersion.appendS('/malformed' + bad, '/')
+        if (X.isVerbose()) {
+            sOptionT(addEllipsis(meta), 'info:"', '"');
+            sOption(outSz(p), 'sz:');
+        }
+    }
+
+
+    function isZ80() {
+        //from https://github.com/FuseEmulator/fuse-emulator-svn/blob/master/libspectrum/z80.c
+        // & https://worldofspectrum.org/faq/reference/z80format.htm
+        // basic header len = 30, v2ext = 23, v3ext = 54, xzxext = 55
+        if (!extIs('z80') && !extIs('slt')) return false; if (X.Sz() < 1380) return false;
+        nv = 0; co = true; joystick = hw = ''; const xhdr = 32, b12 = X.U8(12); if (b12 == 0xFF) b12 = 1;
+        var pc = X.U16(6), srx = X.U8(37) & 0x80, hdrsz = 0x1E;
+        if (!pc) { //PC register 0 means v2+
+            switch (xblk = X.U16(30)) { case 23: nv = 2; break; case 54: case 55: nv = 3; break; default: return false }
+            hdrsz += xblk + 2;
+            switch (nv) {
+                case 2:
+                    switch ((X.U8(29) >> 6) && 3) {
+                        case 0: joystick = 'cursor'; break; case 1: joystick = 'Kempston'; break;
+                        case 2: joystick = 'SinclairI2-L'; break; case 3: joystick = 'SinclairI2-R'
+                    } break;
+                case 3:
+                    switch ((X.U8(29) >> 6) && 3) {
+                        case 0: joystick = 'cursor'; break; case 1: joystick = 'Kempston'; break; case 3: joystick = 'SinclairI2-R'; break;
+                        case 2: if (X.c("030F0308 03040302 0301", xhdr + 32)) joystick = 'Sinclair2-L'; else joystick = 'custom';
+                    } break;
+                default: return false
+            }
+            var tp = X.U8(xhdr + 2), mgttp = X.U8(xhdr + 51);
+            if (tp < 7) {
+                switch (nv) {
+                    case 2:
+                        switch (tp) {
+                            case 0: hw = 'ZX Spectrum ' + (srx ? '16k' : '48k'); break;
+                            case 1: hw = 'ZX Spectrum ' + (srx ? '16' : '48') + 'k & Interface1'; break;
+                            case 2: hw = 'ZX Spectrum ' + (srx ? '16' : '48') + 'k & SamRam'; break;
+                            case 3: hw = 'ZX Spectrum ' + (srx ? '+2' : '128k'); break;
+                            case 4: hw = 'ZX Spectrum ' + (srx ? '+2' : '128k') + ' & Interface1'; break;
+                            default: return false
+                        }
+                        break;
+                    case 3:
+                        const mgttps = ['MGT EPSON DISCiPLE', 'MGT HP DISCiPLE', 'MGT +D'];
+                        mgttp = [0, 1, 16].indexOf(mgttp);
+                        switch (tp) {
+                            case 0: hw = 'ZX Spectrum ' + (srx ? '16k' : '48k'); break;
+                            case 1: hw = 'ZX Spectrum ' + (srx ? '16' : '48') + 'k & Interface1'; break;
+                            case 2: hw = 'ZX Spectrum ' + (srx ? '16' : '48') + 'k & SamRam'; break;
+                            case 3: if (mgttp < 0) return false;
+                                hw = 'ZX Spectrum ' + (srx ? '16' : '48') + 'k & ' + mgttps[mgttp] + ' MGT'; break;
+                            case 4: hw = 'ZX Spectrum ' + (srx ? '+2' : '128k'); break;
+                            case 5: hw = 'ZX Spectrum ' + (srx ? '+2' : '128k') + ' & Interface1'; break;
+                            case 6: if (mgttp < 0) return false;
+                                hw = 'ZX Spectrum ' + (srx ? '+2' : '128k') + ' & ' + mgttps[mgttp] + ' MGT'; break;
+                            default: return false //won't happen
+                        }
+                        break;
+                    default: return false //won't happen
+                }
+            } else {
+                switch (tp) {
+                    case 7: case 8: hw = 'ZX Spectrum ' + (srx ? '+2A' : '+3'); break; case 9: hw = 'Pentagon 128+'; break;
+                    case 10: hw = 'Scorpion ZS-256'; break; case 11: hw = 'Didaktik-Kompakt'; break;
+                    case 12: hw = 'ZX Spectrum +2'; break; case 13: hw = 'ZX Spectrum +2A'; break;
+                    case 14: hw = 'Timex Sinclair TC-2048'; break; case 15: hw = 'Timex Sinclair TC-2068';
+                    case 128: hw = 'Timex Sinclair TS-2068'; break;
+                    default: return false
+                }
+            }
+            if (X.U8(37) & 0x44) hw += ' + Fuller Box'; else if (X.U8(37) & 4) hw += ' + Melodik';
+        } else {
+            nv = 1; hw = 'ZX Spectrum 48k';
+            co = (b12 & 0x20) > 0;
+            switch ((X.U8(29) >> 6) && 3) {
+                case 0: joystick = 'cursor'; break; case 1: joystick = 'Kempston'; break;
+                case 2: joystick = 'SinclairI2-L'; break; case 3: joystick = 'SinclairI2-R'
+            }
+        }
+        pgs = [];
+        if (!co) sz = p = hdrsz + 0xC000; else {
+            const maxbsz = nv == 1 ? 0xC000 : 0x4000;
+            for (p = hdrsz, i = unpsz = 0; p < X.Sz() && i < 0x40; i++) { //reading blocks, i = blocks count in case of a FP loop
+                if (X.c("000000'SLT'", p)) break;
+                var hksz = nv == 1 ? 0x10000 : X.U16(p), //compressed chunk size; moot if v.1
+                    pg = nv == 1 ? 3 : X.U8(p + 2); // ROM/RAM 'page' number; page 3 is the normal start of a 48k snapshot
+                if (pgs.indexOf(pg) >= 0)
+                    if (i < 3) return false; else break
+                else pgs.push(pg);
+                if (nv > 1) p += 3;
+                //_l2r('z80',p,'blk '+i+' p.'+pg+' sz '+Hex(hksz))
+                if (i > 0) q = p + hksz;
+                else for (bsz = b = c = 0, q = p; q < p + hksz && bsz < maxbsz && q < X.Sz();) { //parse a block — a couple times; can be slow
+                    if (X.c("EDED", q)) {
+                        q += 2; c = X.U8(q++); b = X.U8(q++);
+                        if (c < 5 && b != 0xED) return false;
+                        bsz += c;
+                    } else { q++; bsz++ }
+                    if (nv == 1 && X.c("00EDED00", q)) { q += 4; break } // block-end marker
+                } //for: parse a block
+                if (bsz != maxbsz || (n > 1 && q != p + hksz)) return false;
+                p = q; unpsz += bsz;
+                if (nv == 1 || pg > 10 || pgs.length > 10) break;
+            } //for: reading blocks
+            //_l2r('z80',p,'blks:'+i+' pages:'+pgs.join('+')+' unpsz '+Hex(unpsz))
+            if (p > X.Sz() || (nv > 1 && !i)) return false;
+            sz = p
+        }
+        if (slt = X.c("000000'SLT'", p)) sltcycle: for (sltsz = 0, sltlv = [], p += 6; p < X.Sz(); p += 8)
+            switch (X.U16(p)) {
+                case 0: sz += 14 + sltsz; sltinfo = 'SLT levels:' + sltlv.join(','); break sltcycle;
+                case 1: sltlv.push(X.U16(p + 2)); sltsz += 8 + X.U32(p + 4); break;
+                default: sltsz += 8 + X.U32(p + 4); _l2r('z80', p, 'Unknown block! Please send this file to the author of rom.1.sg'); break //unknown block!
+            } else sltinfo = '';
+        return true
+    }
+    if (!bDetected && isZ80()) {
+        sName = slt ? 'ZX Spectrum state snapshot + levels (.SLT)' : 'ZX Spectrum state snapshot (.Z80)'; bDetected = true;
+        sVersion = 'v' + nv; if (nv == 3 && X.U16(30) == 55) sVersion += 'x'; if (co) sVersion += '/compressed';
+        if (X.isVerbose()) {
+            sOption(hw, 'on:'); sOption(joystick, 'joystick:');
+            if (co) sOption('pages:' + pgs.join('+') + ' unp.sz:' + Util.divu64(unpsz, 1024) + 'k'); if (slt) sOption(sltinfo); sOption(outSz(sz), 'sz:')
+        }
+    }
+
+
+    // shaky heuristics follow
+    if (!bDetected && X.isHeuristicScan()) {
+
+        function isTAP() {
+            //from https://github.com/0sAND1s/HCDisk/blob/master/Tape/tap.cpp
+            if (X.Sz() < 17 || X.Sz() < X.U16(0) + 2) return false;
+            p = blk = sus = 0; fnames = bad = ''; const types = ['B', 'N', 'S', 'C'];
+            while (p < X.Sz()) { //parse the blocks
+                hksz = X.U16(p); if (!hksz) return false; p += 2; if (X.Sz() < p + hksz) break;
+                var c = 0, tp = X.U8(p); if ([0, 0xFF].indexOf(tp) < 0) break;
+                if (p < 0xC000 && blk < 5) { /*CRC test. No need to test the WHOLE file*/
+                    for (i = p; i < p + hksz - 1; i++) c ^= X.U8(i); if (c != X.U8(i)) return false;
+                }
+                if (tp == 0) {
+                    //_l2r('tap',p+2,X.readBytes(p+2,10)+':'
+                    //	+outArray(X.readBytes(p+2,10),16)
+                    //	+' -> '+decEncoding(X.readBytes(p+2,10),CPSpeccy))
+                    if (charStat(t = X.readBytes(p + 2, 10), 1).indexOf('allasc') < 0) { sus++; bad = bad.addIfNone('!nonASCII:' + decEncoding(t, CPSpeccy)) }
+                    t = decEncoding(t, CPSpeccy).trim();
+                    if (!t) if (X.U8(p + 1) < 3) return false; else { sus++; bad = bad.addIfNone('!emptyname') }
+                    fnames = fnames.appendS(t + '.' + types[X.U8(p + 1)], ',')
+                }
+                else fnames = fnames.appendS((hksz - 3), ':');
+                if (sus > 2) return false; blk++; p += hksz
+            }
+            if (!fnames.length && blk) { sus++; bad = bad.addIfNone('!nonameblk0') }
+            if (blk < 2 && bad.indexOf('!nonASCII')) sus++;
+            //if(X.Sz() != p) sus++;
+            if (sus > 2 || !blk || !fnames.length || p < 17) { delete bad; return false }
+            return true
+        }
+        if (isTAP()) {
+            sName = 'ZX Spectrum tape (.TAP)'; bDetected = true;
+            if (bad.length) sVersion = 'malformed#' + sus + bad;
+            if (X.isVerbose()) {
+                sOptionT(addEllipsis(fnames, 0xA0), 'blocks:' + blk + ' (', ')');
+                sOption(outSz(p), 'sz:')
+            }
+        }
+
+        // if(extIs('bin'))
+        // 	if(X.c("FA33C08E") || X.c("FA33C08E",0x455E0)) { //doens't catch all
+        // 		_setResult("ROM","Palm OS disk image (.BIN)",'','')
+        // 	}
+
+        if (extIs('rom'))
+            if ((X.c("4142") || X.c("4142", 0x4000) || X.c("41421040", 0x3C000)
+                || X.c("0002204810A8D08055E0A8B088800280", 0x7FF0)) // the weirdly specific one for Eagle Fighter (JP).rom
+                && [0x2000, 0x4000, 0x8000, 0xC000, 0x10000,
+                    0x20000, 0x40000, 0x60000, 0x80000, 0x100000].indexOf(X.Sz()) >= 0) {
+                _setResult("ROM", "Microsoft MSX/MSX 2 cartridge (.ROM)", '', '')
+            }
+
+        if (extIs('sna') && X.Sz() == 49179)
+            _setResult("ROM", "ZX Spectrum 48k state snapshot file (.SNA)", '', '')
+    }
+
+    return result()
+}
+/* beautify ignore:end */

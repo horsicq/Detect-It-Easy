@@ -1,0 +1,51 @@
+// Detect It Easy: detection rule file
+// Author: Jason Hood <jadoxa@yahoo.com.au>
+
+meta("image", "JPEG");
+
+function detect() {
+    if (X.Sz() >= 22) {
+        if (X.c("FFD8FFE0....'JFIF'00")) {
+            bDetected = true;
+            sVersion = X.U8(11) + ".";
+            if (X.U8(12) < 10) {
+                sVersion = sVersion + "0";
+            }
+
+            sVersion = sVersion + X.U8(12);
+            // Search for a Start Of Frame to get dimensions.
+            var nOffset = 2;
+            while (nOffset < X.Sz()) {
+                var wTag = X.U16(nOffset, _BE);
+                if (wTag >= 0xFFC0 && wTag <= 0xFFC3) {
+                    sOptions = X.U16(nOffset + 7, _BE) + "x" +
+                        X.U16(nOffset + 5, _BE);
+                    switch (X.U8(nOffset + 9)) {
+                        case 1:
+                            sOptions = sOptions.append("grey");
+                            break;
+                        case 3:
+                            sOptions = sOptions.append("YCbCr");
+                            break;
+                        case 4:
+                            sOptions = sOptions.append("CMYK");
+                            break;
+                    }
+                    break;
+                }
+                nOffset += 2 + X.U16(nOffset + 2, _BE);
+            }
+        } else if (X.c("FFD8FFE1....'Exif'00")) {
+            bDetected = true;
+            sVersion = X.U8(11) + ".";
+            if (X.U8(12) < 10) sVersion = sVersion + "0";
+            sVersion = sVersion + X.U8(12);
+            sOptions = "EXIF";
+        } else if (X.c("FFD8FFDB")) {
+            bDetected = true;
+            sOptions = "OLD";
+        }
+    }
+
+    return result();
+}

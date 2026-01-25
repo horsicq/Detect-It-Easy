@@ -1,0 +1,50 @@
+// Detect It Easy: detection rule file
+
+meta("packer", "UPX");
+
+function getUPXVersion(nSize) {
+    var sResult = "",
+        nOffset = MSDOS.findString(0, nSize, "$Id: UPX");
+
+    if (nOffset !== -1) {
+        sResult = MSDOS.getString(nOffset + 9, 4);
+    }
+
+    return sResult;
+}
+
+function detect() {
+    sVersion = getUPXVersion(Math.min(8192, MSDOS.getSize()));
+    if (sVersion) {
+        bDetected = true;
+    } else {
+        if (MSDOS.compareEP("..............fcb430cd213c03")) {
+            sVersion = "3.X";
+            bDetected = true;
+        } else if (MSDOS.compareEP("B9....BE....89F71EA9....8CC805....8ED805....8EC0FDF3A5FC2E........73..92AFAD0E0E")) {
+            sVersion = "0.82";
+            bDetected = true;
+        } else if (MSDOS.compareEP("8CCBB9....BE....89F71EA9....8D......8ED805....8EC0FDF3A5FC")) {
+            sVersion = "0.20-0.60";
+            bDetected = true;
+        } else if (MSDOS.isSignaturePresent(0, Math.min(128, MSDOS.getSize()), "'UPX!'")) {
+            bDetected = true;
+        } else if (MSDOS.compareEP("f99cb9....be....89f71ea9....8cc805....8ed805....8ec0fdf3a5fc2e........73..92afad0e0e")) {
+            sVersion = "?.??";
+            bDetected = true;
+        } else if (MSDOS.compareEP("8ccb8dbf....57b9....ba....be....89f71e1ea9....8d87....8daf....8ed88ec5fdf3a5fc")) {
+            sVersion = "0.05";
+            bDetected = true;
+        }
+
+        if (bDetected) {
+            // Correct version for large files.
+            sUPXVersion = getUPXVersion(MSDOS.getSize());
+            if (sUPXVersion) {
+                sVersion = sUPXVersion;
+            }
+        }
+    }
+
+    return result();
+}

@@ -1,0 +1,504 @@
+// Detect It Easy: detection rule file
+// Author: Kaens (TG@kaens)
+// Mostly from the all-encompassing https://github.com/temisu/ancient
+//Lots of these formats have very shaky signatures, and some won't even have decompression errors...
+
+meta("archive", "");
+/* beautify ignore:start */
+debug = 0;
+
+function detect() {
+	const maxsz = 0x40000000; var bad = "", xpk = 0, sname = sversion = soptions = "";
+
+	//the following is provisory until the system CRC functions get updated
+	const CRC16Table = [
+	0x0000,0xc0c1,0xc181,0x0140,0xc301,0x03c0,0x0280,0xc241,0xc601,0x06c0,0x0780,0xc741,0x0500,0xc5c1,0xc481,0x0440,
+	0xcc01,0x0cc0,0x0d80,0xcd41,0x0f00,0xcfc1,0xce81,0x0e40,0x0a00,0xcac1,0xcb81,0x0b40,0xc901,0x09c0,0x0880,0xc841,
+	0xd801,0x18c0,0x1980,0xd941,0x1b00,0xdbc1,0xda81,0x1a40,0x1e00,0xdec1,0xdf81,0x1f40,0xdd01,0x1dc0,0x1c80,0xdc41,
+	0x1400,0xd4c1,0xd581,0x1540,0xd701,0x17c0,0x1680,0xd641,0xd201,0x12c0,0x1380,0xd341,0x1100,0xd1c1,0xd081,0x1040,
+	0xf001,0x30c0,0x3180,0xf141,0x3300,0xf3c1,0xf281,0x3240,0x3600,0xf6c1,0xf781,0x3740,0xf501,0x35c0,0x3480,0xf441,
+	0x3c00,0xfcc1,0xfd81,0x3d40,0xff01,0x3fc0,0x3e80,0xfe41,0xfa01,0x3ac0,0x3b80,0xfb41,0x3900,0xf9c1,0xf881,0x3840,
+	0x2800,0xe8c1,0xe981,0x2940,0xeb01,0x2bc0,0x2a80,0xea41,0xee01,0x2ec0,0x2f80,0xef41,0x2d00,0xedc1,0xec81,0x2c40,
+	0xe401,0x24c0,0x2580,0xe541,0x2700,0xe7c1,0xe681,0x2640,0x2200,0xe2c1,0xe381,0x2340,0xe101,0x21c0,0x2080,0xe041,
+	0xa001,0x60c0,0x6180,0xa141,0x6300,0xa3c1,0xa281,0x6240,0x6600,0xa6c1,0xa781,0x6740,0xa501,0x65c0,0x6480,0xa441,
+	0x6c00,0xacc1,0xad81,0x6d40,0xaf01,0x6fc0,0x6e80,0xae41,0xaa01,0x6ac0,0x6b80,0xab41,0x6900,0xa9c1,0xa881,0x6840,
+	0x7800,0xb8c1,0xb981,0x7940,0xbb01,0x7bc0,0x7a80,0xba41,0xbe01,0x7ec0,0x7f80,0xbf41,0x7d00,0xbdc1,0xbc81,0x7c40,
+	0xb401,0x74c0,0x7580,0xb541,0x7700,0xb7c1,0xb681,0x7640,0x7200,0xb2c1,0xb381,0x7340,0xb101,0x71c0,0x7080,0xb041,
+	0x5000,0x90c1,0x9181,0x5140,0x9301,0x53c0,0x5280,0x9241,0x9601,0x56c0,0x5780,0x9741,0x5500,0x95c1,0x9481,0x5440,
+	0x9c01,0x5cc0,0x5d80,0x9d41,0x5f00,0x9fc1,0x9e81,0x5e40,0x5a00,0x9ac1,0x9b81,0x5b40,0x9901,0x59c0,0x5880,0x9841,
+	0x8801,0x48c0,0x4980,0x8941,0x4b00,0x8bc1,0x8a81,0x4a40,0x4e00,0x8ec1,0x8f81,0x4f40,0x8d01,0x4dc0,0x4c80,0x8c41,
+	0x4400,0x84c1,0x8581,0x4540,0x8701,0x47c0,0x4680,0x8641,0x8201,0x42c0,0x4380,0x8341,0x4100,0x81c1,0x8081,0x4040];
+	function _CRC16(ofs,len,acc) {
+		if (!len || ofs+len > X.Sz()) return -1;
+		for (var i=0; i < len; i++) acc = (acc >> 8) ^ CRC16Table[(acc&0xff) ^ X.U8(ofs+i)];
+		return acc
+	}
+	function CRC16(ofs,len,acc) {
+		if(typeof(File.crc16) == "undefined")
+			return _CRC16(ofs,len,acc)
+		else {
+			_log("Please remove the CRC16 implementation from archives.ancient.sg!");
+			return File.crc16(ofs,len,acc)
+		}
+	}
+	function CRC16Byte(b, acc) { return (acc >> 8) ^ CRC16Table[(acc&0xff) ^ b] }
+
+	var xpkfault = found = false; //for leaving the recursion real quick. For when/if said recursion does happen.
+	function isXPK(reclvl) { if(found) return true;
+		if(reclvl >= 4 || xpkfault) {xpkfault = true; return false }
+		if(X.c("'XPKF'",xpk) && X.Sz() < 0x2C) { xpkfault = true; return false }
+		sz = X.U32(xpk+4,_BE); type = X.SA(xpk+8,4);unpsz=X.U32(xpk+12,_BE);
+		if(!sz || !unpsz || sz > maxsz || unpsz > maxsz ) { xpkfault = true; return false }
+		flags = X.U8(xpk+0x20); xhdrs = flags&1; haspass = flags&2;
+		if(flags&4) hdrsz = 0x26+X.U16(xpk+0x24,_BE); else hdrsz = 0x24;
+		if(xpk+sz+8 > X.Sz()) { xpkfault = true; return false }
+cccc = [ // They often repeat the other detections below, but more standardised. And repeat we shall.
+[/ACCA/,"André Osterhues's Code Compression Algorithm (XPK-ACCA.)"],
+[/ARTM/,"Arithmetic encoding compressor (XPK-ARTM.)"],
+[/BLZW/,"LZW-compressor by Bryan Ford (XPK-BLZW.)"],
+[/BZIP/,"bzip by Julian Seward (XPK-BZIP."],
+[/BZP2/,"bzip2 by Julian Sadler (XPK-BZP2.)"],
+[/CBR[01]/,"RLE-compressor by Bilbo 1st of Hypenosis (XPK-CBR0.,XPK-CBR1.)"],
+[/CRM2/,"Crunch-Mania by Thomas Schwarz, LZH-mode (XPK-CRM2.)"],
+[/CRMS/,"Crunch-Mania by Thomas Schwarz, sampled LZH-mode (XPK-CRMS.)"],
+[/CYB[12]/,"XpkCybPrefs container by Alexis Nasr (XPK-CYB1.,XPK-CYB2.)"],
+[/GZIP/,"DEFLATE by Jean-loup Gailly (XPK-GZIP.)"],
+[/DLTA/,"Delta encoding by Stephan Fuhrmann (XPK-DLTA.)"],
+[/FAST/,"Fast LZ77 compressor by Christian von Roques (XPK-FAST.)"],
+[/FBR2/,"FBR2 CyberYAFA compressor (XPK-FBR2.)"],
+[/FRLE/,"RLE-compressor by Jorma Oksanen (XPK-FRLE.)"],
+[/HFMN/,"Huffman compressor (XPK-HFMN.)"],
+[/HUFF/,"Huffman compressor by Marc Zimmermann (XPK-HUFF.)"],
+[/ILZR/,"Incremental Lempel-Ziv-Renau compressor (XPK-ILZR.)"],
+[/IMPL/,"File Imploder by Peter Struijk (XPK-IMPL.)"],
+[/LHLB/,"LZRW-compressor by Gunther Nikl (XPK-LHLB.)"],
+[/LIN1/,"LIN1 LINO packer (XPK-LIN1.)"], [/LIN3/,"LIN3 LINO packer (XPK-LIN3.)"],
+[/LIN2/,"LIN2 LINO packer (XPK-LIN2.)"], [/LIN4/,"LIN4 LINO packer (XPK-LIN4.)"],
+[/LZBS/,"LZBS CyberYAFA compressor (XPK-LZBS.)"],
+[/LZCB/,": LZ-compressor (XPK-LZCB.)"],
+[/LZW2/,"LZW2 CyberYAFA compressor (XPK-LZW2.)"], [/LZW3/,"LZW3 CyberYAFA compressor (XPK-LZW3.)"],
+[/LZW4/,"LZW4 CyberYAFA compressor (XPK-LZW4.)"],
+[/LZW5/,"LZW5 CyberYAFA compressor (XPK-LZW5.)"],
+[/ELZX/,"LZX-compressor by Piotr Kasprzyk (XPK-ELZX.)"],
+[/SLZX/,"LZX-compressor with delta encoding by Piotr Kasprzyk (XPK-SLZX.)"],
+[/MASH/,"LZRW-compressor by Zdenek Kabelac (XPK-MASH.)"],
+[/NONE/,"Null compressor by Dirk Stöcker (XPK-NONE.)"],
+[/NUKE/,"LZ77-compressor by Christian von Roques (XPK-NUKE.)"],
+[/DUKE/,"LZ77-compressor by Christian von Roques, with delta encoding (XPK-DUKE.)"],
+[/PWPK/,"Power Peak's PowerPacker by Nico François (XPK-PWPK.)"],
+[/PPMQ/,"PPM compressor by Charles Bloom (XPK-PPMQ.)"],
+[/(FRHT|RAKE)/,"LZ77-compressor (XPK-FRHT.,XPK-RAKE.)"],
+[/RDCN/,"Ross data compression (XPK-RDCN.)"],
+[/RLEN/,"RLE-compressor (XPK-RLEN.)"],
+[/SDHC/,"Sample delta Huffman compressor (XPK-SDHC.)"],
+[/SHR[I3]/,"LZ-compressor with arithmetic encoding by Matthias Meixner (XPK-SHR3.,XPK-SHRI)"],
+[/SLZ3/,"SLZ3 CyberYAFA compressor by Niels Fröhling (XPK-SLZ3.)"],
+[/SMPL/,"Huffman compressor with delta encoding (XPK-SMPL.)"],
+[/SQSH/,"Squash compressor for sampled sounds by John Hendrikx (XPK-SQSH.)"],
+[/SASC/,"LZ-compressor with arithmetic and delta encoding (XPK-SASC.)"],
+[/SHSC/,"Context modeling compressor by Peter Kunath (XPK-SHSC.)"],
+[/TDCS/,"LZ77-compressor by Niels Fröhling (XPK-TDCS.)"],
+[/ZENO/,"LZW-compressor (XPK-ZENO.)"],
+//the following aren't implemented in Ancient
+[/BLFH/,"Blowfish encryption by Bruce Schneider (XPK-BLFH.)"],
+[/BZIP/,"Encapsulated Bzip v1 (XPK-BZIP.)"],
+[/CAST/,"CAST encryption by Dirk Pauli (XPK-CAST.)"],
+[/ENCO/,"Unsafe encryption (XPK-ENCO.)"],
+[/DHUF/,"Huffman compressor (lost) (XPK-DHUF.)"],
+[/DMCB/,"68881/2 fp-based arithmetic compressor (XPK-DMCB.)"],
+[/DMCD/,"68881/2 fp-based arithmetic compressor (XPK-DMCD.)"],
+[/DMCI/,"Arithmetic compressor (lost) (XPK-DMCI.)"],
+[/DMCU/,"68881/2 fp-based arithmetic compressor (XPK-DMCU.)"],
+[/FEAL/,"FEAL-N encryption by Christian von Roques (XPK-FEAL.)"],
+[/IDEA/,"IDEA encryption (XPK-IDEA.)"],
+[/L2XZ/,"LZMA2 compressor (XPK-L2XZ.)"],
+[/LZ40/,"LZ4 compressor (XPK-LZ40.)"],
+[/LZMA/,"LZMA2 compressor (XPK-LZMA.)"],
+[/NUID/,"IDEA encryption + NUKE (XPK-NUID.)"],
+[/SHID/,"IDEA encryption + SHRI (XPK-SHID.)"],
+[/TLTA/,"TLTA encoder (lost) (XPK-TLTA.)"] ]
+		found = -1;
+		for(i=0; i < cccc.length && found < 0; i++) if(cccc[i][0].test(type)) found = i;
+		if(found < 0) { xpkfault = true; return false }
+		sname = sname.appendS(cccc[found][1],"/n");
+		if(xpk+0x24 > X.Sz()) bad = bad.addIfNone("!short");
+		else { c = 0; for(i=0; i < 0x24; i++) c ^= X.U8(xpk+i);
+			if(c) bad = bad.addIfNone("!badhdr"); }
+		//if(X.isDeepScan()) { //TODO check all the chunks; for each: isXPK(reclvl+1); }
+		sz += xpk+8;
+		return true;
+	}
+	if(isXPK()) {
+		if(X.isVerbose()) sName = "Amiga eXtended PacKer Format container by Dirk Stöcker et al. (XPKF.)";
+		else sName = "XPK container (XPKF.)";
+		sVersion = sversion+(bad!=""?"malformed"+bad:""); bDetected = 1;
+		if(X.isVerbose()) sOptions = sname+"; payload at:"+Hex(hdrsz)+" unp.sz:"+unpsz+" sz:"+outSz()
+	}
+
+	else if(X.Sz() > 4 && X.c("'ACCA'"))
+		_setResult("archive","André Osterhues's Code Compression Algorithm (ACCA.)","","");
+
+	else if(X.Sz() > 2 && X.c("FF1F"))
+		_setResult("archive","Compact by Colin L. McMaster (.C)","","");
+
+	function isCompress() {
+		if(X.Sz() < 3 || !X.c("1F9D")) return false;
+		t = X.U8(2); sversion = t&0x80 ? "new" : "old"; t &= 0x7F;
+		if(t < 9 || t > 16) return false;
+		return true
+	}
+	if(isCompress())
+		_setResult("archive","Compress by Spencer Thomas (.Z)",sversion,"");
+
+	function isCrunchMania() {
+		if(X.Sz() < 20) return false;
+		if(!X.c("'CrM!'") && !X.c("'CrM2'") && !X.c("'Crm!'") && !X.c("'Crm2'")
+		  && !X.c("18051973") && !X.c("'CD'B3B9") && !X.c("'DCS!'")
+		  && !X.c("'Iron'") && !X.c("'MSS!'") && !X.c("'mss!'")) return false;
+		unpsz = X.U32(6,_BE); if(!unpsz || unpsz > maxsz) return false;
+		sz = X.U32(10,_BE)+14; if(sz < 15 || sz > X.Sz() || sz > maxsz) return false;
+		hdr = X.SA(0,4); switch(hdr) {
+		  case "\x18\x05\x19\x73": case "CD\xB3\xB9": case "Iron": case "MSS!":  hdr = "CrM2"; break;
+		  case "mss!":  hdr = "Crm2"; break;  case "DCS!":  hdr = "CrM!" }
+		var isSampled = hdr[2] == 'm', isLZH = hdr[3] == '2';
+		sversion = ["std","std sampled","LZH","LZH sampled"][(isLZH?2:0)+(isSampled?1:0)];
+		return true
+	}
+	if(!bDetected && isCrunchMania()) {
+		sName = "Crunch-Mania by Thomas Schwarz (CRM.)"; sVersion = sversion;
+		if(X.isVerbose()) sOptions = "unp.sz:"+unpsz+" sz:"+outSz(); bDetected = 1
+	}
+
+	function isDMS() { //TODO move to internal CRC16 once that's ready
+		if(!X.c("'DMS!'") || X.Sz() < 0x38) return false;
+		if(X.U16(0x32,_BE) > 6) return false; bad = '';
+		if(_CRC16(4,0x32,0) != X.U16(0x36,_BE)) bad = bad.addIfNone('!badhdr');
+		var info = X.U16(10,_BE); if(info&0x20) return false;
+		sversion = ''; if(info&2) sversion = "obfuscated";
+		p = 0x38; var ctxsz = tsz = acsz = lasttrksz = trks = mintrk = prevtrk = 0;
+		var ctxszs = [0,0,0x100,0x4000,0x4000,0x1000,0x2000];
+		while(p+20 < X.Sz()) {
+			if(!X.c("'TR'",p)) return false;
+			ctrk = X.U16(p+2,_BE); if(ctrk < prevtrk) break;
+			if(X.isDeepScan())
+				if(_CRC16(p,18,0) != X.U16(p+18,_BE)) { bad = bad.addIfNone("!badtrkhdr"); break }
+			var mode = X.U8(p+13); if(mode > 6) return false;
+			var ctxsz = Math.max(ctxsz,ctxszs[mode]);
+			var flags = X.U8(p,12);
+			if((mode >= 2 && mode <= 4) || (mode >= 5 && (flags&4)))
+				tsz = Math.max(tsz,X.U16(p+8,_BE));
+			var hksz = X.U16(p+6,_BE);
+			if(p+20+hksz > X.Sz()) return false;
+			// ↓ potential to slow the script down:
+			if(X.isAggressiveScan())
+				if(_CRC16(p+20,hksz,0) != X.U16(p+16,_BE)) {
+					bad = bad.addIfNone("!badtrkcrc"); break }
+			if(ctrk < 80) {
+				if(ctrk >= trks) lasttrksz = X.U16(p+10,_BE);
+				if(mintrk > ctrk) mintrk = ctrk; if(ctrk > trks) trks = ctrk;
+				prevtrk = ctrk
+			}
+			p += hksz+20; acsz += hksz;
+			if(p > X.Sz()) { bad = bad.addIfNone("!short"); break }
+			if(ctrk >= 79 && ctrk < 0x8000) break;
+			if(bad) break;
+		}
+		var trksz = (info&16)?22528:11264; //var rawofs = mintrk*trksz;
+		if(mintrk >= trks) bad = bad.addIfNone("!badtrknum");
+		unpsz = (trks-mintrk)*trksz+lasttrksz; //imgsz = trksz*80;
+		sz = p; if(sz > maxsz) bad = bad.addIfNone("!badcalcsize");
+		if(bad) sversion += "/malformed"+bad;
+		return true;
+	}
+	if(!bDetected && isDMS()) {
+		sName = "Disk Masher System (DMS.)"; sVersion = sversion;
+		if(X.isVerbose()) sOptions = "unp.sz:"+unpsz+" sz:"+outSz(sz); bDetected = 1
+	}
+
+	function isFreeze() {
+		if(!X.c("1F9E") && !X.c("1F9F")) return false;
+		var old = X.c("1F9E");
+		sname = sversion = "";
+		if(old) {
+			if(X.Sz() > 2) {
+				var _t = [0,0,1,3,8,12,42,16];
+				var lent = [], i = btl = k = 0;
+				var br = new BitReader(2);
+				for(; i < 8; i++) for(; k < _t[i]; k++) lent[btl++] = i+1;
+				_t = createOrderlyHuffmanTable(lent,btl,br); if(!_t) return false;
+			}
+			sversion = "v1.x = gzip v0.5"
+		} else {
+			if(X.Sz() < 5) return false;
+			t = X.U16(2,_LE); if(t & 0x8000) return false;
+			t2 = X.U8(4); if(t2 & 0xC0) return false;
+			var _t = [t&1, (t>>1)&3, (t>>3)&7, (t>>6)&0xF, t>>10, t2];
+			var count = 62; for(i=0; i < 6; i++) count -= _t[i];
+			var weights = 0x100, j = 7;
+			for(i=0; i < 6; i++) weights -= _t[i] << j--;
+			if(weights < count || count*2 < weights) return false;
+			if(!createOrderlyHuffmanTable())
+			sversion = "v2.x"
+		}
+		return true
+	}
+	if(!bDetected && isFreeze()) {
+		sName = "Freeze/Melt by Leonid A. Broukhis (.F,.lzc)"; sVersion = sversion; bDetected = 1
+	}
+
+	function isIMP() {
+		hdr = X.SA(0,4); switch(hdr) {
+		case "ATN!": case "EDAM": case "IMP!": case "M.H.": add = 7; break;
+		case "BDPI": add = 0x6E8; break;  case "CHFI": add = 0xFE4; break;
+		case "RDC9": case "Dupa": case "FLT!": case "PARA": add = 0; break;
+		default: return false;
+		}
+		unpsz = X.U32(4,_BE); sz = X.U32(8,_BE); sversion = "";
+		if(!unpsz || !sz || (sz&1) || (sz < 0xC) || sz+0x32 > X.Sz() || unpsz > maxsz || sz > maxsz) return false;
+		if(X.isDeepScan()) {
+			crc = X.U32(sz+0x2E,_BE);
+			for(i=0; i < sz+0x2E; i += 2) add += X.U16(i,_BE);
+			if((add&0xFFFFFFFF) != crc) sversion = "malformed!CRC"
+		}
+		sz += 0x32;
+		return true
+	}
+	if(!bDetected && isIMP()) {
+		sName = "File Imploder by Peter Struijk (FImp.)"; sVersion = sversion;
+		if(X.isVerbose()) sOptions = "unp.sz:"+unpsz+" sz:"+outSz(); bDetected = 1
+	}
+
+	function isLOB() {
+		if(X.Sz() < 12 || !/[\x01\x02\x03]LOB/.test(X.SA(0,4))) return false;
+		var nV = X.U8(0); method = X.U8(4); if(!method || method > 6) return false;
+		unpsz = 0;
+		if(nV === 1) { unpsz = File.read_uint24(5,_BE); if(!unpsz || unpsz > maxsz) return false; }
+		sz = 12+X.U32(8,_BE);
+		if(method === 2) { var c = 2;
+			for(i = 0; i < c; i += 2) { if(sz+c > X.Sz()) return false;
+				t1 = X.U8(sz+i); t2 = X.U8(sz+i+1);
+				if(t1 != t2) { if(t1 < t2) t1 = t2;  if(c < t1+i+4) c = t1+i+4;  if(c > 1024) return false } }
+			sz += c; // the count is also off in Ancient, but it does unpack! (could be an extra 00 at the end)
+		}
+		sversion = ["BMC: RLE", "HUF: Huffman", "LZW: 12-bit fixed code",
+			"LZB: 9 to 12-bit fixed LZW","MSP: LZ variant","MSS: LZSS variant"][method-1]
+		  + ["","/double","/triple"][nV-1]
+		  +(sz > X.Sz() ? "/malformed!short" : "");
+		return true
+	}
+	if(!bDetected && isLOB()) {
+		sName = "LOB's File Compressor aka. Multipak (LOB.)"; sVersion = sversion;
+		if(X.isVerbose()) sOptions = (unpsz?"unp.sz:"+unpsz+" ":"")+"sz:"+outSz(); bDetected = 1
+	}
+
+	function isMMCMP() {
+		if(!X.c("'ziRCONia'0E00") || X.Sz() < 24) return false;
+		var blkn = X.U16(0x0C,_LE), blkp = X.U32(0x12,_LE);
+		unpsz = X.U32(0x0E,_LE); if(unpsz > maxsz) return false;
+		if(blkp+blkn*4 > X.Sz()) return false;
+		bad = ""; sz = 0;
+		for(i = 0; i < blkn; i++) {
+			var t = X.U32(blkp+i*4,_LE); if(t+20 > X.Sz()) return false;
+			var bkp = t+X.U32(t+4,_LE)+8*X.U16(t+12,_LE)+20;
+			if(sz < bkp) sz = bkp
+		}
+		return true
+	}
+	if(!bDetected) if(isMMCMP()) {
+		sName = "Music Module Compressor by Emmanuel 'Zirconia' Giasson (MMCMP.)"; nV = X.U16(0x0A,_LE).toString(16).toUpperCase();
+		sVersion = "v"+nV[0]+"."+nV.slice(1,3);
+		if(X.isVerbose()) sOptions = "unp.sz:"+unpsz+" sz:"+outSz(); bDetected = 1
+	}
+	else if(X.c("'MMS '00")) {
+		sName = "C(ompression)KIT by Mad Man Software (C4-,C4A,C`A)"; bDetected = 1;
+	}
+
+	function isPack() {
+		if(!X.c("1F1E") && !X.c("1F1F") || X.Sz() < 6) return false;
+		old = X.c("1F1F");
+		if(old) unpsz = (X.U16(2,_LE) << 16) | X.U16(4,_LE); //PDP-endian
+		else { unpsz = X.U32(2,_BE);  t = X.U8(6);
+			if(!t || t > 0x18 || 6+t > X.Sz()) return false }
+		if(unpsz > maxsz || (old && !unpsz)) return false;
+		if(old) { var p = 6; var tree = [];
+			var c = X.U16(p,_LE); p += 2; if(c >= 1024) return false;
+			for(i=0; i < c; i++) { t = X.U8(p++);
+				if(t < 255) tree[i] = t; else { tree[i] = X.U16(p,_LE); p += 2 }
+			}
+			var detect = true;
+			function branch(node,len,bits) { if(!detect) return;
+				if(node > c) { detect = false; return }
+				if(tree[node]) {
+					len++; if(len > 24) { detect = false; return }
+					bits <<= 1; branch(node+tree[node],len,bits);
+					if(node+1 >= c) { detect = false; return }
+					branch(node+tree[node+1],len,bits|1);
+				} else if(!len) { detect = false; return }
+			}
+			branch(0,0,0); return detect
+		}
+		return true
+	}
+	if(!bDetected && isPack()) {
+		sName = "Pack (.z)"; if(old) sVersion = "old";
+		if(X.isVerbose()) sOptions = "unp.sz:"+unpsz; bDetected = 1
+	}
+
+	function isPP() {
+		if(X.Sz() < 0x10 || !X.c("'PP11'") && !X.c("'PP20'") && !X.c("'PX20'")
+		  && !X.c("'CHFC'") && !X.c("'DEN!'") && !X.c("'DXS9'")
+		  && !X.c("'H.D.'") && !X.c("'RVV!'")) return false;
+		var isObf = false; sversion = "";
+		if(X.c("'PX20'")) { if(X.Sz() < 0x12) return false; isObf = true; sversion = "obfuscated" }
+		var m = X.U32(isObf?6:4, _BE);
+		if(m != 0x9090909 && m != 0x90A0A0A && m != 0x90A0B0B && m != 0x90A0C0C && m != 0x90A0C0D)
+			return false;
+		if(X.isDeepScan()) {
+			t = X.U32(X.Sz()-4,_BE); unpsz = t>>8;
+			if(!unpsz || unpsz > maxsz || (t&0xFF) >= 0x20) return false
+		}
+		return true
+	}
+	if(!bDetected && isPP()) {
+		sName = "Power Peak's PowerPacker by Nico François (PP.)"; sVersion = sversion;
+		if(X.isDeepScan() && X.isVerbose()) sOptions = "unp.sz:"+unpsz; bDetected = 1
+	}
+
+	else if(!bDetected && X.c("'SFHD'"))
+		_setResult("archive","PowerPlayer Music Cruncher by Stephan Fuhrmann (PMC.)","v1.0",
+			"lh.library-based, unp.sz:"+X.U32(4,_BE)+" sz:"+outSz(X.U32(8,_BE)+0xC));
+	else if(!bDetected && X.c("'SFCD'"))
+		_setResult("archive","PowerPlayer Music Cruncher by Stephan Fuhrmann (PMC.)","v2.x",
+			"LZRW-compressor, unp.sz:"+X.U32(4,_BE)+" sz:"+outSz(X.U32(8,_BE)+0xC));
+
+	function isRNC() {
+		if(!X.c("'RNC'01") && !X.c("'RNC'02") && !X.c("'...'01")) return false;
+		unpsz = X.U32(4,_BE); sz = X.U32(8,_BE);
+		if(!unpsz || !sz || unpsz > maxsz || sz > maxsz) return false;
+		var verified = false; sversion = "";
+		if(X.c("'RNC'01"))
+			if(X.Sz() <= 0x12) sversion = "old"; else {
+				var news = X.U8(0x12), olds = X.U8(sz+0x0B);
+				if(!(olds&0x80)) sversion = "new";
+				else if((news&3) || !(news&0x7C)) sversion = "old";
+				else if(X.Sz() >= sz+0x12
+				  && (File.isHeuristicScan() || X.isDeepScan() && CRC16(0x12,sz,0) == X.U16(0x0E,_BE))) {
+					sversion = "new"; verified = true
+				}  else sversion = "old"
+			}
+		else if(X.c("'RNC'02"))
+			if(X.Sz() <= 0x12) sversion = "old"; else {
+				var news = X.U8(0x12), olds = X.U8(sz+0x0A);
+				if(!(olds&0x80)) sversion = "new";
+				else if((news&0x30) == 0x30) sversion = "old";
+				else if(X.Sz() >= sz+0x12
+				  && (File.isHeuristicScan() || X.isDeepScan() && CRC16(0x12,sz,0) == X.U16(0x0E,_BE))) {
+					sversion = "new"; verified = true
+				}  else sversion = "old"
+			}
+		else if(X.c("'...'01")) version = "new";// else return false
+		var hdsz = sversion[0] == "o" ? 0x0C : 0x12; bad = "";
+		if(hdsz+sz > X.Sz()) bad = "!short";
+		if(X.isDeepScan() && sversion[0] == "n" && !verified && CRC16(0x12,sz,0) != X.U16(0x0E,_BE))
+			bad = bad.addIfNone("!badcrc");
+		sz += hdsz; if(bad) sversion += "/malformed"+bad;
+		return true
+	}
+	if(!bDetected && isRNC()) {
+		sName = "Rob Northen Compressor (RNC"+X.U8(3)+".)"; sVersion = sversion;
+		if(X.isDeepScan() && X.isVerbose()) sOptions = "unp.sz:"+unpsz+" sz:"+sz; bDetected = 1
+	}
+	else if(!bDetected && File.isHeuristicScan() && X.Sz() >= 4 && X.c("1FA0"))
+		_setResult("archive","SCO Compress LZH (SCO.)","","");
+
+	function isSQSH() {
+		if(!X.c("'SQSH'")) return false;
+		return true
+	}
+	if(!bDetected && isSQSH()) {
+		sName = "Squash compressor by John Hendrikx (SQSH.)";
+		sOption = "12-bit LZW"; bDetected = 1
+	}
+
+	function isStoneCracker() {
+		//won't recognise an archive with a zero-length file in it, by design, to minimise FPs
+		var ihdr = X.U32(0,_BE), bhdr = X.readBytes(0,3), hdr = X.SA(0,4);
+		function _subdetect() {
+			if(ihdr >= 0x08090A08 && ihdr <= 0x08090A0E && ihdr != 0x08090A09) { gen = 2; return true }
+			if((ihdr&0xFF) >= 8 && (ihdr&0xFF) <= 0x0E)
+				if(bhdr[0] != bhdr[1] && bhdr[0] != bhdr[2] && bhdr[1] != bhdr[2]) { gen = 1; return true }
+			switch(hdr.slice(0,3)) { case "1AM": gen = 3; return true; case "2AM": gen = 6; return true;
+			}
+			switch(hdr) {
+			case "S300": gen = 3; return true; case "S310": gen = 4; return true; case "S400": gen = 5; return true;
+			case "S401": gen = 6; return true; case "S403": case "Z&G!": case "ZULU": gen = 7; return true;
+			case "S404": case "AYS!": gen = 8; return true; default: return false
+			}
+		}
+		if(!_subdetect()) return false;
+		var _m = []; sz = unpsz = -1;
+		function readModes(value) {
+			for (var i=0; i < 4; i++) {
+				_m[i] = value >> 24; if (_m[i] < 8 || _m[i] > 14) return false;
+				value <<= 8;
+			}
+		}
+		function meta() {
+			switch(gen) {
+			case 1: p = 0x12; if(X.Sz() < p) return false; _m[0] = ihdr;
+			 for(i=1; i < 3; i++) { _m[i] = X.U8(i+15); if(_m[i] < 4 || _m[i] > 7) return false }
+			 var rlesz = X.U32(4,_BE); if(!rlesz) return false;
+			 unpsz = X.U32(8,_BE); if(!unpsz || rlesz > unpsz || unpsz > 0x100000) return false;
+			 sz = X.U32(12,_BE); if(!sz || sz > rlesz) return false; break;
+			case 2: readModes(ihdr); case 4: case 5: case 6: p = 12; if(X.Sz() < p) return false;
+			 unpsz = X.U32(4,_BE); if(!unpsz) return false;
+			 sz = X.U32(8,_BE); if(!sz) return false; break;
+			case 3: p = 0x10; if(X.Sz() < p) return false; readModes(X.U32(4,_BE));
+			 unpsz = X.U32(8,_BE); if(!unpsz) return false;
+			 sz = X.U32(12,_BE); if(!sz) return false; break;
+			case 7: case 8: p = 0x10; if(X.Sz() < p+2) return false;
+			 unpsz = X.U32(8,_BE); if(!unpsz) return false;
+			 sz = X.U32(12,_BE)+2; if(sz < 2) return false; break;
+			default: return false;
+			}
+			sz += p; if(sz > X.Sz() || sz > maxsz || unpsz > maxsz) return false;
+			return true
+		}
+		if(gen == 2 && !meta()) gen = 1;
+		if(!meta()) return false;
+		names = [["?","?"], ["SC","v2.69-81"],["SC","v2.92-99"],["S300","v3.00"],["S310","v3.10-11b"],
+		  ["S400","pre-v4.00"],["S401","v4.01"],["S403","v4.02a"],["S404","v4.10"]][gen];
+		return true
+	}
+	if(!bDetected && isStoneCracker()) {
+		sName = "StoneCracker by Jouni 'Mr. Spiv' Korhonen ("+names[0]+".)"; sVersion = names[1]; bDetected = 1;
+		if(X.isVerbose())
+			sOptions = (unpsz >= 0 ? "unp.sz:"+unpsz+" " : "")+(sz >= 0 ? "sz:"+outSz() : "")
+	}
+
+	function isTPWM() {
+		if(X.Sz() < 12 || !X.c("'TPWM'")) return false;
+		unpsz = X.U32(4,_BE); if(!unpsz || unpsz > maxsz) return false;
+		return true
+	}
+	if(!bDetected && isTPWM()) {
+		sName = "Turbo Packer by Wolfgang Meyerle (TPWM.)"; if(X.isVerbose()) sOptions = "unp.sz:"+unpsz; bDetected = 1
+	}
+
+	function isVice() {
+		if(X.c("'Vice'")) { return true }
+		else if(!X.c("'Vic2'")) return false;
+		else {
+			unpsz = X.U32(4); sz = 0xC+X.U32(8,_BE);
+			if(!unpsz || unpsz > maxsz || sz < 1036 || sz > maxsz) return false;
+		}
+		return true
+	}
+	if(!bDetected && isVice()) {
+		sName = "Huffman compressor with RLE ("+X.SA(0,4)+".)"; bDetected = 1;
+		if(X.isVerbose() && X.U8(3) == 0x32) sOptions = "unp.sz:"+unpsz+" sz:"+sz
+	}
+
+	return result()
+}
+/* beautify ignore:end */

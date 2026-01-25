@@ -1,0 +1,68 @@
+// Detect It Easy: detection rule file
+// Authors: Kaens TG@kaens
+
+meta("image", "IFF InterLeaved BitMap (.IFF,.LBM)");
+
+function detect() {
+    if (File.compare("'FORM'") && (File.compare("'ILBM'", 8) || File.compare("'PBM '", 8))) {
+        sz = File.read_uint32(4, _BE) + 8;
+        if (File.getSize() < sz) sVersion = "malformed!short";
+        p = 0x0C;
+        end = Math.min(File.getSize(), sz);
+        w = viewportMode = hsx = -1;
+        while (p < end) {
+            hkhd = File.read_ansiString(p, 4);
+            hksz = File.read_uint32(p + 4, _BE);
+            p += 8;
+            switch (hkhd) {
+                case "BMHD":
+                    w = File.read_uint16(p, _BE);
+                    h = File.read_uint16(p + 2, _BE);
+                    x0 = File.read_int16(p + 4, _BE);
+                    y0 = File.read_int16(p + 6, _BE);
+                    numPlanes = File.read_uint8(p + 8);
+                    mask = File.read_uint8(p + 9);
+                    co = File.read_uint8(p + 0xA);
+                    tcol = File.read_uint16(p + 0xC);
+                    xa = File.read_uint8(p + 0xE);
+                    ya = File.read_uint8(p + 0xF);
+                    pw = File.read_int16(p + 0x10, _BE);
+                    ph = File.read_int16(p + 0x12, _BE);
+                    break;
+                case "CAMG":
+                    viewportMode = File.read_uint32(p, _BE);
+                    break;
+                case "GRAB":
+                    hsx = File.read_int16(p, _BE);
+                    hsy = File.read_int16(p + 2, _BE);
+                    break;
+            }
+            p += hksz;
+            if (hksz % 2) p++;
+        }
+        if (w < 0) return;
+        if (File.isVerbose()) {
+            sOption(w + "x" + h + " (" + x0 + "," + y0 + ") [" + pw + "x" + ph + "] AR" + xa + ":" + ya);
+            sOption("planes:" + numPlanes);
+            switch (co) {
+                case 0:
+                    sOption("uncompressed");
+                    break;
+                case 1:
+                    sOption("RLE");
+                    break;
+                case 2:
+                    sOption("vertical RLE");
+                    break;
+                default:
+                    sOption("unk.compression")
+            }
+            if (mask >= 2) sOption("t.col:" + Hex(tcol));
+            if (viewportMode >= 0) sOption(Hex(viewportMode), "view_port_mode:");
+            if (hsx >= 0) sOption("hotspot: (" + hsx + "," + hsy + ")")
+        }
+        bDetected = true;
+    }
+
+    return result();
+}

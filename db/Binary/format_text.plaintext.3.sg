@@ -1,0 +1,26 @@
+// Detect It Easy: detection rule file
+
+meta("format", "Plain text");
+
+function detect() {
+    if (Binary.isPlainText()) {
+        var sText = Binary.getString(0, Math.min(Binary.getSize(), 3));
+        // UTF-8 BOM.
+        if (/^\xef\xbb\xbf/.test(sText)) {
+            sName = "UTF-8 text";
+        }
+
+        var size = Binary.getSize() < 4096 ? Binary.getSize() : 4096,
+            pos = Binary.findByte(0, size, 10);
+
+        if (pos !== -1) {
+            sOptions = (pos != 0 && Binary.readByte(pos - 1) == 13) || (pos + 1 < Binary.getSize() && Binary.readByte(pos + 1) == 13) ? "CRLF" : "LF";
+        } else if (Binary.findByte(0, size, 13) != -1) {
+            sOptions = "CR";
+        }
+
+        bDetected = true;
+    }
+
+    return result();
+}

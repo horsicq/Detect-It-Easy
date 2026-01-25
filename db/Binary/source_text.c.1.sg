@@ -1,0 +1,35 @@
+// Detect It Easy: detection rule file
+// Author: Jason Hood <jadoxa@yahoo.com.au>
+
+meta("source", "C/C++");
+
+function detect() {
+    var sText = Binary.getHeaderString();
+    if (/^#ifndef (\w+).*\s+^#define \1/m.test(sText) ||
+        /#\s*pragma (?:once|hdrstop)/.test(sText)) {
+        sOptions = "header";
+        bDetected = true;
+    }
+    if (/^(?:class\b|virtual\b|public:|private:|template\b)/m.test(sText)) {
+        if (!(/\sdef\s/.test(sText))) // to avoid false positives on python
+        {
+            sName = "C++";
+            bDetected = true;
+        }
+    } else {
+        var aInclude = sText.match(/^#include ["<].*?[>"]/mg);
+        if (aInclude) {
+            bDetected = true;
+            for (var i = 0; i < aInclude.length; i++) {
+                if (aInclude[i].indexOf(".") < 0) {
+                    sName = "C++";
+                    break;
+                }
+            }
+        } else if (/^#define/m.test(sText)) {
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

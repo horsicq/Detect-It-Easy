@@ -1,0 +1,55 @@
+// Detect It Easy: detection rule file
+// Authors: Jason Hood <jadoxa@yahoo.com.au>, Kae <TG@kaens>
+
+meta("image", "Windows Cursor");
+
+includeScript("CurIcoBPP");
+
+function detect() {
+    if (X.Sz() >= 40) {
+        if (X.c("00000200")) {
+            // Find the biggest, assuming square.
+            var nCount = X.U16(4);
+            var nWidth = 0,
+                nHeight = 0,
+                nBPP = 0,
+                sz = 6 + nCount * 16;
+            if (sz === 6 || sz > X.Sz()) return false;
+            var nHotX, nHotY;
+            for (var i = 0; i < nCount; i++) {
+                if (Binary.read_uint8(9 + i * 16)) return false;
+                sz_ = Binary.read_uint32(14 + i * 16, _LE);
+                if (!sz_ || sz_ > X.Sz() - 22)
+                    return false;
+                sz += sz_;
+                var w = X.U8(6 + i * 16);
+                if (w > nWidth) {
+                    nWidth = w;
+                    nHeight = X.U8(7 + i * 16);
+                    nBPP = getCurIcoBPP(6 + i * 16);
+                    nHotX = X.I16(10 + i * 16);
+                    nHotY = X.I16(12 + i * 16);
+                } else if (w == nWidth) {
+                    var b = getCurIcoBPP(6 + i * 16);
+                    if (b > nBPP) {
+                        nBPP = b;
+                        nHotX = X.I16(10 + i * 16);
+                        nHotY = X.I16(12 + i * 16);
+                    }
+                }
+            }
+            sOptions = nWidth + "x" + nHeight;
+            if (nBPP != 0) {
+                sOptions = sOptions.append(nBPP + "bpp");
+            }
+            sOptions = sOptions.append("(" + nHotX + "," + nHotY + ")");
+            if (nCount > 1) {
+                sOptions = sOptions.append(nCount + " cursors");
+            }
+            sOptions = sOptions.append("sz:" + sz);
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

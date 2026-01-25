@@ -1,0 +1,149 @@
+// Detect It Easy: detection rule file
+// Author: Kaens (TG@kaens)
+
+meta("image", "Truevision Advanced Raster Graphics Adapter bitmap (.TGA,.ICB,.VDA,.VST)");
+
+function detect() {
+    //ref https://github.com/ImageMagick/ImageMagick/blob/main/coders/tga.c
+    // & https://www.dca.fee.unicamp.br/~martino/disciplinas/ea978/tgaffs.pdf
+    if (X.Sz() < 0x12) return false;
+    var msg = bad = "", idlen = X.U8(0), cmt = X.U8(1), col = 0, depth = 0,
+        it = X.U8(2), bpp = X.U8(0x10), strcls = "", co = "none";
+    if ((bpp < 1 || bpp >= 17) && bpp != 24 && bpp != 32) return false;
+    switch (it) {
+        case 1: if (!cmt) return; strcls = "pseudo";
+            if (X.isVerbose()) sOption("colormap"); break;
+        case 2: if (X.isVerbose()) sOption("RGB"); col = "24bit"; break;
+        case 3: if (X.isVerbose()) sOption("monochrome"); break;
+        case 9: if (!cmt) return; co = "rle"; strcls = "pseudo";
+            if (X.isVerbose()) sOption("RLE colormap"); break;
+        case 10: co = "rle"; if (X.isVerbose()) sOption("RLE RGB"); col = "24bit"; break;
+        case 11: co = "rle"; if (X.isVerbose()) sOption("RLE monochrome"); break;
+        case 32: if (!cmt) return; co = "hdr"; strcls = "pseudo";
+            if (X.isVerbose()) sOption("H/d/RLE colormap"); break;
+        case 33: if (!cmt) return; co = "hdrq"; strcls = "pseudo";
+            if (X.isVerbose()) sOption("H/d/RLE 4-pass colormap"); break;
+        default: return;
+    }
+    var sus = 0, cmin = X.U16(3), cmlen = X.U16(5), cmsz = X.U8(7),
+        x0 = X.U16(8), y0 = X.U16(0xA),
+        w = X.U16(0xC), h = X.U16(0xE), attr = X.U8(0x11);
+    if (!w || !h || w > 4096 || h > 2048 || x0 > 1600 || y0 > 1200 || cmsz > 32 || (attr & 0xC0)) return false;
+    // suspiciousness is probably the only way to filter out all the FPs, so let's measure that
+    if (x0) sus++; if (y0) sus++; if (w < 4) sus++; if (h < 4) sus++; if (w > 1600) sus++; if (h > 1200) sus++;
+    if (attr & 0x10) sus++; // that's right-to-left
+    if (!cmsz && cmlen) return false;
+    if (cmt == 1 && (it == 2 || it == 10)) sus++; //shouldn't have colour maps with True-color
+    if (cmsz < 15 || isWithin(cmsz, 17, 23) || isWithin(cmsz, 25, 31)) sus++; if (cmlen > 256) sus++; if (cmin) sus++;
+    if (it == 2 || it == 10) { if (cmin) sus++; if (cmlen) sus++; if (cmsz) sus++ }
+    if (it != 1 && it != 9 && it != 32 && it != 33) depth = bpp <= 8 ? 8 : (bpp <= 16 ? 5 : 8);
+    else depth = cmsz <= 8 ? 8 : (cmsz <= 16 ? 5 : 8);
+    var col = 1 << depth;
+    if (strcls == "pseudo")
+        if (cmt) col = cmin + cmlen;
+        else { col = 1 << bpp; if (col > X.Sz()) return }
+    p = 0x12;
+    if (idlen) msg = X.SC(p, idlen, 'CP437'); p += idlen;
+    //_log("colormap? @"+Hex(p)+"  type:"+cmt+" index:"+cmin+" len:"+cmlen+" size:"+cmsz);
+    if (cmt) {
+        if (col < cmin) col = cmin;
+        switch (cmsz) {
+            case 8: default: p += col; break;
+            case 15: case 16: p += col * 2; break;
+            case 24: p += col * 3; break;
+            case 32: p += col * 4; break;
+        }
+    }
+    if (cmlen > col) sus++;
+    if (sus > 3) {
+        //_log('TGAFault: '+sus+'-fold suspicious!');
+        return;
+    }
+
+    //unpack!
+    var pix = base = flag = skip = index = runlen = ofs = 0, ofsss = 1;
+    if (((attr & 0xC0) >> 6) == 2) ofsss = 2;
+    if (co != "hdr" && co != "hdrq")
+        for (var y = 0; y < h && p < X.Sz(); y++) {
+            for (var x = 0; x < w && p < X.Sz(); x++) {
+                if (co == "rle")
+                    if (runlen) { runlen--; skip = flag != 0 }
+                    else {
+                        runlen = X.U8(p++);
+                        skip = 0; flag = runlen & 0x80; if (flag) runlen -= 0x80;
+                    }
+                if (!skip) switch (bpp) {
+                    case 1: if (!(x & 7)) p++; break;
+                    case 8: default: p++; break;
+                    case 15: case 16: p += 2; break;
+                    case 24: p += 3; break;
+                    case 32: p += 4; break;
+                }
+            }
+        }
+    else p = 0; //giving up on reading huffman/delta etc. (not even Imagemagick can do that)
+    ofs += ofsss; if (ofs > w) { base++; ofs = base }
+    if (p > X.Sz())
+        if (X.isHeuristicScan())
+            bad = bad.addIfNone("!short");
+        else return; //because the format is shaky and FPs are more than possible
+
+    ea = 0;
+    if (X.isHeuristicScan()) {
+        function isNewTGA(ext) {
+            if (ext <= p) return false;
+            //let's see if it's not us accidentally catching the next resource.
+            ea = X.U32(ext - 8); esz = X.U16(ea); var dd = X.U32(ext - 4);
+            //_l2r('tga',p,'ext='+Hex(ext)+' dd='+Hex(dd)+' ea='+Hex(ea)+' ['+Hex(esz)+']'+' ext/esz check:'+(ea && ea+esz > ext));
+            if (p > ext - 8 || (ea && p > ea) || (dd && p > dd) || ((dd || ea) && ea == dd) ||
+                (ea && ea + esz > ext) ||
+                (dd && ea && ea < dd && ea + esz > dd))
+                return false; //false alarm
+            if (ea) {
+                if (esz == 495) sV = "v2.0"; else sV = "v2.X";
+                auth = X.SC(ea + 2, 41, 'CP437');
+                xmsg = X.SC(ea + 43, 324, 'CP437');
+                timestamp = X.U16(ea + 371) + "-" + X.U16(ea + 369) + "-" +
+                    X.U16(ea + 367) + " " +
+                    X.U16(ea + 373) + ":" + X.U16(ea + 375) + ":" + X.U16(ea + 377);
+                sw = X.SC(ea + 426, 41, 'CP437').trim() + " v" +
+                    Math.floor(X.U16(ea + 467) / 100).toString() + '.' +
+                    (X.U16(ea + 467) % 100).toString() + X.SC(ea + 469, 1, 'CP437'),
+                    gamma = (X.U16(ea + 478) / X.U16(ea + 480)).toFixed(1);
+            }
+            else sV = "v2.X";
+            if (dd) {
+                var ddtn = X.U16(dd); var dsz = ddtn * 10 + 2;
+                if (dd + dsz > ext || (ea && dd + dsz > ea)) return false;
+                for (i = 0; i < ddtn; i++) {
+                    var dtp = X.U32(dd + 4 + i * 10), dtsz = X.U32(dd + 8 + i * 10);
+                    if (dtp + dtsz > ext || dtp + dtsz < p) return false;
+                }
+            }
+            return true
+        }
+        sigsz = 15; found = false;
+        //first, check for the strange signature sometime soon after the end of data
+        ext = X.fSig(p, 0x1000, "'TRUEVISION-XX.'00"); if (isNewTGA(ext)) found = true;
+        //then, check for the _proper_ signature sometime soon after the end of data
+        if (!found) { sigsz = 18; ext = X.fSig(p, 0x1000, "'TRUEVISION-XFILE.'00"); if (isNewTGA(ext)) found = true }
+        //if broken (hello H2_Hero_01a.tga with two broken v2-sigs), just give up and try our luck with the eof-sig:
+        if (!found) { ext = X.fSig(X.Sz() - 20, 21, "'TRUEVISION-XFILE.'00"); if (isNewTGA(ext)) found = true }
+        if (found) { sVersion = sV; p = ext + sigsz } else sVersion = "v1.X";
+    }
+    else sVersion = "v1.X";
+    if (X.isVerbose()) {
+        sOption(w + "x" + h + " (" + x0 + "," + y0 + ")");
+        sOption(bpp, "bpp:");
+        if (bpp < 24) sOption(col, "colours:");
+        if (ea) {
+            sOption(gamma, "gamma:");
+            sOptionT(auth, "by:"); sOption(timestamp, "on:"); sOption(sw, "in:"); sOption(xmsg, 'msg:"', '"')
+        }
+        if (co != "rle" || X.isDeepScan()) sOption(outSz(p), "sz:")
+    }
+    if (bad) sVersion += "/malformed" + bad;
+    bDetected = true;
+
+    return result();
+}
