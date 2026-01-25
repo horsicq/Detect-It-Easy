@@ -1,0 +1,39 @@
+// Detect It Easy: detection rule file
+
+meta("sfx", "WinZip");
+
+function detect() {
+    if (PE.compareEP("ff15........b1..380874..b1..4080....74..380874..4080....75..80....74..4033")) {
+        sVersion = "6.X";
+        bDetected = true;
+    } else if (PE.compareEP("53ff15........b3..38..74..80c3..4033d28a083aca74..3acb74..408a083aca75")) {
+        if (PE.findSignature(PE.getOverlayOffset(), Math.min(255, PE.getOverlaySize()), "504b0304") != -1) {
+            sVersion = "2.2";
+        } else if (PE.compareEP("8A48014033D23ACA740A3ACB74068A4801", 16)) {
+            sVersion = "8.X";
+        }
+        bDetected = true;
+    } else if (PE.compareEP("53ff15........b3..38..74..80c3..8a48..4033d23aca74..3acb74..8a48..40")) {
+        sVersion = "8.X";
+        bDetected = true;
+    } else if (PE.compareEP("e8$$$$$$$$558bec83ec..a1........8365....8365....5357bf........3bc7bb........74..85c374..f7d0")) {
+        for (var i = 0; i < PE.resource.length && !bDetected; i++) {
+            if (PE.resource[i].Type != "RT_DIALOG") {
+                if (PE.findSignature(PE.resource[i].Offset, Math.min(PE.resource[i].Size, 0x1100), "'PK'0304") != -1) {
+                    bDetected = true;
+                }
+            }
+        }
+        if (PE.isSectionNamePresent("_winzip_")) {
+            bDetected = true;
+        }
+    }
+    if (PE.isSectionNamePresent("_winzip_")) {
+        if (PE.findSignature(PE.getSectionFileOffset(PE.getSectionNumber("_winzip_")), 0x1000, "'PK'0304") != -1) {
+            sVersion = "3.1";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}
