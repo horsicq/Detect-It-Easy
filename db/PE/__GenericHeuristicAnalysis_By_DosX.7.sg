@@ -1028,6 +1028,9 @@ function scanForObfuscations_NET() {
         }
     }
 
+    // Clean up: release the dictionary
+    protectionsRuntime = undefined;
+
     if (isProtectionRuntimePresent) options = addOption(options, runtimeFound + " runtime");
 
 
@@ -1528,6 +1531,21 @@ function scanForAntiAnalysis_NET() {
  */
 function isCppClrLikeApp() {
     return PE.isNet() && PE_Cached.isRichSignaturePresent && PE.isLibraryPresent("KERNEL32.DLL") && PE_Cached.isNetGlobalCctorPresent;
+}
+
+
+
+/**
+ * Checks if the PE file is linked with an unpackaged Windows App SDK.
+ * 
+ * This function verifies the presence of specific .NET objects that indicate
+ * the application uses the Windows App SDK in an unpackaged deployment scenario.
+ * 
+ * @returns {boolean} True if both "AutoInitialize" and "InitializeWindowsAppSDK" 
+ *                    .NET objects are present in the PE file, false otherwise.
+ */
+function isUnpackagedWindowsAppSdkLinked() {
+    return PE.isNetObjectPresent("AutoInitialize") && PE.isNetObjectPresent("InitializeWindowsAppSDK");
 }
 
 
@@ -4505,8 +4523,8 @@ function scanForObfuscations_Native() {
 /**
  * Determines if the PE file's operating system architecture is x86-based.
  *
- * @returns {boolean|undefined} Returns true if the architecture is x86 or x86_64 (AMD64),
- *                               false if the architecture is ARM-based (ARM, ARMNT, THUMB),
+ * @returns {boolean|undefined} Returns true if the architecture is x86 (I386), x86_64 (AMD64) or x86_16 (ARMNT),
+ *                               false if the architecture is ARM-based (ARM, THUMB),
  *                               undefined if the architecture is unknown or not recognized.
  */
 function isArchX86() {
