@@ -217,8 +217,11 @@ function initializeCache() {
        /* Boolean */ isCppClrLikeApp: isCppClrLikeApp,
        /* Boolean */ isVbNetStandardLibraryPresent: isVbNetStandardLibraryPresent,
        /* Boolean */ isJscriptNetStandardLibraryPresent: isJscriptNetStandardLibraryPresent,
+       /* String  */ firstEpAsmInstruction: getFirstEpAsmInstruction,
        /* Native functions */
+       /* Boolean */ is64bit: PE["is64"],
        /* Boolean */ isDotNet: PE["isNet"],
+       /* Boolean */ isDynamicLinkLibrary: PE["isDll"],
        /* Boolean */ isNetGlobalCctorPresent: PE["isNetGlobalCctorPresent"],
        /* Boolean */ isRichSignaturePresent: PE["isRichSignaturePresent"],
        /* Number  */ numberOfSections: PE["getNumberOfSections"],
@@ -226,6 +229,8 @@ function initializeCache() {
        /* Number  */ numberOfUnmanagedResources: PE["getNumberOfResources"],
        /* Number  */ numberOfUnmanagedImports: PE["getNumberOfImports"],
        /* Number  */ numberOfUnmanagedExports: PE["getNumberOfExports"],
+       /* Number  */ indexOfImportsSection: PE["getImportSection"],
+       /* Number  */ indexOfExportsSection: PE["getExportSection"],
        /* String  */ nameOfNetAssemblyName: PE["getNetAssemblyName"],
        /* String  */ nameOfNetModuleName: PE["getNetModuleName"]
     };
@@ -285,7 +290,7 @@ function scanForObfuscations_NET() {
         "_WinMainCRTStartup"
     ]
 
-    if (!PE.isDll()) {
+    if (!PE_Cached.isDynamicLinkLibrary) {
         if (PE_Cached.isVbNetStandardLibraryPresent) {
             if (isAllNetReferencesMissing(vbNetEntries)) {
                 isEntryPointModified = true;
@@ -335,7 +340,7 @@ function scanForObfuscations_NET() {
     const defaultNetSection = 0;
 
     // Check conditions for a strange entry point position (not for CLR apps)
-    if (!PE.isDll() && PE_Cached.numberOfSections > 1 && !PE_Cached.isCppClrLikeApp) {
+    if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.numberOfSections > 1 && !PE_Cached.isCppClrLikeApp) {
         // Iterate through .NET metadata headers
         for (var s = 0; s < netMetaHeaders.length; s++) {
             const headerName = netMetaHeaders[s];
@@ -357,8 +362,8 @@ function scanForObfuscations_NET() {
 
     var isNativeEntryPointModified = false;
 
-    if (!PE.isDll() && !PE_Cached.isCppClrLikeApp) { // not for CLR apps
-        if (!PE.is64()) {
+    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isCppClrLikeApp) { // not for CLR apps
+        if (!PE_Cached.is64bit && PE_Cached.isArchX86) {
             // FF2500????00: jmp dword ptr [ ... ]
             const firstOpCode = getFirstEpAsmOpCode();
 
@@ -1523,11 +1528,6 @@ function scanForAntiAnalysis_NET() {
 /**
  * Determines if the current PE file is a C++/CLR .NET application.
  *
- * Checks if the PE file:
- * - Is a .NET assembly
- * - Imports the "KERNEL32.DLL" library
- * - Has a .NET global class constructor present
- *
  * @returns {boolean} True if the PE file matches the C++/CLR .NET application heuristics, otherwise false.
  */
 function isCppClrLikeApp() {
@@ -2213,7 +2213,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isSfx = false;
 
-    if (!PE.isDll() && PE.isOverlayPresent()) {
+    if (!PE_Cached.isDynamicLinkLibrary && PE.isOverlayPresent()) {
         const overlayPatterns = [
             "'Rar!'", // samples by: WinRAR
             "'PK'03", // samples by: Zip SFX (by Intel)
@@ -2364,7 +2364,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isLastSectionEP = false;
 
-    if (!PE.isDll()) {
+    if (!PE_Cached.isDynamicLinkLibrary) {
         if (PE_Cached.numberOfSections > 1) {
             // Get addresses of the last section and entry point
 
@@ -2549,90 +2549,101 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     // [{Name}, {Version}, {SectionNameSignature}]
 
     var dbCollectionOfSectionNamesDict = [
-        ["Themida", "2.XX", "   "], // https://www.oreans.com/Themida.php
         ["DBPE", null, "        "],
-        ["Themida", "3.XX", [".imports", ".loadcon", ".themida", ".winlice"]],
-        ["Themida", null, [".stub01", "WinLicen", ".v-lizer", "Themida "]],
-        ["PEBundle", null, /^(PEB|peb)undle$/], // https://bitsum.com/pebundle.htm
+        ["Themida", "2.XX", "   "],                                                  // https://www.oreans.com/Themida.php
+        ["Themida", "3.XX", [".imports", ".loadcon", ".themida", ".winlice"]],       // .
+        ["Themida", null, [".stub01", "WinLicen", ".v-lizer", "Themida "]],          // .
+        ["PEBundle", null, /^(PEB|peb)undle$/],                                      // https://bitsum.com/pebundle.htm
         ["DZA Patcher", null, "yoda"],
-        ["UPX", null, /^UPX[0-3]$/], // https://github.com/upx/upx
-        ["VMProtect", null, /^\.vmp[0-3]$/], // https://vmpsoft.com/
-        [".NET Reactor", "2.XX", ".reacto"], // https://www.eziriz.com/dotnet_reactor.htm
-        ["ACProtect", null, ".perplex"], // https://acprotect-standard.soft112.com/
+        ["UPX", null, /^UPX[0-3]$/],                                                 // https://github.com/upx/upx
+        ["VMProtect", null, /^\.vmp[0-3]$/],                                         // https://vmpsoft.com/
+        [".NET Reactor", "2.XX", ".reacto"],                                         // https://www.eziriz.com/dotnet_reactor.htm
+        ["ACProtect", null, ".perplex"],                                             // https://acprotect-standard.soft112.com/
         ["ANDpakk2", null, "ANDpakk2"],
-        ["ASM Guard", "2.XX", [".asmg", "ASMGUARD"]], // https://github.com/DosX-dev/ASM-Guard
-        ["ASPack", "1.08-2.XX", ".adata"], // https://www.aspack.com/
-        ["ASPack", "2.XX", ".aspack"],
-        ["ASPack", null, /^(\.)?ASPack$/],
-        ["Alienyze", null, ".alien"], // https://alienyze.com/
+        ["ASM Guard", "2.XX", [".asmg", "ASMGUARD"]],                                // https://github.com/DosX-dev/ASM-Guard
+        ["ASPack", "1.08-2.XX", ".adata"],                                           // https://www.aspack.com/
+        ["ASPack", "2.XX", ".aspack"],                                               // .
+        ["ASPack", null, /^(\.)?ASPack$/],                                           // .
+        ["Alienyze", null, ".alien"],                                                // https://alienyze.com/
+        ["BoxedApp", null, ".bxpck"],                                                // https://www.boxedapp.com/
+        ["CodeVirtualizer", null, ".vlizer"],                                        // https://www.oreans.com/CodeVirtualizer.php
+        ["Enigma", null, /^\.enigma[12]$/],                                          // https://enigmaprotector.com/
+        ["Eronana", null, ".packer"],                                                // https://github.com/Eronana/packer
+        ["MPRESS", null, /^\.MPRESS[12]$/],                                          // https://www.autohotkey.com/mpress/mpress_web.htm
+        ["NsPack", null, [/^(\.)?nsp[01]$/, /^PE[Pp][01]$/, ".Packer!"]],            // https://nspack.apponic.com/
+        ["PE Diminisher", null, ".teraphy"],                                         // https://web.archive.org/web/20060111104142/http://www.exetools.com/files/compressors/win/ped.zip
+        ["PE-SHiELD", null, "PESHiELD"],                                             // https://webscene.ir/tools/show/PE-SHIELD-0.25
+        ["PECompact", null, [/^PEC2(MO)?$/, /^pec(1)?$/]],                           // https://bitsum.com/portfolio/pecompact/
+        ["PELock", null, ["PELOCKnt", ".pelock"]],                                   // https://www.pelock.com/ 💩
+        ["Petite", null, /^(\.)?petite$/],                                           // https://www.un4seen.com/petite/
+        ["SecuROM", null, [/^\.cms_[dt]$/, ".securom", ".dsstext"]],                 // https://en.wikipedia.org/wiki/SecuROM
+        ["StarForce", "3.X", [".sforce3", ".brick"]],                                // https://www.star-force.com/
+        ["Wise Installer", null, ".wise"],                                           // https://wpkg.org/WISE_installer
+        ["Gentee Installer", null, ".gentee"],                                       // https://www.gentee.com/download/
+        ["Nullsoft Installer", null, ".ndata"],                                      // https://sourceforge.net/projects/nsis/
+        ["WiX Installer", null, ".wixburn"],                                         // https://github.com/wixtoolset
+        ["BeRoEXEPacker", null, ["packerBY", "bero^fr "]],                           // https://blog.rosseaux.net/page/875fbe6549aa072b5ee0ac9cefff4827/BeRoEXEPacker
+        ["Warbird", null, "?g_Encry"],                                               // https://security-explorations.com/microsoft-warbird-pmp.html
+        ["YodasCrypter", "1.X", "yC"],                                               // https://sourceforge.net/projects/yodap/files/Yoda%20Crypter/1.3/yC1.3.zip/download
+        ["eXPressor", null, /^\.ex_(cod|rsc)$/],                                     // https://www.cgsoftlabs.ro/express.html
+        ["kkrunchy", null, "kkrunchy"],                                              // https://www.farbrausch.de/~fg/kkrunchy/
+        ["tElock", null, "UPX!"],                                                    // https://www.softpedia.com/get/Programming/Packers-Crypters-Protectors/Telock.shtml
+        ["Private EXE Protector", null, [".-PEP-", ".TRIAL!", ".const"]],            // https://github.com/NIKJOO/PEP
+        ["AtomPePacker", null, ".ATOM"],                                             // https://web.archive.org/web/20221012050538/https://github.com/ORCx41/AtomPePacker
+        ["ExeStealth", null, "ExeS"],                                                // https://web.archive.org/web/20250124130104/https://www.webtoolmaster.com/exestealth.htm
+        ["RLPack", null, [".RLPack", ".packed"]],
+        ["RLPack", null, "Obsidium"],                                                // (Fake Obsidium section name)
+        ["BattlEye", null, /^\.be[0-2]$/],                                           // https://www.battleye.com/ (VMProtect-based)
+        ["YodasProtector", "1.0b", [".y0da", ".yP"]],                                // https://yodap.sourceforge.net/
+        ["obfus.h", null, ".obfh"],                                                  // https://github.com/DosX-dev/obfus.h
+        ["Windows PE Packer by Chenzs108", null, ".shell"],                          // https://github.com/czs108/Windows-PE-Packer
+        ["SoftSentry", null, [/^_(stext|rdata|data|idata|rsrc|reloc)$/, ".prdata"]], // https://forum.exetools.com/showthread.php?t=1181
+        ["PE Lock Phantasm", "1.X", "DINGBOY"],                                      // https://www.arteam.accessroot.com/download39d1.html
+        ["XComp", null, /^\.XComp(0)?$/],                                            // http://www.soft-lab.de/JoKo/
+        ["XVolkolak", null, ".xvlk"],                                                // unpacker & reconstructor
+        ["NetShield", null, "!Sugar"],                                               // https://github.com/AdvDebug/NetShield_Protector
+        ["Fatpack", null, ".fpack  "],                                               // https://github.com/Fatmike-GH/Fatpack
+        ["Safengine Shielden", null, ".sedat"],                                      // https://safengine.com/downloads/get-demo
+        ["Inquartos Obfuscator", null, ".inq"],                                      // http://www.vbnet.ru/forum/show.aspx?id=175877
+        ["WinUPack", null, [".ByDwing", ".Upack"]],                                  // https://www.softpedia.com/get/PORTABLE-SOFTWARE/Compression-Tools/Windows-Portable-Applications-Portable-WinUpack.shtml
+        ["Xenocode Postbuild", null, ".xcpad"],                                      // https://download.cnet.com/xenocode-postbuild/3000-10250_4-10506240.html
         ["Alloy", null, ".alloy32"],
-        ["BoxedApp", null, ".bxpck"], // https://www.boxedapp.com/
-        ["CodeVirtualizer", null, ".vlizer"], // https://www.oreans.com/CodeVirtualizer.php
         ["Crinkler", null, "lz32.dll"],
         ["Crunch", "2.0", "BitArts"],
         ["CrypToCrack", null, ".ccp3p"],
         ["DxPack", "1.0", ["coderpub", ".reloc1"]],
-        ["Enigma", null, /^\.enigma[12]$/], // https://enigmaprotector.com/
         ["EXE Pack", null, "!EPack"],
-        ["Eronana", null, ".packer"], // https://github.com/Eronana/packer
         ["FishPE Shield", null, ".FishPE"],
         ["FishPE", null, ".FISHEP"],
         ["G!X Protector", null, ".g!x"],
         ["JDPack", null, ".jdpack"],
         ["Krypton", null, ["krypton", "YADO", "_!_!_!_"]],
         ["MEW", null, "MEW"],
-        ["MPRESS", null, /^\.MPRESS[12]$/], // https://www.autohotkey.com/mpress/mpress_web.htm
         ["MaskPE", null, ".MaskPE"],
         ["Morphnah", "1.0.X", ".nah"],
         ["NakedPacker", null, /^\.naked[12]$/],
         ["NativeCryptor", null, /^(NATIVES|CONFIG|(F)?CRYPT)~$/],
         ["NeoLite", null, ".neolite"],
-        ["NsPack", null, [/^(\.)?nsp[01]$/, /^PE[Pp][01]$/, ".Packer!"]], // https://nspack.apponic.com/
-        ["PE Diminisher", null, ".teraphy"], // https://web.archive.org/web/20060111104142/http://www.exetools.com/files/compressors/win/ped.zip
         ["PE-PACK", "1.0", "PEPACK!!"],
-        ["PE-SHiELD", null, "PESHiELD"], // https://webscene.ir/tools/show/PE-SHIELD-0.25
-        ["PECompact", null, [/^PEC2(MO)?$/, /^pec(1)?$/]], // https://bitsum.com/portfolio/pecompact/
-        ["PELock", null, ["PELOCKnt", ".pelock"]], // https://www.pelock.com/ 💩
         ["Perplex", null, ".perplex"],
-        ["Petite", null, /^(\.)?petite$/], // https://www.un4seen.com/petite/
         ["RLP", null, ".rlp"],
         ["ORiEN", "2.XX", ".loader"],
-        ["RLPack", null, [".RLPack", ".packed"]],
-        ["RLPack", null, "Obsidium"], // fake sign
         ["SC Pack", null, ".scpack"],
         ["SVK Protector", null, ["SVKP", /\.svkp( )?/]],
         ["SafeNet", null, /^\.AKS[1-3]$/],
-        ["Safengine Shielden", null, ".sedat"],
-        ["SecuROM", null, [/^\.cms_[dt]$/, ".securom", ".dsstext"]], // https://en.wikipedia.org/wiki/SecuROM
         ["Shrinker", null, ".shrink1"],
         ["Simple Pack", null, ".spack"],
         ["Software Compress", null, "SoftComp"],
-        ["StarForce", "3.X", [".sforce3", ".brick"]], // https://www.star-force.com/
         ["StarForce", "4.X-5.X", ".ps4"],
         ["VCL", null, ".vcl"],
         ["VirtualizeProtect", null, "VProtect"],
         ["WWPack", null, ".WWPACK"],
         ["WWPack32", null, ".WWP32"],
-        ["Warbird", null, "?g_Encry"], // https://security-explorations.com/microsoft-warbird-pmp.html
-        ["WinUPack", null, [".ByDwing", ".Upack"]],
-        ["YodasCrypter", "1.X", "yC"], // https://sourceforge.net/projects/yodap/files/Yoda%20Crypter/1.3/yC1.3.zip/download
-        ["YodasProtector", "1.0b", [".y0da", ".yP"]], // https://yodap.sourceforge.net/
         ["dePack", "1.3.5", ".depack"],
-        ["eXPressor", null, /^\.ex_(cod|rsc)$/], // https://www.cgsoftlabs.ro/express.html
         ["hmimys", "1.3", "hmimys"],
-        ["kkrunchy", null, "kkrunchy"], // https://www.farbrausch.de/~fg/kkrunchy/
         ["nPack", null, ".nPack"],
-        ["obfus.h", null, ".obfh"], // https://github.com/DosX-dev/obfus.h
-        ["tElock", null, "UPX!"], // https://www.softpedia.com/get/Programming/Packers-Crypters-Protectors/Telock.shtml
         ["yzPack", null, ".yzpack2"],
-        ["Inquartos Obfuscator", null, ".inq"],
-        ["Wise Installer", null, ".wise"], // https://wpkg.org/WISE_installer
-        ["Gentee Installer", null, ".gentee"], // https://www.gentee.com/download/
-        ["Nullsoft Installer", null, ".ndata"], // https://sourceforge.net/projects/nsis/
-        ["WiX Installer", null, ".wixburn"], // https://github.com/wixtoolset
-        ["BeRoEXEPacker", null, ["packerBY", "bero^fr "]], // https://blog.rosseaux.net/page/875fbe6549aa072b5ee0ac9cefff4827/BeRoEXEPacker
         ["NeoLite", null, ".neolit"],
-        ["Private EXE Protector", null, [".-PEP-", ".TRIAL!", ".const"]], // https://github.com/NIKJOO/PEP
         ["bambam", null, ".bedrock"],
         ["WibuKey", null, ".wibu"],
         ["Wibu CodeMeter", null, /^__wibu0[01]$/],
@@ -2641,11 +2652,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Morphnah", "1.0.X", ".nah"],
         ["TSULoader", null, ".tsustub"],
         ["RPCrypt", null, /^\.R(Cryptor|PCrypt)$/],
-        ["AtomPePacker", null, ".ATOM"], // https://web.archive.org/web/20221012050538/https://github.com/ORCx41/AtomPePacker
         ["ExE Pack", null, ["!EPack", ".!ep"]],
         ["XerinFuscator", null, ".Xerin"],
         ["AZProtect 0001", null, "AZPR0001"],
-        ["ExeStealth", null, "ExeS"],
         ["ExeShield", null, ".shield"],
         ["XPack", null, /^\.XPack(0)?$/],
         ["KByS", null, ".shoooo"],
@@ -2654,14 +2663,12 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["DYAMAR", "1.3.X", /^\.dyamar[CD]$/],
         ["Alcatraz", null, ".0Dev"],
         ["Squishy", null, "logicoma"],
-        ["BattlEye", null, /^\.be[0-2]$/], // https://www.battleye.com/ (VMProtect-based)
         ["DragonArmor", "0.0.4.1", /^(\.)?DAStub$/],
         ["EXECrypt", "1.0", "CRPT"],
         ["N-Code", "0.2", [".pepsi", "n-coded", ".vrs"]],
         ["NoodleCrypt", "2.X", [".Ncryo  ", ".De-vir "]],
         ["TheArk", null, ["30cm", ".tw"]],
         ["Virbox", null, /^\.v(data[1-9]|irbox[1-9]?)$/],
-        ["Windows PE Packer by Chenzs108", null, ".shell"], // https://github.com/czs108/Windows-PE-Packer
         ["ElecKey", null, ".sstb"],
         ["PKLITE32", "1.1", ".pklstb"],
         [".BJFnt", "1.X", ".BJFnt"],
@@ -2673,23 +2680,16 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["SDProtector", null, ".data "],
         ["Shielden", null, ".sedata"],
         ["SimbiOZ", null, ".ximera"],
-        ["SoftSentry", null, [/^_(stext|rdata|data|idata|rsrc|reloc)$/, ".prdata"]],
-        ["PE Lock Phantasm", "1.X", "DINGBOY"], // https://www.arteam.accessroot.com/download39d1.html
         ["LARP", "2.X", "SnD "],
         ["DalKrypt", "1.X", ".DalKiT"],
         ["Fish PE", "1.2-1.4", ".PEDATA"],
         ["NoobyProtect (Safengine)", null, "SE"],
-        ["Xenocode Postbuild", null, ".xcpad"],
-        ["XComp", null, /^\.XComp(0)?$/], // http://www.soft-lab.de/JoKo/
-        ["XVolkolak", null, ".xvlk"], // unpacker & reconstructor
-        ["NetShield", null, "!Sugar"], // https://github.com/AdvDebug/NetShield_Protector
         ["KeySec", null, ".ksec"],
         ["Lumy", null, ".lumy"],
         ["TomatoX", null, ".tomato"],
         ["PwdProtect", null, ".pwdprot"],
         ["ID Application", null, /^\.Prt(1)?$/],
-        ["PETetris", null, "PETETRIS"],
-        ["Fatpack", null, ".fpack  "]
+        ["PETetris", null, "PETETRIS"]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDict.concat(
@@ -2986,7 +2986,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var isHighEntropy = false;
 
     // Checks for high entropy (ignore overlay)
-    if (!(PE.isDll() && (PE.section[".rdata"] || PE.isSectionNamePresent(".rsrc"))) && // .dll with resources
+    if (!(PE_Cached.isDynamicLinkLibrary && (PE.section[".rdata"] || PE.isSectionNamePresent(".rsrc"))) && // .dll with resources
         PE.calculateEntropy(0x00, PE.getSize() - PE.getOverlaySize()) > 7.3) {
         isHighEntropy = true;
     }
@@ -3257,7 +3257,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
     var isExportTableIncorrect = false;
 
-    if (PE.isDll() && !PE.isExportTableCorrect()) {
+    if (PE_Cached.isDynamicLinkLibrary && !PE.isExportTableCorrect()) {
         isExportTableIncorrect = true;
     }
 
@@ -3367,7 +3367,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     var isSymbolsExported = false;
 
-    if (!PE.isDll() && PE.isExportFunctionPresent("main")) {
+    if (!PE_Cached.isDynamicLinkLibrary && PE.isExportFunctionPresent("main")) {
         log(logType.any, "The \"--export-all-symbols\" linker option was probably used");
 
         isSymbolsExported = true;
@@ -3493,7 +3493,7 @@ function isJscriptNetStandardLibraryPresent() {
  * @returns {boolean} Returns true if the PE file is identified as a .NET component, otherwise false.
  */
 function isFrameworkComponent() {
-    if (!PE.isNet() || !PE.isDll() || PE_Cached.isNetGlobalCctorPresent) {
+    if (!PE_Cached.isDotNet || !PE_Cached.isDynamicLinkLibrary || PE_Cached.isNetGlobalCctorPresent) {
         return false;
     }
 
@@ -4012,7 +4012,7 @@ function scanForObfuscations_Native() {
 
     var exeAsDll = false;
 
-    if (PE.isDll() &&
+    if (PE_Cached.isDynamicLinkLibrary &&
         PE.isExportFunctionPresentExp(/^(Start|main|_start|(w)?WinMain|EntryPoint)$/)) {
         exeAsDll = true;
     }
@@ -4040,9 +4040,9 @@ function scanForObfuscations_Native() {
     var isIatMissing = false,
         isEmptyIatPresent = false;
 
-    if (PE.getImportSection() === -1 && !PE.isDll()) { // DLLs can be resource-only
+    if (PE_Cached.indexOfImportsSection === -1 && !PE_Cached.isDynamicLinkLibrary) { // DLLs can be resource-only
         isIatMissing = true;
-    } else if (PE.getImportSection() !== -1 && !PE_Cached.numberOfUnmanagedImports) {
+    } else if (PE_Cached.indexOfImportsSection !== -1 && !PE_Cached.numberOfUnmanagedImports) {
         isEmptyIatPresent = true;
     }
 
@@ -4057,10 +4057,10 @@ function scanForObfuscations_Native() {
     var isDllEatMissing = false,
         isDllEmptyEatPresent = false;
 
-    if (PE.isDll()) {
-        if (PE.getExportSection() === -1 && PE.getAddressOfEntryPoint()) { // DLL without exports and with EP (not a resource-only DLL)
+    if (PE_Cached.isDynamicLinkLibrary) {
+        if (PE_Cached.indexOfExportsSection === -1 && PE.getAddressOfEntryPoint()) { // DLL without exports and with EP (not a resource-only DLL)
             isDllEatMissing = true;
-        } else if (PE.getExportSection() !== -1 && PE_Cached.numberOfUnmanagedExports === 0) { // DLL with empty exports
+        } else if (PE_Cached.indexOfExportsSection !== -1 && PE_Cached.numberOfUnmanagedExports === 0) { // DLL with empty exports
             isDllEmptyEatPresent = true;
         }
     }
@@ -4075,7 +4075,7 @@ function scanForObfuscations_Native() {
 
     var isDllIatAndEatMissing = false;
 
-    if (PE.isDll() && PE.getAddressOfEntryPoint() && (PE.getImportSection() === -1 && PE.getExportSection() === -1)) { // DLLs without imports/exports and with EP (not a resource-only DLL)
+    if (PE_Cached.isDynamicLinkLibrary && PE.getAddressOfEntryPoint() && (PE_Cached.indexOfImportsSection === -1 && PE_Cached.indexOfExportsSection === -1)) { // DLLs without imports/exports and with EP (not a resource-only DLL)
         isDllIatAndEatMissing = true;
     }
 
@@ -4253,10 +4253,12 @@ function scanForObfuscations_Native() {
 
     var proxyJumpsAtEpPresent = false;
 
-    if (PE.compareEP("EB $$ EB") ||
+    if (PE_Cached.isArchX86 && (
+        PE.compareEP("EB $$ EB") ||
         PE.compareEP("EB $$ E9") ||
         PE.compareEP("E9 ## ## ## ## EB") ||
-        PE.compareEP("E9 ## ## ## ## E9")) {
+        PE.compareEP("E9 ## ## ## ## E9")
+    )) {
         proxyJumpsAtEpPresent = true;
     }
 
@@ -4361,9 +4363,9 @@ function scanForObfuscations_Native() {
 
     if (!_isResultPresent("linker", "Turbo Linker")) { // Ignore Delphi
         // Offset of the IAT directory (12 is the number of IMAGE_DIRECTORY_ENTRY_ entries, 8 is the size of each entry)
-        const iatDirOffset = getOptHeaderOffset() + (PE.is64() ? 0x70 : 0x60) + 12 * 8;
+        const iatDirOffset = getOptHeaderOffset() + (PE_Cached.is64bit ? 0x70 : 0x60) + 12 * 8;
 
-        if (PE.getImportSection() !== -1 && PE.read_int32(iatDirOffset) === 0) {
+        if (PE_Cached.indexOfImportsSection !== -1 && PE.read_int32(iatDirOffset) === 0) {
             isIatDirEmpty = true;
         }
     }
@@ -4380,7 +4382,7 @@ function scanForObfuscations_Native() {
     if (PE.isSectionNamePresentExp(/^\.[xp]data$/)) {
 
         // Offset of the exception directory (12 is the number of IMAGE_DIRECTORY_ENTRY_ entries, 8 is the size of each entry)
-        var exceptionDirOffset = getOptHeaderOffset() + (PE.is64() ? 0x88 : 0x78);
+        var exceptionDirOffset = getOptHeaderOffset() + (PE_Cached.is64bit ? 0x88 : 0x78);
 
         if (PE.read_int32(exceptionDirOffset) === 0 && PE.read_int32(exceptionDirOffset + 4) === 0) {
             isUnusedExceptionSectionPresent = true;
@@ -4682,7 +4684,7 @@ function getAsmOpCode(instruction) {
  * @returns {string} The assembly operation code of the first instruction at the entry point.
  */
 function getFirstEpAsmOpCode() {
-    return getAsmOpCode(getFirstEpAsmInstruction());
+    return getAsmOpCode(PE_Cached.firstEpAsmInstruction);
 }
 
 
@@ -5166,7 +5168,7 @@ function isNetMetaDataPresent() {
 
     var numRvaAndSizesOffset, clrDirOffset;
 
-    if (!PE.is64()) {
+    if (!PE_Cached.is64bit) {
         numRvaAndSizesOffset = optHeaderOffset + 0x5C;
         clrDirOffset = optHeaderOffset + 0xD0; // CLR offset for PE32
     } else {
@@ -5471,7 +5473,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
         if (!_getNumberOfResults("protector") &&
             !_getNumberOfResults("cryptor") && !_getNumberOfResults("~cryptor") &&
             !_getNumberOfResults("packer") && !_getNumberOfResults("~packer")) {
-            _setLangByHeur("ASMx" + (PE.is64() ? "64" : "86"));
+            _setLangByHeur("ASMx" + (PE_Cached.is64bit ? "64" : "86"));
         }
     }
 }
