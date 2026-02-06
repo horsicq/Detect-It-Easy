@@ -2339,20 +2339,35 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Check if the first instruction at entry point starts with a stack operation
 
-    var isStartsWithStackOperation = false;
+    var isStartsWithStackOperation = false,
+        firstEpAsmOpCode;
 
-    // Get the opcode of the first instruction at entry point
-    const firstEpAsmOpCode = getFirstEpAsmOpCode();
+    // Get the opcode of the first instruction at entry point and check for specific stack operations
+    if (PE_Cached.isArchX86) {
+        firstEpAsmOpCode = getFirstEpAsmOpCode();
 
-    // Switch statement to check for specific stack operation opcodes
-    switch (firstEpAsmOpCode) {
-        case "PUSHAL":
-        case "PUSHA":
-        case "PUSHF":
-        case "POPA":
-            log(logType.nothing, "\"" + firstEpAsmOpCode + "\" at EP");
+        switch (firstEpAsmOpCode) {
+            case "PUSHAL":
+            case "PUSHA":
+            case "PUSHF":
+            case "POPA":
+                log(logType.nothing, "\"" + firstEpAsmOpCode + "\" at EP");
 
-            isStartsWithStackOperation = true;
+                isStartsWithStackOperation = true;
+        }
+    } else {
+        firstEpAsmOpCode = getFirstEpAsmOpCode();
+
+        switch (firstEpAsmOpCode) {
+            case "POP":
+            case "STMDB":
+            case "LDMIA":
+            case "STMFD":
+            case "LDMFD":
+                log(logType.nothing, "\"" + firstEpAsmOpCode + "\" at EP");
+
+                isStartsWithStackOperation = true;
+        }
     }
 
     if (isStartsWithStackOperation) options = addOption(options, firstEpAsmOpCode[0].toUpperCase() + firstEpAsmOpCode.toLowerCase().substring(1, firstEpAsmOpCode.length) + " at EP");
@@ -2396,15 +2411,30 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Check for strange calls if entry point is in the last section
 
-    var isStrangeCallOrJmpPresent = false;
+    var isStrangeCallOrJmpPresent = false,
+        firstOpCode;
 
-    var firstOpCode = getAsmOpCode(getFirstEpAsmInstruction());
+    if (PE_Cached.isArchX86) {
+        firstOpCode = getAsmOpCode(PE_Cached.firstEpAsmInstruction);
 
-    if (!PE.isDll()) {
-        if (isLastSectionEP && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
-            log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + getFirstEpAsmInstruction().split(" ")[1].toLowerCase());
+        if (!PE_Cached.isDynamicLinkLibrary) {
+            if (isLastSectionEP && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
+                log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
 
-            isStrangeCallOrJmpPresent = true;
+                isStrangeCallOrJmpPresent = true;
+            }
+        }
+    } else {
+        // ARM: Check for strange branch instructions
+        firstOpCode = getAsmOpCode(PE_Cached.firstEpAsmInstruction);
+
+        if (!PE_Cached.isDynamicLinkLibrary) {
+            // ARM uses B (branch) and BL (branch with link) for jumps and calls
+            if (isLastSectionEP && (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BX" || firstOpCode === "BLX")) {
+                log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
+
+                isStrangeCallOrJmpPresent = true;
+            }
         }
     }
 
@@ -4088,79 +4118,145 @@ function scanForObfuscations_Native() {
 
     var isStartsWithNop = false;
 
-    /**
-     * NOP-equivalent instructions for x86/x64:
-     *     * Standard NOP instructions:
-     * - 0x90                                           -> NOP (standard 1-byte NOP)
-     * - 0x66 0x90                                      -> XCHG AX, AX (2-byte NOP)
-     * - 0x0F 0x1F 0x00                                 -> NOP DWORD PTR [EAX/RAX] (3-byte NOP)
-     * - 0x0F 0x1F 0x40 0x00                            -> NOP DWORD PTR [EAX/RAX+0x00] (4-byte NOP)
-     * - 0x0F 0x1F 0x44 0x00 0x00                       -> NOP DWORD PTR [EAX/RAX+EAX/RAX*1+0x00] (5-byte NOP)
-     * - 0x66 0x0F 0x1F 0x44 0x00 0x00                  -> NOP WORD PTR [EAX/RAX+EAX/RAX*1+0x00] (6-byte NOP)
-     * - 0x0F 0x1F 0x80 0x00 0x00 0x00 0x00             -> NOP DWORD PTR [EAX/RAX+0x00000000] (7-byte NOP)
-     * - 0x0F 0x1F 0x84 0x00 0x00 0x00 0x00 0x00        -> NOP DWORD PTR [EAX/RAX+EAX/RAX*1+0x00000000] (8-byte NOP)
-     * - 0x66 0x0F 0x1F 0x84 0x00 0x00 0x00 0x00 0x00   -> NOP WORD PTR [EAX/RAX+EAX/RAX*1+0x00000000] (9-byte NOP)
-     * 
-     * Functional equivalents of NOP:
-     * - 0x89 0xF6                       -> MOV ESI, ESI (x86)
-     * - 0x48 0x89 0xF6                  -> MOV RSI, RSI (x64)
-     * - 0x8D 0x76 0x00                  -> LEA ESI, [ESI+0x00] (x86)
-     * - 0x48 0x8D 0x76 0x00             -> LEA RSI, [RSI+0x00] (x64)
-     * - 0x8D 0x74 0x26 0x00             -> LEA ESI, [ESI+EIZ+0x00] (x86)
-     * - 0x48 0x8D 0x74 0x26 0x00        -> LEA RSI, [RSI+RIZ+0x00] (x64)
-     * - 0x87 0xDB                       -> XCHG EBX, EBX (x86)
-     * - 0x48 0x87 0xDB                  -> XCHG RBX, RBX (x64)
-     * - 0x87 0xC9                       -> XCHG ECX, ECX (x86)
-     * - 0x48 0x87 0xC9                  -> XCHG RCX, RCX (x64)
-     * - 0x87 0xD2                       -> XCHG EDX, EDX (x86)
-     * - 0x48 0x87 0xD2                  -> XCHG RDX, RDX (x64)
-     * - 0x87 0xFF                       -> XCHG EDI, EDI (x86)
-     * - 0x48 0x87 0xFF                  -> XCHG RDI, RDI (x64)
-     * - 0x87 0xC0                       -> XCHG EAX, EAX (x86)
-     * - 0x48 0x87 0xC0                  -> XCHG RAX, RAX (x64)
-     * - 0x8D 0x00                       -> LEA EAX, [EAX] (x86)
-     * - 0x48 0x8D 0x00                  -> LEA RAX, [RAX] (x64)
-     */
+    if (PE_Cached.isArchX86) {
+        /*
+         * NOP-equivalent instructions for x86/x64:
+         *     * Standard NOP instructions:
+         * - 0x90                                           -> NOP                                          (standard 1-byte NOP)
+         * - 0x66 0x90                                      -> XCHG AX, AX                                  (2-byte NOP)
+         * - 0x0F 0x1F 0x00                                 -> NOP DWORD PTR [EAX/RAX]                      (3-byte NOP)
+         * - 0x0F 0x1F 0x40 0x00                            -> NOP DWORD PTR [EAX/RAX+0x00]                 (4-byte NOP)
+         * - 0x0F 0x1F 0x44 0x00 0x00                       -> NOP DWORD PTR [EAX/RAX+EAX/RAX*1+0x00]       (5-byte NOP)
+         * - 0x66 0x0F 0x1F 0x44 0x00 0x00                  -> NOP WORD PTR [EAX/RAX+EAX/RAX*1+0x00]        (6-byte NOP)
+         * - 0x0F 0x1F 0x80 0x00 0x00 0x00 0x00             -> NOP DWORD PTR [EAX/RAX+0x00000000]           (7-byte NOP)
+         * - 0x0F 0x1F 0x84 0x00 0x00 0x00 0x00 0x00        -> NOP DWORD PTR [EAX/RAX+EAX/RAX*1+0x00000000] (8-byte NOP)
+         * - 0x66 0x0F 0x1F 0x84 0x00 0x00 0x00 0x00 0x00   -> NOP WORD PTR [EAX/RAX+EAX/RAX*1+0x00000000]  (9-byte NOP)
+         * 
+         * Functional equivalents of NOP:
+         * - 0x89 0xF6                       -> MOV ESI, ESI            (x86)
+         * - 0x48 0x89 0xF6                  -> MOV RSI, RSI            (x64)
+         * - 0x8D 0x76 0x00                  -> LEA ESI, [ESI+0x00]     (x86)
+         * - 0x48 0x8D 0x76 0x00             -> LEA RSI, [RSI+0x00]     (x64)
+         * - 0x8D 0x74 0x26 0x00             -> LEA ESI, [ESI+EIZ+0x00] (x86)
+         * - 0x48 0x8D 0x74 0x26 0x00        -> LEA RSI, [RSI+RIZ+0x00] (x64)
+         * - 0x87 0xDB                       -> XCHG EBX, EBX           (x86)
+         * - 0x48 0x87 0xDB                  -> XCHG RBX, RBX           (x64)
+         * - 0x87 0xC9                       -> XCHG ECX, ECX           (x86)
+         * - 0x48 0x87 0xC9                  -> XCHG RCX, RCX           (x64)
+         * - 0x87 0xD2                       -> XCHG EDX, EDX           (x86)
+         * - 0x48 0x87 0xD2                  -> XCHG RDX, RDX           (x64)
+         * - 0x87 0xFF                       -> XCHG EDI, EDI           (x86)
+         * - 0x48 0x87 0xFF                  -> XCHG RDI, RDI           (x64)
+         * - 0x87 0xC0                       -> XCHG EAX, EAX           (x86)
+         * - 0x48 0x87 0xC0                  -> XCHG RAX, RAX           (x64)
+         * - 0x8D 0x00                       -> LEA EAX, [EAX]          (x86)
+         * - 0x48 0x8D 0x00                  -> LEA RAX, [RAX]          (x64)
+         */
 
-    // Universal NOP equivalents (work on both architectures)
-    const nopEquivalentsUniversal = [
-        "XCHG AX, AX",
-        "XCHG BX, BX", "XCHG CX, CX", "XCHG DX, DX",
-        "XCHG SI, SI", "XCHG DI, DI", "XCHG BP, BP"
-    ];
+        // Universal NOP equivalents (work on both architectures)
+        const nopEquivalentsUniversal = [
+            "XCHG AX, AX",
+            "XCHG BX, BX", "XCHG CX, CX", "XCHG DX, DX",
+            "XCHG SI, SI", "XCHG DI, DI", "XCHG BP, BP"
+        ];
 
-    // Collections of NOP-equivalent instructions based on architecture
-    const nopEquivalents32bit = [
-        // x86
-        "MOV ESI, ESI", "XCHG EAX, EAX",
-        "XCHG EBX, EBX", "XCHG ECX, ECX",
-        "XCHG EDX, EDX", "XCHG EDI, EDI",
-        "LEA EAX, [EAX]", "LEA ESI, [ESI]",
-        "LEA ESI, CS:[ESI]"
-    ];
+        // Collections of NOP-equivalent instructions based on architecture
+        const nopEquivalents32bit = [
+            // x86
+            "MOV ESI, ESI", "XCHG EAX, EAX",
+            "XCHG EBX, EBX", "XCHG ECX, ECX",
+            "XCHG EDX, EDX", "XCHG EDI, EDI",
+            "LEA EAX, [EAX]", "LEA ESI, [ESI]",
+            "LEA ESI, CS:[ESI]"
+        ];
 
-    const nopEquivalents64bit = [
-        // x64
-        "MOV RSI, RSI", "XCHG RAX, RAX",
-        "XCHG RBX, RBX", "XCHG RCX, RCX",
-        "XCHG RDX, RDX", "XCHG RDI, RDI",
-        "LEA RAX, [RAX]", "LEA RSI, [RSI]",
-        "LEA RSI, CS:[RSI]"
-    ];
+        const nopEquivalents64bit = [
+            // x64
+            "MOV RSI, RSI", "XCHG RAX, RAX",
+            "XCHG RBX, RBX", "XCHG RCX, RCX",
+            "XCHG RDX, RDX", "XCHG RDI, RDI",
+            "LEA RAX, [RAX]", "LEA RSI, [RSI]",
+            "LEA RSI, CS:[RSI]"
+        ];
 
-    // Combine universal and architecture-specific instructions
-    const nopEquivalents = nopEquivalentsUniversal.concat(
-        PE.is64() ? nopEquivalents64bit : nopEquivalents32bit
-    );
+        // Combine universal and architecture-specific instructions
+        const nopEquivalents = nopEquivalentsUniversal.concat(
+            PE_Cached.is64bit ? nopEquivalents64bit : nopEquivalents32bit
+        );
 
-    // First check for standard NOP opcode which covers all NOP variants with different operands
-    if (getFirstEpAsmOpCode() === "NOP") {
-        isStartsWithNop = true;
+        // First check for standard NOP opcode which covers all NOP variants with different operands
+        if (getFirstEpAsmOpCode() === "NOP") {
+            isStartsWithNop = true;
+        } else {
+            // Then check for all functional NOP equivalents that have different opcodes
+            for (var i = 0; i < nopEquivalents.length && !isStartsWithNop; i++) {
+                if (PE_Cached.firstEpAsmInstruction === nopEquivalents[i]) {
+                    isStartsWithNop = true;
+                }
+            }
+        }
     } else {
-        // Then check for all functional NOP equivalents that have different opcodes
-        for (var i = 0; i < nopEquivalents.length && !isStartsWithNop; i++) {
-            if (getFirstEpAsmInstruction() === nopEquivalents[i]) {
-                isStartsWithNop = true;
+        /*
+         * NOP-equivalent instructions for ARM/ARM64:
+         *     * Standard NOP instructions:
+         * - 0x00 0xF0 0x20 0xE3               -> NOP (ARM32 explicit)
+         * - 0x1F 0x20 0x03 0xD5               -> NOP (ARM64 explicit)
+         * 
+         * Functional equivalents of NOP:
+         * - 0x00 0x00 0xA0 0xE1               -> MOV R0, R0   (ARM32)
+         * - 0x01 0x10 0xA0 0xE1               -> MOV R1, R1   (ARM32)
+         * - 0x02 0x20 0xA0 0xE1               -> MOV R2, R2   (ARM32)
+         * - 0x03 0x30 0xA0 0xE1               -> MOV R3, R3   (ARM32)
+         * - 0x04 0x40 0xA0 0xE1               -> MOV R4, R4   (ARM32)
+         * - 0x05 0x50 0xA0 0xE1               -> MOV R5, R5   (ARM32)
+         * - 0x06 0x60 0xA0 0xE1               -> MOV R6, R6   (ARM32)
+         * - 0x07 0x70 0xA0 0xE1               -> MOV R7, R7   (ARM32)
+         * - 0x08 0x80 0xA0 0xE1               -> MOV R8, R8   (ARM32)
+         * - 0x09 0x90 0xA0 0xE1               -> MOV R9, R9   (ARM32)
+         * - 0x0A 0xA0 0xA0 0xE1               -> MOV R10, R10 (ARM32)
+         * - 0x0B 0xB0 0xA0 0xE1               -> MOV R11, R11 (ARM32)
+         * - 0x0C 0xC0 0xA0 0xE1               -> MOV R12, R12 (ARM32)
+         * - 0xE0 0x03 0x00 0xAA               -> MOV X0, X0   (ARM64)
+         * - 0xE1 0x03 0x01 0xAA               -> MOV X1, X1   (ARM64)
+         * - 0xE2 0x03 0x02 0xAA               -> MOV X2, X2   (ARM64)
+         * - 0xE3 0x03 0x03 0xAA               -> MOV X3, X3   (ARM64)
+         * - 0xE4 0x03 0x04 0xAA               -> MOV X4, X4   (ARM64)
+         * - 0xE5 0x03 0x05 0xAA               -> MOV X5, X5   (ARM64)
+         * - 0xE6 0x03 0x06 0xAA               -> MOV X6, X6   (ARM64)
+         * - 0xE7 0x03 0x07 0xAA               -> MOV X7, X7   (ARM64)
+         * - 0xE0 0x03 0x00 0x2A               -> MOV W0, W0   (ARM64)
+         * - 0xE1 0x03 0x01 0x2A               -> MOV W1, W1   (ARM64)
+         * - 0xE2 0x03 0x02 0x2A               -> MOV W2, W2   (ARM64)
+         * - 0xE3 0x03 0x03 0x2A               -> MOV W3, W3   (ARM64)
+         */
+
+        // ARM/ARM64 NOP equivalents
+        const nopEquivalentsArm = [
+            "NOP",
+            "MOV R0, R0", "MOV R1, R1", "MOV R2, R2", "MOV R3, R3",
+            "MOV R4, R4", "MOV R5, R5", "MOV R6, R6", "MOV R7, R7",
+            "MOV R8, R8", "MOV R9, R9", "MOV R10, R10", "MOV R11, R11",
+            "MOV R12, R12", "MOV R13, R13", "MOV R14, R14", "MOV R15, R15"
+        ];
+
+        const nopEquivalentsArm64 = [
+            "NOP",
+            "MOV X0, X0", "MOV X1, X1", "MOV X2, X2", "MOV X3, X3",
+            "MOV X4, X4", "MOV X5, X5", "MOV X6, X6", "MOV X7, X7",
+            "MOV W0, W0", "MOV W1, W1", "MOV W2, W2", "MOV W3, W3"
+        ];
+
+        const nopEquivalents = PE_Cached.is64bit ? nopEquivalentsArm64 : nopEquivalentsArm;
+
+        // Check for standard NOP opcode
+        if (getFirstEpAsmOpCode() === "NOP") {
+            isStartsWithNop = true;
+        } else {
+            // Check for functional NOP equivalents
+            for (var i = 0; i < nopEquivalents.length && !isStartsWithNop; i++) {
+                if (PE_Cached.firstEpAsmInstruction === nopEquivalents[i]) {
+                    isStartsWithNop = true;
+                }
             }
         }
     }
@@ -4174,30 +4270,32 @@ function scanForObfuscations_Native() {
 
     var isAddrToStackTrickPresent = false;
 
-    // Check first 30 instructions for "Stack-push address near EP"
-    // This trick uses "CALL $+5" (E8 00 00 00 00) to push next instruction address on stack
-    if (!PE.isDll()) {
-        for (var i = 0; i < 30 && !isAddrToStackTrickPresent; i++) {
-            var asmInstruction = getAsmInstructionByIndex(i);
+    if (PE_Cached.isArchX86) {
+        // Check first 30 instructions for "Stack-push address near EP"
+        // This trick uses "CALL $+5" (E8 00 00 00 00) to push next instruction address on stack
+        if (!PE_Cached.isDynamicLinkLibrary) {
+            for (var i = 0; i < 32 && !isAddrToStackTrickPresent; i++) {
+                var asmInstruction = getAsmInstructionByIndex(i);
 
-            if (!asmInstruction) break; // Safety check
+                if (!asmInstruction) break; // Safety check
 
-            // Check if instruction is CALL
-            if (getAsmOpCode(asmInstruction) === "CALL") {
-                // Get address and offset for this instruction
-                var disasmAddress = PE.getAddressOfEntryPoint();
+                // Check if instruction is CALL
+                if (getAsmOpCode(asmInstruction) === "CALL") {
+                    // Get address and offset for this instruction
+                    var disasmAddress = PE.getAddressOfEntryPoint();
 
-                for (var j = 0; j < i; j++) {
-                    disasmAddress = PE.getDisasmNextAddress(disasmAddress);
-                }
+                    for (var j = 0; j < i; j++) {
+                        disasmAddress = PE.getDisasmNextAddress(disasmAddress);
+                    }
 
-                var currentOffset = PE.VAToOffset(disasmAddress);
+                    var currentOffset = PE.VAToOffset(disasmAddress);
 
-                // Check if machine code matches E8 00 00 00 00 pattern
-                if (PE.compare("E8 00 00 00 00", currentOffset)) {
-                    log(logType.any, "Stack-push address near EP found at offset: 0x" + currentOffset.toString(16));
+                    // Check if machine code matches E8 00 00 00 00 pattern
+                    if (PE.compare("E8 00 00 00 00", currentOffset)) {
+                        log(logType.any, "Stack-push address near EP found at offset: 0x" + currentOffset.toString(16));
 
-                    isAddrToStackTrickPresent = true;
+                        isAddrToStackTrickPresent = true;
+                    }
                 }
             }
         }
@@ -4212,18 +4310,20 @@ function scanForObfuscations_Native() {
 
     var isCpuidNearEpPresent = false;
 
-    // Check first 15 instructions for CPUID instruction
-    if (!PE.isDll()) {
-        for (var i = 0; i < 15 && !isCpuidNearEpPresent; i++) {
-            var asmInstruction = getAsmInstructionByIndex(i);
+    if (PE_Cached.isArchX86) {
+        // Check first 15 instructions for CPUID instruction
+        if (!PE_Cached.isDynamicLinkLibrary) {
+            for (var i = 0; i < 15 && !isCpuidNearEpPresent; i++) {
+                var asmInstruction = getAsmInstructionByIndex(i);
 
-            if (!asmInstruction) break; // Safety check
+                if (!asmInstruction) break; // Safety check
 
-            // Check if instruction is CPUID
-            if (getAsmOpCode(asmInstruction) === "CPUID") {
-                log(logType.any, "CPUID near EP found at instruction index: " + i);
+                // Check if instruction is CPUID
+                if (getAsmOpCode(asmInstruction) === "CPUID") {
+                    log(logType.any, "CPUID near EP found at instruction index: " + i);
 
-                isCpuidNearEpPresent = true;
+                    isCpuidNearEpPresent = true;
+                }
             }
         }
     }
@@ -4237,11 +4337,21 @@ function scanForObfuscations_Native() {
 
     var isTlsWithBadEpPresent = false;
 
-    if (PE.isTLSPresent() && (
-        /^INT( )?3$/.test(getAsmOpCode(getFirstEpAsmInstruction())) || // INT3 (0xCC) / INT 3 (0xCD 0x03)
-        /^RET( \d+)?$/.test(getAsmOpCode(getFirstEpAsmInstruction())) // All types of RET
-    )) {
-        isTlsWithBadEpPresent = true;
+    if (PE.isTLSPresent()) {
+        if (PE_Cached.isArchX86) {
+            if (/^INT( )?3$/.test(getAsmOpCode(PE_Cached.firstEpAsmInstruction)) ||    // INT3 (0xCC) / INT 3 (0xCD 0x03)
+                /^RET( \d+)?$/.test(getAsmOpCode(PE_Cached.firstEpAsmInstruction))) {  // All types of RET
+                isTlsWithBadEpPresent = true;
+            }
+        } else {
+            // ARM: Check for breakpoint or return instructions
+            if (/^BKPT/.test(getAsmOpCode(PE_Cached.firstEpAsmInstruction)) ||    // BKPT  (breakpoint)
+                /^BRK/.test(getAsmOpCode(PE_Cached.firstEpAsmInstruction)) ||     // BRK   (ARM64 breakpoint)
+                /^RET/.test(getAsmOpCode(PE_Cached.firstEpAsmInstruction)) ||     // RET   (ARM64 return)
+                /^BX( )?LR$/.test(PE_Cached.firstEpAsmInstruction)) {             // BX LR (ARM32 return)) {
+                isTlsWithBadEpPresent = true;
+            }
+        }
     }
 
     if (isTlsWithBadEpPresent) options = addOption(options, "TLS hidden EP");
