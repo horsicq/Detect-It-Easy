@@ -29,6 +29,12 @@
 //       │     includes pinpoint scanning, intelligent inspections,    │
 //       │     signature-based analysis, thorough file content         │
 //       │     evaluation, and much more! >:)                          │
+//       │                                                             │
+//       │     Supported archictures:                                  │
+//       │      1.  I386 (x86_32)            2.  AMD64 (x86_64)        │
+//       │      3.  ARM                      4.  ARM THUMB             │
+//       │      5.  ARMNT (ARMv7)                                      │
+//       │                                                             │
 //       └─────────────────────────────────────────────────────────────┘
 
 //       ┌─────────────────────────┤ CONTACTS ├────────────────────────┐
@@ -145,7 +151,8 @@ function main() {
 
 function stubForLegacyEngines() {
     if (typeof PE.getNetAssemblyName === "undefined") {
-        stdout(">>> Update DIE Engine to 3.11 and higher for using Heuristic-analyser by DosX <<<");
+        stdout(">>> Update DIE Engine to 3.20 and higher for using Heuristic-analyzer by DosX <<<");
+        debugger;
         return true;
     }
 
@@ -157,11 +164,13 @@ function stubForLegacyEngines() {
 function stubForWrongEnvironment() {
     if (typeof PE === "undefined") {
         stdout(">>> Wrong environment! 'PE' is undefined. Check DIE-engine for correct installation <<<");
+        debugger;
         return true;
     }
 
     if (PE.isHeuristicScan() && PE.isVerbose() && !_getNumberOfResults("operation system")) {
-        stdout(">>> Script is running outside the environment! <<<");
+        stdout(">>> Script is running outside the environment! Are you in debug mode? <<<");
+        debugger;
     }
 
     return false;
@@ -242,6 +251,7 @@ function initializeCache() {
             PE_Cached[key] = functionBody();
         } else {
             stdout(">>> PE API function '" + key + "' is undefined! <<<");
+            debugger;
         }
     }
 }
@@ -403,6 +413,21 @@ function scanForObfuscations_NET() {
 
 
 
+    // PE file must contain at least two sections: one for code and one for resources.
+
+    var isOneSectionFile = false;
+
+    if (PE_Cached.numberOfSections === 1) {
+        log(logType.net, "Only one section found!");
+
+        isOneSectionFile = true;
+    }
+
+    if (isOneSectionFile) options = addOption(options, "Only one section");
+
+
+
+
     // Check for strange sections
 
     var isStrangeSectionsPresent = false;
@@ -447,7 +472,7 @@ function scanForObfuscations_NET() {
         const unmanagedResourceName = PE.getResourceNameByNumber(i);
 
         if (unmanagedResourceName && (!isAsciiString(unmanagedResourceName) || isNameObfuscated(unmanagedResourceName))) {
-            log(logType.any, "Strange unmanaged resource name: " + unmanagedResourceName);
+            log(logType.net, "Strange unmanaged resource name: " + unmanagedResourceName);
 
             isStrangeUnmanagedResourcesPresent = true;
         }
@@ -866,7 +891,7 @@ function scanForObfuscations_NET() {
     var isBadCctor = false;
 
     if (currentCtorOffset === -1) {
-        log("It seems that the .cctor is missing. Bad PE format!");
+        log(logType.net, "It seems that the .cctor is missing. Bad PE format!");
 
         isBadCctor = true;
     }
@@ -937,6 +962,7 @@ function scanForObfuscations_NET() {
 
 
     // A type of obfuscation of numbers in which they are inverted several times from positive to negative and vice versa...
+
     var isMathInversionsPresent = false;
 
     if (validateNetByteCode(opCodes.ldc_i4 + opCodes.not) && (
@@ -988,7 +1014,7 @@ function scanForObfuscations_NET() {
             opCodes.setStrict(opCodes.calli, "FF FF FF FF") + opCodes.setStrict(opCodes.sizeof, "FF FF FF FF")
         )
     ) {
-        log(logType, "Invalid OpCodes detected, offset " + lastOffsetDetected);
+        log(logType.net, "Invalid OpCodes detected, offset " + lastOffsetDetected);
 
         invalidOpCodes = true;
     }
@@ -1102,7 +1128,7 @@ function scanForObfuscations_NET() {
         // "Watermark" is only possible in the absence of fake signatures
 
         if (signaturesCounter === 1) {
-            log(logType.nothing, "Watermark (Attribute) found: \"" + obfuscatorAttributeFound + "\"");
+            log(logType.net, "Watermark (Attribute) found: \"" + obfuscatorAttributeFound + "\"");
 
             isWatermarkPresent = true;
         }
@@ -3894,6 +3920,21 @@ function scanForObfuscations_Native() {
 
 
 
+    // PE file must contain at least two sections: one for code and one for resources.
+
+    var isOneSectionFile = false;
+
+    if (PE_Cached.numberOfSections === 1) {
+        log(logType.any, "Only one section found!");
+
+        isOneSectionFile = true;
+    }
+
+    if (isOneSectionFile) options = addOption(options, "Only one section");
+
+
+
+
     // Check for section names containing forbidden characters
 
     var isStrangeSectionsPresent = false;
@@ -4636,18 +4677,18 @@ function scanForObfuscations_Native() {
 /**
  * Determines if the PE file's operating system architecture is x86-based.
  *
- * @returns {boolean|undefined} Returns true if the architecture is x86 (I386), x86_64 (AMD64) or x86_16 (ARMNT),
- *                               false if the architecture is ARM-based (ARM, THUMB),
+ * @returns {boolean|undefined} Returns true if the architecture is x86_32 (I386) or x86_64 (AMD64),
+ *                               false if the architecture is ARM-based (ARM, ARMNT, THUMB),
  *                               undefined if the architecture is unknown or not recognized.
  */
 function isArchX86() {
     switch (PE.getOperationSystemOptions().split(',')[0]) {
         case "I386":  // x86
         case "AMD64": // x86_64
-        case "ARMNT": // x86_16
             return true;
-        case "ARM":
-        case "THUMB":
+        case "ARM":   // ARM
+        case "ARMNT": // ARMv7
+        case "THUMB": // ARM Thumb
             return false;
         default:
             return undefined;
@@ -6006,11 +6047,10 @@ function scanForMaliciousCode_NET_and_Native() {
         if (verdicts.length === 0 && (PE.isSignatureInSectionPresent(0, "00" + generateUnicodeSignatureMask(" RAT") + "00 **") ||
             PE.isNetObjectPresent("AntiTaskManager") ||
             PE.isNetObjectPresent("BlockAvSites") ||
-            PE.isNetObjectPresent("UpdaterEXE") ||
-            (
+            PE.isNetObjectPresent("UpdaterEXE") || (
                 // System.Net.Sockets + GetForegroundWindow + GetWindowsText
-                PE.isNetObjectPresent("System.Net.Sockets") && PE.isNetObjectPresent("GetForegroundWindow") && PE.isNetObjectPresent("GetWindowText") &&
-                ( // Search for 'AntivirusProduct' or 'DisableTaskMgr'
+                PE.isNetObjectPresent("System.Net.Sockets") && PE.isNetObjectPresent("GetForegroundWindow") && PE.isNetObjectPresent("GetWindowText") && (
+                    // Search for 'AntivirusProduct' or 'DisableTaskMgr'
                     PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("AntivirusProduct")) || PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("DisableTaskMgr"))
                 )
             ) || (
