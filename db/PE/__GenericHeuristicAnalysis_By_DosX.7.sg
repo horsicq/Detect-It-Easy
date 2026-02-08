@@ -3846,6 +3846,15 @@ function isTokenObfuscated(token) {
     // Common abbreviations/acronyms (all caps with digits): DX11, OpenGL3, Win32
     if (token.match(/^[A-Z]{2,}[0-9]{1,3}$/)) return false;
 
+    // Changelist/build numbers (pure digits 6-12 chars): CL 35398403, Build 123456
+    // Todo: upgrade
+    if (token.match(/^\d{6,12}$/)) return false;
+
+    // Build/CI server patterns: buildbot, jenkins, gitlab-runner, etc.
+    // Contains common CI/build keywords with hyphens/underscores
+    if (token.match(/(buildbot|builder|jenkins|gitlab|runner|relclient|steam|win32|win64|x64|x86)/i)) return false;
+
+
     // === OBFUSCATION DETECTION ===
 
     var stats = { digits: 0, lower: 0, upper: 0, special: 0, transitions: 0 };
@@ -3896,6 +3905,52 @@ function isTokenObfuscated(token) {
             return true;
         }
     }
+
+    // Repeating syllables/segments (e.g., "jnfasjknjnjnjn" - "nj" repeats 3+ times)
+    // Detects 2-3 char segments repeating 3+ times consecutively
+    if (token.match(/(.{2,3})\1{2,}/)) return true;
+
+    // Mixed letters and digit clusters (e.g., "ac8a8sic8i19o9oi", "j9813jd1039i098")
+    // Pattern: letter(s) + digit(s), repeated 4+ times with varying lengths
+    if (token.match(/(?:[a-z]+\d+){4,}/i) && stats.digits >= 4) return true;
+
+    // Chaotic alternating: single letter + multiple digits (e.g., "j9813jd1039i098")
+    // Pattern: letter + 3+ digits, repeated 2+ times
+    if (token.match(/(?:[a-z]\d{3,}){2,}/i)) return true;
+
+    // Random consonant clusters without vowels (e.g., "jnfsjknjn", "bcdfgh")
+    // 6+ consonants in a row (excluding common patterns)
+    if (token.match(/[bcdfghjklmnpqrstvwxz]{6,}/i) && !token.match(/str|chr|thr|sch|scr|spr/i)) return true;
+
+    // Single consonant repeated excessively (e.g., "jnfasjknjnjnjn")
+    // Same consonant appears 5+ times in strings shorter than 15 chars
+    var consonantCounts = {};
+    for (var i = 0; i < token.length; i++) {
+        var ch = token[i].toLowerCase();
+        if ('bcdfghjklmnpqrstvwxz'.indexOf(ch) !== -1) {
+            consonantCounts[ch] = (consonantCounts[ch] || 0) + 1;
+            if (consonantCounts[ch] >= 5 && token.length < 15) return true;
+        }
+    }
+
+    // Keyboard walk patterns (e.g., "qwerty", "asdfgh", "zxcvbn")
+    if (token.match(/qwerty|asdfgh|zxcvbn|yuiop|hjkl|cvbnm|poiuy|lkjh/i)) return true;
+
+    // Excessive digit-letter boundaries (e.g., "a1b2c3d4e5f6")
+    // Count transitions specifically between letters and digits (8+ transitions)
+    var digitLetterTransitions = 0;
+    for (var i = 1; i < token.length; i++) {
+        var curr = token[i], prev = token[i - 1],
+            currIsDigit = (curr >= '0' && curr <= '9'),
+            prevIsDigit = (prev >= '0' && prev <= '9'),
+            currIsLetter = ((curr >= 'a' && curr <= 'z') || (curr >= 'A' && curr <= 'Z')),
+            prevIsLetter = ((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+
+        if ((currIsDigit && prevIsLetter) || (currIsLetter && prevIsDigit)) {
+            digitLetterTransitions++;
+        }
+    }
+    if (digitLetterTransitions >= 8) return true;
 
     // Statistical thresholds for obfuscation
     return (
