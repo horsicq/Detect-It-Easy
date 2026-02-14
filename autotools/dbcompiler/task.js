@@ -1,9 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 const { Worker } = require("worker_threads");
+const zlib = require('zlib');
 
 const inputDirs = ["db", "db_custom", "db_extra"];
 const outputDir = "dbs_min";
+const CACHE_FILE = path.join(outputDir, '.compiler_cache');
 const MAX_PARALLEL = 16;
 
 const stats = {
@@ -17,6 +19,92 @@ const stats = {
 
 const failedFiles = [];
 const copiedFiles = [];
+
+// --- Cache helpers (ADLER32 + CRC32 key)
+function adler32(str) {
+    let a = 1, b = 0;
+    for (let i = 0; i < str.length; i++) {
+        a = (a + str.charCodeAt(i)) % 65521;
+        b = (b + a) % 65521;
+    }
+    return (b << 16) | a;
+}
+
+function makeCrc32Table() {
+    const table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let k = 0; k < 8; k++) {
+            c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        table[i] = c >>> 0;
+    }
+    return table;
+}
+
+const CRC32_TABLE = makeCrc32Table();
+function crc32(str) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ code) & 0xFF];
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function computeKeyForPath(p) {
+    // Use normalized relative path to project root
+    const rel = path.normalize(path.relative(process.cwd(), p)).replace(/\\/g, '/');
+    const a = adler32(rel) >>> 0;
+    const c = crc32(rel) >>> 0;
+    // Combine into 64-bit-like decimal using BigInt
+    const big = (BigInt(a) << 32n) | BigInt(c);
+    return big.toString();
+}
+
+function loadCache() {
+    const map = new Map();
+    try {
+        if (!fs.existsSync(CACHE_FILE)) return map;
+        // Read as buffer and try to inflate (Deflate). Fallback to plain text.
+        let txt = null;
+        try {
+            const buf = fs.readFileSync(CACHE_FILE);
+            const inflated = zlib.inflateSync(buf);
+            txt = inflated.toString('utf8');
+        } catch (e) {
+            // fallback: try read as utf8 plain text
+            try { txt = fs.readFileSync(CACHE_FILE, 'utf8'); } catch (e2) { txt = null; }
+        }
+        if (!txt) return map;
+        const parts = txt.split(';');
+        for (const p of parts) {
+            if (!p) continue;
+            const kv = p.split('=');
+            if (kv.length !== 2) continue;
+            map.set(kv[0], Number(kv[1]));
+        }
+    } catch (e) {
+        // ignore parsing errors
+    }
+    return map;
+}
+
+function saveCache(map) {
+    try {
+        fs.mkdirSync(outputDir, { recursive: true });
+        const parts = [];
+        for (const [k, v] of map.entries()) {
+            parts.push(`${k}=${v};`);
+        }
+        const txt = parts.join('');
+        // Deflate with best compression
+        const buf = zlib.deflateSync(Buffer.from(txt, 'utf8'), { level: zlib.constants.Z_BEST_COMPRESSION });
+        fs.writeFileSync(CACHE_FILE, buf);
+    } catch (e) {
+        console.warn('[CACHE WRITE FAILED] ' + e.message);
+    }
+}
 
 function processFile(srcFile, dstFile) {
     return new Promise((resolve) => {
@@ -194,12 +282,40 @@ function deleteEmptyDirs(dir) {
 
     console.log(`[i] Found ${allFiles.length} files to process\n`);
 
+    // Load cache and filter files unchanged by mtime
+    const cache = loadCache();
+    const newCache = new Map();
+    const toProcess = [];
+
+    for (const f of allFiles) {
+        try {
+            const st = fs.statSync(f.src);
+            const mtime = Math.floor(st.mtimeMs);
+            const key = computeKeyForPath(f.src);
+            newCache.set(key, mtime);
+
+            if (cache.has(key) && cache.get(key) === mtime) {
+                stats.skipped++;
+                console.log("[SKIP] " + f.src);
+                // skip processing this file (unchanged)
+                continue;
+            }
+        } catch (e) {
+            // couldn't stat - process to be safe
+        }
+        toProcess.push(f);
+    }
+
+    // Delete obsolete files in output (files not present in source list)
     stats.deleted = syncDeleteOldFiles(allFiles);
     if (stats.deleted > 0) {
         console.log(`\n[i] Deleted ${stats.deleted} obsolete files\n`);
     }
 
-    await processFilesInParallel(allFiles);
+    await processFilesInParallel(toProcess);
+
+    // Update cache with current mtime values
+    saveCache(newCache);
 
     let report = "\n[V] Done!\n" +
         `— Total:     ${stats.total}\n` +
