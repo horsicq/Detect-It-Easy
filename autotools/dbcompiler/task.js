@@ -55,23 +55,21 @@ function crc32(str) {
 function computeKeyForPath(p) {
     // Use normalized relative path to project root
     const rel = path.normalize(path.relative(process.cwd(), p)).replace(/\\/g, '/');
-    const a = adler32(rel) >>> 0;
-    const c = crc32(rel) >>> 0;
-    // Combine into 64-bit-like decimal using BigInt
-    const big = (BigInt(a) << 32n) | BigInt(c);
-    return big.toString();
+    // Combine into 64-bit-like hex
+    const big = (BigInt(adler32(rel) >>> 0) << 32n) | BigInt(crc32(rel) >>> 0);
+    return big.toString(16);
 }
 
 function loadCache() {
     const map = new Map();
     try {
         if (!fs.existsSync(CACHE_FILE)) return map;
-        // Read as buffer and try to inflate (Deflate). Fallback to plain text.
+        // Read as buffer and try to decompress (Brotli). Fallback to plain text.
         let txt = null;
         try {
             const buf = fs.readFileSync(CACHE_FILE);
-            const inflated = zlib.inflateSync(buf);
-            txt = inflated.toString('utf8');
+            const decompressed = zlib.brotliDecompressSync(buf);
+            txt = decompressed.toString('utf8');
         } catch (e) {
             // fallback: try read as utf8 plain text
             try { txt = fs.readFileSync(CACHE_FILE, 'utf8'); } catch (e2) { txt = null; }
@@ -82,7 +80,15 @@ function loadCache() {
             if (!p) continue;
             const kv = p.split('=');
             if (kv.length !== 2) continue;
-            map.set(kv[0], Number(kv[1]));
+            // Decode hex to number
+            try {
+                const val = parseInt(kv[1], 16);
+                if (!isNaN(val)) {
+                    map.set(kv[0], val);
+                }
+            } catch (e) {
+                // skip invalid entry
+            }
         }
     } catch (e) {
         // ignore parsing errors
@@ -93,13 +99,23 @@ function loadCache() {
 function saveCache(map) {
     try {
         fs.mkdirSync(outputDir, { recursive: true });
+
+        // Sort keys for better compression
+        const sorted = Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
         const parts = [];
-        for (const [k, v] of map.entries()) {
-            parts.push(`${k}=${v};`);
+        for (const [k, v] of sorted) {
+            parts.push(`${k}=${v.toString(16)}`);
         }
-        const txt = parts.join('');
-        // Deflate with best compression
-        const buf = zlib.deflateSync(Buffer.from(txt, 'utf8'), { level: zlib.constants.Z_BEST_COMPRESSION });
+        const txt = parts.join(';');
+
+        // Brotli with maximum compression quality
+        const buf = zlib.brotliCompressSync(Buffer.from(txt, 'utf8'), {
+            params: {
+                [zlib.constants.BROTLI_PARAM_QUALITY]: zlib.constants.BROTLI_MAX_QUALITY,
+                [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_TEXT
+            }
+        });
         fs.writeFileSync(CACHE_FILE, buf);
     } catch (e) {
         console.warn('[CACHE WRITE FAILED] ' + e.message);
@@ -194,8 +210,9 @@ async function processFilesInParallel(files) {
 function collectFiles(srcDir, relBase, dstBase, fileList = []) {
     const items = fs.readdirSync(srcDir);
     for (const item of items) {
-        const srcPath = path.join(srcDir, item);
-        const stat = fs.statSync(srcPath);
+        const
+            srcPath = path.join(srcDir, item),
+            stat = fs.statSync(srcPath);
 
         if (stat.isDirectory()) {
             collectFiles(srcPath, relBase, dstBase, fileList);
@@ -214,8 +231,9 @@ function getAllFilesInDir(dir, fileList = []) {
 
     const items = fs.readdirSync(dir);
     for (const item of items) {
-        const fullPath = path.join(dir, item);
-        const stat = fs.statSync(fullPath);
+        const
+            fullPath = path.join(dir, item),
+            stat = fs.statSync(fullPath);
 
         if (stat.isDirectory()) {
             getAllFilesInDir(fullPath, fileList);
@@ -227,12 +245,19 @@ function getAllFilesInDir(dir, fileList = []) {
 }
 
 function syncDeleteOldFiles(expectedFiles) {
-    const expectedSet = new Set(expectedFiles.map(f => path.normalize(f.dst)));
-    const existingFiles = getAllFilesInDir(outputDir);
+    const
+        expectedSet = new Set(expectedFiles.map(f => path.normalize(f.dst))),
+        existingFiles = getAllFilesInDir(outputDir);
 
     let deletedCount = 0;
     for (const existingFile of existingFiles) {
         const normalized = path.normalize(existingFile);
+
+        // Skip cache file itself
+        if (normalized === path.normalize(CACHE_FILE)) {
+            continue;
+        }
+
         if (!expectedSet.has(normalized)) {
             try {
                 fs.unlinkSync(existingFile);
@@ -282,22 +307,31 @@ function deleteEmptyDirs(dir) {
 
     console.log(`[i] Found ${allFiles.length} files to process\n`);
 
+    // Delete obsolete files FIRST (before any other output)
+    stats.deleted = syncDeleteOldFiles(allFiles);
+    if (stats.deleted > 0) {
+        console.log(`[i] Deleted ${stats.deleted} obsolete files\n`);
+    }
+
     // Load cache and filter files unchanged by mtime
-    const cache = loadCache();
-    const newCache = new Map();
-    const toProcess = [];
+    const
+        cache = loadCache(),
+        newCache = new Map(),
+        toProcess = [];
 
     for (const f of allFiles) {
         try {
             const st = fs.statSync(f.src);
             const mtime = Math.floor(st.mtimeMs);
             const key = computeKeyForPath(f.src);
+
+            // Always update cache with current mtime
             newCache.set(key, mtime);
 
+            // Check if file unchanged
             if (cache.has(key) && cache.get(key) === mtime) {
                 stats.skipped++;
                 console.log("[SKIP] " + f.src);
-                // skip processing this file (unchanged)
                 continue;
             }
         } catch (e) {
@@ -306,10 +340,8 @@ function deleteEmptyDirs(dir) {
         toProcess.push(f);
     }
 
-    // Delete obsolete files in output (files not present in source list)
-    stats.deleted = syncDeleteOldFiles(allFiles);
-    if (stats.deleted > 0) {
-        console.log(`\n[i] Deleted ${stats.deleted} obsolete files\n`);
+    if (stats.skipped > 0) {
+        console.log(`\n[i] Skipped ${stats.skipped} unchanged files (cache)`);
     }
 
     await processFilesInParallel(toProcess);
