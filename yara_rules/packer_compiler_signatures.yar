@@ -5,8 +5,7 @@
 import "pe"
 import "math"
 
-rule IsPE32 : PECheck
-{
+rule IsPE32 {
 	condition:
 		// MZ signature at offset 0 and ...
 		uint16(0) == 0x5A4D and
@@ -14,8 +13,7 @@ rule IsPE32 : PECheck
 		uint16(uint32(0x3C)+0x18) == 0x010B
 }
 
-rule IsPE64 : PECheck
-{
+rule IsPE64 {
 	condition:
 		// MZ signature at offset 0 and ...
 		uint16(0) == 0x5A4D and
@@ -23,20 +21,17 @@ rule IsPE64 : PECheck
 		uint16(uint32(0x3C)+0x18) == 0x020B
 }
 
-rule IsNET_EXE : PECheck
-{
+rule IsNET_EXE {
 	condition:
 		pe.imports ("mscoree.dll","_CorExeMain")
 }
 
-rule IsNET_DLL : PECheck
-{
+rule IsNET_DLL {
 	condition:
 		pe.imports ("mscoree.dll","_CorDllMain")
 }
 
-rule IsDLL : PECheck
-{
+rule IsDLL {
 	condition:
 		// MZ signature at offset 0 and ...
 		uint16(0) == 0x5A4D and
@@ -45,8 +40,7 @@ rule IsDLL : PECheck
 
 }
 
-rule IsConsole : PECheck
-{
+rule IsConsole {
 	condition:
 		// MZ signature at offset 0 and ...
 		uint16(0) == 0x5A4D and
@@ -54,8 +48,7 @@ rule IsConsole : PECheck
 		uint16(uint32(0x3C)+0x5C) == 0x0003
 }
 
-rule IsWindowsGUI : PECheck
-{
+rule IsWindowsGUI {
 	condition:
 		// MZ signature at offset 0 and ...
 		uint16(0) == 0x5A4D and
@@ -63,8 +56,7 @@ rule IsWindowsGUI : PECheck
 		uint16(uint32(0x3C)+0x5C) == 0x0002
 }
 
-rule IsPacked : PECheck
-{
+rule IsPacked {
 	meta: 
 		description = "Entropy Check"
 	condition:
@@ -76,8 +68,7 @@ rule IsPacked : PECheck
 }
 
 
-rule HasOverlay : PECheck
-{
+rule HasOverlay {
 	meta: 
 		author="_pusher_"
 		description = "Overlay Check"
@@ -93,8 +84,7 @@ rule HasOverlay : PECheck
 		
 }
 
-rule HasTaggantSignature : PECheck
-{
+rule HasTaggantSignature {
 	meta: 
 		author="_pusher_"
 		description = "TaggantSignature Check"
@@ -117,8 +107,7 @@ rule HasTaggantSignature : PECheck
 }
 
 
-rule HasDigitalSignature : PECheck
-{
+rule HasDigitalSignature {
 	meta: 
 		author="_pusher_"
 		description = "DigitalSignature Check"
@@ -139,8 +128,7 @@ rule HasDigitalSignature : PECheck
 		//and  uint32(@a0) == (filesize-(pe.sections[pe.number_of_sections-1].raw_data_offset+pe.sections[pe.number_of_sections-1].raw_data_size))
 }
 
-rule HasDebugData : PECheck
-{
+rule HasDebugData {
 	meta: 
 		author = "_pusher_"
 		description = "DebugData Check"
@@ -157,8 +145,7 @@ rule HasDebugData : PECheck
 		((uint32(uint32(0x3C)+0xA8+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5)) >0x0) and (uint32be(uint32(0x3C)+0xAC+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5)) >0x0))
 }
 
-rule IsBeyondImageSize : PECheck
-{
+rule IsBeyondImageSize {
 	meta: 
 		author = "_pusher_"
 		date = "2016-07"
@@ -175,8 +162,7 @@ rule IsBeyondImageSize : PECheck
 		)
 }
 
-rule ImportTableIsBad : PECheck
-{
+rule ImportTableIsBad {
 	meta: 
 		author = "_pusher_ & mrexodia"
 		date = "2016-07"
@@ -187,46 +173,16 @@ rule ImportTableIsBad : PECheck
 		// ... PE signature at offset stored in MZ header at 0x3C
 		uint32(uint32(0x3C)) == 0x00004550 and
 		(IsPE32 or IsPE64) and
-		( 		//Import_Table_RVA+Import_Data_Size .. cannot be outside imagesize
+		(
 		((uint32(uint32(0x3C)+0x80+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5) )) + (uint32(uint32(0x3C)+0x84+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5))))     > (uint32(uint32(0x3C)+0x50)) 
 		or
 		(((uint32(uint32(0x3C)+0x80+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5) )) + (uint32(uint32(0x3C)+0x84+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5))))  == 0x0)
-		//or
-
-		//doest work
-		//pe.imports("", "")
-
-		//need to check if this is ok.. 15:06 2016-08-12
-		//uint32( uint32(uint32(0x3C)+0x80+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5))+uint32(uint32(0x3C)+0x34)) == 0x408000
-		//this works.. 
-		//uint32(uint32(0x3C)+0x80+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5))+uint32(uint32(0x3C)+0x34) == 0x408000
-		
-		//uint32be(uint32be(0x409000)) == 0x005A
-		//pe.image_base
-		//correct:
-
-		//uint32(uint32(0x3C)+0x80)+pe.image_base == 0x408000
-
-		//this works (file offset):
-		//$a0 at 0x4000
-		//this does not work rva:
-		//$a0 at uint32(0x0408000)
-
-		//(uint32(uint32(uint32(0x3C)+0x80)+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5))+pe.image_base) == 0x0)
-
 		or
-		//tiny PE files..
 		(uint32(0x3C)+0x80+((uint16(uint32(0x3C)+0x18) & 0x200) >> 5) > filesize)
-
-		//or
-		//uint32(uint32(0x3C)+0x80) == 0x21000
-   		//uint32(uint32(uint32(0x3C)+0x80)) == 0x0
-		//pe.imports("", "")
 		)				
 }
 
-rule ExportTableIsBad : PECheck
-{
+rule ExportTableIsBad {
 	meta: 
 		author = "_pusher_ & mrexodia"
 		date = "2016-07"
@@ -243,8 +199,7 @@ rule ExportTableIsBad : PECheck
 }
 
 
-rule HasModified_DOS_Message : PECheck
-{
+rule HasModified_DOS_Message {
 	meta: 
 		author = "_pusher_"
 		description = "DOS Message Check"
@@ -263,8 +218,7 @@ rule HasModified_DOS_Message : PECheck
 		(for any of ($a*) : ($ in (0x0..uint32(0x3c) )))
 }
 
-rule HasRichSignature : PECheck
-{
+rule HasRichSignature {
 	meta: 
 		author = "_pusher_"
 		description = "Rich Signature Check"
@@ -279,8 +233,7 @@ rule HasRichSignature : PECheck
 		(for any of ($a*) : ($ in (0x0..uint32(0x3c) )))
 }
 
-rule IsSuspicious
-{
+rule IsSuspicious {
 	meta:
 		author="_pusher_"
 		date = "2016-07"
@@ -289,8 +242,7 @@ rule IsSuspicious
 		uint32(0x20) == 0x20202020	
 }
 
-rule IsGoLink
-{
+rule IsGoLink {
 	meta:
 		author="_pusher_"
 		date = "2016-08"
@@ -334,15 +286,15 @@ rule borland_delphi {
 	strings:
 		$c0 = { 53 8B D8 33 C0 A3 ?? ?? ?? ?? 6A ?? E8 ?? ?? ?? FF A3 ?? ?? ?? ?? A1 ?? ?? ?? ?? A3 ?? ?? ?? ?? 33 C0 A3 ?? ?? ?? ?? 33 C0 A3 }
 		$c1 = { 53 8B D8 33 C0 A3 ?? ?? ?? ?? 6A ?? E8 ?? ?? ?? ?? A3 ?? ?? ?? ?? A1 ?? ?? ?? ?? A3 ?? ?? ?? ?? 33 C0 A3 ?? ?? ?? ?? 33 C0 A3 ?? ?? ?? ?? 8D 43 08 A3 ?? ?? ?? ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 8B C3 E8 ?? ?? ?? ?? 5B C3 }
-		//some x64 version of delphi
+		// some x64 version of delphi
 		$c2 = { 53 48 83 EC 20 48 89 CB C7 05 ?? ?? ?? ?? ?? ?? ?? ?? 48 33 C9 E8 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D 43 10 48 89 05 ?? ?? ?? ?? 48 8D 05 ?? FC FF FF 48 89 05 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 89 D9 48 8D 15 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 83 C4 20 5B C3 }
-		//unusual delphi version unknown version (unpackme- FSG 1.31 - dulek)
+		// unusual delphi version unknown version (unpackme- FSG 1.31 - dulek)
 		$c3 = { 50 6A 00 E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 52 89 05 ?? ?? ?? ?? 89 42 04 C7 42 08 00 00 00 00 C7 42 0C 00 00 00 00 E8 ?? ?? ?? ?? 5A 58 E8 ?? ?? ?? ?? C3 }
-		//delphi2
+		// delphi2
 		$c4 = { E8 ?? ?? ?? ?? 6A ?? E8 ?? ?? ?? ?? 89 05 ?? ?? ?? ?? E8 ?? ?? ?? ?? 89 05 ?? ?? ?? ?? C7 05 ?? ?? ?? ?? 0A ?? ?? ?? B8 ?? ?? ?? ?? C3 }
-		//delphi3
+		// delphi3
 		$c5 = { 50 6A 00 E8 ?? ?? FF FF BA ?? ?? ?? ?? 52 89 05 ?? ?? ?? ?? 89 42 04 E8 ?? ?? ?? ?? 5A 58 E8 ?? ?? ?? ?? C3 55 8B EC 33 C0 }
-		//delphi5
+		// delphi5
 		$c6 = { 50 6A ?? E8 ?? ?? FF FF BA ?? ?? ?? ?? 52 89 05 ?? ?? ?? ?? 89 42 04 C7 42 08 ?? ?? ?? ?? C7 42 0C ?? ?? ?? ?? E8 ?? ?? ?? ?? 5A 58 E8 ?? ?? ?? ?? C3 }
 	condition:
 		any of them
@@ -396,8 +348,7 @@ rule borland_component {
 		$c0 at pe.entry_point
 }
 
-rule PureBasic : Neil Hodgson
-{
+rule PureBasic : Neil Hodgson {
       	meta:
 		author="_pusher_"
 		date="2016-07"
@@ -413,8 +364,7 @@ rule PureBasic : Neil Hodgson
 		((pe.linker_version.major == 2) and (pe.linker_version.minor == 50 ))
 }
 
-rule PureBasicDLL : Neil Hodgson
-{
+rule PureBasicDLL : Neil Hodgson {
       meta:
 		author="malware-lu"
 strings:
@@ -424,8 +374,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-rule PureBasic4xDLL : Neil Hodgson
-{
+rule PureBasic4xDLL : Neil Hodgson {
       meta:
 		author="malware-lu"
 strings:
@@ -463,8 +412,7 @@ rule SkDUndetectabler : SkDrat {
 		)
 }
 
-rule MicrosoftVisualCV80
-{
+rule MicrosoftVisualCV80 {
       meta:
 		author="malware-lu"
 strings:
@@ -474,8 +422,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-rule Cygwin : Red Hat
-{
+rule Cygwin : Red Hat {
 	meta:
 		author = "_pusher_"
 		date = "2016-07"
@@ -493,8 +440,7 @@ rule Cygwin : Red Hat
 		($a0 and (any of ($aa*) ))
 }
 
-rule MinGW_1
-{
+rule MinGW_1 {
 	meta:
 		author = "_pusher_"
 		date = "2016-07"
@@ -533,8 +479,7 @@ rule FASM : flat assembler {
 		//and $c0
 }
 
-rule AutoIt
-{
+rule AutoIt {
 	meta:
 		author = "_pusher_"
 		date = "2016-07"
@@ -557,8 +502,7 @@ rule AutoIt
 }
 
 
-rule PellesC : Pelle Orinius
-{
+rule PellesC : Pelle Orinius {
 	meta:
 		author = "_pusher_"
 		date = "2016-08"
@@ -573,8 +517,7 @@ rule PellesC : Pelle Orinius
 		(pe.linker_version.major == 2) and (pe.linker_version.minor == 50 )
 }
 
-rule QtFrameWork
-{
+rule QtFrameWork {
       	meta:
 		author="_pusher_"
 		date="2016-08"
@@ -586,8 +529,7 @@ rule QtFrameWork
 }
 
 /* usefull ? 18:32 2016-08-10
-rule masm32_tasm32
-{
+rule masm32_tasm32 {
 	meta:
 		author = "PEiD"
 		description = "MASM32 / TASM32"

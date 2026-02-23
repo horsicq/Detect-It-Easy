@@ -27,8 +27,7 @@ rule emotet_packer {
        $pdb1 or $pdb2
 }
 
-rule silent_banker : banker
-{
+rule silent_banker : banker {
       meta:
 		author="malware-lu"
     strings:
@@ -40,8 +39,7 @@ rule silent_banker : banker
         $a or $b or $c
 }
 
-rule zbot : banker
-{
+rule zbot : banker {
       meta:
 		author="malware-lu"
      strings:
@@ -55,8 +53,7 @@ rule zbot : banker
         ($a and $b) or ($c and $d and $e)
 }
 
-rule banbra : banker
-{
+rule banbra : banker {
       meta:
 		author="malware-lu"
     strings:
@@ -70,8 +67,7 @@ rule banbra : banker
         #a > 3 and #b > 3 and #c > 3 and #d > 3 and #e > 3
 }
 
-rule Borland
-{
+rule Borland {
       meta:
 		author="malware-lu"
 	strings:
@@ -80,20 +76,7 @@ rule Borland
 		$patternBorland
 }
 
-// 20150909 - Issue #39 - Commented because of High FP rate
-/*
-rule java
-{
-      meta:
-		author="malware-lu"
-	strings:
-		$patternjava = "java" wide ascii
-	condition:
-		$patternjava
-}
-*/
-rule MSLRHv032afakePCGuard4xxemadicius
-{
+rule MSLRHv032afakePCGuard4xxemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -103,9 +86,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EnigmaProtector1XSukhovVladimirSergeNMarkin
-{
+rule EnigmaProtector1XSukhovVladimirSergeNMarkin {
       meta:
 		author="malware-lu"
 strings:
@@ -115,9 +96,7 @@ condition:
 		$a0
 }
 
-
-rule SPLayerv008
-{
+rule SPLayerv008 {
       meta:
 		author="malware-lu"
 strings:
@@ -127,9 +106,7 @@ condition:
 		$a0
 }
 
-
-rule DxPackV086Dxd
-{
+rule DxPackV086Dxd {
       meta:
 		author="malware-lu"
 strings:
@@ -139,9 +116,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMicrosoftVisualC60
-{
+rule FSGv110EngdulekxtMicrosoftVisualC60 {
       meta:
 		author="malware-lu"
 strings:
@@ -160,9 +135,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point or $a3 at pe.entry_point or $a4 at pe.entry_point or $a5 at pe.entry_point or $a6 at pe.entry_point or $a7 at pe.entry_point or $a8 at pe.entry_point or $a9 at pe.entry_point
 }
 
-
-rule TPPpackclane
-{
+rule TPPpackclane {
       meta:
 		author="malware-lu"
 strings:
@@ -172,9 +145,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMicrosoftVisualC6070
-{
+rule FSGv110EngdulekxtMicrosoftVisualC6070 {
       meta:
 		author="malware-lu"
 strings:
@@ -188,9 +159,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point or $a3 at pe.entry_point or $a4 at pe.entry_point
 }
 
-
-rule Thinstall24x25xJititSoftware
-{
+rule Thinstall24x25xJititSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -200,9 +169,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule LocklessIntroPack
-{
+rule LocklessIntroPack {
       meta:
 		author="malware-lu"
 strings:
@@ -212,9 +179,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03faketElock061FEUERRADER
-{
+rule AHTeamEPProtector03faketElock061FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -224,9 +189,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeStealth275aWebtoolMaster
-{
+rule ExeStealth275aWebtoolMaster {
       meta:
 		author="malware-lu"
 strings:
@@ -236,9 +199,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEArmor046Hying
-{
+rule PEArmor046Hying {
       meta:
 		author="malware-lu"
 strings:
@@ -249,9 +210,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule eXPressorv13CGSoftLabs
-{
+rule eXPressorv13CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -262,9 +221,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule Upackv032BetaDwing
-{
+rule Upackv032BetaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -275,9 +232,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule MSLRHV031emadicius
-{
+rule MSLRHV031emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -287,9 +242,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv184
-{
+rule PECompactv184 {
       meta:
 		author="malware-lu"
 strings:
@@ -299,9 +252,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCGuardforWin32v500SofProBlagojeCeklic
-{
+rule PCGuardforWin32v500SofProBlagojeCeklic {
       meta:
 		author="malware-lu"
 strings:
@@ -311,9 +262,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WiseInstallerStub
-{
+rule WiseInstallerStub {
       meta:
 		author="malware-lu"
 strings:
@@ -325,9 +274,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2
 }
 
-
-rule AnskyaNTPackerGeneratorAnskya
-{
+rule AnskyaNTPackerGeneratorAnskya {
       meta:
 		author="malware-lu"
 strings:
@@ -337,9 +284,7 @@ condition:
 		$a0
 }
 
-
-rule ThinstallVirtualizationSuite30493080ThinstallCompany
-{
+rule ThinstallVirtualizationSuite30493080ThinstallCompany {
       meta:
 		author="malware-lu"
 strings:
@@ -350,9 +295,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule NsPack14byNorthStarLiuXingPing
-{
+rule NsPack14byNorthStarLiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -362,9 +305,7 @@ condition:
 		$a0
 }
 
-
-rule FSGv110EngbartxtWatcomCCEXE
-{
+rule FSGv110EngbartxtWatcomCCEXE {
       meta:
 		author="malware-lu"
 strings:
@@ -374,9 +315,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AcidCrypt: Packer
-{
+rule AcidCrypt: Packer {
       meta:
 		author="malware-lu"
 strings:
@@ -387,9 +326,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule eXPressorv1451CGSoftLabs
-{
+rule eXPressorv1451CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -400,9 +337,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule BeRoEXEPackerv100LZMABeRoFarbrausch
-{
+rule BeRoEXEPackerv100LZMABeRoFarbrausch {
       meta:
 		author="malware-lu"
 strings:
@@ -412,9 +347,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PackanoidArkanoid
-{
+rule PackanoidArkanoid {
       meta:
 		author="malware-lu"
 strings:
@@ -424,9 +357,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DAEMONProtectv067
-{
+rule DAEMONProtectv067 {
       meta:
 		author="malware-lu"
 strings:
@@ -436,9 +367,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EmbedPEV100V124cyclotron
-{
+rule EmbedPEV100V124cyclotron {
       meta:
 		author="malware-lu"
 strings:
@@ -448,9 +377,7 @@ condition:
 		$a0
 }
 
-
-rule VProtectorV10Avcasm
-{
+rule VProtectorV10Avcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -460,9 +387,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EncryptPE2200481022005314WFS
-{
+rule EncryptPE2200481022005314WFS {
       meta:
 		author="malware-lu"
 strings:
@@ -472,9 +397,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02JDPack1xJDProtect09Anorganix
-{
+rule PseudoSigner02JDPack1xJDProtect09Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -484,9 +407,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EmbedPEV1Xcyclotron
-{
+rule EmbedPEV1Xcyclotron {
       meta:
 		author="malware-lu"
 strings:
@@ -496,9 +417,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EncryptPEV220070411WFS
-{
+rule EncryptPEV220070411WFS {
       meta:
 		author="malware-lu"
 strings:
@@ -508,9 +427,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01MicrosoftVisualBasic60DLLAnorganix
-{
+rule PseudoSigner01MicrosoftVisualBasic60DLLAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -520,9 +437,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPack14Liuxingping
-{
+rule NsPack14Liuxingping {
       meta:
 		author="malware-lu"
 strings:
@@ -532,9 +447,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxTrivial46
-{
+rule VxTrivial46 {
       meta:
 		author="malware-lu"
 strings:
@@ -544,9 +457,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule STUDRC410JamieEditionScanTimeUnDetectablebyMarjinZ
-{
+rule STUDRC410JamieEditionScanTimeUnDetectablebyMarjinZ {
       meta:
 		author="malware-lu"
 strings:
@@ -556,9 +467,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxSonikYouth
-{
+rule VxSonikYouth {
       meta:
 		author="malware-lu"
 strings:
@@ -568,9 +477,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01Anorganix
-{
+rule PseudoSigner01Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -580,9 +487,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXShit006
-{
+rule UPXShit006 {
       meta:
 		author="malware-lu"
 strings:
@@ -592,9 +497,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SetupFactoryv6003SetupLauncher
-{
+rule SetupFactoryv6003SetupLauncher {
       meta:
 		author="malware-lu"
 strings:
@@ -604,9 +507,7 @@ condition:
 		$a0
 }
 
-
-rule CrypKeyV61XDLLCrypKeyCanadaInc
-{
+rule CrypKeyV61XDLLCrypKeyCanadaInc {
       meta:
 		author="malware-lu"
 strings:
@@ -616,9 +517,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VcAsmProtectorVcAsm
-{
+rule VcAsmProtectorVcAsm {
       meta:
 		author="malware-lu"
 strings:
@@ -628,9 +527,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompact2xxSlimLoaderBitSumTechnologies
-{
+rule PECompact2xxSlimLoaderBitSumTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -640,9 +537,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ENIGMAProtectorV11V12SukhovVladimir
-{
+rule ENIGMAProtectorV11V12SukhovVladimir {
       meta:
 		author="malware-lu"
 strings:
@@ -652,9 +547,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yodasProtectorv10bAshkbizDanehkar
-{
+rule yodasProtectorv10bAshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -664,9 +557,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEDiminisherv01
-{
+rule PEDiminisherv01 {
       meta:
 		author="malware-lu"
 strings:
@@ -677,9 +568,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule SOFTWrapperforWin9xNTEvaluationVersion
-{
+rule SOFTWrapperforWin9xNTEvaluationVersion {
       meta:
 		author="malware-lu"
 strings:
@@ -689,9 +578,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov200
-{
+rule Armadillov200 {
       meta:
 		author="malware-lu"
 strings:
@@ -701,9 +588,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov201
-{
+rule Armadillov201 {
       meta:
 		author="malware-lu"
 strings:
@@ -713,9 +598,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeJoinerSmallbuild014021024027GlOFF
-{
+rule FreeJoinerSmallbuild014021024027GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -725,9 +608,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SDProtector1xRandyLi
-{
+rule SDProtector1xRandyLi {
       meta:
 		author="malware-lu"
 strings:
@@ -737,9 +618,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NSISInstallerNullSoft
-{
+rule NSISInstallerNullSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -749,9 +628,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEXv099
-{
+rule PEXv099 {
       meta:
 		author="malware-lu"
 strings:
@@ -761,9 +638,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule IMPPacker10MahdiHezavehiIMPOSTER
-{
+rule IMPPacker10MahdiHezavehiIMPOSTER {
       meta:
 		author="malware-lu"
 strings:
@@ -773,9 +648,7 @@ condition:
 		$a0
 }
 
-
-rule PEProtectv09
-{
+rule PEProtectv09 {
       meta:
 		author="malware-lu"
 strings:
@@ -786,9 +659,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule nbuildv10soft
-{
+rule nbuildv10soft {
       meta:
 		author="malware-lu"
 strings:
@@ -798,9 +669,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01StelthPE101Anorganix
-{
+rule PseudoSigner01StelthPE101Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -810,9 +679,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule IProtect10FxSubdllmodebyFuXdas
-{
+rule IProtect10FxSubdllmodebyFuXdas {
       meta:
 		author="malware-lu"
 strings:
@@ -822,9 +689,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSVisualCv8DLLhsmallsig2
-{
+rule MSVisualCv8DLLhsmallsig2 {
       meta:
 		author="malware-lu"
 strings:
@@ -834,9 +699,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSVisualCv8DLLhsmallsig1
-{
+rule MSVisualCv8DLLhsmallsig1 {
       meta:
 		author="malware-lu"
 strings:
@@ -846,9 +709,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv16xVaska
-{
+rule RCryptorv16xVaska {
       meta:
 		author="malware-lu"
 strings:
@@ -858,9 +719,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXv20MarkusLaszloReiser
-{
+rule UPXv20MarkusLaszloReiser {
       meta:
 		author="malware-lu"
 strings:
@@ -870,9 +729,7 @@ condition:
 		$a0
 }
 
-
-rule BladeJoinerv15
-{
+rule BladeJoinerv15 {
       meta:
 		author="malware-lu"
 strings:
@@ -882,9 +739,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv133Engdulekxt
-{
+rule FSGv133Engdulekxt {
       meta:
 		author="malware-lu"
 strings:
@@ -895,9 +750,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule FSGv13
-{
+rule FSGv13 {
       meta:
 		author="malware-lu"
 strings:
@@ -907,9 +760,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv12
-{
+rule FSGv12 {
       meta:
 		author="malware-lu"
 strings:
@@ -919,9 +770,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv11
-{
+rule FSGv11 {
       meta:
 		author="malware-lu"
 strings:
@@ -931,9 +780,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv10
-{
+rule FSGv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -943,9 +790,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv120EngdulekxtMicrosoftVisualC6070
-{
+rule FSGv120EngdulekxtMicrosoftVisualC6070 {
       meta:
 		author="malware-lu"
 strings:
@@ -955,9 +800,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SuperDAT: Packer PEiD
-{
+rule SuperDAT: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -967,9 +810,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv200alpha38
-{
+rule PECompactv200alpha38 {
       meta:
 		author="malware-lu"
 strings:
@@ -979,9 +820,7 @@ condition:
 		$a0
 }
 
-
-rule RCryptor16cVaska
-{
+rule RCryptor16cVaska {
       meta:
 		author="malware-lu"
 strings:
@@ -991,9 +830,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule TheGuardLibrary
-{
+rule TheGuardLibrary {
       meta:
 		author="malware-lu"
 strings:
@@ -1003,9 +840,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeCryptor01build001GlOFF
-{
+rule FreeCryptor01build001GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -1015,9 +850,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02BJFNT12Anorganix
-{
+rule PseudoSigner02BJFNT12Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -1027,9 +860,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DingBoysPElockPhantasmv08
-{
+rule DingBoysPElockPhantasmv08 {
       meta:
 		author="malware-lu"
 strings:
@@ -1039,9 +870,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Thinstall2736Jitit
-{
+rule Thinstall2736Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -1051,9 +880,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnnamedScrambler11Cp0ke
-{
+rule UnnamedScrambler11Cp0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -1063,9 +890,7 @@ condition:
 		$a0
 }
 
-
-rule y0dasCrypterv1xModified
-{
+rule y0dasCrypterv1xModified {
       meta:
 		author="malware-lu"
 strings:
@@ -1075,9 +900,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov252b2
-{
+rule Armadillov252b2 {
       meta:
 		author="malware-lu"
 strings:
@@ -1087,9 +910,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv036betaDwing
-{
+rule Upackv036betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -1100,9 +921,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule VxNecropolis
-{
+rule VxNecropolis {
       meta:
 		author="malware-lu"
 strings:
@@ -1112,9 +931,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WinUpackv039finalrelocatedimagebaseByDwingc2005h2
-{
+rule WinUpackv039finalrelocatedimagebaseByDwingc2005h2 {
       meta:
 		author="malware-lu"
 strings:
@@ -1124,9 +941,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv1061bAlexeySolodovnikov
-{
+rule ASPackv1061bAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -1136,9 +951,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule aPackv062
-{
+rule aPackv062 {
       meta:
 		author="malware-lu"
 strings:
@@ -1148,9 +961,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv071
-{
+rule tElockv071 {
       meta:
 		author="malware-lu"
 strings:
@@ -1160,9 +971,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv070
-{
+rule tElockv070 {
       meta:
 		author="malware-lu"
 strings:
@@ -1172,9 +981,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Ningishzida10CyberDoom
-{
+rule Ningishzida10CyberDoom {
       meta:
 		author="malware-lu"
 strings:
@@ -1184,9 +991,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectSKE21xdllAlexeySolodovnikov
-{
+rule ASProtectSKE21xdllAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -1196,9 +1001,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PAVCryptorPawningAntiVirusCryptormasha_dev
-{
+rule PAVCryptorPawningAntiVirusCryptormasha_dev {
       meta:
 		author="malware-lu"
 strings:
@@ -1208,9 +1011,7 @@ condition:
 		$a0
 }
 
-
-rule ExeShieldCryptor13RCTomCommander
-{
+rule ExeShieldCryptor13RCTomCommander {
       meta:
 		author="malware-lu"
 strings:
@@ -1220,9 +1021,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrinklerV01V02RuneLHStubbeandAskeSimonChristensen
-{
+rule CrinklerV01V02RuneLHStubbeandAskeSimonChristensen {
       meta:
 		author="malware-lu"
 strings:
@@ -1232,9 +1031,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxGRUNT4Family
-{
+rule VxGRUNT4Family {
       meta:
 		author="malware-lu"
 strings:
@@ -1244,9 +1041,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule nPackV112002006BetaNEOxuinC
-{
+rule nPackV112002006BetaNEOxuinC {
       meta:
 		author="malware-lu"
 strings:
@@ -1256,9 +1051,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxEddie1800
-{
+rule VxEddie1800 {
       meta:
 		author="malware-lu"
 strings:
@@ -1268,9 +1061,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EncryptPEV22006115WFS
-{
+rule EncryptPEV22006115WFS {
       meta:
 		author="malware-lu"
 strings:
@@ -1280,9 +1071,7 @@ condition:
 		$a0
 }
 
-
-rule PrincessSandyv10eMiNENCEProcessPatcherPatch
-{
+rule PrincessSandyv10eMiNENCEProcessPatcherPatch {
       meta:
 		author="malware-lu"
 strings:
@@ -1292,9 +1081,7 @@ condition:
 		$a0
 }
 
-
-rule aPackv082
-{
+rule aPackv082 {
       meta:
 		author="malware-lu"
 strings:
@@ -1304,9 +1091,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NJoiner01AsmVersionNEX
-{
+rule NJoiner01AsmVersionNEX {
       meta:
 		author="malware-lu"
 strings:
@@ -1316,9 +1101,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsiduim1304ObsiduimSoftware
-{
+rule Obsiduim1304ObsiduimSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -1328,9 +1111,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02FSG131Anorganix
-{
+rule PseudoSigner02FSG131Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -1340,9 +1121,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01CodeSafe20Anorganix
-{
+rule PseudoSigner01CodeSafe20Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -1352,9 +1131,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01NorthStarPEShrinker13Anorganix
-{
+rule PseudoSigner01NorthStarPEShrinker13Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -1364,9 +1141,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ocBat2Exe10OC
-{
+rule ocBat2Exe10OC {
       meta:
 		author="malware-lu"
 strings:
@@ -1376,9 +1151,7 @@ condition:
 		$a0
 }
 
-
-rule ASDPack20asd
-{
+rule ASDPack20asd {
       meta:
 		author="malware-lu"
 strings:
@@ -1390,9 +1163,7 @@ condition:
 		$a0 or $a1 or $a2 at pe.entry_point
 }
 
-
-rule EXECryptor2021protectedIAT
-{
+rule EXECryptor2021protectedIAT {
       meta:
 		author="malware-lu"
 strings:
@@ -1402,9 +1173,7 @@ condition:
 		$a0
 }
 
-
-rule ShrinkWrapv14
-{
+rule ShrinkWrapv14 {
       meta:
 		author="malware-lu"
 strings:
@@ -1414,9 +1183,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnknownbySMT
-{
+rule UnknownbySMT {
       meta:
 		author="malware-lu"
 strings:
@@ -1426,9 +1193,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01VOBProtectCD5Anorganix
-{
+rule PseudoSigner01VOBProtectCD5Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -1438,9 +1203,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimplePack10Xbagie
-{
+rule SimplePack10Xbagie {
       meta:
 		author="malware-lu"
 strings:
@@ -1450,9 +1213,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThemidaWinLicenseV18XV19XOreansTechnologies
-{
+rule ThemidaWinLicenseV18XV19XOreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -1462,9 +1223,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEjoinerAmok
-{
+rule EXEjoinerAmok {
       meta:
 		author="malware-lu"
 strings:
@@ -1474,9 +1233,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EmbedPEv124cyclotron
-{
+rule EmbedPEv124cyclotron {
       meta:
 		author="malware-lu"
 strings:
@@ -1486,9 +1243,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv04xv05x
-{
+rule tElockv04xv05x {
       meta:
 		author="malware-lu"
 strings:
@@ -1498,9 +1253,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov301v305
-{
+rule Armadillov301v305 {
       meta:
 		author="malware-lu"
 strings:
@@ -1510,9 +1263,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DingBoysPElockv007
-{
+rule DingBoysPElockv007 {
       meta:
 		author="malware-lu"
 strings:
@@ -1522,9 +1273,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule mPack003DeltaAziz
-{
+rule mPack003DeltaAziz {
       meta:
 		author="malware-lu"
 strings:
@@ -1534,9 +1283,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SixtoFourv10
-{
+rule SixtoFourv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -1546,9 +1293,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeJoinerSmallbuild029GlOFF
-{
+rule FreeJoinerSmallbuild029GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -1558,9 +1303,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThemidaWinLicenseV1XNoCompressionSecureEngineOreansTechnologies
-{
+rule ThemidaWinLicenseV1XNoCompressionSecureEngineOreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -1570,9 +1313,7 @@ condition:
 		$a0
 }
 
-
-rule WinUpackv030betaByDwing
-{
+rule WinUpackv030betaByDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -1583,9 +1324,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule Armadillov260b2
-{
+rule Armadillov260b2 {
       meta:
 		author="malware-lu"
 strings:
@@ -1595,9 +1334,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov260b1
-{
+rule Armadillov260b1 {
       meta:
 		author="malware-lu"
 strings:
@@ -1607,9 +1344,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeLockerv10IonIce
-{
+rule ExeLockerv10IonIce {
       meta:
 		author="malware-lu"
 strings:
@@ -1619,9 +1354,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV10betaap0x
-{
+rule RLPackV10betaap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -1631,9 +1364,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PellesC300400450EXEX86CRTDLL
-{
+rule PellesC300400450EXEX86CRTDLL {
       meta:
 		author="malware-lu"
 strings:
@@ -1643,9 +1374,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BeRoEXEPackerv100LZBRRBeRoFarbrausch
-{
+rule BeRoEXEPackerv100LZBRRBeRoFarbrausch {
       meta:
 		author="malware-lu"
 strings:
@@ -1655,9 +1384,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov190a
-{
+rule Armadillov190a {
       meta:
 		author="malware-lu"
 strings:
@@ -1667,9 +1394,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv305c4Modified
-{
+rule WWPACKv305c4Modified {
       meta:
 		author="malware-lu"
 strings:
@@ -1679,9 +1404,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule APatchGUIv11
-{
+rule APatchGUIv11 {
       meta:
 		author="malware-lu"
 strings:
@@ -1691,9 +1414,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeSafeguardv10simonzh
-{
+rule ExeSafeguardv10simonzh {
       meta:
 		author="malware-lu"
 strings:
@@ -1703,9 +1424,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner01CDCopsIIAnorganix
-{
+rule PseudoSigner01CDCopsIIAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -1715,9 +1434,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeVIRUSIWormHybrisFEUERRADER
-{
+rule AHTeamEPProtector03fakeVIRUSIWormHybrisFEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -1727,9 +1444,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1322ObsidiumSoftware
-{
+rule Obsidium1322ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -1739,9 +1454,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PrivateEXEProtector20SetiSoft
-{
+rule PrivateEXEProtector20SetiSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -1751,9 +1464,7 @@ condition:
 		$a0
 }
 
-
-rule NTkrnlSecureSuite01015DLLNTkrnlSoftware
-{
+rule NTkrnlSecureSuite01015DLLNTkrnlSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -1763,9 +1474,7 @@ condition:
 		$a0
 }
 
-
-rule UPXHiTv001DJSiba
-{
+rule UPXHiTv001DJSiba {
       meta:
 		author="malware-lu"
 strings:
@@ -1775,9 +1484,7 @@ condition:
 		$a0
 }
 
-
-rule Vpackerttui
-{
+rule Vpackerttui {
       meta:
 		author="malware-lu"
 strings:
@@ -1787,9 +1494,7 @@ condition:
 		$a0
 }
 
-
-rule IProtect10FxlibdllmodebyFuXdas
-{
+rule IProtect10FxlibdllmodebyFuXdas {
       meta:
 		author="malware-lu"
 strings:
@@ -1799,9 +1504,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02DxPack10Anorganix
-{
+rule PseudoSigner02DxPack10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -1811,9 +1514,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SecureEXE30ZipWorx
-{
+rule SecureEXE30ZipWorx {
       meta:
 		author="malware-lu"
 strings:
@@ -1823,9 +1524,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressorv12CGSoftLabs
-{
+rule eXPressorv12CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -1837,9 +1536,7 @@ condition:
 		$a0 or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule NullsoftPIMPInstallSystemv13x
-{
+rule NullsoftPIMPInstallSystemv13x {
       meta:
 		author="malware-lu"
 strings:
@@ -1849,9 +1546,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Enigmaprotector110111VladimirSukhov
-{
+rule Enigmaprotector110111VladimirSukhov {
       meta:
 		author="malware-lu"
 strings:
@@ -1862,9 +1557,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule PECompactv140b5v140b6
-{
+rule PECompactv140b5v140b6 {
       meta:
 		author="malware-lu"
 strings:
@@ -1874,9 +1567,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxExplosion1000
-{
+rule VxExplosion1000 {
       meta:
 		author="malware-lu"
 strings:
@@ -1886,9 +1577,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKZIPSFXv11198990
-{
+rule PKZIPSFXv11198990 {
       meta:
 		author="malware-lu"
 strings:
@@ -1898,9 +1587,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEBundlev20b5v23
-{
+rule PEBundlev20b5v23 {
       meta:
 		author="malware-lu"
 strings:
@@ -1910,9 +1597,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PUNiSHERV15DemoFEUERRADER
-{
+rule PUNiSHERV15DemoFEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -1922,9 +1607,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HACKSTOPv110v111
-{
+rule HACKSTOPv110v111 {
       meta:
 		author="malware-lu"
 strings:
@@ -1934,9 +1617,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1336ObsidiumSoftware
-{
+rule Obsidium1336ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -1946,9 +1627,7 @@ condition:
 		$a0
 }
 
-
-rule DualseXeEncryptor10bDual
-{
+rule DualseXeEncryptor10bDual {
       meta:
 		author="malware-lu"
 strings:
@@ -1958,9 +1637,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MarjinZEXEScramblerSEbyMarjinZ
-{
+rule MarjinZEXEScramblerSEbyMarjinZ {
       meta:
 		author="malware-lu"
 strings:
@@ -1970,9 +1647,7 @@ condition:
 		$a0
 }
 
-
-rule nPack111502006BetaNEOx
-{
+rule nPack111502006BetaNEOx {
       meta:
 		author="malware-lu"
 strings:
@@ -1982,9 +1657,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DingBoysPElockPhantasmv15b3
-{
+rule DingBoysPElockPhantasmv15b3 {
       meta:
 		author="malware-lu"
 strings:
@@ -1994,9 +1667,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ShellModify01pll621
-{
+rule ShellModify01pll621 {
       meta:
 		author="malware-lu"
 strings:
@@ -2006,9 +1677,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01MacromediaFlashProjector60Anorganix
-{
+rule PseudoSigner01MacromediaFlashProjector60Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -2018,9 +1687,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Packman0001Bubbasoft
-{
+rule Packman0001Bubbasoft {
       meta:
 		author="malware-lu"
 strings:
@@ -2030,9 +1697,7 @@ condition:
 		$a0
 }
 
-
-rule aPackv098bDSESnotsaved
-{
+rule aPackv098bDSESnotsaved {
       meta:
 		author="malware-lu"
 strings:
@@ -2042,9 +1707,7 @@ condition:
 		$a0
 }
 
-
-rule ASProtectvIfyouknowthisversionpostonPEiDboardh2
-{
+rule ASProtectvIfyouknowthisversionpostonPEiDboardh2 {
       meta:
 		author="malware-lu"
 strings:
@@ -2054,9 +1717,7 @@ condition:
 		$a0
 }
 
-
-rule Aluwainv809
-{
+rule Aluwainv809 {
       meta:
 		author="malware-lu"
 strings:
@@ -2066,9 +1727,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AntiDote12DLLDemoSISTeam
-{
+rule AntiDote12DLLDemoSISTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -2078,9 +1737,7 @@ condition:
 		$a0
 }
 
-
-rule MSLRHv032afakeMicrosoftVisualCemadicius
-{
+rule MSLRHv032afakeMicrosoftVisualCemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -2090,9 +1747,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftwareCompressV12BGSoftwareProtectTechnologies
-{
+rule SoftwareCompressV12BGSoftwareProtectTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -2102,9 +1757,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Themida1201OreansTechnologies
-{
+rule Themida1201OreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -2114,9 +1767,7 @@ condition:
 		$a0
 }
 
-
-rule PECompactv126b1v126b2
-{
+rule PECompactv126b1v126b2 {
       meta:
 		author="malware-lu"
 strings:
@@ -2126,9 +1777,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Cruncherv10
-{
+rule Cruncherv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -2138,9 +1787,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AntiDote1214SEDLLSISTeam
-{
+rule AntiDote1214SEDLLSISTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -2150,9 +1797,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectSKE21xexeAlexeySolodovnikov
-{
+rule ASProtectSKE21xexeAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -2162,9 +1807,7 @@ condition:
 		$a0
 }
 
-
-rule DBPEv210DingBoy
-{
+rule DBPEv210DingBoy {
       meta:
 		author="malware-lu"
 strings:
@@ -2174,9 +1817,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPacKV37LiuXingPing
-{
+rule NsPacKV37LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -2186,9 +1827,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElock099tE
-{
+rule tElock099tE {
       meta:
 		author="malware-lu"
 strings:
@@ -2198,9 +1837,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WinZipSelfExtractor22personaleditionWinZipComputing
-{
+rule WinZipSelfExtractor22personaleditionWinZipComputing {
       meta:
 		author="malware-lu"
 strings:
@@ -2210,8 +1847,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-rule ZipWorxSecureEXEv25ZipWORXTechnologiesLLC
-{
+rule ZipWorxSecureEXEv25ZipWORXTechnologiesLLC {
       meta:
 		author="malware-lu"
 strings:
@@ -2221,9 +1857,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackFullEdition117iBoxaPLibAp0x
-{
+rule RLPackFullEdition117iBoxaPLibAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -2233,9 +1867,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Alloyv1x2000
-{
+rule Alloyv1x2000 {
       meta:
 		author="malware-lu"
 strings:
@@ -2245,9 +1877,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeJoiner153Stubengine171GlOFF
-{
+rule FreeJoiner153Stubengine171GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -2257,9 +1887,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02MicrosoftVisualC70DLLAnorganix
-{
+rule PseudoSigner02MicrosoftVisualC70DLLAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -2269,9 +1897,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EYouDiDaiYueHeiFengGao
-{
+rule EYouDiDaiYueHeiFengGao {
       meta:
 		author="malware-lu"
 strings:
@@ -2281,9 +1907,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptorV21Xsoftcompletecom
-{
+rule EXECryptorV21Xsoftcompletecom {
       meta:
 		author="malware-lu"
 strings:
@@ -2294,9 +1918,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule PCShrinkerv045
-{
+rule PCShrinkerv045 {
       meta:
 		author="malware-lu"
 strings:
@@ -2306,9 +1928,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yodasProtectorV1033AshkbizDanehkar
-{
+rule yodasProtectorV1033AshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -2318,9 +1938,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftSentryv211
-{
+rule SoftSentryv211 {
       meta:
 		author="malware-lu"
 strings:
@@ -2330,9 +1948,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv120EngdulekxtBorlandDelphiBorlandC
-{
+rule FSGv120EngdulekxtBorlandDelphiBorlandC {
       meta:
 		author="malware-lu"
 strings:
@@ -2342,9 +1958,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeStonesPEEncryptor20FEUERRADER
-{
+rule AHTeamEPProtector03fakeStonesPEEncryptor20FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -2354,9 +1968,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov300
-{
+rule Armadillov300 {
       meta:
 		author="malware-lu"
 strings:
@@ -2366,9 +1978,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv11Vaska
-{
+rule RCryptorv11Vaska {
       meta:
 		author="malware-lu"
 strings:
@@ -2379,9 +1989,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule Fusion10jaNooNi
-{
+rule Fusion10jaNooNi {
       meta:
 		author="malware-lu"
 strings:
@@ -2391,9 +1999,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UpxLock1012CyberDoomTeamXBoBBobSoft
-{
+rule UpxLock1012CyberDoomTeamXBoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -2403,9 +2009,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCPEEncryptorAlphapreview
-{
+rule PCPEEncryptorAlphapreview {
       meta:
 		author="malware-lu"
 strings:
@@ -2415,9 +2019,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxKeypress1212
-{
+rule VxKeypress1212 {
       meta:
 		author="malware-lu"
 strings:
@@ -2427,9 +2029,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftwareCompressv12BGSoftwareProtectTechnologies
-{
+rule SoftwareCompressv12BGSoftwareProtectTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -2439,9 +2039,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPackV14LiuXingPing
-{
+rule NsPackV14LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -2451,9 +2049,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VProtectorV11Avcasm
-{
+rule VProtectorV11Avcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -2463,9 +2059,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1300ObsidiumSoftware
-{
+rule Obsidium1300ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -2475,9 +2069,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule XXPack01bagie
-{
+rule XXPack01bagie {
       meta:
 		author="malware-lu"
 strings:
@@ -2487,9 +2079,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeLocker10IonIce
-{
+rule ExeLocker10IonIce {
       meta:
 		author="malware-lu"
 strings:
@@ -2499,9 +2089,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yodasProtectorV101AshkbizDanehkar
-{
+rule yodasProtectorV101AshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -2511,9 +2099,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv2001AlexeySolodovnikov
-{
+rule ASPackv2001AlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -2523,9 +2109,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule USERNAMEv300
-{
+rule USERNAMEv300 {
       meta:
 		author="malware-lu"
 strings:
@@ -2535,9 +2119,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule nSpackV2xLiuXingPing
-{
+rule nSpackV2xLiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -2547,9 +2129,7 @@ condition:
 		$a0
 }
 
-
-rule GameGuardv20065xxdllsignbyhot_UNP
-{
+rule GameGuardv20065xxdllsignbyhot_UNP {
       meta:
 		author="malware-lu"
 strings:
@@ -2559,9 +2139,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upack_PatchoranyVersionDwing
-{
+rule Upack_PatchoranyVersionDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -2571,9 +2149,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCPECalpha
-{
+rule PCPECalpha {
       meta:
 		author="malware-lu"
 strings:
@@ -2583,9 +2159,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv305c4Unextractable
-{
+rule WWPACKv305c4Unextractable {
       meta:
 		author="malware-lu"
 strings:
@@ -2595,9 +2169,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Escargot01finalMeat
-{
+rule Escargot01finalMeat {
       meta:
 		author="malware-lu"
 strings:
@@ -2607,9 +2179,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MetrowerksCodeWarriorv20GUI
-{
+rule MetrowerksCodeWarriorv20GUI {
       meta:
 		author="malware-lu"
 strings:
@@ -2619,9 +2189,7 @@ condition:
 		$a0
 }
 
-
-rule UnnamedScrambler21Beta211p0ke
-{
+rule UnnamedScrambler21Beta211p0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -2631,9 +2199,7 @@ condition:
 		$a0
 }
 
-
-rule NoodleCryptv20
-{
+rule NoodleCryptv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -2644,9 +2210,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule PoPa001PackeronPascalbagie
-{
+rule PoPa001PackeronPascalbagie {
       meta:
 		author="malware-lu"
 strings:
@@ -2656,9 +2220,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BlindSpot10s134k
-{
+rule BlindSpot10s134k {
       meta:
 		author="malware-lu"
 strings:
@@ -2668,9 +2230,7 @@ condition:
 		$a0
 }
 
-
-rule GamehouseMediaProtectorVersionUnknown
-{
+rule GamehouseMediaProtectorVersionUnknown {
       meta:
 		author="malware-lu"
 strings:
@@ -2680,9 +2240,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv042
-{
+rule tElockv042 {
       meta:
 		author="malware-lu"
 strings:
@@ -2692,9 +2250,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEStealthv274WebToolMaster
-{
+rule EXEStealthv274WebToolMaster {
       meta:
 		author="malware-lu"
 strings:
@@ -2704,9 +2260,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEManagerVersion301994cSolarDesigner
-{
+rule EXEManagerVersion301994cSolarDesigner {
       meta:
 		author="malware-lu"
 strings:
@@ -2716,9 +2270,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv02BetaDwing
-{
+rule Upackv02BetaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -2728,9 +2280,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DEFv100Engbartxt
-{
+rule DEFv100Engbartxt {
       meta:
 		author="malware-lu"
 strings:
@@ -2740,9 +2290,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AnslymCrypter
-{
+rule AnslymCrypter {
       meta:
 		author="malware-lu"
 strings:
@@ -2752,9 +2300,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ARMProtectorv02SMoKE
-{
+rule ARMProtectorv02SMoKE {
       meta:
 		author="malware-lu"
 strings:
@@ -2764,9 +2310,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrypKeyV56XDLLKenonicControlsLtd
-{
+rule CrypKeyV56XDLLKenonicControlsLtd {
       meta:
 		author="malware-lu"
 strings:
@@ -2776,9 +2320,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEiDBundlev102v104BoBBobSoft
-{
+rule PEiDBundlev102v104BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -2788,9 +2330,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxHeloween1172
-{
+rule VxHeloween1172 {
       meta:
 		author="malware-lu"
 strings:
@@ -2800,9 +2340,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PackedwithPKLITEv150withCRCcheck1
-{
+rule PackedwithPKLITEv150withCRCcheck1 {
       meta:
 		author="malware-lu"
 strings:
@@ -2812,9 +2350,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Pe123v2006412
-{
+rule Pe123v2006412 {
       meta:
 		author="malware-lu"
 strings:
@@ -2824,9 +2360,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DropperCreatorV01Conflict
-{
+rule DropperCreatorV01Conflict {
       meta:
 		author="malware-lu"
 strings:
@@ -2836,9 +2370,7 @@ condition:
 		$a0
 }
 
-
-rule XCRv013
-{
+rule XCRv013 {
       meta:
 		author="malware-lu"
 strings:
@@ -2848,9 +2380,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule XCRv012
-{
+rule XCRv012 {
       meta:
 		author="malware-lu"
 strings:
@@ -2860,9 +2390,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule InnoSetupModulev129
-{
+rule InnoSetupModulev129 {
       meta:
 		author="malware-lu"
 strings:
@@ -2872,9 +2400,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov3xx
-{
+rule Armadillov3xx {
       meta:
 		author="malware-lu"
 strings:
@@ -2884,9 +2410,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule dUP2xPatcherwwwdiablo2oo2cjbnet
-{
+rule dUP2xPatcherwwwdiablo2oo2cjbnet {
       meta:
 		author="malware-lu"
 strings:
@@ -2896,9 +2420,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02PEProtect09Anorganix
-{
+rule PseudoSigner02PEProtect09Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -2908,9 +2430,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule pscrambler12byp0ke
-{
+rule pscrambler12byp0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -2920,9 +2440,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor2223compressedcodewwwstrongbitcom
-{
+rule EXECryptor2223compressedcodewwwstrongbitcom {
       meta:
 		author="malware-lu"
 strings:
@@ -2933,9 +2451,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule Armadillov265b1
-{
+rule Armadillov265b1 {
       meta:
 		author="malware-lu"
 strings:
@@ -2945,9 +2461,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackFullEdition117aPLibAp0x
-{
+rule RLPackFullEdition117aPLibAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -2957,9 +2471,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PolyCryptPE214b215JLabSoftwareCreationshoep
-{
+rule PolyCryptPE214b215JLabSoftwareCreationshoep {
       meta:
 		author="malware-lu"
 strings:
@@ -2969,9 +2481,7 @@ condition:
 		$a0
 }
 
-
-rule yodasProtector10xAshkbizDanehkar
-{
+rule yodasProtector10xAshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -2981,9 +2491,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upack_UnknownDLLDwing
-{
+rule Upack_UnknownDLLDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -2993,9 +2501,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AINEXEv21
-{
+rule AINEXEv21 {
       meta:
 		author="malware-lu"
 strings:
@@ -3005,9 +2511,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AppProtectorSilentTeam
-{
+rule AppProtectorSilentTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -3017,9 +2521,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RODHighTECHAyman
-{
+rule RODHighTECHAyman {
       meta:
 		author="malware-lu"
 strings:
@@ -3029,9 +2531,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ICrypt10byBuGGz
-{
+rule ICrypt10byBuGGz {
       meta:
 		author="malware-lu"
 strings:
@@ -3041,9 +2541,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEPackv099
-{
+rule PEPackv099 {
       meta:
 		author="malware-lu"
 strings:
@@ -3053,9 +2551,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV115V117LZMA430ap0x
-{
+rule RLPackV115V117LZMA430ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -3065,9 +2561,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxQuake518
-{
+rule VxQuake518 {
       meta:
 		author="malware-lu"
 strings:
@@ -3077,9 +2571,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv305c4UnextractableVirusShield
-{
+rule WWPACKv305c4UnextractableVirusShield {
       meta:
 		author="malware-lu"
 strings:
@@ -3089,9 +2581,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium13013ObsidiumSoftware
-{
+rule Obsidium13013ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -3101,9 +2591,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ObsidiumV130XObsidiumSoftware
-{
+rule ObsidiumV130XObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -3113,9 +2601,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MetrowerksCodeWarriorv20Console
-{
+rule MetrowerksCodeWarriorv20Console {
       meta:
 		author="malware-lu"
 strings:
@@ -3125,9 +2611,7 @@ condition:
 		$a0
 }
 
-
-rule PESpinv07Cyberbob
-{
+rule PESpinv07Cyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -3137,9 +2621,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimpleUPXCryptorV3042005MANtiCORE
-{
+rule SimpleUPXCryptorV3042005MANtiCORE {
       meta:
 		author="malware-lu"
 strings:
@@ -3149,9 +2631,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WinRAR32bitSFXModule
-{
+rule WinRAR32bitSFXModule {
       meta:
 		author="malware-lu"
 strings:
@@ -3161,9 +2641,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule iPBProtect013017forgot
-{
+rule iPBProtect013017forgot {
       meta:
 		author="malware-lu"
 strings:
@@ -3173,9 +2651,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeASPack211demadicius
-{
+rule MSLRHv032afakeASPack211demadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -3185,9 +2661,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv036alphaDwing
-{
+rule Upackv036alphaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -3197,9 +2671,7 @@ condition:
 		$a0
 }
 
-
-rule CrinklerV03V04RuneLHStubbeandAskeSimonChristensen
-{
+rule CrinklerV03V04RuneLHStubbeandAskeSimonChristensen {
       meta:
 		author="malware-lu"
 strings:
@@ -3209,9 +2681,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DingBoysPElockPhantasmv10v11
-{
+rule DingBoysPElockPhantasmv10v11 {
       meta:
 		author="malware-lu"
 strings:
@@ -3221,9 +2691,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactV2XBitsumTechnologies
-{
+rule PECompactV2XBitsumTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -3233,9 +2701,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CRYPTVersion17cDismember
-{
+rule CRYPTVersion17cDismember {
       meta:
 		author="malware-lu"
 strings:
@@ -3245,9 +2711,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxXPEH4768
-{
+rule VxXPEH4768 {
       meta:
 		author="malware-lu"
 strings:
@@ -3257,9 +2721,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECrypt32v102
-{
+rule PECrypt32v102 {
       meta:
 		author="malware-lu"
 strings:
@@ -3269,9 +2731,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01PESHiELD025Anorganix
-{
+rule PseudoSigner01PESHiELD025Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -3281,9 +2741,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NETDLLMicrosoft
-{
+rule NETDLLMicrosoft {
       meta:
 		author="malware-lu"
 strings:
@@ -3293,9 +2751,7 @@ condition:
 		$a0
 }
 
-
-rule MSLRH: Packer PEiD
-{
+rule MSLRH: Packer PEiD {
       meta:
 		author="malware-lu"
         note="Added some checks"
@@ -3308,9 +2764,7 @@ condition:
 		for any of ($*) : ( $ at pe.entry_point )
 }
 
-
-rule BeRoEXEPackerv100DLLLZMABeRoFarbrausch
-{
+rule BeRoEXEPackerv100DLLLZMABeRoFarbrausch {
       meta:
 		author="malware-lu"
 strings:
@@ -3320,9 +2774,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02ExeSmasherAnorganix
-{
+rule PseudoSigner02ExeSmasherAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -3332,9 +2784,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ObsidiumV125ObsidiumSoftware
-{
+rule ObsidiumV125ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -3344,9 +2794,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv107bDLLAlexeySolodovnikov
-{
+rule ASPackv107bDLLAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -3356,9 +2804,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MicroJoiner17coban2k
-{
+rule MicroJoiner17coban2k {
       meta:
 		author="malware-lu"
 strings:
@@ -3368,9 +2814,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeVOBProtectCDFEUERRADER
-{
+rule AHTeamEPProtector03fakeVOBProtectCDFEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -3380,9 +2824,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CelsiusCrypt21Z3r0
-{
+rule CelsiusCrypt21Z3r0 {
       meta:
 		author="malware-lu"
 strings:
@@ -3393,9 +2835,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule Armadillov260
-{
+rule Armadillov260 {
       meta:
 		author="malware-lu"
 strings:
@@ -3405,9 +2845,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov261
-{
+rule Armadillov261 {
       meta:
 		author="malware-lu"
 strings:
@@ -3417,9 +2855,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeASPack212emadicius
-{
+rule MSLRHv032afakeASPack212emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -3429,9 +2865,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RatPackerGluestub
-{
+rule RatPackerGluestub {
       meta:
 		author="malware-lu"
 strings:
@@ -3441,9 +2875,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CreateInstallv200335
-{
+rule CreateInstallv200335 {
       meta:
 		author="malware-lu"
 strings:
@@ -3453,9 +2885,7 @@ condition:
 		$a0
 }
 
-
-rule SPECb3
-{
+rule SPECb3 {
       meta:
 		author="malware-lu"
 strings:
@@ -3465,9 +2895,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SPECb2
-{
+rule SPECb2 {
       meta:
 		author="malware-lu"
 strings:
@@ -3477,9 +2905,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXV200V290MarkusOberhumerLaszloMolnarJohnReiser
-{
+rule UPXV200V290MarkusOberhumerLaszloMolnarJohnReiser {
       meta:
 		author="malware-lu"
 strings:
@@ -3489,9 +2915,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner01MicrosoftVisualBasic5060Anorganix
-{
+rule PseudoSigner01MicrosoftVisualBasic5060Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -3501,9 +2925,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXModifiedStubbFarbrauschConsumerConsulting
-{
+rule UPXModifiedStubbFarbrauschConsumerConsulting {
       meta:
 		author="malware-lu"
 strings:
@@ -3513,9 +2935,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule E2CbyDoP
-{
+rule E2CbyDoP {
       meta:
 		author="malware-lu"
 strings:
@@ -3525,9 +2945,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SVKProtectorv111
-{
+rule SVKProtectorv111 {
       meta:
 		author="malware-lu"
 strings:
@@ -3537,9 +2955,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCShrinkerv071
-{
+rule PCShrinkerv071 {
       meta:
 		author="malware-lu"
 strings:
@@ -3549,9 +2965,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petite21
-{
+rule Petite21 {
       meta:
 		author="malware-lu"
 strings:
@@ -3561,9 +2975,7 @@ condition:
 		$a0
 }
 
-
-rule BeRoEXEPackerv100DLLLZBRRBeRoFarbrausch
-{
+rule BeRoEXEPackerv100DLLLZBRRBeRoFarbrausch {
       meta:
 		author="malware-lu"
 strings:
@@ -3573,9 +2985,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule hmimysPackerV12hmimys
-{
+rule hmimysPackerV12hmimys {
       meta:
 		author="malware-lu"
 strings:
@@ -3585,9 +2995,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EnigmaProtector131Build20070615DllSukhovVladimirSergeNMarkin
-{
+rule EnigmaProtector131Build20070615DllSukhovVladimirSergeNMarkin {
       meta:
 		author="malware-lu"
 strings:
@@ -3597,9 +3005,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PureBasicDLLNeilHodgson
-{
+rule PureBasicDLLNeilHodgson {
       meta:
 		author="malware-lu"
 strings:
@@ -3609,9 +3015,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HPA
-{
+rule HPA {
       meta:
 		author="malware-lu"
 strings:
@@ -3621,9 +3025,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov310
-{
+rule Armadillov310 {
       meta:
 		author="malware-lu"
 strings:
@@ -3633,9 +3035,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upack012betaDwing
-{
+rule Upack012betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -3645,9 +3045,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxNcuLi1688
-{
+rule VxNcuLi1688 {
       meta:
 		author="malware-lu"
 strings:
@@ -3657,9 +3055,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VProtectorvcasm
-{
+rule VProtectorvcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -3671,9 +3067,7 @@ condition:
 		$a0 or $a1 or $a2
 }
 
-
-rule XPackv142
-{
+rule XPackv142 {
       meta:
 		author="malware-lu"
 strings:
@@ -3683,9 +3077,7 @@ condition:
 		$a0
 }
 
-
-rule W32JeefoPEFileInfector
-{
+rule W32JeefoPEFileInfector {
       meta:
 		author="malware-lu"
 strings:
@@ -3695,9 +3087,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeSplitter13SplitCryptMethodBillPrisonerTPOC
-{
+rule ExeSplitter13SplitCryptMethodBillPrisonerTPOC {
       meta:
 		author="malware-lu"
 strings:
@@ -3708,9 +3098,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule AntiDote12BetaDemoSISTeam
-{
+rule AntiDote12BetaDemoSISTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -3720,9 +3108,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv211bAlexeySolodovnikov
-{
+rule ASPackv211bAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -3732,9 +3118,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor224StrongbitSoftCompleteDevelopmenth1
-{
+rule EXECryptor224StrongbitSoftCompleteDevelopmenth1 {
       meta:
 		author="malware-lu"
 strings:
@@ -3744,9 +3128,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor224StrongbitSoftCompleteDevelopmenth2
-{
+rule EXECryptor224StrongbitSoftCompleteDevelopmenth2 {
       meta:
 		author="malware-lu"
 strings:
@@ -3756,9 +3138,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor224StrongbitSoftCompleteDevelopmenth3
-{
+rule EXECryptor224StrongbitSoftCompleteDevelopmenth3 {
       meta:
 		author="malware-lu"
 strings:
@@ -3768,9 +3148,7 @@ condition:
 		$a0
 }
 
-
-rule ProActivateV10XTurboPowerSoftwareCompany
-{
+rule ProActivateV10XTurboPowerSoftwareCompany {
       meta:
 		author="malware-lu"
 strings:
@@ -3780,9 +3158,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PackMasterv10
-{
+rule PackMasterv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -3793,9 +3169,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule DBPEv153
-{
+rule DBPEv153 {
       meta:
 		author="malware-lu"
 strings:
@@ -3805,9 +3179,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeJoiner152Stubengine16GlOFF
-{
+rule FreeJoiner152Stubengine16GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -3817,9 +3189,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv12AlexeySolodovnikovh1
-{
+rule ASProtectv12AlexeySolodovnikovh1 {
       meta:
 		author="malware-lu"
 strings:
@@ -3829,9 +3199,7 @@ condition:
 		$a0
 }
 
-
-rule FSGv110EngdulekxtBorlandDelphiMicrosoftVisualCx
-{
+rule FSGv110EngdulekxtBorlandDelphiMicrosoftVisualCx {
       meta:
 		author="malware-lu"
 strings:
@@ -3841,9 +3209,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PENightMare2Beta
-{
+rule PENightMare2Beta {
       meta:
 		author="malware-lu"
 strings:
@@ -3853,9 +3219,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MinGWGCC3x
-{
+rule MinGWGCC3x {
       meta:
 		author="malware-lu"
 strings:
@@ -3865,9 +3229,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PIRITv15
-{
+rule PIRITv15 {
       meta:
 		author="malware-lu"
 strings:
@@ -3877,9 +3239,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Reg2Exe224byJanVorel
-{
+rule Reg2Exe224byJanVorel {
       meta:
 		author="malware-lu"
 strings:
@@ -3889,9 +3249,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SVKProtectorv13xEngPavolCerven
-{
+rule SVKProtectorv13xEngPavolCerven {
       meta:
 		author="malware-lu"
 strings:
@@ -3901,9 +3259,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallEmbedded2609Jitit
-{
+rule ThinstallEmbedded2609Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -3913,9 +3269,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXcrypterarchphaseNWC
-{
+rule UPXcrypterarchphaseNWC {
       meta:
 		author="malware-lu"
 strings:
@@ -3925,9 +3279,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule StarForceProtectionDriverProtectionTechnology
-{
+rule StarForceProtectionDriverProtectionTechnology {
       meta:
 		author="malware-lu"
 strings:
@@ -3937,9 +3289,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FishPEV10Xhellfish
-{
+rule FishPEV10Xhellfish {
       meta:
 		author="malware-lu"
 strings:
@@ -3949,9 +3299,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECrypter
-{
+rule PECrypter {
       meta:
 		author="malware-lu"
 strings:
@@ -3961,9 +3309,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv051
-{
+rule tElockv051 {
       meta:
 		author="malware-lu"
 strings:
@@ -3973,9 +3319,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule LY_WGKXwwwszleyucom
-{
+rule LY_WGKXwwwszleyucom {
       meta:
 		author="malware-lu"
 strings:
@@ -3985,9 +3329,7 @@ condition:
 		$a0
 }
 
-
-rule ASProtect13321RegisteredAlexeySolodovnikov
-{
+rule ASProtect13321RegisteredAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -3997,9 +3339,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV111ap0x
-{
+rule RLPackV111ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -4009,9 +3349,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMicrosoftVisualC4xLCCWin321x
-{
+rule FSGv110EngdulekxtMicrosoftVisualC4xLCCWin321x {
       meta:
 		author="malware-lu"
 strings:
@@ -4021,9 +3359,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule dePACKdeNULL
-{
+rule dePACKdeNULL {
       meta:
 		author="malware-lu"
 strings:
@@ -4034,9 +3370,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule EXECryptorv1401
-{
+rule EXECryptorv1401 {
       meta:
 		author="malware-lu"
 strings:
@@ -4046,9 +3380,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakePELockNT204emadicius
-{
+rule MSLRHv032afakePELockNT204emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -4058,9 +3390,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PELockNTv203
-{
+rule PELockNTv203 {
       meta:
 		author="malware-lu"
 strings:
@@ -4070,9 +3400,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Reg2Exe220221byJanVorel
-{
+rule Reg2Exe220221byJanVorel {
       meta:
 		author="malware-lu"
 strings:
@@ -4082,9 +3410,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PELockNTv201
-{
+rule PELockNTv201 {
       meta:
 		author="malware-lu"
 strings:
@@ -4094,9 +3420,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PELockNTv204
-{
+rule PELockNTv204 {
       meta:
 		author="malware-lu"
 strings:
@@ -4106,9 +3430,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXFreakv01BorlandDelphiHMX0101
-{
+rule UPXFreakv01BorlandDelphiHMX0101 {
       meta:
 		author="malware-lu"
 strings:
@@ -4119,9 +3441,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Obsidium13017Obsidiumsoftware
-{
+rule Obsidium13017Obsidiumsoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -4131,9 +3451,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petite22c199899IanLuck
-{
+rule Petite22c199899IanLuck {
       meta:
 		author="malware-lu"
 strings:
@@ -4143,9 +3461,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PluginToExev101BoBBobSoft
-{
+rule PluginToExev101BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -4155,9 +3471,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Enigmaprotector110unregistered
-{
+rule Enigmaprotector110unregistered {
       meta:
 		author="malware-lu"
 strings:
@@ -4168,9 +3482,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule Obsidium1341ObsidiumSoftware
-{
+rule Obsidium1341ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -4180,9 +3492,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WebCopsDLLLINKDataSecurity
-{
+rule WebCopsDLLLINKDataSecurity {
       meta:
 		author="malware-lu"
 strings:
@@ -4192,9 +3502,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01PackMaster10PEXCloneAnorganix
-{
+rule PseudoSigner01PackMaster10PEXCloneAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -4204,9 +3512,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv037v038BetaStripbaserelocationtableOptionDwing
-{
+rule Upackv037v038BetaStripbaserelocationtableOptionDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -4216,9 +3522,7 @@ condition:
 		$a0
 }
 
-
-rule AHTeamEPProtector03fakeSVKP13xFEUERRADER
-{
+rule AHTeamEPProtector03fakeSVKP13xFEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -4228,9 +3532,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule InstallShieldCustom
-{
+rule InstallShieldCustom {
       meta:
 		author="malware-lu"
 strings:
@@ -4240,9 +3542,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petitevafterv14
-{
+rule Petitevafterv14 {
       meta:
 		author="malware-lu"
 strings:
@@ -4252,9 +3552,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeToolsv21EncruptorbyDISMEMBER
-{
+rule ExeToolsv21EncruptorbyDISMEMBER {
       meta:
 		author="malware-lu"
 strings:
@@ -4264,9 +3562,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NTkrnlSecureSuiteNTkrnlteam
-{
+rule NTkrnlSecureSuiteNTkrnlteam {
       meta:
 		author="malware-lu"
 strings:
@@ -4276,9 +3572,7 @@ condition:
 		$a0
 }
 
-
-rule PESpinv0b
-{
+rule PESpinv0b {
       meta:
 		author="malware-lu"
 strings:
@@ -4288,9 +3582,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VXTibsZhelatinStormWormvariant
-{
+rule VXTibsZhelatinStormWormvariant {
       meta:
 		author="malware-lu"
 strings:
@@ -4300,9 +3592,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakePEX099emadicius
-{
+rule MSLRHv032afakePEX099emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -4312,9 +3602,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NSPack3xLiuXingPing
-{
+rule NSPack3xLiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -4324,9 +3612,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv25RetailBitsumTechnologies
-{
+rule PECompactv25RetailBitsumTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -4336,9 +3622,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WARNINGTROJANXiaoHui
-{
+rule WARNINGTROJANXiaoHui {
       meta:
 		author="malware-lu"
 strings:
@@ -4348,9 +3632,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NFOv10
-{
+rule NFOv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -4360,9 +3642,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PMODEWv112116121133DOSextender
-{
+rule PMODEWv112116121133DOSextender {
       meta:
 		author="malware-lu"
 strings:
@@ -4372,9 +3652,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AaseCrypterbysantasdad
-{
+rule AaseCrypterbysantasdad {
       meta:
 		author="malware-lu"
 strings:
@@ -4384,9 +3662,7 @@ condition:
 		$a0
 }
 
-
-rule aPackv098bJibz
-{
+rule aPackv098bJibz {
       meta:
 		author="malware-lu"
 strings:
@@ -4396,9 +3672,7 @@ condition:
 		$a0
 }
 
-
-rule UPackv011Dwing
-{
+rule UPackv011Dwing {
       meta:
 		author="malware-lu"
 strings:
@@ -4408,9 +3682,7 @@ condition:
 		$a0
 }
 
-
-rule NsPacKNetLiuXingPing
-{
+rule NsPacKNetLiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -4420,9 +3692,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02PENightMare2BetaAnorganix
-{
+rule PseudoSigner02PENightMare2BetaAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -4432,9 +3702,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01MicrosoftVisualC60DebugVersionAnorganix
-{
+rule PseudoSigner01MicrosoftVisualC60DebugVersionAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -4444,9 +3712,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DJoinv07publicRC4encryptiondrmist
-{
+rule DJoinv07publicRC4encryptiondrmist {
       meta:
 		author="malware-lu"
 strings:
@@ -4456,9 +3722,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXv103v104
-{
+rule UPXv103v104 {
       meta:
 		author="malware-lu"
 strings:
@@ -4468,9 +3732,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEDiminisherV01Teraphy
-{
+rule PEDiminisherV01Teraphy {
       meta:
 		author="malware-lu"
 strings:
@@ -4480,9 +3742,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv305c4ExtrPasswcheckVirshield
-{
+rule WWPACKv305c4ExtrPasswcheckVirshield {
       meta:
 		author="malware-lu"
 strings:
@@ -4492,9 +3752,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeGuarderv18Exeiconcom
-{
+rule ExeGuarderv18Exeiconcom {
       meta:
 		author="malware-lu"
 strings:
@@ -4504,9 +3762,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule codeCrypter031Tibbar
-{
+rule codeCrypter031Tibbar {
       meta:
 		author="malware-lu"
 strings:
@@ -4516,9 +3772,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPv073betaap0x
-{
+rule RLPv073betaap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -4528,9 +3782,7 @@ condition:
 		$a0
 }
 
-
-rule PEnguinCryptv10
-{
+rule PEnguinCryptv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -4540,9 +3792,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MetrowerksCodeWarriorDLLv20
-{
+rule MetrowerksCodeWarriorDLLv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -4552,9 +3802,7 @@ condition:
 		$a0
 }
 
-
-rule PECrc32088ZhouJinYu
-{
+rule PECrc32088ZhouJinYu {
       meta:
 		author="malware-lu"
 strings:
@@ -4564,9 +3812,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv123b3v1241
-{
+rule PECompactv123b3v1241 {
       meta:
 		author="malware-lu"
 strings:
@@ -4576,9 +3822,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Noodlecrypt2rsc
-{
+rule Noodlecrypt2rsc {
       meta:
 		author="malware-lu"
 strings:
@@ -4588,9 +3832,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPack120BasicEditionLZMAAp0x
-{
+rule RLPack120BasicEditionLZMAAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -4600,9 +3842,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01PENightMare2BetaAnorganix
-{
+rule PseudoSigner01PENightMare2BetaAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -4612,9 +3852,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeXtremeProtector105FEUERRADER
-{
+rule AHTeamEPProtector03fakeXtremeProtector105FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -4624,9 +3862,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackv118BasicDLLLZMAAp0x
-{
+rule RLPackv118BasicDLLLZMAAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -4636,9 +3872,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrypKeyv5v6
-{
+rule CrypKeyv5v6 {
       meta:
 		author="malware-lu"
 strings:
@@ -4648,9 +3882,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule InnoSetupModulev109a
-{
+rule InnoSetupModulev109a {
       meta:
 		author="malware-lu"
 strings:
@@ -4660,9 +3892,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ObsidiumV1300ObsidiumSoftware
-{
+rule ObsidiumV1300ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -4673,9 +3903,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PCryptv351
-{
+rule PCryptv351 {
       meta:
 		author="malware-lu"
 strings:
@@ -4685,9 +3913,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallEmbedded2312Jitit
-{
+rule ThinstallEmbedded2312Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -4697,9 +3923,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv305c4Extractable
-{
+rule WWPACKv305c4Extractable {
       meta:
 		author="malware-lu"
 strings:
@@ -4709,9 +3933,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackAp0x
-{
+rule RLPackAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -4726,9 +3948,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point or $a3 at pe.entry_point or $a4 at pe.entry_point or $a5 at pe.entry_point
 }
 
-
-rule PseudoSigner02VOBProtectCD5Anorganix
-{
+rule PseudoSigner02VOBProtectCD5Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -4738,9 +3958,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PESpinv04x
-{
+rule PESpinv04x {
       meta:
 		author="malware-lu"
 strings:
@@ -4750,9 +3968,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02WatcomCCDLLAnorganix
-{
+rule PseudoSigner02WatcomCCDLLAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -4762,9 +3978,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yodasCrypter13AshkbizDanehkar
-{
+rule yodasCrypter13AshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -4774,9 +3988,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule D1NS1GD1N
-{
+rule D1NS1GD1N {
       meta:
 		author="malware-lu"
 strings:
@@ -4786,9 +3998,7 @@ condition:
 		$a0
 }
 
-
-rule FSGv110EngdulekxtMicrosoftVisualC6070ASM
-{
+rule FSGv110EngdulekxtMicrosoftVisualC6070ASM {
       meta:
 		author="malware-lu"
 strings:
@@ -4798,9 +4008,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv102aAlexeySolodovnikov
-{
+rule ASPackv102aAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -4810,9 +4018,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01MinGWGCC2xAnorganix
-{
+rule PseudoSigner01MinGWGCC2xAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -4822,9 +4028,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov253
-{
+rule Armadillov253 {
       meta:
 		author="malware-lu"
 strings:
@@ -4835,9 +4039,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Armadillov252
-{
+rule Armadillov252 {
       meta:
 		author="malware-lu"
 strings:
@@ -4848,9 +4050,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Armadillov251
-{
+rule Armadillov251 {
       meta:
 		author="malware-lu"
 strings:
@@ -4860,9 +4060,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov250
-{
+rule Armadillov250 {
       meta:
 		author="malware-lu"
 strings:
@@ -4872,9 +4070,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1331ObsidiumSoftware
-{
+rule Obsidium1331ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -4884,9 +4080,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CExev10a
-{
+rule CExev10a {
       meta:
 		author="malware-lu"
 strings:
@@ -4896,9 +4090,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DIETv144v145f
-{
+rule DIETv144v145f {
       meta:
 		author="malware-lu"
 strings:
@@ -4908,9 +4100,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv098
-{
+rule PECompactv098 {
       meta:
 		author="malware-lu"
 strings:
@@ -4920,9 +4110,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv099
-{
+rule PECompactv099 {
       meta:
 		author="malware-lu"
 strings:
@@ -4932,9 +4120,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPacKV30LiuXingPing
-{
+rule NsPacKV30LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -4944,9 +4130,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMicrosoftVisualBasic5060
-{
+rule FSGv110EngdulekxtMicrosoftVisualBasic5060 {
       meta:
 		author="malware-lu"
 strings:
@@ -4956,9 +4140,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv090
-{
+rule PECompactv090 {
       meta:
 		author="malware-lu"
 strings:
@@ -4968,9 +4150,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv092
-{
+rule PECompactv092 {
       meta:
 		author="malware-lu"
 strings:
@@ -4980,9 +4160,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv094
-{
+rule PECompactv094 {
       meta:
 		author="malware-lu"
 strings:
@@ -4992,9 +4170,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PeX099bartCrackPl
-{
+rule PeX099bartCrackPl {
       meta:
 		author="malware-lu"
 strings:
@@ -5004,9 +4180,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ObsidiumV1304ObsidiumSoftware
-{
+rule ObsidiumV1304ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -5016,9 +4190,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftwareCompressv14LITEBGSoftwareProtectTechnologies
-{
+rule SoftwareCompressv14LITEBGSoftwareProtectTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -5029,9 +4201,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule FixupPakv120
-{
+rule FixupPakv120 {
       meta:
 		author="malware-lu"
 strings:
@@ -5041,9 +4211,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ARCSFXArchive
-{
+rule ARCSFXArchive {
       meta:
 		author="malware-lu"
 strings:
@@ -5053,9 +4221,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MoleBoxv230Teggo
-{
+rule MoleBoxv230Teggo {
       meta:
 		author="malware-lu"
 strings:
@@ -5065,9 +4231,7 @@ condition:
 		$a0
 }
 
-
-rule VxIgor
-{
+rule VxIgor {
       meta:
 		author="malware-lu"
 strings:
@@ -5077,9 +4241,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FACRYPTv10
-{
+rule FACRYPTv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -5089,9 +4251,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01WATCOMCCEXEAnorganix
-{
+rule PseudoSigner01WATCOMCCEXEAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -5101,9 +4261,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV115V117aPlib043ap0x
-{
+rule RLPackV115V117aPlib043ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -5113,9 +4271,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EmbedPEv113cyclotron
-{
+rule EmbedPEv113cyclotron {
       meta:
 		author="malware-lu"
 strings:
@@ -5125,9 +4281,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXcaliburv103forgotus
-{
+rule eXcaliburv103forgotus {
       meta:
 		author="malware-lu"
 strings:
@@ -5137,9 +4291,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petite14
-{
+rule Petite14 {
       meta:
 		author="malware-lu"
 strings:
@@ -5149,9 +4301,7 @@ condition:
 		$a0
 }
 
-
-rule Petite12
-{
+rule Petite12 {
       meta:
 		author="malware-lu"
 strings:
@@ -5161,9 +4311,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petite13
-{
+rule Petite13 {
       meta:
 		author="malware-lu"
 strings:
@@ -5173,9 +4321,7 @@ condition:
 		$a0
 }
 
-
-rule Upack021betaDwing
-{
+rule Upack021betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -5185,9 +4331,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WebCopsEXELINKDataSecurity
-{
+rule WebCopsEXELINKDataSecurity {
       meta:
 		author="malware-lu"
 strings:
@@ -5197,9 +4341,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02FSG10Anorganix
-{
+rule PseudoSigner02FSG10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -5209,9 +4351,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThemidaOreansTechnologies2004
-{
+rule ThemidaOreansTechnologies2004 {
       meta:
 		author="malware-lu"
 strings:
@@ -5221,9 +4361,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxNumberOne
-{
+rule VxNumberOne {
       meta:
 		author="malware-lu"
 strings:
@@ -5233,9 +4371,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WinKriptv10MrCrimson
-{
+rule WinKriptv10MrCrimson {
       meta:
 		author="malware-lu"
 strings:
@@ -5245,9 +4381,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv085f
-{
+rule tElockv085f {
       meta:
 		author="malware-lu"
 strings:
@@ -5257,9 +4391,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RosAsm2050aBetov
-{
+rule RosAsm2050aBetov {
       meta:
 		author="malware-lu"
 strings:
@@ -5269,9 +4401,7 @@ condition:
 		$a0
 }
 
-
-rule Obsidium13021ObsidiumSoftware
-{
+rule Obsidium13021ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -5281,9 +4411,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv211dAlexeySolodovnikov
-{
+rule ASPackv211dAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -5293,9 +4421,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv211cAlexeySolodovnikov
-{
+rule ASPackv211cAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -5305,9 +4431,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ACProtect14xRISCOsoft
-{
+rule ACProtect14xRISCOsoft {
       meta:
 		author="malware-lu"
 strings:
@@ -5317,9 +4441,7 @@ condition:
 		$a0
 }
 
-
-rule SplashBitmapv100BoBBobsoft
-{
+rule SplashBitmapv100BoBBobsoft {
       meta:
 		author="malware-lu"
 strings:
@@ -5329,9 +4451,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEZipv10byBaGIE
-{
+rule PEZipv10byBaGIE {
       meta:
 		author="malware-lu"
 strings:
@@ -5341,9 +4461,7 @@ condition:
 		$a0
 }
 
-
-rule LamerStopv10ccStefanEsser
-{
+rule LamerStopv10ccStefanEsser {
       meta:
 		author="malware-lu"
 strings:
@@ -5353,9 +4471,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ACProtectV14Xrisco
-{
+rule ACProtectV14Xrisco {
       meta:
 		author="malware-lu"
 strings:
@@ -5365,9 +4481,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxGRUNT2Family
-{
+rule VxGRUNT2Family {
       meta:
 		author="malware-lu"
 strings:
@@ -5377,9 +4491,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeMicrosoftVisualC70FEUERRADER
-{
+rule AHTeamEPProtector03fakeMicrosoftVisualC70FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -5389,9 +4501,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule InstallStub32bit
-{
+rule InstallStub32bit {
       meta:
 		author="malware-lu"
 strings:
@@ -5401,9 +4511,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VcasmProtector10evcasm
-{
+rule VcasmProtector10evcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -5413,9 +4521,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakePEBundle20x24xemadicius
-{
+rule MSLRHv032afakePEBundle20x24xemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -5425,9 +4531,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov190b4
-{
+rule Armadillov190b4 {
       meta:
 		author="malware-lu"
 strings:
@@ -5437,9 +4541,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXv103v104Modified
-{
+rule UPXv103v104Modified {
       meta:
 		author="malware-lu"
 strings:
@@ -5449,9 +4551,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPackV2XLiuXingPing
-{
+rule NsPackV2XLiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -5461,9 +4561,7 @@ condition:
 		$a0
 }
 
-
-rule ThemidaWinLicenseV1000V1800OreansTechnologies
-{
+rule ThemidaWinLicenseV1000V1800OreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -5473,9 +4571,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PACKWINv101p
-{
+rule PACKWINv101p {
       meta:
 		author="malware-lu"
 strings:
@@ -5485,9 +4581,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv110b1
-{
+rule PECompactv110b1 {
       meta:
 		author="malware-lu"
 strings:
@@ -5497,9 +4591,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MicroJoiner15coban2k
-{
+rule MicroJoiner15coban2k {
       meta:
 		author="malware-lu"
 strings:
@@ -5509,9 +4601,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ANDpakk2018byDmitryANDAndreev
-{
+rule ANDpakk2018byDmitryANDAndreev {
       meta:
 		author="malware-lu"
 strings:
@@ -5521,9 +4611,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv110b2
-{
+rule PECompactv110b2 {
       meta:
 		author="malware-lu"
 strings:
@@ -5533,9 +4621,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv110b5
-{
+rule PECompactv110b5 {
       meta:
 		author="malware-lu"
 strings:
@@ -5545,9 +4631,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NJoy10NEX
-{
+rule NJoy10NEX {
       meta:
 		author="malware-lu"
 strings:
@@ -5557,9 +4641,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv110b7
-{
+rule PECompactv110b7 {
       meta:
 		author="malware-lu"
 strings:
@@ -5569,9 +4651,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv110b6
-{
+rule PECompactv110b6 {
       meta:
 		author="malware-lu"
 strings:
@@ -5581,9 +4661,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule KBysPacker028BetaShoooo
-{
+rule KBysPacker028BetaShoooo {
       meta:
 		author="malware-lu"
 strings:
@@ -5593,9 +4671,7 @@ condition:
 		$a0
 }
 
-
-rule nPack113002006BetaNEOx
-{
+rule nPack113002006BetaNEOx {
       meta:
 		author="malware-lu"
 strings:
@@ -5605,9 +4681,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02BorlandC1999Anorganix
-{
+rule PseudoSigner02BorlandC1999Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -5617,9 +4691,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv100bAlexeySolodovnikov
-{
+rule ASPackv100bAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -5629,9 +4701,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SEAAXEv22
-{
+rule SEAAXEv22 {
       meta:
 		author="malware-lu"
 strings:
@@ -5641,9 +4711,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PureBasic4xDLLNeilHodgson
-{
+rule PureBasic4xDLLNeilHodgson {
       meta:
 		author="malware-lu"
 strings:
@@ -5653,9 +4721,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEPackerv70byTurboPowerSoftware
-{
+rule EXEPackerv70byTurboPowerSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -5665,9 +4731,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxSYP
-{
+rule VxSYP {
       meta:
 		author="malware-lu"
 strings:
@@ -5677,9 +4741,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DSHIELD: Packer PEiD
-{
+rule DSHIELD: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -5689,9 +4751,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule kkrunchy023alphaRyd
-{
+rule kkrunchy023alphaRyd {
       meta:
 		author="malware-lu"
 strings:
@@ -5701,9 +4761,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NJoy12NEX
-{
+rule NJoy12NEX {
       meta:
 		author="malware-lu"
 strings:
@@ -5713,9 +4771,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AntiDote12DemoSISTeam
-{
+rule AntiDote12DemoSISTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -5725,9 +4781,7 @@ condition:
 		$a0
 }
 
-
-rule EXE32Packv137
-{
+rule EXE32Packv137 {
       meta:
 		author="malware-lu"
 strings:
@@ -5737,9 +4791,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXE32Packv136
-{
+rule EXE32Packv136 {
       meta:
 		author="malware-lu"
 strings:
@@ -5749,9 +4801,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AINEXEv230
-{
+rule AINEXEv230 {
       meta:
 		author="malware-lu"
 strings:
@@ -5761,9 +4811,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallEmbedded20XJitit
-{
+rule ThinstallEmbedded20XJitit {
       meta:
 		author="malware-lu"
 strings:
@@ -5773,9 +4821,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptorv151x
-{
+rule EXECryptorv151x {
       meta:
 		author="malware-lu"
 strings:
@@ -5785,9 +4831,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidiumv1304ObsidiumSoftware
-{
+rule Obsidiumv1304ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -5798,9 +4842,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule CopyProtectorv20
-{
+rule CopyProtectorv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -5810,9 +4852,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXE32Packv139
-{
+rule EXE32Packv139 {
       meta:
 		author="malware-lu"
 strings:
@@ -5822,9 +4862,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXE32Packv138
-{
+rule EXE32Packv138 {
       meta:
 		author="malware-lu"
 strings:
@@ -5834,9 +4872,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtBorlandC1999
-{
+rule FSGv110EngdulekxtBorlandC1999 {
       meta:
 		author="malware-lu"
 strings:
@@ -5846,9 +4882,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallEmbedded2547V2600Jitit
-{
+rule ThinstallEmbedded2547V2600Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -5858,9 +4892,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv131Engdulekxt
-{
+rule FSGv131Engdulekxt {
       meta:
 		author="malware-lu"
 strings:
@@ -5870,9 +4902,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SDProtectorBasicProEdition110RandyLi
-{
+rule SDProtectorBasicProEdition110RandyLi {
       meta:
 		author="malware-lu"
 strings:
@@ -5882,9 +4912,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petite12c1998IanLuck
-{
+rule Petite12c1998IanLuck {
       meta:
 		author="malware-lu"
 strings:
@@ -5894,9 +4922,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PcSharev40
-{
+rule PcSharev40 {
       meta:
 		author="malware-lu"
 strings:
@@ -5906,9 +4932,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VProtector0X12Xvcasm
-{
+rule VProtector0X12Xvcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -5918,9 +4942,7 @@ condition:
 		$a0
 }
 
-
-rule STNPEE113
-{
+rule STNPEE113 {
       meta:
 		author="malware-lu"
 strings:
@@ -5930,9 +4952,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftDefenderV11xRandyLi
-{
+rule SoftDefenderV11xRandyLi {
       meta:
 		author="malware-lu"
 strings:
@@ -5942,9 +4962,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CDCopsII
-{
+rule CDCopsII {
       meta:
 		author="malware-lu"
 strings:
@@ -5954,9 +4972,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPack11BasicEditionap0x
-{
+rule RLPack11BasicEditionap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -5966,9 +4982,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXE32Packv13x
-{
+rule EXE32Packv13x {
       meta:
 		author="malware-lu"
 strings:
@@ -5978,9 +4992,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxInvoluntary1349
-{
+rule VxInvoluntary1349 {
       meta:
 		author="malware-lu"
 strings:
@@ -5990,9 +5002,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WinZip32bit6x
-{
+rule WinZip32bit6x {
       meta:
 		author="malware-lu"
 strings:
@@ -6002,9 +5012,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPacKV36LiuXingPing
-{
+rule NsPacKV36LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -6014,9 +5022,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02LCCWin321xAnorganix
-{
+rule PseudoSigner02LCCWin321xAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -6026,9 +5032,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECrypt10ReBirth
-{
+rule EXECrypt10ReBirth {
       meta:
 		author="malware-lu"
 strings:
@@ -6038,9 +5042,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NJoy11NEX
-{
+rule NJoy11NEX {
       meta:
 		author="malware-lu"
 strings:
@@ -6050,9 +5052,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEcryptbyarchphase
-{
+rule PEcryptbyarchphase {
       meta:
 		author="malware-lu"
 strings:
@@ -6062,9 +5062,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrunchPEv30xx
-{
+rule CrunchPEv30xx {
       meta:
 		author="malware-lu"
 strings:
@@ -6074,9 +5072,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule LameCryptLaZaRus
-{
+rule LameCryptLaZaRus {
       meta:
 		author="malware-lu"
 strings:
@@ -6086,9 +5082,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPack29NorthStar
-{
+rule NsPack29NorthStar {
       meta:
 		author="malware-lu"
 strings:
@@ -6098,9 +5092,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BeRoEXEPackerv100LZBRSBeRoFarbrausch
-{
+rule BeRoEXEPackerv100LZBRSBeRoFarbrausch {
       meta:
 		author="malware-lu"
 strings:
@@ -6110,9 +5102,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtBorlandC
-{
+rule FSGv110EngdulekxtBorlandC {
       meta:
 		author="malware-lu"
 strings:
@@ -6123,9 +5113,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule VIRUSIWormKLEZ
-{
+rule VIRUSIWormKLEZ {
       meta:
 		author="malware-lu"
 strings:
@@ -6135,9 +5123,7 @@ condition:
 		$a0
 }
 
-
-rule YZPack12UsAr
-{
+rule YZPack12UsAr {
       meta:
 		author="malware-lu"
 strings:
@@ -6147,9 +5133,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02LocklessIntroPackAnorganix
-{
+rule PseudoSigner02LocklessIntroPackAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -6159,9 +5143,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITE3211
-{
+rule PKLITE3211 {
       meta:
 		author="malware-lu"
 strings:
@@ -6171,9 +5153,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv20bartxt
-{
+rule FSGv20bartxt {
       meta:
 		author="malware-lu"
 strings:
@@ -6183,9 +5163,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeSVKP111emadicius
-{
+rule MSLRHv032afakeSVKP111emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -6195,9 +5173,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMASM32TASM32MicrosoftVisualBasic
-{
+rule FSGv110EngdulekxtMASM32TASM32MicrosoftVisualBasic {
       meta:
 		author="malware-lu"
 strings:
@@ -6207,9 +5183,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor239DLLminimumprotection
-{
+rule EXECryptor239DLLminimumprotection {
       meta:
 		author="malware-lu"
 strings:
@@ -6219,9 +5193,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Frusionbiff
-{
+rule Frusionbiff {
       meta:
 		author="malware-lu"
 strings:
@@ -6231,9 +5203,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule OpenSourceCodeCrypterp0ke
-{
+rule OpenSourceCodeCrypterp0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -6243,9 +5213,7 @@ condition:
 		$a0
 }
 
-
-rule QrYPt0rbyNuTraL
-{
+rule QrYPt0rbyNuTraL {
       meta:
 		author="malware-lu"
 strings:
@@ -6257,9 +5225,7 @@ condition:
 		$a0 or $a1 or $a2 at pe.entry_point
 }
 
-
-rule EXECryptor2xxmaxcompressedresources
-{
+rule EXECryptor2xxmaxcompressedresources {
       meta:
 		author="malware-lu"
 strings:
@@ -6269,9 +5235,7 @@ condition:
 		$a0
 }
 
-
-rule Upackv024v028AlphaDwing
-{
+rule Upackv024v028AlphaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -6281,9 +5245,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallEmbedded24222428Jitit
-{
+rule ThinstallEmbedded24222428Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -6293,9 +5255,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SVKProtectorv1051
-{
+rule SVKProtectorv1051 {
       meta:
 		author="malware-lu"
 strings:
@@ -6305,9 +5265,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeZCode101FEUERRADER
-{
+rule AHTeamEPProtector03fakeZCode101FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -6317,9 +5275,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEPacker
-{
+rule PEPacker {
       meta:
 		author="malware-lu"
 strings:
@@ -6329,9 +5285,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ProgramProtectorXPv10
-{
+rule ProgramProtectorXPv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -6341,9 +5295,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimplePack111Method2NTbagieTMX
-{
+rule SimplePack111Method2NTbagieTMX {
       meta:
 		author="malware-lu"
 strings:
@@ -6353,9 +5305,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032aemadicius
-{
+rule MSLRHv032aemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -6367,9 +5317,7 @@ condition:
 		$a0 or $a1 or $a2 at pe.entry_point
 }
 
-
-rule VxHafen1641
-{
+rule VxHafen1641 {
       meta:
 		author="malware-lu"
 strings:
@@ -6379,9 +5327,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NativeUDPacker11ModdedPoisonIvyShellcodeokkixot
-{
+rule NativeUDPacker11ModdedPoisonIvyShellcodeokkixot {
       meta:
 		author="malware-lu"
 strings:
@@ -6391,9 +5337,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor2xxcompressedresources
-{
+rule EXECryptor2xxcompressedresources {
       meta:
 		author="malware-lu"
 strings:
@@ -6403,9 +5347,7 @@ condition:
 		$a0
 }
 
-
-rule NXPEPackerv10
-{
+rule NXPEPackerv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -6415,9 +5357,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PolyBoxCAnskya
-{
+rule PolyBoxCAnskya {
       meta:
 		author="malware-lu"
 strings:
@@ -6427,9 +5367,7 @@ condition:
 		$a0
 }
 
-
-rule UPolyXv05
-{
+rule UPolyXv05 {
       meta:
 		author="malware-lu"
 strings:
@@ -6444,9 +5382,7 @@ condition:
 		$a0 or $a1 or $a2 or $a3 or $a4 or $a5
 }
 
-
-rule beriav007publicWIPsymbiont
-{
+rule beriav007publicWIPsymbiont {
       meta:
 		author="malware-lu"
 strings:
@@ -6456,9 +5392,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCGuardv405dv410dv415d
-{
+rule PCGuardv405dv410dv415d {
       meta:
 		author="malware-lu"
 strings:
@@ -6468,9 +5402,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule asscrypterbysantasdad
-{
+rule asscrypterbysantasdad {
       meta:
 		author="malware-lu"
 strings:
@@ -6480,9 +5412,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CopyControlv303
-{
+rule CopyControlv303 {
       meta:
 		author="malware-lu"
 strings:
@@ -6492,9 +5422,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110Engbartxt
-{
+rule FSGv110Engbartxt {
       meta:
 		author="malware-lu"
 strings:
@@ -6504,9 +5432,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Elanguage
-{
+rule Elanguage {
       meta:
 		author="malware-lu"
 strings:
@@ -6516,9 +5442,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXELOCK66615
-{
+rule EXELOCK66615 {
       meta:
 		author="malware-lu"
 strings:
@@ -6528,9 +5452,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AdysGluev010
-{
+rule AdysGluev010 {
       meta:
 		author="malware-lu"
 strings:
@@ -6540,9 +5462,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SVKProtectorv132
-{
+rule SVKProtectorv132 {
       meta:
 		author="malware-lu"
 strings:
@@ -6552,9 +5472,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv114v115v1203
-{
+rule PKLITEv114v115v1203 {
       meta:
 		author="malware-lu"
 strings:
@@ -6564,9 +5482,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SafeGuardV10Xsimonzh2000
-{
+rule SafeGuardV10Xsimonzh2000 {
       meta:
 		author="malware-lu"
 strings:
@@ -6576,9 +5492,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEiDBundlev102v103DLLBoBBobSoft
-{
+rule PEiDBundlev102v103DLLBoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -6588,9 +5502,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeJoinerSmallbuild023GlOFF
-{
+rule FreeJoinerSmallbuild023GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -6600,9 +5512,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PrivatePersonalPackerPPP102ConquestOfTroycom
-{
+rule PrivatePersonalPackerPPP102ConquestOfTroycom {
       meta:
 		author="malware-lu"
 strings:
@@ -6612,9 +5522,7 @@ condition:
 		$a0
 }
 
-
-rule DIETv102bv110av120
-{
+rule DIETv102bv110av120 {
       meta:
 		author="malware-lu"
 strings:
@@ -6624,9 +5532,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXECLiPSElayer
-{
+rule UPXECLiPSElayer {
       meta:
 		author="malware-lu"
 strings:
@@ -6636,9 +5542,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1334ObsidiumSoftware
-{
+rule Obsidium1334ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -6649,9 +5553,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PKLITEv150Devicedrivercompression
-{
+rule PKLITEv150Devicedrivercompression {
       meta:
 		author="malware-lu"
 strings:
@@ -6661,9 +5563,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxGrazie883
-{
+rule VxGrazie883 {
       meta:
 		author="malware-lu"
 strings:
@@ -6673,9 +5573,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PROTECTEXECOMv60
-{
+rule PROTECTEXECOMv60 {
       meta:
 		author="malware-lu"
 strings:
@@ -6685,9 +5583,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ENIGMAProtectorSukhovVladimir
-{
+rule ENIGMAProtectorSukhovVladimir {
       meta:
 		author="malware-lu"
 strings:
@@ -6697,9 +5593,7 @@ condition:
 		$a0
 }
 
-
-rule CRYPToCRACksPEProtectorV093LukasFleischer
-{
+rule CRYPToCRACksPEProtectorV093LukasFleischer {
       meta:
 		author="malware-lu"
 strings:
@@ -6709,9 +5603,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv147v150
-{
+rule PECompactv147v150 {
       meta:
 		author="malware-lu"
 strings:
@@ -6721,9 +5613,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PocketPCMIB
-{
+rule PocketPCMIB {
       meta:
 		author="malware-lu"
 strings:
@@ -6733,9 +5623,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv305c4ExtractableVirusShield
-{
+rule WWPACKv305c4ExtractableVirusShield {
       meta:
 		author="malware-lu"
 strings:
@@ -6745,9 +5633,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxNoon1163
-{
+rule VxNoon1163 {
       meta:
 		author="malware-lu"
 strings:
@@ -6757,9 +5643,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PuNkMoD1xPuNkDuDe
-{
+rule PuNkMoD1xPuNkDuDe {
       meta:
 		author="malware-lu"
 strings:
@@ -6769,9 +5653,7 @@ condition:
 		$a0
 }
 
-
-rule PECrypt32Consolev10v101v102
-{
+rule PECrypt32Consolev10v101v102 {
       meta:
 		author="malware-lu"
 strings:
@@ -6781,9 +5663,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule InnoSetupModulev2018
-{
+rule InnoSetupModulev2018 {
       meta:
 		author="malware-lu"
 strings:
@@ -6793,9 +5673,7 @@ condition:
 		$a0
 }
 
-
-rule Nakedbind10nakedcrew
-{
+rule Nakedbind10nakedcrew {
       meta:
 		author="malware-lu"
 strings:
@@ -6805,9 +5683,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPacKV31LiuXingPing
-{
+rule NsPacKV31LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -6817,9 +5693,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AntiVirusVaccinev103
-{
+rule AntiVirusVaccinev103 {
       meta:
 		author="malware-lu"
 strings:
@@ -6829,9 +5703,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxKuku448
-{
+rule VxKuku448 {
       meta:
 		author="malware-lu"
 strings:
@@ -6841,9 +5713,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv12xNewStrain
-{
+rule ASProtectv12xNewStrain {
       meta:
 		author="malware-lu"
 strings:
@@ -6853,9 +5723,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimpleUPXCryptorv3042005OnelayerencryptionMANtiCORE
-{
+rule SimpleUPXCryptorv3042005OnelayerencryptionMANtiCORE {
       meta:
 		author="malware-lu"
 strings:
@@ -6865,9 +5733,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AntiDote10Demo12SISTeam
-{
+rule AntiDote10Demo12SISTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -6877,9 +5743,7 @@ condition:
 		$a0
 }
 
-
-rule FSGv110EngbartxtWinRARSFX
-{
+rule FSGv110EngbartxtWinRARSFX {
       meta:
 		author="malware-lu"
 strings:
@@ -6890,9 +5754,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule BJFntv11b
-{
+rule BJFntv11b {
       meta:
 		author="malware-lu"
 strings:
@@ -6902,9 +5764,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallEmbedded26202623Jitit
-{
+rule ThinstallEmbedded26202623Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -6914,9 +5774,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SLVc0deProtector11xSLVICU
-{
+rule SLVc0deProtector11xSLVICU {
       meta:
 		author="malware-lu"
 strings:
@@ -6926,9 +5784,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RJoinerbyVaskaSignfrompinch250320071700
-{
+rule RJoinerbyVaskaSignfrompinch250320071700 {
       meta:
 		author="malware-lu"
 strings:
@@ -6938,9 +5794,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AverCryptor10os1r1s
-{
+rule AverCryptor10os1r1s {
       meta:
 		author="malware-lu"
 strings:
@@ -6950,9 +5804,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule nSpackV23LiuXingPing
-{
+rule nSpackV23LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -6962,9 +5814,7 @@ condition:
 		$a0
 }
 
-
-rule SENDebugProtector
-{
+rule SENDebugProtector {
       meta:
 		author="malware-lu"
 strings:
@@ -6974,9 +5824,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule xPEP03xxIkUg
-{
+rule xPEP03xxIkUg {
       meta:
 		author="malware-lu"
 strings:
@@ -6986,9 +5834,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AntiDote14SESISTeam
-{
+rule AntiDote14SESISTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -6998,9 +5844,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPack30NorthStar
-{
+rule NsPack30NorthStar {
       meta:
 		author="malware-lu"
 strings:
@@ -7010,9 +5854,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ORiENV212FisunAV
-{
+rule ORiENV212FisunAV {
       meta:
 		author="malware-lu"
 strings:
@@ -7022,9 +5864,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPackv23NorthStar
-{
+rule NsPackv23NorthStar {
       meta:
 		author="malware-lu"
 strings:
@@ -7035,9 +5875,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule ObsidiumV1342ObsidiumSoftware
-{
+rule ObsidiumV1342ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -7047,9 +5885,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SplashBitmapv100WithUnpackCodeBoBBobsoft
-{
+rule SplashBitmapv100WithUnpackCodeBoBBobsoft {
       meta:
 		author="malware-lu"
 strings:
@@ -7059,9 +5895,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule KBySV028shoooo
-{
+rule KBySV028shoooo {
       meta:
 		author="malware-lu"
 strings:
@@ -7071,9 +5905,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ObsidiumV12XObsidiumSoftware
-{
+rule ObsidiumV12XObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -7083,9 +5915,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPackV13LiuXingPing
-{
+rule NsPackV13LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -7095,9 +5925,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01PENinja131Anorganix
-{
+rule PseudoSigner01PENinja131Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -7107,9 +5935,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidiumv1300ObsidiumSoftware
-{
+rule Obsidiumv1300ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -7120,9 +5946,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Feokt
-{
+rule Feokt {
       meta:
 		author="malware-lu"
 strings:
@@ -7132,9 +5956,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NTkrnlSecureSuite01015NTkrnlSoftware
-{
+rule NTkrnlSecureSuite01015NTkrnlSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -7144,9 +5966,7 @@ condition:
 		$a0
 }
 
-
-rule PEPROTECT09
-{
+rule PEPROTECT09 {
       meta:
 		author="malware-lu"
 strings:
@@ -7156,9 +5976,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXERefactorV01random
-{
+rule EXERefactorV01random {
       meta:
 		author="malware-lu"
 strings:
@@ -7168,9 +5986,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrunchPEv40
-{
+rule CrunchPEv40 {
       meta:
 		author="malware-lu"
 strings:
@@ -7180,9 +5996,7 @@ condition:
 		$a0
 }
 
-
-rule NullsoftPIMPInstallSystemv1x
-{
+rule NullsoftPIMPInstallSystemv1x {
       meta:
 		author="malware-lu"
 strings:
@@ -7192,9 +6006,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Pohernah100byKas
-{
+rule Pohernah100byKas {
       meta:
 		author="malware-lu"
 strings:
@@ -7204,9 +6016,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule dUP2diablo2oo2
-{
+rule dUP2diablo2oo2 {
       meta:
 		author="malware-lu"
 strings:
@@ -7216,9 +6026,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01ASPack2xxHeuristicAnorganix
-{
+rule PseudoSigner01ASPack2xxHeuristicAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -7228,9 +6036,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXpressorv145CGSoftLabs
-{
+rule eXpressorv145CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -7240,9 +6046,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule hmimysProtectv10
-{
+rule hmimysProtectv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -7253,9 +6057,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule VProtectorV10Evcasm
-{
+rule VProtectorV10Evcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -7265,9 +6067,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01LCCWin32DLLAnorganix
-{
+rule PseudoSigner01LCCWin32DLLAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -7277,9 +6077,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CodeCryptv014b
-{
+rule CodeCryptv014b {
       meta:
 		author="malware-lu"
 strings:
@@ -7289,9 +6087,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PellesC450DLLX86CRTLIB
-{
+rule PellesC450DLLX86CRTLIB {
       meta:
 		author="malware-lu"
 strings:
@@ -7301,9 +6097,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EEXEVersion112
-{
+rule EEXEVersion112 {
       meta:
 		author="malware-lu"
 strings:
@@ -7313,9 +6107,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv120EngdulekxtMASM32TASM32
-{
+rule FSGv120EngdulekxtMASM32TASM32 {
       meta:
 		author="malware-lu"
 strings:
@@ -7325,9 +6117,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEDiminisherv01Teraphy
-{
+rule PEDiminisherv01Teraphy {
       meta:
 		author="malware-lu"
 strings:
@@ -7337,9 +6127,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02VBOX43MTEAnorganix
-{
+rule PseudoSigner02VBOX43MTEAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -7349,9 +6137,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SEAAXE
-{
+rule SEAAXE {
       meta:
 		author="malware-lu"
 strings:
@@ -7361,9 +6147,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UpackV010V011Dwing
-{
+rule UpackV010V011Dwing {
       meta:
 		author="malware-lu"
 strings:
@@ -7373,9 +6157,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakePCGuard403415FEUERRADER
-{
+rule AHTeamEPProtector03fakePCGuard403415FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -7385,9 +6167,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimplePack111Method1bagieTMX
-{
+rule SimplePack111Method1bagieTMX {
       meta:
 		author="malware-lu"
 strings:
@@ -7398,9 +6178,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule MASM32: Packer PEiD
-{
+rule MASM32: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -7410,9 +6188,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftDefenderv10v11
-{
+rule SoftDefenderv10v11 {
       meta:
 		author="malware-lu"
 strings:
@@ -7422,9 +6198,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule XtremeProtectorv106
-{
+rule XtremeProtectorv106 {
       meta:
 		author="malware-lu"
 strings:
@@ -7434,9 +6208,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VcasmProtector1112vcasm
-{
+rule VcasmProtector1112vcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -7446,9 +6218,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidiumv1111
-{
+rule Obsidiumv1111 {
       meta:
 		author="malware-lu"
 strings:
@@ -7458,9 +6228,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxEddie1530
-{
+rule VxEddie1530 {
       meta:
 		author="malware-lu"
 strings:
@@ -7470,9 +6238,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule KBySV028DLLshoooo
-{
+rule KBySV028DLLshoooo {
       meta:
 		author="malware-lu"
 strings:
@@ -7482,9 +6248,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEncrypt10JunkCode
-{
+rule PEncrypt10JunkCode {
       meta:
 		author="malware-lu"
 strings:
@@ -7494,9 +6258,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEPasswordv02SMTSMF
-{
+rule PEPasswordv02SMTSMF {
       meta:
 		author="malware-lu"
 strings:
@@ -7506,9 +6268,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EncryptPE22006710220061025WFS
-{
+rule EncryptPE22006710220061025WFS {
       meta:
 		author="malware-lu"
 strings:
@@ -7518,9 +6278,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv16Vaska
-{
+rule RCryptorv16Vaska {
       meta:
 		author="malware-lu"
 strings:
@@ -7531,9 +6289,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PEPaCKv10CCopyright1998byANAKiN
-{
+rule PEPaCKv10CCopyright1998byANAKiN {
       meta:
 		author="malware-lu"
 strings:
@@ -7543,9 +6299,7 @@ condition:
 		$a0
 }
 
-
-rule YodasProtectorv1032Beta2AshkbizDanehkar
-{
+rule YodasProtectorv1032Beta2AshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -7555,9 +6309,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxMTEnonencrypted
-{
+rule VxMTEnonencrypted {
       meta:
 		author="malware-lu"
 strings:
@@ -7567,9 +6319,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01FSG131Anorganix
-{
+rule PseudoSigner01FSG131Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -7579,9 +6329,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv212AlexeySolodovnikov
-{
+rule ASPackv212AlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -7592,9 +6340,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Upack022023betaDwing
-{
+rule Upack022023betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -7606,9 +6352,7 @@ condition:
 		$a0 or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule PseudoSigner01CodeLockAnorganix
-{
+rule PseudoSigner01CodeLockAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -7618,9 +6362,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv100c1
-{
+rule PKLITEv100c1 {
       meta:
 		author="malware-lu"
 strings:
@@ -7630,9 +6372,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakenSPack13emadicius
-{
+rule MSLRHv032afakenSPack13emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -7642,9 +6382,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv100c2
-{
+rule PKLITEv100c2 {
       meta:
 		author="malware-lu"
 strings:
@@ -7654,9 +6392,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule kkrunchyv017FGiesen
-{
+rule kkrunchyv017FGiesen {
       meta:
 		author="malware-lu"
 strings:
@@ -7666,9 +6402,7 @@ condition:
 		$a0
 }
 
-
-rule ACProtectv190gRiscosoftwareInc
-{
+rule ACProtectv190gRiscosoftwareInc {
       meta:
 		author="malware-lu"
 strings:
@@ -7678,9 +6412,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPX293300LZMAMarkusOberhumerLaszloMolnarJohnReiser
-{
+rule UPX293300LZMAMarkusOberhumerLaszloMolnarJohnReiser {
       meta:
 		author="malware-lu"
 strings:
@@ -7690,9 +6422,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium133720070623ObsidiumSoftware
-{
+rule Obsidium133720070623ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -7702,9 +6432,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv2000AlexeySolodovnikov
-{
+rule ASPackv2000AlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -7714,9 +6442,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov4000053SiliconRealmsToolworks
-{
+rule Armadillov4000053SiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -7726,9 +6452,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov160a
-{
+rule Armadillov160a {
       meta:
 		author="malware-lu"
 strings:
@@ -7738,9 +6462,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ACProtectUltraProtect10X20XRiSco
-{
+rule ACProtectUltraProtect10X20XRiSco {
       meta:
 		author="malware-lu"
 strings:
@@ -7750,9 +6472,7 @@ condition:
 		$a0
 }
 
-
-rule Thinstall3035Jtit
-{
+rule Thinstall3035Jtit {
       meta:
 		author="malware-lu"
 strings:
@@ -7763,9 +6483,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PENinjav10DzAkRAkerTNT
-{
+rule PENinjav10DzAkRAkerTNT {
       meta:
 		author="malware-lu"
 strings:
@@ -7775,9 +6493,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallEmbedded19XJitit
-{
+rule ThinstallEmbedded19XJitit {
       meta:
 		author="malware-lu"
 strings:
@@ -7787,9 +6503,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptorv13045
-{
+rule EXECryptorv13045 {
       meta:
 		author="malware-lu"
 strings:
@@ -7800,9 +6514,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Obsidium1338ObsidiumSoftware
-{
+rule Obsidium1338ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -7812,9 +6524,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPV073betaap0x
-{
+rule RLPV073betaap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -7824,9 +6534,7 @@ condition:
 		$a0
 }
 
-
-rule yCv13byAshkbizDanehkar
-{
+rule yCv13byAshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -7836,9 +6544,7 @@ condition:
 		$a0
 }
 
-
-rule PCPECalphapreview
-{
+rule PCPECalphapreview {
       meta:
 		author="malware-lu"
 strings:
@@ -7848,9 +6554,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AlexProtectorv10Alex
-{
+rule AlexProtectorv10Alex {
       meta:
 		author="malware-lu"
 strings:
@@ -7860,9 +6564,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Shrinkv10
-{
+rule Shrinkv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -7872,9 +6574,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHPack01FEUERRADER
-{
+rule AHPack01FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -7884,9 +6584,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SentinelSuperProAutomaticProtectionv640Safenet
-{
+rule SentinelSuperProAutomaticProtectionv640Safenet {
       meta:
 		author="malware-lu"
 strings:
@@ -7896,9 +6594,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DxPack10
-{
+rule DxPack10 {
       meta:
 		author="malware-lu"
 strings:
@@ -7908,9 +6604,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Pohernah103byKas
-{
+rule Pohernah103byKas {
       meta:
 		author="malware-lu"
 strings:
@@ -7920,9 +6614,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ObsidiumV1258ObsidiumSoftware
-{
+rule ObsidiumV1258ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -7932,9 +6624,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule nPackv11150200BetaNEOx
-{
+rule nPackv11150200BetaNEOx {
       meta:
 		author="malware-lu"
 strings:
@@ -7944,9 +6634,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PerlApp602ActiveState
-{
+rule PerlApp602ActiveState {
       meta:
 		author="malware-lu"
 strings:
@@ -7957,9 +6645,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule UPXProtectorv10x2
-{
+rule UPXProtectorv10x2 {
       meta:
 		author="malware-lu"
 strings:
@@ -7969,9 +6655,7 @@ condition:
 		$a0
 }
 
-
-rule ThinstallEmbedded2501Jitit
-{
+rule ThinstallEmbedded2501Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -7981,9 +6665,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CodeVirtualizer1310OreansTechnologies
-{
+rule CodeVirtualizer1310OreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -7993,9 +6675,7 @@ condition:
 		$a0
 }
 
-
-rule VProtector13Xvcasm
-{
+rule VProtector13Xvcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -8006,9 +6686,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule Packman0001bubba
-{
+rule Packman0001bubba {
       meta:
 		author="malware-lu"
 strings:
@@ -8018,9 +6696,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimplePackV11XV12XMethod1bagie
-{
+rule SimplePackV11XV12XMethod1bagie {
       meta:
 		author="malware-lu"
 strings:
@@ -8030,9 +6706,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEEncryptv40bJunkCode
-{
+rule PEEncryptv40bJunkCode {
       meta:
 		author="malware-lu"
 strings:
@@ -8042,9 +6716,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEQuake006forgat
-{
+rule PEQuake006forgat {
       meta:
 		author="malware-lu"
 strings:
@@ -8054,9 +6726,7 @@ condition:
 		$a0
 }
 
-
-rule Kryptonv02
-{
+rule Kryptonv02 {
       meta:
 		author="malware-lu"
 strings:
@@ -8066,9 +6736,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakePELockNT204FEUERRADER
-{
+rule AHTeamEPProtector03fakePELockNT204FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -8078,9 +6746,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressorPacK150XCGSoftLabs
-{
+rule eXPressorPacK150XCGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -8090,9 +6756,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule D1S1Gv11BetaScrambledEXED1N
-{
+rule D1S1Gv11BetaScrambledEXED1N {
       meta:
 		author="malware-lu"
 strings:
@@ -8102,9 +6766,7 @@ condition:
 		$a0
 }
 
-
-rule ReversingLabsProtector074betaAp0x
-{
+rule ReversingLabsProtector074betaAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -8114,9 +6776,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ACProtect109gRiscosoftwareInc
-{
+rule ACProtect109gRiscosoftwareInc {
       meta:
 		author="malware-lu"
 strings:
@@ -8126,9 +6786,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NorthStarPEShrinker13Liuxingping
-{
+rule NorthStarPEShrinker13Liuxingping {
       meta:
 		author="malware-lu"
 strings:
@@ -8138,9 +6796,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressorV13CGSoftLabs
-{
+rule eXPressorV13CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -8150,9 +6806,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeJoinerSmallbuild035GlOFF
-{
+rule FreeJoinerSmallbuild035GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -8162,9 +6816,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upack020betaDwing
-{
+rule Upack020betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -8174,9 +6826,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPX20030XMarkusOberhumerLaszloMolnarJohnReiser
-{
+rule UPX20030XMarkusOberhumerLaszloMolnarJohnReiser {
       meta:
 		author="malware-lu"
 strings:
@@ -8186,9 +6836,7 @@ condition:
 		$a0
 }
 
-
-rule WinUpackv039finalByDwingc2005h1
-{
+rule WinUpackv039finalByDwingc2005h1 {
       meta:
 		author="malware-lu"
 strings:
@@ -8198,9 +6846,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnnamedScrambler12Bp0ke
-{
+rule UnnamedScrambler12Bp0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -8210,9 +6856,7 @@ condition:
 		$a0
 }
 
-
-rule Upack010012betaDwing
-{
+rule Upack010012betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -8222,9 +6866,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEArmorV07Xhying
-{
+rule PEArmorV07Xhying {
       meta:
 		author="malware-lu"
 strings:
@@ -8234,9 +6876,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule LauncherGeneratorv103
-{
+rule LauncherGeneratorv103 {
       meta:
 		author="malware-lu"
 strings:
@@ -8246,9 +6886,7 @@ condition:
 		$a0
 }
 
-
-rule yodasProtector102103AshkbizDanehkar
-{
+rule yodasProtector102103AshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -8258,9 +6896,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NakedPacker10byBigBoote
-{
+rule NakedPacker10byBigBoote {
       meta:
 		author="malware-lu"
 strings:
@@ -8270,9 +6906,7 @@ condition:
 		$a0
 }
 
-
-rule tElockv080
-{
+rule tElockv080 {
       meta:
 		author="malware-lu"
 strings:
@@ -8282,9 +6916,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01YodasProtector102Anorganix
-{
+rule PseudoSigner01YodasProtector102Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -8294,9 +6926,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VProtector11Xvcasm
-{
+rule VProtector11Xvcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -8306,9 +6936,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMASM32
-{
+rule FSGv110EngdulekxtMASM32 {
       meta:
 		author="malware-lu"
 strings:
@@ -8318,9 +6946,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Pohernah102byKas
-{
+rule Pohernah102byKas {
       meta:
 		author="malware-lu"
 strings:
@@ -8330,9 +6956,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ActiveMARK5xTrymediaSystemsInc
-{
+rule ActiveMARK5xTrymediaSystemsInc {
       meta:
 		author="malware-lu"
 strings:
@@ -8342,9 +6966,7 @@ condition:
 		$a0
 }
 
-
-rule RCryptorv20HideEPVaska
-{
+rule RCryptorv20HideEPVaska {
       meta:
 		author="malware-lu"
 strings:
@@ -8354,9 +6976,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov172v173
-{
+rule Armadillov172v173 {
       meta:
 		author="malware-lu"
 strings:
@@ -8366,9 +6986,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AsCryptv01SToRM2
-{
+rule AsCryptv01SToRM2 {
       meta:
 		author="malware-lu"
 strings:
@@ -8378,9 +6996,7 @@ condition:
 		$a0
 }
 
-
-rule AsCryptv01SToRM3
-{
+rule AsCryptv01SToRM3 {
       meta:
 		author="malware-lu"
 strings:
@@ -8390,9 +7006,7 @@ condition:
 		$a0
 }
 
-
-rule ASProtectV2XDLLAlexeySolodovnikov
-{
+rule ASProtectV2XDLLAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -8402,9 +7016,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AsCryptv01SToRM4
-{
+rule AsCryptv01SToRM4 {
       meta:
 		author="malware-lu"
 strings:
@@ -8414,9 +7026,7 @@ condition:
 		$a0
 }
 
-
-rule yzpack20UsAr
-{
+rule yzpack20UsAr {
       meta:
 		author="malware-lu"
 strings:
@@ -8426,9 +7036,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PasswordprotectormySMT
-{
+rule PasswordprotectormySMT {
       meta:
 		author="malware-lu"
 strings:
@@ -8438,9 +7046,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ObsidiumV1258V133XObsidiumSoftware
-{
+rule ObsidiumV1258V133XObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -8450,9 +7056,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ReflexiveArcadeWrapper
-{
+rule ReflexiveArcadeWrapper {
       meta:
 		author="malware-lu"
 strings:
@@ -8462,9 +7066,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxTrojanTelefoon
-{
+rule VxTrojanTelefoon {
       meta:
 		author="malware-lu"
 strings:
@@ -8474,9 +7076,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv030betaDwing
-{
+rule Upackv030betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -8486,9 +7086,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxACMEClonewarMutant
-{
+rule VxACMEClonewarMutant {
       meta:
 		author="malware-lu"
 strings:
@@ -8498,9 +7096,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov2xxCopyMemII
-{
+rule Armadillov2xxCopyMemII {
       meta:
 		author="malware-lu"
 strings:
@@ -8510,9 +7106,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule TPACKv05cm1
-{
+rule TPACKv05cm1 {
       meta:
 		author="malware-lu"
 strings:
@@ -8522,9 +7116,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEStealthv271
-{
+rule EXEStealthv271 {
       meta:
 		author="malware-lu"
 strings:
@@ -8534,9 +7126,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule TPACKv05cm2
-{
+rule TPACKv05cm2 {
       meta:
 		author="malware-lu"
 strings:
@@ -8546,9 +7136,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeJoiner10Yodaf2f
-{
+rule ExeJoiner10Yodaf2f {
       meta:
 		author="malware-lu"
 strings:
@@ -8558,9 +7146,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv101bAlexeySolodovnikov
-{
+rule ASPackv101bAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -8570,9 +7156,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MacromediaWindowsFlashProjectorPlayerv30
-{
+rule MacromediaWindowsFlashProjectorPlayerv30 {
       meta:
 		author="malware-lu"
 strings:
@@ -8582,9 +7166,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PESpinV11cyberbob
-{
+rule PESpinV11cyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -8594,9 +7176,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPack118aPlib043ap0x
-{
+rule RLPack118aPlib043ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -8606,9 +7186,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DotFixNiceProtectvna
-{
+rule DotFixNiceProtectvna {
       meta:
 		author="malware-lu"
 strings:
@@ -8618,9 +7196,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv032betaDwing
-{
+rule Upackv032betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -8630,9 +7206,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PackItBitch10archphase
-{
+rule PackItBitch10archphase {
       meta:
 		author="malware-lu"
 strings:
@@ -8642,9 +7216,7 @@ condition:
 		$a0
 }
 
-
-rule JDPack2xJDPack
-{
+rule JDPack2xJDPack {
       meta:
 		author="malware-lu"
 strings:
@@ -8654,9 +7226,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RPolyCryptv10personalpolycryptorsignfrompinch
-{
+rule RPolyCryptv10personalpolycryptorsignfrompinch {
       meta:
 		author="malware-lu"
 strings:
@@ -8666,9 +7236,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv031betaDwing
-{
+rule Upackv031betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -8678,9 +7246,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Packmanv0001
-{
+rule Packmanv0001 {
       meta:
 		author="malware-lu"
 strings:
@@ -8690,9 +7256,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01PEPack099Anorganix
-{
+rule PseudoSigner01PEPack099Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -8702,9 +7266,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor239minimumprotection
-{
+rule EXECryptor239minimumprotection {
       meta:
 		author="malware-lu"
 strings:
@@ -8714,9 +7276,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMicrosoftVisualC60ASM
-{
+rule FSGv110EngdulekxtMicrosoftVisualC60ASM {
       meta:
 		author="malware-lu"
 strings:
@@ -8726,9 +7286,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HaspdongleAlladin
-{
+rule HaspdongleAlladin {
       meta:
 		author="malware-lu"
 strings:
@@ -8738,9 +7296,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SafeDiscv4
-{
+rule SafeDiscv4 {
       meta:
 		author="malware-lu"
 strings:
@@ -8750,9 +7306,7 @@ condition:
 		$a0
 }
 
-
-rule PKLITEv112v115v1201
-{
+rule PKLITEv112v115v1201 {
       meta:
 		author="malware-lu"
 strings:
@@ -8762,9 +7316,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv112v115v1202
-{
+rule PKLITEv112v115v1202 {
       meta:
 		author="malware-lu"
 strings:
@@ -8774,9 +7326,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptorv153
-{
+rule EXECryptorv153 {
       meta:
 		author="malware-lu"
 strings:
@@ -8786,9 +7336,7 @@ condition:
 		$a0
 }
 
-
-rule MSLRHv032afakeEXE32Pack13xemadicius
-{
+rule MSLRHv032afakeEXE32Pack13xemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -8798,9 +7346,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXpressorv11CGSoftLabs
-{
+rule eXpressorv11CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -8810,9 +7356,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPackV11LiuXingPing
-{
+rule NsPackV11LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -8822,9 +7366,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PrivatePersonalPackerPPPv102ConquestOfTroycom
-{
+rule PrivatePersonalPackerPPPv102ConquestOfTroycom {
       meta:
 		author="malware-lu"
 strings:
@@ -8834,9 +7376,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxHorse1776
-{
+rule VxHorse1776 {
       meta:
 		author="malware-lu"
 strings:
@@ -8846,9 +7386,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEShit: Packer PEiD
-{
+rule PEShit: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -8858,9 +7396,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DrWebVirusFindingEngineInSoftEDVSysteme
-{
+rule DrWebVirusFindingEngineInSoftEDVSysteme {
       meta:
 		author="malware-lu"
 strings:
@@ -8870,9 +7406,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PluginToExev100BoBBobSoft
-{
+rule PluginToExev100BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -8882,9 +7416,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv15PrivateVaska
-{
+rule RCryptorv15PrivateVaska {
       meta:
 		author="malware-lu"
 strings:
@@ -8894,9 +7426,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NeoLitev200
-{
+rule NeoLitev200 {
       meta:
 		author="malware-lu"
 strings:
@@ -8906,9 +7436,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv200bextra
-{
+rule PKLITEv200bextra {
       meta:
 		author="malware-lu"
 strings:
@@ -8918,9 +7446,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Crunch5Fusion4
-{
+rule Crunch5Fusion4 {
       meta:
 		author="malware-lu"
 strings:
@@ -8930,9 +7456,7 @@ condition:
 		$a0
 }
 
-
-rule MSLRHv032afakePEBundle023xemadicius
-{
+rule MSLRHv032afakePEBundle023xemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -8942,9 +7466,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEMangle
-{
+rule PEMangle {
       meta:
 		author="malware-lu"
 strings:
@@ -8954,9 +7476,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv302v302av304Relocationspack
-{
+rule WWPACKv302v302av304Relocationspack {
       meta:
 		author="malware-lu"
 strings:
@@ -8966,9 +7486,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXProtectorv10x
-{
+rule UPXProtectorv10x {
       meta:
 		author="malware-lu"
 strings:
@@ -8978,9 +7496,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NorthStarPEShrinkerv13byLiuxingping
-{
+rule NorthStarPEShrinkerv13byLiuxingping {
       meta:
 		author="malware-lu"
 strings:
@@ -8990,9 +7506,7 @@ condition:
 		$a0
 }
 
-
-rule CodeCryptv015b
-{
+rule CodeCryptv015b {
       meta:
 		author="malware-lu"
 strings:
@@ -9002,9 +7516,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackFullEdition117Ap0x
-{
+rule RLPackFullEdition117Ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -9014,9 +7526,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv100
-{
+rule PECompactv100 {
       meta:
 		author="malware-lu"
 strings:
@@ -9026,9 +7536,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeASProtect10FEUERRADER
-{
+rule AHTeamEPProtector03fakeASProtect10FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -9038,9 +7546,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule KGCryptvxx
-{
+rule KGCryptvxx {
       meta:
 		author="malware-lu"
 strings:
@@ -9050,9 +7556,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxKBDflags1024
-{
+rule VxKBDflags1024 {
       meta:
 		author="malware-lu"
 strings:
@@ -9062,9 +7566,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yodasProtectorV102AshkbizDanehkar
-{
+rule yodasProtectorV102AshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -9074,9 +7576,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1311ObsidiumSoftware
-{
+rule Obsidium1311ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -9086,9 +7586,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01MicrosoftVisualC620Anorganix
-{
+rule PseudoSigner01MicrosoftVisualC620Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -9098,9 +7596,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MEGALITEv120a
-{
+rule MEGALITEv120a {
       meta:
 		author="malware-lu"
 strings:
@@ -9110,9 +7606,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule GoatsMutilatorV16Goat_e0f
-{
+rule GoatsMutilatorV16Goat_e0f {
       meta:
 		author="malware-lu"
 strings:
@@ -9122,9 +7616,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillo430aSiliconRealmsToolworks
-{
+rule Armadillo430aSiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -9134,9 +7626,7 @@ condition:
 		$a0
 }
 
-
-rule Upackv038betaDwing
-{
+rule Upackv038betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -9147,9 +7637,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule DCryptPrivate09bdrmist
-{
+rule DCryptPrivate09bdrmist {
       meta:
 		author="malware-lu"
 strings:
@@ -9159,9 +7647,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule kkrunchyV02XRyd
-{
+rule kkrunchyV02XRyd {
       meta:
 		author="malware-lu"
 strings:
@@ -9171,9 +7657,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SkDUndetectabler3NoFSG2MethodSkD
-{
+rule SkDUndetectabler3NoFSG2MethodSkD {
       meta:
 		author="malware-lu"
 strings:
@@ -9183,9 +7667,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NTPacker10ErazerZ
-{
+rule NTPacker10ErazerZ {
       meta:
 		author="malware-lu"
 strings:
@@ -9195,9 +7677,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SexeCrypter11bysantasdad
-{
+rule SexeCrypter11bysantasdad {
       meta:
 		author="malware-lu"
 strings:
@@ -9207,9 +7687,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxGotcha879
-{
+rule VxGotcha879 {
       meta:
 		author="malware-lu"
 strings:
@@ -9219,9 +7697,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MZ0oPE106bTaskFall
-{
+rule MZ0oPE106bTaskFall {
       meta:
 		author="malware-lu"
 strings:
@@ -9232,9 +7708,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule SoftDefenderv11xRandyLi
-{
+rule SoftDefenderv11xRandyLi {
       meta:
 		author="malware-lu"
 strings:
@@ -9244,9 +7718,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv010v012BetaDwing
-{
+rule Upackv010v012BetaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -9256,9 +7728,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeBorlandDelphi6070FEUERRADER
-{
+rule AHTeamEPProtector03fakeBorlandDelphi6070FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -9268,9 +7738,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule STProtectorV15SilentSoftware
-{
+rule STProtectorV15SilentSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -9280,9 +7748,7 @@ condition:
 		$a0
 }
 
-
-rule ASPackv105bAlexeySolodovnikov
-{
+rule ASPackv105bAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -9292,9 +7758,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor226minimumprotection
-{
+rule EXECryptor226minimumprotection {
       meta:
 		author="malware-lu"
 strings:
@@ -9304,9 +7768,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEProtector093CRYPToCRACk
-{
+rule PEProtector093CRYPToCRACk {
       meta:
 		author="malware-lu"
 strings:
@@ -9316,9 +7778,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PellesC300400450EXEX86CRTLIB
-{
+rule PellesC300400450EXEX86CRTLIB {
       meta:
 		author="malware-lu"
 strings:
@@ -9328,9 +7788,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackv118BasicaPLibAp0x
-{
+rule RLPackv118BasicaPLibAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -9340,9 +7798,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule vfpexeNcV500WangJianGuo
-{
+rule vfpexeNcV500WangJianGuo {
       meta:
 		author="malware-lu"
 strings:
@@ -9352,9 +7808,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeJoiner153Stubengine17GlOFF
-{
+rule FreeJoiner153Stubengine17GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -9364,9 +7818,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule TheHypersprotectorTheHyper
-{
+rule TheHypersprotectorTheHyper {
       meta:
 		author="malware-lu"
 strings:
@@ -9376,9 +7828,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ANDpakk2006DmitryAndreev
-{
+rule ANDpakk2006DmitryAndreev {
       meta:
 		author="malware-lu"
 strings:
@@ -9388,9 +7838,7 @@ condition:
 		$a0
 }
 
-
-rule Thinstall2628Jtit
-{
+rule Thinstall2628Jtit {
       meta:
 		author="malware-lu"
 strings:
@@ -9401,9 +7849,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule UPXModifierv01x
-{
+rule UPXModifierv01x {
       meta:
 		author="malware-lu"
 strings:
@@ -9413,9 +7859,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1333ObsidiumSoftware
-{
+rule Obsidium1333ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -9426,9 +7870,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PureBasic4xNeilHodgson
-{
+rule PureBasic4xNeilHodgson {
       meta:
 		author="malware-lu"
 strings:
@@ -9438,9 +7880,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxAugust16thIronMaiden
-{
+rule VxAugust16thIronMaiden {
       meta:
 		author="malware-lu"
 strings:
@@ -9450,9 +7890,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VProtector10Xvcasm
-{
+rule VProtector10Xvcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -9462,9 +7900,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEPACK099
-{
+rule PEPACK099 {
       meta:
 		author="malware-lu"
 strings:
@@ -9474,9 +7910,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Freshbindv20gFresh
-{
+rule Freshbindv20gFresh {
       meta:
 		author="malware-lu"
 strings:
@@ -9486,9 +7920,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXSCRAMBLER306OnToL
-{
+rule UPXSCRAMBLER306OnToL {
       meta:
 		author="malware-lu"
 strings:
@@ -9498,9 +7930,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompact2xxBitSumTechnologies
-{
+rule PECompact2xxBitSumTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -9510,9 +7940,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PESpinv01Cyberbob
-{
+rule PESpinv01Cyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -9523,9 +7951,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule VxEddie2100
-{
+rule VxEddie2100 {
       meta:
 		author="malware-lu"
 strings:
@@ -9535,9 +7961,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NETexecutableMicrosoft
-{
+rule NETexecutableMicrosoft {
       meta:
 		author="malware-lu"
 strings:
@@ -9547,9 +7971,7 @@ condition:
 		$a0
 }
 
-
-rule tElockv098
-{
+rule tElockv098 {
       meta:
 		author="malware-lu"
 strings:
@@ -9559,9 +7981,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AZProtect0001byAlexZakaAZCRC
-{
+rule AZProtect0001byAlexZakaAZCRC {
       meta:
 		author="malware-lu"
 strings:
@@ -9572,9 +7992,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule UPX290LZMAMarkusOberhumerLaszloMolnarJohnReiser
-{
+rule UPX290LZMAMarkusOberhumerLaszloMolnarJohnReiser {
       meta:
 		author="malware-lu"
 strings:
@@ -9585,9 +8003,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule MEW510Northfox
-{
+rule MEW510Northfox {
       meta:
 		author="malware-lu"
 strings:
@@ -9597,9 +8013,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv090
-{
+rule tElockv090 {
       meta:
 		author="malware-lu"
 strings:
@@ -9609,9 +8023,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1258ObsidiumSoftware
-{
+rule Obsidium1258ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -9621,9 +8033,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SVKProtectorv132EngPavolCerven
-{
+rule SVKProtectorv132EngPavolCerven {
       meta:
 		author="malware-lu"
 strings:
@@ -9633,9 +8043,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeSplitter12BillPrisonerTPOC
-{
+rule ExeSplitter12BillPrisonerTPOC {
       meta:
 		author="malware-lu"
 strings:
@@ -9645,9 +8053,7 @@ condition:
 		$a0
 }
 
-
-rule COPv10c1988
-{
+rule COPv10c1988 {
       meta:
 		author="malware-lu"
 strings:
@@ -9657,9 +8063,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv25RetailSlimLoaderBitsumTechnologies
-{
+rule PECompactv25RetailSlimLoaderBitsumTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -9669,9 +8073,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Morphinev27Holy_FatherRatter29A
-{
+rule Morphinev27Holy_FatherRatter29A {
       meta:
 		author="malware-lu"
 strings:
@@ -9682,9 +8084,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule diPackerV1XdiProtectorSoftware
-{
+rule diPackerV1XdiProtectorSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -9694,9 +8094,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01REALBasicAnorganix
-{
+rule PseudoSigner01REALBasicAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -9706,9 +8104,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PPCPROTECT11XAlexeyGorchakov
-{
+rule PPCPROTECT11XAlexeyGorchakov {
       meta:
 		author="malware-lu"
 strings:
@@ -9718,9 +8114,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule nPackV111502006BetaNEOxuinC
-{
+rule nPackV111502006BetaNEOxuinC {
       meta:
 		author="malware-lu"
 strings:
@@ -9730,9 +8124,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EnigmaProtector11X13XSukhovVladimirSergeNMarkin
-{
+rule EnigmaProtector11X13XSukhovVladimirSergeNMarkin {
       meta:
 		author="malware-lu"
 strings:
@@ -9742,9 +8134,7 @@ condition:
 		$a0
 }
 
-
-rule HardlockdongleAlladin
-{
+rule HardlockdongleAlladin {
       meta:
 		author="malware-lu"
 strings:
@@ -9754,9 +8144,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov190c
-{
+rule Armadillov190c {
       meta:
 		author="malware-lu"
 strings:
@@ -9766,9 +8154,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upack_PatchDwing
-{
+rule Upack_PatchDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -9778,9 +8164,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeJoinerV10Yodaf2f
-{
+rule ExeJoinerV10Yodaf2f {
       meta:
 		author="malware-lu"
 strings:
@@ -9790,9 +8174,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCShrink071beta
-{
+rule PCShrink071beta {
       meta:
 		author="malware-lu"
 strings:
@@ -9802,9 +8184,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMASM32TASM32
-{
+rule FSGv110EngdulekxtMASM32TASM32 {
       meta:
 		author="malware-lu"
 strings:
@@ -9815,9 +8195,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PEiDBundlev101BoBBobSoft
-{
+rule PEiDBundlev101BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -9827,9 +8205,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPX072
-{
+rule UPX072 {
       meta:
 		author="malware-lu"
 strings:
@@ -9839,9 +8215,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AdFlt2: Packer PEiD
-{
+rule AdFlt2: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -9851,9 +8225,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPack120BasicEditionaPLibAp0x
-{
+rule RLPack120BasicEditionaPLibAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -9863,9 +8235,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AsCryptv01SToRM1
-{
+rule AsCryptv01SToRM1 {
       meta:
 		author="malware-lu"
 strings:
@@ -9875,9 +8245,7 @@ condition:
 		$a0
 }
 
-
-rule SmartEMicrosoft
-{
+rule SmartEMicrosoft {
       meta:
 		author="malware-lu"
 strings:
@@ -9887,9 +8255,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PE_Admin10EncryptPE12003518SoldFlyingCat
-{
+rule PE_Admin10EncryptPE12003518SoldFlyingCat {
       meta:
 		author="malware-lu"
 strings:
@@ -9900,9 +8266,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule MacromediaWindowsFlashProjectorPlayerv40
-{
+rule MacromediaWindowsFlashProjectorPlayerv40 {
       meta:
 		author="malware-lu"
 strings:
@@ -9912,9 +8276,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPack32v100v111v112v120
-{
+rule WWPack32v100v111v112v120 {
       meta:
 		author="malware-lu"
 strings:
@@ -9924,9 +8286,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VProtectorV11vcasm
-{
+rule VProtectorV11vcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -9936,9 +8296,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MaskPE16yzkzero
-{
+rule MaskPE16yzkzero {
       meta:
 		author="malware-lu"
 strings:
@@ -9948,9 +8306,7 @@ condition:
 		$a0
 }
 
-
-rule bambam001bedrock
-{
+rule bambam001bedrock {
       meta:
 		author="malware-lu"
 strings:
@@ -9960,9 +8316,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01MEW11SE10Anorganix
-{
+rule PseudoSigner01MEW11SE10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -9972,9 +8326,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv20
-{
+rule ASProtectv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -9984,9 +8336,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner01BorlandDelphi6070Anorganix
-{
+rule PseudoSigner01BorlandDelphi6070Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -9996,9 +8346,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ObsidiumV12ObsidiumSoftware
-{
+rule ObsidiumV12ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -10008,9 +8356,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01PEProtect09Anorganix
-{
+rule PseudoSigner01PEProtect09Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -10020,9 +8366,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPack32v1x
-{
+rule WWPack32v1x {
       meta:
 		author="malware-lu"
 strings:
@@ -10032,9 +8376,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ChSfxsmallv11
-{
+rule ChSfxsmallv11 {
       meta:
 		author="malware-lu"
 strings:
@@ -10044,9 +8386,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXModifiedStubcFarbrauschConsumerConsulting
-{
+rule UPXModifiedStubcFarbrauschConsumerConsulting {
       meta:
 		author="malware-lu"
 strings:
@@ -10056,9 +8396,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02NorthStarPEShrinker13Anorganix
-{
+rule PseudoSigner02NorthStarPEShrinker13Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -10068,9 +8406,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv098tE
-{
+rule tElockv098tE {
       meta:
 		author="malware-lu"
 strings:
@@ -10080,9 +8416,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMicrosoftVisualBasicMASM32
-{
+rule FSGv110EngdulekxtMicrosoftVisualBasicMASM32 {
       meta:
 		author="malware-lu"
 strings:
@@ -10092,9 +8426,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv022v023BetaDwing
-{
+rule Upackv022v023BetaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -10104,9 +8436,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxVirusConstructorbased
-{
+rule VxVirusConstructorbased {
       meta:
 		author="malware-lu"
 strings:
@@ -10117,9 +8447,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PESHiELD02
-{
+rule PESHiELD02 {
       meta:
 		author="malware-lu"
 strings:
@@ -10129,9 +8457,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02Gleam100Anorganix
-{
+rule PseudoSigner02Gleam100Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -10141,9 +8467,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DBPEv233DingBoy
-{
+rule DBPEv233DingBoy {
       meta:
 		author="malware-lu"
 strings:
@@ -10153,9 +8477,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01PEtite2xlevel0Anorganix
-{
+rule PseudoSigner01PEtite2xlevel0Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -10165,9 +8487,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EPack14litefinalby6aHguT
-{
+rule EPack14litefinalby6aHguT {
       meta:
 		author="malware-lu"
 strings:
@@ -10177,9 +8497,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElock098tE
-{
+rule tElock098tE {
       meta:
 		author="malware-lu"
 strings:
@@ -10189,9 +8507,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnnamedScrambler10p0ke
-{
+rule UnnamedScrambler10p0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -10201,9 +8517,7 @@ condition:
 		$a0
 }
 
-
-rule WARNINGTROJANADinjector
-{
+rule WARNINGTROJANADinjector {
       meta:
 		author="malware-lu"
 strings:
@@ -10213,9 +8527,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule TopSpeedv3011989
-{
+rule TopSpeedv3011989 {
       meta:
 		author="malware-lu"
 strings:
@@ -10225,9 +8537,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CodeCryptv0164
-{
+rule CodeCryptv0164 {
       meta:
 		author="malware-lu"
 strings:
@@ -10237,9 +8547,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXHiT001DJSiba
-{
+rule UPXHiT001DJSiba {
       meta:
 		author="malware-lu"
 strings:
@@ -10249,9 +8557,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner01ASProtectAnorganix
-{
+rule PseudoSigner01ASProtectAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -10261,9 +8567,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PocketPCARM
-{
+rule PocketPCARM {
       meta:
 		author="malware-lu"
 strings:
@@ -10273,9 +8577,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AnskyaBinderv11Anskya
-{
+rule AnskyaBinderv11Anskya {
       meta:
 		author="malware-lu"
 strings:
@@ -10285,9 +8587,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VProtectorV10Bvcasm
-{
+rule VProtectorV10Bvcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -10297,9 +8597,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SecurePE1Xwwwdeepzoneorg
-{
+rule SecurePE1Xwwwdeepzoneorg {
       meta:
 		author="malware-lu"
 strings:
@@ -10309,9 +8607,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yPv10bbyAshkbizDanehkar
-{
+rule yPv10bbyAshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -10321,9 +8617,7 @@ condition:
 		$a0
 }
 
-
-rule MSLRHv031a
-{
+rule MSLRHv031a {
       meta:
 		author="malware-lu"
 strings:
@@ -10334,9 +8628,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule Upackv039finalDwing
-{
+rule Upackv039finalDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -10347,9 +8639,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule vprotector12vcasm
-{
+rule vprotector12vcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -10360,9 +8650,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule FakeNinjav28Spirit
-{
+rule FakeNinjav28Spirit {
       meta:
 		author="malware-lu"
 strings:
@@ -10372,9 +8660,7 @@ condition:
 		$a0
 }
 
-
-rule PECompactv133
-{
+rule PECompactv133 {
       meta:
 		author="malware-lu"
 strings:
@@ -10384,9 +8670,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DragonArmorOrient
-{
+rule DragonArmorOrient {
       meta:
 		author="malware-lu"
 strings:
@@ -10396,9 +8680,7 @@ condition:
 		$a0
 }
 
-
-rule ThemidaWinLicenseV1802OreansTechnologies
-{
+rule ThemidaWinLicenseV1802OreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -10408,9 +8690,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftDefender1xRandyLi
-{
+rule SoftDefender1xRandyLi {
       meta:
 		author="malware-lu"
 strings:
@@ -10420,9 +8700,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PellesC2x4xDLLPelleOrinius
-{
+rule PellesC2x4xDLLPelleOrinius {
       meta:
 		author="malware-lu"
 strings:
@@ -10432,9 +8710,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPX290LZMADelphistubMarkusOberhumerLaszloMolnarJohnReiser
-{
+rule UPX290LZMADelphistubMarkusOberhumerLaszloMolnarJohnReiser {
       meta:
 		author="malware-lu"
 strings:
@@ -10444,9 +8720,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV119aPlib043ap0x
-{
+rule RLPackV119aPlib043ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -10456,9 +8730,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VirogensPEShrinkerv014
-{
+rule VirogensPEShrinkerv014 {
       meta:
 		author="malware-lu"
 strings:
@@ -10468,9 +8740,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtBorlandDelphiBorlandC
-{
+rule FSGv110EngdulekxtBorlandDelphiBorlandC {
       meta:
 		author="malware-lu"
 strings:
@@ -10482,9 +8752,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule PseudoSigner01ACProtect109Anorganix
-{
+rule PseudoSigner01ACProtect109Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -10494,9 +8762,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorV16dVaska
-{
+rule RCryptorV16dVaska {
       meta:
 		author="malware-lu"
 strings:
@@ -10506,9 +8772,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv032BetaPatchDwing
-{
+rule Upackv032BetaPatchDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -10518,9 +8782,7 @@ condition:
 		$a0
 }
 
-
-rule Apex30alpha500mhz
-{
+rule Apex30alpha500mhz {
       meta:
 		author="malware-lu"
 strings:
@@ -10530,9 +8792,7 @@ condition:
 		$a0
 }
 
-
-rule SimbiOZPoly21Extranger
-{
+rule SimbiOZPoly21Extranger {
       meta:
 		author="malware-lu"
 strings:
@@ -10542,9 +8802,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov184
-{
+rule Armadillov184 {
       meta:
 		author="malware-lu"
 strings:
@@ -10554,9 +8812,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov183
-{
+rule Armadillov183 {
       meta:
 		author="malware-lu"
 strings:
@@ -10566,9 +8822,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov182
-{
+rule Armadillov182 {
       meta:
 		author="malware-lu"
 strings:
@@ -10578,9 +8832,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov180
-{
+rule Armadillov180 {
       meta:
 		author="malware-lu"
 strings:
@@ -10590,9 +8842,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeSplitter13SplitMethodBillPrisonerTPOC
-{
+rule ExeSplitter13SplitMethodBillPrisonerTPOC {
       meta:
 		author="malware-lu"
 strings:
@@ -10603,9 +8853,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule RJoiner12aVaska
-{
+rule RJoiner12aVaska {
       meta:
 		author="malware-lu"
 strings:
@@ -10615,9 +8863,7 @@ condition:
 		$a0
 }
 
-
-rule VxVirusConstructorIVPbased
-{
+rule VxVirusConstructorIVPbased {
       meta:
 		author="malware-lu"
 strings:
@@ -10627,9 +8873,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EncryptPE12003518WFS
-{
+rule EncryptPE12003518WFS {
       meta:
 		author="malware-lu"
 strings:
@@ -10639,9 +8883,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv168v184
-{
+rule PECompactv168v184 {
       meta:
 		author="malware-lu"
 strings:
@@ -10651,9 +8893,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SDProtectorProEdition116RandyLi
-{
+rule SDProtectorProEdition116RandyLi {
       meta:
 		author="malware-lu"
 strings:
@@ -10664,9 +8904,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Reg2Exe222223byJanVorel
-{
+rule Reg2Exe222223byJanVorel {
       meta:
 		author="malware-lu"
 strings:
@@ -10676,9 +8914,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv120EngdulekxtBorlandDelphiMicrosoftVisualC
-{
+rule FSGv120EngdulekxtBorlandDelphiMicrosoftVisualC {
       meta:
 		author="malware-lu"
 strings:
@@ -10688,9 +8924,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrunchPE: Packer PEiD
-{
+rule CrunchPE: Packer PEiD {
       meta:
 		author="malware-lu"
         note="Added extra checks"
@@ -10702,9 +8936,7 @@ condition:
 		for any of ($*) : ( $ at pe.entry_point )
 }
 
-
-rule CICompressv10
-{
+rule CICompressv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -10714,9 +8946,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeShieldv27b
-{
+rule ExeShieldv27b {
       meta:
 		author="malware-lu"
 strings:
@@ -10726,9 +8956,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXInlinerv10byGPcH
-{
+rule UPXInlinerv10byGPcH {
       meta:
 		author="malware-lu"
 strings:
@@ -10738,9 +8966,7 @@ condition:
 		$a0
 }
 
-
-rule PKLITEv114v120
-{
+rule PKLITEv114v120 {
       meta:
 		author="malware-lu"
 strings:
@@ -10750,9 +8976,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeToolsCOM2EXE
-{
+rule ExeToolsCOM2EXE {
       meta:
 		author="malware-lu"
 strings:
@@ -10762,9 +8986,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallEmbedded2545Jitit
-{
+rule ThinstallEmbedded2545Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -10774,9 +8996,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxARCV4
-{
+rule VxARCV4 {
       meta:
 		author="malware-lu"
 strings:
@@ -10786,9 +9006,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillo3X5XSiliconRealmsToolworks
-{
+rule Armadillo3X5XSiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -10798,9 +9016,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakePESHiELD025emadicius
-{
+rule MSLRHv032afakePESHiELD025emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -10810,9 +9026,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov252beta2
-{
+rule Armadillov252beta2 {
       meta:
 		author="malware-lu"
 strings:
@@ -10822,9 +9036,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CipherWallSelfExtratorDecryptorConsolev15
-{
+rule CipherWallSelfExtratorDecryptorConsolev15 {
       meta:
 		author="malware-lu"
 strings:
@@ -10834,9 +9046,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCShrinkerv029
-{
+rule PCShrinkerv029 {
       meta:
 		author="malware-lu"
 strings:
@@ -10846,9 +9056,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPacKV33LiuXingPing
-{
+rule NsPacKV33LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -10858,9 +9066,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CopyMinderMicrocosmLtd
-{
+rule CopyMinderMicrocosmLtd {
       meta:
 		author="malware-lu"
 strings:
@@ -10870,9 +9076,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Crunchv5BitArts
-{
+rule Crunchv5BitArts {
       meta:
 		author="malware-lu"
 strings:
@@ -10882,9 +9086,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCShrinkerv020
-{
+rule PCShrinkerv020 {
       meta:
 		author="malware-lu"
 strings:
@@ -10894,9 +9096,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillo500SiliconRealmsToolworks
-{
+rule Armadillo500SiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -10906,9 +9106,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SLVc0deProtector060SLVICU
-{
+rule SLVc0deProtector060SLVICU {
       meta:
 		author="malware-lu"
 strings:
@@ -10918,9 +9116,7 @@ condition:
 		$a0
 }
 
-
-rule Kryptonv03
-{
+rule Kryptonv03 {
       meta:
 		author="malware-lu"
 strings:
@@ -10930,9 +9126,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrackStopv101cStefanEsser1997
-{
+rule CrackStopv101cStefanEsser1997 {
       meta:
 		author="malware-lu"
 strings:
@@ -10942,9 +9136,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Kryptonv05
-{
+rule Kryptonv05 {
       meta:
 		author="malware-lu"
 strings:
@@ -10954,9 +9146,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Kryptonv04
-{
+rule Kryptonv04 {
       meta:
 		author="malware-lu"
 strings:
@@ -10966,9 +9156,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PassLock2000v10EngMoonlightSoftware
-{
+rule PassLock2000v10EngMoonlightSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -10978,9 +9166,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv029Betav031BetaDwing
-{
+rule Upackv029Betav031BetaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -10990,9 +9176,7 @@ condition:
 		$a0
 }
 
-
-rule AlexProtector10beta2byAlex
-{
+rule AlexProtector10beta2byAlex {
       meta:
 		author="malware-lu"
 strings:
@@ -11002,9 +9186,7 @@ condition:
 		$a0
 }
 
-
-rule MoleBoxv254Teggo
-{
+rule MoleBoxv254Teggo {
       meta:
 		author="malware-lu"
 strings:
@@ -11014,8 +9196,7 @@ condition:
 		$a0
 }
 
-rule Obsidium1337ObsidiumSoftware
-{
+rule Obsidium1337ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -11025,9 +9206,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PESpinv03Engcyberbob
-{
+rule PESpinv03Engcyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -11038,9 +9217,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PseudoSigner02PEPack099Anorganix
-{
+rule PseudoSigner02PEPack099Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -11050,9 +9227,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxVCL
-{
+rule VxVCL {
       meta:
 		author="malware-lu"
 strings:
@@ -11062,9 +9237,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VterminalV10XLeiPeng
-{
+rule VterminalV10XLeiPeng {
       meta:
 		author="malware-lu"
 strings:
@@ -11074,9 +9247,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEEncrypt10Liwuyue
-{
+rule PEEncrypt10Liwuyue {
       meta:
 		author="malware-lu"
 strings:
@@ -11086,9 +9257,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule InstallAnywhere61ZeroGSoftwareInc
-{
+rule InstallAnywhere61ZeroGSoftwareInc {
       meta:
 		author="malware-lu"
 strings:
@@ -11099,9 +9268,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule iLUCRYPTv4018exe
-{
+rule iLUCRYPTv4018exe {
       meta:
 		author="malware-lu"
 strings:
@@ -11111,9 +9278,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02ASProtectAnorganix
-{
+rule PseudoSigner02ASProtectAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -11123,9 +9288,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EncryptPEV22006710WFS
-{
+rule EncryptPEV22006710WFS {
       meta:
 		author="malware-lu"
 strings:
@@ -11136,9 +9299,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Themida10xx18xxnocompressionOreansTechnologies
-{
+rule Themida10xx18xxnocompressionOreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -11149,9 +9310,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule StonesPEEncryptorv10
-{
+rule StonesPEEncryptorv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -11161,9 +9320,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PolyBoxDAnskya
-{
+rule PolyBoxDAnskya {
       meta:
 		author="malware-lu"
 strings:
@@ -11173,9 +9330,7 @@ condition:
 		$a0
 }
 
-
-rule Mew10execoder10NorthfoxHCC
-{
+rule Mew10execoder10NorthfoxHCC {
       meta:
 		author="malware-lu"
 strings:
@@ -11185,9 +9340,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECrypt102
-{
+rule PECrypt102 {
       meta:
 		author="malware-lu"
 strings:
@@ -11197,9 +9350,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DIETv100d
-{
+rule DIETv100d {
       meta:
 		author="malware-lu"
 strings:
@@ -11209,9 +9360,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV119LZMA430ap0x
-{
+rule RLPackV119LZMA430ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -11221,9 +9370,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ENIGMAProtectorV112SukhovVladimir
-{
+rule ENIGMAProtectorV112SukhovVladimir {
       meta:
 		author="malware-lu"
 strings:
@@ -11233,9 +9380,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeASPack212FEUERRADER
-{
+rule AHTeamEPProtector03fakeASPack212FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -11245,9 +9390,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MacromediaWindowsFlashProjectorPlayerv50
-{
+rule MacromediaWindowsFlashProjectorPlayerv50 {
       meta:
 		author="malware-lu"
 strings:
@@ -11257,9 +9400,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule IDApplicationProtector12IDSecuritySuite
-{
+rule IDApplicationProtector12IDSecuritySuite {
       meta:
 		author="malware-lu"
 strings:
@@ -11269,9 +9410,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv305c4ExtractablePasswordchecking
-{
+rule WWPACKv305c4ExtractablePasswordchecking {
       meta:
 		author="malware-lu"
 strings:
@@ -11281,9 +9420,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HASPHLProtectionV1XAladdin
-{
+rule HASPHLProtectionV1XAladdin {
       meta:
 		author="malware-lu"
 strings:
@@ -11294,9 +9431,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule ASProtectv10
-{
+rule ASProtectv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -11306,9 +9441,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv11
-{
+rule ASProtectv11 {
       meta:
 		author="malware-lu"
 strings:
@@ -11318,9 +9451,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov275a
-{
+rule Armadillov275a {
       meta:
 		author="malware-lu"
 strings:
@@ -11330,9 +9461,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner0132Lite003Anorganix
-{
+rule PseudoSigner0132Lite003Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -11342,9 +9471,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxDoom666
-{
+rule VxDoom666 {
       meta:
 		author="malware-lu"
 strings:
@@ -11354,9 +9481,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxSpanz
-{
+rule VxSpanz {
       meta:
 		author="malware-lu"
 strings:
@@ -11366,9 +9491,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BeRoEXEPackerv100DLLLZBRSBeRoFarbrausch
-{
+rule BeRoEXEPackerv100DLLLZBRSBeRoFarbrausch {
       meta:
 		author="malware-lu"
 strings:
@@ -11378,9 +9501,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Pksmart10b
-{
+rule Pksmart10b {
       meta:
 		author="malware-lu"
 strings:
@@ -11390,9 +9511,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PELockv106
-{
+rule PELockv106 {
       meta:
 		author="malware-lu"
 strings:
@@ -11402,9 +9521,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule LaunchAnywherev4001
-{
+rule LaunchAnywherev4001 {
       meta:
 		author="malware-lu"
 strings:
@@ -11414,9 +9531,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv033v034BetaDwing
-{
+rule Upackv033v034BetaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -11426,9 +9541,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule GameGuardnProtect
-{
+rule GameGuardnProtect {
       meta:
 		author="malware-lu"
 strings:
@@ -11438,9 +9551,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yodasProtectorV1032AshkbizDanehkar
-{
+rule yodasProtectorV1032AshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -11450,9 +9561,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule nBinderv40
-{
+rule nBinderv40 {
       meta:
 		author="malware-lu"
 strings:
@@ -11462,9 +9571,7 @@ condition:
 		$a0
 }
 
-
-rule AnslymFUDCrypter
-{
+rule AnslymFUDCrypter {
       meta:
 		author="malware-lu"
 strings:
@@ -11474,9 +9581,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EPExEPackV10EliteCodingGroup
-{
+rule EPExEPackV10EliteCodingGroup {
       meta:
 		author="malware-lu"
 strings:
@@ -11486,9 +9591,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimplePack12build3009Method2bagie
-{
+rule SimplePack12build3009Method2bagie {
       meta:
 		author="malware-lu"
 strings:
@@ -11498,9 +9601,7 @@ condition:
 		$a0
 }
 
-
-rule WinZip32bitSFXv6xmodule
-{
+rule WinZip32bitSFXv6xmodule {
       meta:
 		author="malware-lu"
 strings:
@@ -11510,9 +9611,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxEinstein
-{
+rule VxEinstein {
       meta:
 		author="malware-lu"
 strings:
@@ -11522,9 +9621,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VideoLanClient
-{
+rule VideoLanClient {
       meta:
 		author="malware-lu"
 strings:
@@ -11534,9 +9631,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrunchPEv10xx
-{
+rule CrunchPEv10xx {
       meta:
 		author="malware-lu"
 strings:
@@ -11546,9 +9641,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxTravJack883
-{
+rule VxTravJack883 {
       meta:
 		author="malware-lu"
 strings:
@@ -11558,9 +9651,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RSCsProcessPatcherv151
-{
+rule RSCsProcessPatcherv151 {
       meta:
 		author="malware-lu"
 strings:
@@ -11570,9 +9661,7 @@ condition:
 		$a0
 }
 
-
-rule kryptor9
-{
+rule kryptor9 {
       meta:
 		author="malware-lu"
 strings:
@@ -11582,9 +9671,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SecuPackv15
-{
+rule SecuPackv15 {
       meta:
 		author="malware-lu"
 strings:
@@ -11594,9 +9681,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule kryptor5
-{
+rule kryptor5 {
       meta:
 		author="malware-lu"
 strings:
@@ -11606,9 +9691,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule kryptor6
-{
+rule kryptor6 {
       meta:
 		author="malware-lu"
 strings:
@@ -11618,9 +9701,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ACProtectV13Xrisco
-{
+rule ACProtectV13Xrisco {
       meta:
 		author="malware-lu"
 strings:
@@ -11630,9 +9711,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PELockNTv202c
-{
+rule PELockNTv202c {
       meta:
 		author="malware-lu"
 strings:
@@ -11642,9 +9721,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02MinGWGCC2xAnorganix
-{
+rule PseudoSigner02MinGWGCC2xAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -11654,9 +9731,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeBASIC016b
-{
+rule FreeBASIC016b {
       meta:
 		author="malware-lu"
 strings:
@@ -11666,9 +9741,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv16bv16cVaska
-{
+rule RCryptorv16bv16cVaska {
       meta:
 		author="malware-lu"
 strings:
@@ -11679,9 +9752,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule FileShield: Packer PEiD
-{
+rule FileShield: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -11691,9 +9762,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SDC12SelfDecryptingBinaryGeneratorbyClaesMNyberg
-{
+rule SDC12SelfDecryptingBinaryGeneratorbyClaesMNyberg {
       meta:
 		author="malware-lu"
 strings:
@@ -11703,9 +9772,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv1501
-{
+rule PKLITEv1501 {
       meta:
 		author="malware-lu"
 strings:
@@ -11715,9 +9782,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Inbuildv10hard
-{
+rule Inbuildv10hard {
       meta:
 		author="malware-lu"
 strings:
@@ -11727,9 +9792,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeShieldvxx
-{
+rule ExeShieldvxx {
       meta:
 		author="malware-lu"
 strings:
@@ -11739,9 +9802,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv20Vaska
-{
+rule RCryptorv20Vaska {
       meta:
 		author="malware-lu"
 strings:
@@ -11751,9 +9812,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv125
-{
+rule PECompactv125 {
       meta:
 		author="malware-lu"
 strings:
@@ -11763,9 +9822,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv1Vaska
-{
+rule RCryptorv1Vaska {
       meta:
 		author="malware-lu"
 strings:
@@ -11776,9 +9833,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PECompactv122
-{
+rule PECompactv122 {
       meta:
 		author="malware-lu"
 strings:
@@ -11788,9 +9843,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Packmanv10BrandonLaCombe
-{
+rule Packmanv10BrandonLaCombe {
       meta:
 		author="malware-lu"
 strings:
@@ -11800,9 +9853,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SpecialEXEPaswordProtectorV101EngPavolCerven
-{
+rule SpecialEXEPaswordProtectorV101EngPavolCerven {
       meta:
 		author="malware-lu"
 strings:
@@ -11812,9 +9863,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeSmashervxx
-{
+rule ExeSmashervxx {
       meta:
 		author="malware-lu"
 strings:
@@ -11824,9 +9873,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEArmor046ChinaCrackingGroup
-{
+rule PEArmor046ChinaCrackingGroup {
       meta:
 		author="malware-lu"
 strings:
@@ -11836,9 +9883,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VMProtect106107PolyTech
-{
+rule VMProtect106107PolyTech {
       meta:
 		author="malware-lu"
 strings:
@@ -11848,9 +9893,7 @@ condition:
 		$a0
 }
 
-
-rule USSR031bySpirit
-{
+rule USSR031bySpirit {
       meta:
 		author="malware-lu"
 strings:
@@ -11860,9 +9903,7 @@ condition:
 		$a0
 }
 
-
-rule PeCompact253DLLSlimLoaderBitSumTechnologies
-{
+rule PeCompact253DLLSlimLoaderBitSumTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -11872,9 +9913,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule LameCryptv10
-{
+rule LameCryptv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -11884,9 +9923,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Cygwin32: Packer PEiD
-{
+rule Cygwin32: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -11896,9 +9933,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv123RC4build0807exeAlexeySolodovnikov
-{
+rule ASProtectv123RC4build0807exeAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -11908,9 +9943,7 @@ condition:
 		$a0
 }
 
-
-rule Armadillov210b2
-{
+rule Armadillov210b2 {
       meta:
 		author="malware-lu"
 strings:
@@ -11920,9 +9953,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov190
-{
+rule Armadillov190 {
       meta:
 		author="malware-lu"
 strings:
@@ -11932,9 +9963,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressorProtection150XCGSoftLabs
-{
+rule eXPressorProtection150XCGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -11944,9 +9973,7 @@ condition:
 		$a0
 }
 
-
-rule VxNecropolis1963
-{
+rule VxNecropolis1963 {
       meta:
 		author="malware-lu"
 strings:
@@ -11956,9 +9983,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Shrinkv20
-{
+rule Shrinkv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -11968,9 +9993,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02UPX06Anorganix
-{
+rule PseudoSigner02UPX06Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -11980,9 +10003,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PESpinV071cyberbob
-{
+rule PESpinV071cyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -11992,9 +10013,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule XHider10GlobaL
-{
+rule XHider10GlobaL {
       meta:
 		author="malware-lu"
 strings:
@@ -12005,9 +10024,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule PseudoSigner01MicrosoftVisualC70DLLAnorganix
-{
+rule PseudoSigner01MicrosoftVisualC70DLLAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -12017,9 +10034,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEShieldV05Smoke
-{
+rule EXEShieldV05Smoke {
       meta:
 		author="malware-lu"
 strings:
@@ -12030,9 +10045,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule UnnamedScrambler25Ap0ke
-{
+rule UnnamedScrambler25Ap0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -12042,9 +10055,7 @@ condition:
 		$a0
 }
 
-
-rule Armadillov177
-{
+rule Armadillov177 {
       meta:
 		author="malware-lu"
 strings:
@@ -12054,9 +10065,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxTrivial25
-{
+rule VxTrivial25 {
       meta:
 		author="malware-lu"
 strings:
@@ -12068,8 +10077,7 @@ condition:
 
 // 20150909 - Issue #39 - Commented because of High FP rate
 /*
-rule Armadillov171
-{
+rule Armadillov171 {
       meta:
 		author="malware-lu"
 strings:
@@ -12080,8 +10088,7 @@ condition:
 }
 */
 
-rule KBySV022shoooo
-{
+rule KBySV022shoooo {
       meta:
 		author="malware-lu"
 strings:
@@ -12091,9 +10098,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule InnoSetupModule
-{
+rule InnoSetupModule {
       meta:
 		author="malware-lu"
 strings:
@@ -12104,9 +10109,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule piritv15
-{
+rule piritv15 {
       meta:
 		author="malware-lu"
 strings:
@@ -12116,9 +10119,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftSentryv30
-{
+rule SoftSentryv30 {
       meta:
 		author="malware-lu"
 strings:
@@ -12128,9 +10129,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EncryptPEV22007411WFS
-{
+rule EncryptPEV22007411WFS {
       meta:
 		author="malware-lu"
 strings:
@@ -12140,9 +10139,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov19x
-{
+rule Armadillov19x {
       meta:
 		author="malware-lu"
 strings:
@@ -12152,9 +10149,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov285
-{
+rule Armadillov285 {
       meta:
 		author="malware-lu"
 strings:
@@ -12164,9 +10159,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectvxx
-{
+rule ASProtectvxx {
       meta:
 		author="malware-lu"
 strings:
@@ -12176,9 +10169,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeShieldv17
-{
+rule ExeShieldv17 {
       meta:
 		author="malware-lu"
 strings:
@@ -12188,9 +10179,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Splasherv10v30
-{
+rule Splasherv10v30 {
       meta:
 		author="malware-lu"
 strings:
@@ -12200,9 +10189,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeCryptor01build002GlOFF
-{
+rule FreeCryptor01build002GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -12212,9 +10199,7 @@ condition:
 		$a0
 }
 
-
-rule EXEShieldV06SMoKE
-{
+rule EXEShieldV06SMoKE {
       meta:
 		author="malware-lu"
 strings:
@@ -12225,9 +10210,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PseudoSigner02MicrosoftVisualBasic5060Anorganix
-{
+rule PseudoSigner02MicrosoftVisualBasic5060Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -12237,9 +10220,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPack118DllLZMA430ap0x
-{
+rule RLPack118DllLZMA430ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -12249,9 +10230,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv100v103
-{
+rule PKLITEv100v103 {
       meta:
 		author="malware-lu"
 strings:
@@ -12261,9 +10240,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Shrinkerv34
-{
+rule Shrinkerv34 {
       meta:
 		author="malware-lu"
 strings:
@@ -12274,9 +10251,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Shrinkerv32
-{
+rule Shrinkerv32 {
       meta:
 		author="malware-lu"
 strings:
@@ -12286,9 +10261,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Shrinkerv33
-{
+rule Shrinkerv33 {
       meta:
 		author="malware-lu"
 strings:
@@ -12298,9 +10271,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01JDPack1xJDProtect09Anorganix
-{
+rule PseudoSigner01JDPack1xJDProtect09Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -12310,9 +10281,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upack024027beta028alphaDwing
-{
+rule Upack024027beta028alphaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -12322,9 +10291,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01LocklessIntroPackAnorganix
-{
+rule PseudoSigner01LocklessIntroPackAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -12334,9 +10301,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov250b3
-{
+rule Armadillov250b3 {
       meta:
 		author="malware-lu"
 strings:
@@ -12346,9 +10311,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEBundlev02v20x
-{
+rule PEBundlev02v20x {
       meta:
 		author="malware-lu"
 strings:
@@ -12358,9 +10321,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftProtectwwwsoftprotectbyru
-{
+rule SoftProtectwwwsoftprotectbyru {
       meta:
 		author="malware-lu"
 strings:
@@ -12370,9 +10331,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NTPackerV2XErazerZ
-{
+rule NTPackerV2XErazerZ {
       meta:
 		author="malware-lu"
 strings:
@@ -12382,9 +10341,7 @@ condition:
 		$a0
 }
 
-
-rule SiliconRealmsInstallStub
-{
+rule SiliconRealmsInstallStub {
       meta:
 		author="malware-lu"
 strings:
@@ -12394,9 +10351,7 @@ condition:
 		$a0
 }
 
-
-rule Armadillov430v440SiliconRealmsToolworks
-{
+rule Armadillov430v440SiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -12407,9 +10362,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule MoleBoxv20
-{
+rule MoleBoxv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -12419,9 +10372,7 @@ condition:
 		$a0
 }
 
-
-rule FucknJoyv10cUsAr
-{
+rule FucknJoyv10cUsAr {
       meta:
 		author="malware-lu"
 strings:
@@ -12432,9 +10383,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PseudoSigner02VideoLanClientAnorganix
-{
+rule PseudoSigner02VideoLanClientAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -12444,9 +10393,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftWrap
-{
+rule SoftWrap {
       meta:
 		author="malware-lu"
 strings:
@@ -12456,9 +10403,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AI1Creator1Beta2byMZ
-{
+rule AI1Creator1Beta2byMZ {
       meta:
 		author="malware-lu"
 strings:
@@ -12468,9 +10413,7 @@ condition:
 		$a0
 }
 
-
-rule JAMv211
-{
+rule JAMv211 {
       meta:
 		author="malware-lu"
 strings:
@@ -12480,9 +10423,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv0978
-{
+rule PECompactv0978 {
       meta:
 		author="malware-lu"
 strings:
@@ -12492,9 +10433,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Setup2GoInstallerStub
-{
+rule Setup2GoInstallerStub {
       meta:
 		author="malware-lu"
 strings:
@@ -12504,9 +10443,7 @@ condition:
 		$a0
 }
 
-
-rule themida1005httpwwworeanscom
-{
+rule themida1005httpwwworeanscom {
       meta:
 		author="malware-lu"
 strings:
@@ -12516,9 +10453,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yodasProtectorv1033exescrcomAshkbizDanehkar
-{
+rule yodasProtectorv1033exescrcomAshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -12528,9 +10463,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ORiENv211DEMO
-{
+rule ORiENv211DEMO {
       meta:
 		author="malware-lu"
 strings:
@@ -12540,9 +10473,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv0977
-{
+rule PECompactv0977 {
       meta:
 		author="malware-lu"
 strings:
@@ -12552,9 +10483,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PESpinv13betaCyberbob
-{
+rule PESpinv13betaCyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -12564,9 +10493,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv13bVaska
-{
+rule RCryptorv13bVaska {
       meta:
 		author="malware-lu"
 strings:
@@ -12577,9 +10504,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule mkfpackllydd
-{
+rule mkfpackllydd {
       meta:
 		author="malware-lu"
 strings:
@@ -12589,9 +10514,7 @@ condition:
 		$a0
 }
 
-
-rule PESpinV03cyberbob
-{
+rule PESpinV03cyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -12601,9 +10524,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02BorlandDelphiSetupModuleAnorganix
-{
+rule PseudoSigner02BorlandDelphiSetupModuleAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -12613,9 +10534,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PELOCKnt204
-{
+rule PELOCKnt204 {
       meta:
 		author="malware-lu"
 strings:
@@ -12625,9 +10544,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MacromediaWindowsFlashProjectorPlayerv60
-{
+rule MacromediaWindowsFlashProjectorPlayerv60 {
       meta:
 		author="malware-lu"
 strings:
@@ -12637,9 +10554,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule IMPostorPack10MahdiHezavehi
-{
+rule IMPostorPack10MahdiHezavehi {
       meta:
 		author="malware-lu"
 strings:
@@ -12649,9 +10564,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PluginToExev102BoBBobSoft
-{
+rule PluginToExev102BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -12661,9 +10574,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv120
-{
+rule PKLITEv120 {
       meta:
 		author="malware-lu"
 strings:
@@ -12673,9 +10584,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PrivateexeProtectorV18SetiSoftTeam
-{
+rule PrivateexeProtectorV18SetiSoftTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -12685,9 +10594,7 @@ condition:
 		$a0
 }
 
-
-rule PENinjamodified
-{
+rule PENinjamodified {
       meta:
 		author="malware-lu"
 strings:
@@ -12697,9 +10604,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DotFixNiceProtect21GPcHSoft
-{
+rule DotFixNiceProtect21GPcHSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -12709,9 +10614,7 @@ condition:
 		$a0
 }
 
-
-rule EXEStealthv276WebToolMaster
-{
+rule EXEStealthv276WebToolMaster {
       meta:
 		author="malware-lu"
 strings:
@@ -12721,9 +10624,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor239DLLcompressedresources
-{
+rule EXECryptor239DLLcompressedresources {
       meta:
 		author="malware-lu"
 strings:
@@ -12733,9 +10634,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnoPiX103110BaGiE
-{
+rule UnoPiX103110BaGiE {
       meta:
 		author="malware-lu"
 strings:
@@ -12745,9 +10644,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv110b3
-{
+rule PECompactv110b3 {
       meta:
 		author="malware-lu"
 strings:
@@ -12757,9 +10654,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule IonicWindSoftware
-{
+rule IonicWindSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -12769,9 +10664,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimplePackV11XMethod2bagie
-{
+rule SimplePackV11XMethod2bagie {
       meta:
 		author="malware-lu"
 strings:
@@ -12782,9 +10675,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule PCGuardv500d
-{
+rule PCGuardv500d {
       meta:
 		author="malware-lu"
 strings:
@@ -12794,9 +10685,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PESHiELDv0251
-{
+rule PESHiELDv0251 {
       meta:
 		author="malware-lu"
 strings:
@@ -12806,9 +10695,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackFullEdition117DLLaPLibAp0x
-{
+rule RLPackFullEdition117DLLaPLibAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -12818,9 +10705,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv110b4
-{
+rule PECompactv110b4 {
       meta:
 		author="malware-lu"
 strings:
@@ -12830,9 +10715,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02PEX099Anorganix
-{
+rule PseudoSigner02PEX099Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -12842,9 +10725,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallVirtualizationSuite30XThinstallCompany
-{
+rule ThinstallVirtualizationSuite30XThinstallCompany {
       meta:
 		author="malware-lu"
 strings:
@@ -12855,9 +10736,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule NullsoftInstallSystemv20
-{
+rule NullsoftInstallSystemv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -12867,9 +10746,7 @@ condition:
 		$a0
 }
 
-
-rule SLVc0deProtectorv11SLV
-{
+rule SLVc0deProtectorv11SLV {
       meta:
 		author="malware-lu"
 strings:
@@ -12880,9 +10757,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule FreeJoinerSmallbuild031032GlOFF
-{
+rule FreeJoinerSmallbuild031032GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -12892,9 +10767,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SLVc0deProtectorv06SLV
-{
+rule SLVc0deProtectorv06SLV {
       meta:
 		author="malware-lu"
 strings:
@@ -12904,9 +10777,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEArmor04600759hying
-{
+rule PEArmor04600759hying {
       meta:
 		author="malware-lu"
 strings:
@@ -12916,9 +10787,7 @@ condition:
 		$a0
 }
 
-
-rule RpolycryptbyVaska2003071841
-{
+rule RpolycryptbyVaska2003071841 {
       meta:
 		author="malware-lu"
 strings:
@@ -12928,9 +10797,7 @@ condition:
 		$a0
 }
 
-
-rule DBPEvxxxDingBoy
-{
+rule DBPEvxxxDingBoy {
       meta:
 		author="malware-lu"
 strings:
@@ -12940,9 +10807,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftwareCompressBGSoftware
-{
+rule SoftwareCompressBGSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -12952,9 +10817,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv305c4UnextrPasswcheckVirshield
-{
+rule WWPACKv305c4UnextrPasswcheckVirshield {
       meta:
 		author="malware-lu"
 strings:
@@ -12964,9 +10827,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv0399Dwing
-{
+rule Upackv0399Dwing {
       meta:
 		author="malware-lu"
 strings:
@@ -12978,9 +10839,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule UPXModifiedstub
-{
+rule UPXModifiedstub {
       meta:
 		author="malware-lu"
 strings:
@@ -12990,9 +10849,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Cryptic20Tughack
-{
+rule Cryptic20Tughack {
       meta:
 		author="malware-lu"
 strings:
@@ -13002,9 +10859,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule KGBSFX
-{
+rule KGBSFX {
       meta:
 		author="malware-lu"
 strings:
@@ -13014,9 +10869,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv20betaJeremyCollake
-{
+rule PECompactv20betaJeremyCollake {
       meta:
 		author="malware-lu"
 strings:
@@ -13026,9 +10879,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DevCv4
-{
+rule DevCv4 {
       meta:
 		author="malware-lu"
 strings:
@@ -13038,9 +10889,7 @@ condition:
 		$a0
 }
 
-
-rule DevCv5
-{
+rule DevCv5 {
       meta:
 		author="malware-lu"
 strings:
@@ -13050,9 +10899,7 @@ condition:
 		$a0
 }
 
-
-rule CRYPToCRACksPEProtectorV092LukasFleischer
-{
+rule CRYPToCRACksPEProtectorV092LukasFleischer {
       meta:
 		author="malware-lu"
 strings:
@@ -13062,9 +10909,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UpackV037Dwing
-{
+rule UpackV037Dwing {
       meta:
 		author="malware-lu"
 strings:
@@ -13076,9 +10921,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule Obsidiumv13037ObsidiumSoftware
-{
+rule Obsidiumv13037ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -13088,9 +10931,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxCompiler
-{
+rule VxCompiler {
       meta:
 		author="malware-lu"
 strings:
@@ -13100,9 +10941,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BJFntv13
-{
+rule BJFntv13 {
       meta:
 		author="malware-lu"
 strings:
@@ -13112,9 +10951,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakePEtite21emadicius
-{
+rule MSLRHv032afakePEtite21emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -13124,9 +10961,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXShitv01500mhz
-{
+rule UPXShitv01500mhz {
       meta:
 		author="malware-lu"
 strings:
@@ -13138,9 +10973,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule PackmanV0001Bubbasoft
-{
+rule PackmanV0001Bubbasoft {
       meta:
 		author="malware-lu"
 strings:
@@ -13150,9 +10983,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DJoinv07publicxorencryptiondrmist
-{
+rule DJoinv07publicxorencryptiondrmist {
       meta:
 		author="malware-lu"
 strings:
@@ -13162,9 +10993,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeJoinerSmallbuild033GlOFF
-{
+rule FreeJoinerSmallbuild033GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -13174,9 +11003,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AnticrackSoftwareProtectorv109ACProtect
-{
+rule AnticrackSoftwareProtectorv109ACProtect {
       meta:
 		author="malware-lu"
 strings:
@@ -13186,9 +11013,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnderGroundCrypterbyBooster2000
-{
+rule UnderGroundCrypterbyBooster2000 {
       meta:
 		author="malware-lu"
 strings:
@@ -13198,9 +11023,7 @@ condition:
 		$a0
 }
 
-
-rule MicroJoiner16coban2k
-{
+rule MicroJoiner16coban2k {
       meta:
 		author="malware-lu"
 strings:
@@ -13210,9 +11033,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WiseInstallerStubv11010291
-{
+rule WiseInstallerStubv11010291 {
       meta:
 		author="malware-lu"
 strings:
@@ -13222,9 +11043,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PrivateEXEProtector18
-{
+rule PrivateEXEProtector18 {
       meta:
 		author="malware-lu"
 strings:
@@ -13234,9 +11053,7 @@ condition:
 		$a0
 }
 
-
-rule SimpleUPXCryptorv3042005multilayerencryptionMANtiCORE
-{
+rule SimpleUPXCryptorv3042005multilayerencryptionMANtiCORE {
       meta:
 		author="malware-lu"
 strings:
@@ -13247,9 +11064,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule Themida1201compressedOreansTechnologies
-{
+rule Themida1201compressedOreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -13259,9 +11074,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv155
-{
+rule PECompactv155 {
       meta:
 		author="malware-lu"
 strings:
@@ -13271,9 +11084,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PolyCryptPE214b215JLabSoftwareCreationshsigned
-{
+rule PolyCryptPE214b215JLabSoftwareCreationshsigned {
       meta:
 		author="malware-lu"
 strings:
@@ -13283,9 +11094,7 @@ condition:
 		$a0
 }
 
-
-rule PECompactv156
-{
+rule PECompactv156 {
       meta:
 		author="malware-lu"
 strings:
@@ -13295,9 +11104,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PGMPACKv013
-{
+rule PGMPACKv013 {
       meta:
 		author="malware-lu"
 strings:
@@ -13307,9 +11114,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PGMPACKv014
-{
+rule PGMPACKv014 {
       meta:
 		author="malware-lu"
 strings:
@@ -13319,9 +11124,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner0232Lite003Anorganix
-{
+rule PseudoSigner0232Lite003Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -13331,9 +11134,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakePEtite22FEUERRADER
-{
+rule AHTeamEPProtector03fakePEtite22FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -13343,9 +11144,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MEW10byNorthfox
-{
+rule MEW10byNorthfox {
       meta:
 		author="malware-lu"
 strings:
@@ -13355,9 +11154,7 @@ condition:
 		$a0
 }
 
-
-rule theWRAPbyTronDoc
-{
+rule theWRAPbyTronDoc {
       meta:
 		author="malware-lu"
 strings:
@@ -13367,9 +11164,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petitev211
-{
+rule Petitev211 {
       meta:
 		author="malware-lu"
 strings:
@@ -13379,9 +11174,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petitev212
-{
+rule Petitev212 {
       meta:
 		author="malware-lu"
 strings:
@@ -13391,9 +11184,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MaskPEV20yzkzero
-{
+rule MaskPEV20yzkzero {
       meta:
 		author="malware-lu"
 strings:
@@ -13403,9 +11194,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner01Morphine12Anorganix
-{
+rule PseudoSigner01Morphine12Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -13415,9 +11204,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EZIPv10
-{
+rule EZIPv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -13427,9 +11214,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule y0dasCrypterv12
-{
+rule y0dasCrypterv12 {
       meta:
 		author="malware-lu"
 strings:
@@ -13439,9 +11224,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ChinaProtectdummy
-{
+rule ChinaProtectdummy {
       meta:
 		author="malware-lu"
 strings:
@@ -13451,9 +11234,7 @@ condition:
 		$a0
 }
 
-
-rule BopCryptv10
-{
+rule BopCryptv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -13463,9 +11244,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MinkeV101Codius
-{
+rule MinkeV101Codius {
       meta:
 		author="malware-lu"
 strings:
@@ -13475,9 +11254,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02BorlandDelphiDLLAnorganix
-{
+rule PseudoSigner02BorlandDelphiDLLAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -13487,9 +11264,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule bambam004bedrock
-{
+rule bambam004bedrock {
       meta:
 		author="malware-lu"
 strings:
@@ -13499,9 +11274,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackFullEdition117DLLLZMAAp0x
-{
+rule RLPackFullEdition117DLLLZMAAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -13511,9 +11284,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEtitev22
-{
+rule PEtitev22 {
       meta:
 		author="malware-lu"
 strings:
@@ -13523,9 +11294,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEtitev20
-{
+rule PEtitev20 {
       meta:
 		author="malware-lu"
 strings:
@@ -13535,9 +11304,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEtitev21
-{
+rule PEtitev21 {
       meta:
 		author="malware-lu"
 strings:
@@ -13547,9 +11314,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ElicenseSystemV4000ViaTechInc
-{
+rule ElicenseSystemV4000ViaTechInc {
       meta:
 		author="malware-lu"
 strings:
@@ -13559,9 +11324,7 @@ condition:
 		$a0
 }
 
-
-rule VProtectorV10Build20041213testvcasm
-{
+rule VProtectorV10Build20041213testvcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -13571,9 +11334,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Themida18xxOreansTechnologies
-{
+rule Themida18xxOreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -13584,9 +11345,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule EXEJoinerv10
-{
+rule EXEJoinerv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -13596,9 +11355,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MicroJoiner11coban2k
-{
+rule MicroJoiner11coban2k {
       meta:
 		author="malware-lu"
 strings:
@@ -13608,9 +11365,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01FSG10Anorganix
-{
+rule PseudoSigner01FSG10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -13620,9 +11375,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov200b2200b3
-{
+rule Armadillov200b2200b3 {
       meta:
 		author="malware-lu"
 strings:
@@ -13632,9 +11385,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RAZOR1911encruptor
-{
+rule RAZOR1911encruptor {
       meta:
 		author="malware-lu"
 strings:
@@ -13644,9 +11395,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElock051tE
-{
+rule tElock051tE {
       meta:
 		author="malware-lu"
 strings:
@@ -13656,9 +11405,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SDProtectorBasicProEdition112RandyLi
-{
+rule SDProtectorBasicProEdition112RandyLi {
       meta:
 		author="malware-lu"
 strings:
@@ -13668,9 +11415,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxFaxFreeTopo
-{
+rule VxFaxFreeTopo {
       meta:
 		author="malware-lu"
 strings:
@@ -13680,9 +11425,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02MEW11SE10Anorganix
-{
+rule PseudoSigner02MEW11SE10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -13692,9 +11435,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Joinersignfrompinch250320072010
-{
+rule Joinersignfrompinch250320072010 {
       meta:
 		author="malware-lu"
 strings:
@@ -13704,9 +11445,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxSK
-{
+rule VxSK {
       meta:
 		author="malware-lu"
 strings:
@@ -13716,9 +11455,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEStubOEPv1x
-{
+rule PEStubOEPv1x {
       meta:
 		author="malware-lu"
 strings:
@@ -13728,9 +11465,7 @@ condition:
 		$a0
 }
 
-
-rule MoleBoxV23XMoleStudiocom
-{
+rule MoleBoxV23XMoleStudiocom {
       meta:
 		author="malware-lu"
 strings:
@@ -13740,9 +11475,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxHymn1865
-{
+rule VxHymn1865 {
       meta:
 		author="malware-lu"
 strings:
@@ -13752,9 +11485,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule kkrunchyRyd
-{
+rule kkrunchyRyd {
       meta:
 		author="malware-lu"
 strings:
@@ -13764,9 +11495,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECryptv100v101
-{
+rule PECryptv100v101 {
       meta:
 		author="malware-lu"
 strings:
@@ -13776,9 +11505,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CERBERUSv20
-{
+rule CERBERUSv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -13788,9 +11515,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor2117StrongbitSoftCompleteDevelopment
-{
+rule EXECryptor2117StrongbitSoftCompleteDevelopment {
       meta:
 		author="malware-lu"
 strings:
@@ -13800,9 +11525,7 @@ condition:
 		$a0
 }
 
-
-rule WWPACKv303
-{
+rule WWPACKv303 {
       meta:
 		author="malware-lu"
 strings:
@@ -13812,9 +11535,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule GHFProtectorpackonlyGPcH
-{
+rule GHFProtectorpackonlyGPcH {
       meta:
 		author="malware-lu"
 strings:
@@ -13825,9 +11546,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule yzpackV11UsAr
-{
+rule yzpackV11UsAr {
       meta:
 		author="malware-lu"
 strings:
@@ -13837,9 +11556,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxDanishtiny
-{
+rule VxDanishtiny {
       meta:
 		author="malware-lu"
 strings:
@@ -13849,9 +11566,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXV194MarkusOberhumerLaszloMolnarJohnReiser
-{
+rule UPXV194MarkusOberhumerLaszloMolnarJohnReiser {
       meta:
 		author="malware-lu"
 strings:
@@ -13861,9 +11576,7 @@ condition:
 		$a0
 }
 
-
-rule yzpack112UsAr
-{
+rule yzpack112UsAr {
       meta:
 		author="malware-lu"
 strings:
@@ -13873,9 +11586,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02YodasProtector102Anorganix
-{
+rule PseudoSigner02YodasProtector102Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -13885,9 +11596,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02PESHiELD025Anorganix
-{
+rule PseudoSigner02PESHiELD025Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -13897,9 +11606,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPacKV34V35LiuXingPing
-{
+rule NsPacKV34V35LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -13909,9 +11616,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DualseXe10
-{
+rule DualseXe10 {
       meta:
 		author="malware-lu"
 strings:
@@ -13921,9 +11626,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NoodleCryptv200EngNoodleSpa
-{
+rule NoodleCryptv200EngNoodleSpa {
       meta:
 		author="malware-lu"
 strings:
@@ -13933,9 +11636,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SoftComp1xBGSoftPT
-{
+rule SoftComp1xBGSoftPT {
       meta:
 		author="malware-lu"
 strings:
@@ -13945,9 +11646,7 @@ condition:
 		$a0
 }
 
-
-rule Petite13c1998IanLuck
-{
+rule Petite13c1998IanLuck {
       meta:
 		author="malware-lu"
 strings:
@@ -13957,9 +11656,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PENightMarev13
-{
+rule PENightMarev13 {
       meta:
 		author="malware-lu"
 strings:
@@ -13969,9 +11666,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillo50DllSiliconRealmsToolworks
-{
+rule Armadillo50DllSiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -13981,9 +11676,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ObsidiumV1350ObsidiumSoftware
-{
+rule ObsidiumV1350ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -13993,9 +11686,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv123RC1
-{
+rule ASProtectv123RC1 {
       meta:
 		author="malware-lu"
 strings:
@@ -14005,9 +11696,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PUNiSHERv15DEMOFEUERRADERAHTeam
-{
+rule PUNiSHERv15DEMOFEUERRADERAHTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -14018,9 +11707,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PECompactv140b2v140b4
-{
+rule PECompactv140b2v140b4 {
       meta:
 		author="malware-lu"
 strings:
@@ -14030,9 +11717,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NullsoftInstallSystemv198
-{
+rule NullsoftInstallSystemv198 {
       meta:
 		author="malware-lu"
 strings:
@@ -14042,9 +11727,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CryptoLockv202EngRyanThian
-{
+rule CryptoLockv202EngRyanThian {
       meta:
 		author="malware-lu"
 strings:
@@ -14056,9 +11739,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule vfpexeNcv600WangJianGuo
-{
+rule vfpexeNcv600WangJianGuo {
       meta:
 		author="malware-lu"
 strings:
@@ -14068,9 +11749,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule XPEORv099b
-{
+rule XPEORv099b {
       meta:
 		author="malware-lu"
 strings:
@@ -14081,9 +11760,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PEiDBundlev100BoBBobSoft
-{
+rule PEiDBundlev100BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -14093,9 +11770,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PeCompact2253276BitSumTechnologies
-{
+rule PeCompact2253276BitSumTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -14105,9 +11780,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02CodeLockAnorganix
-{
+rule PseudoSigner02CodeLockAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -14117,9 +11790,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv100Engdulekxt
-{
+rule FSGv100Engdulekxt {
       meta:
 		author="malware-lu"
 strings:
@@ -14129,9 +11800,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01BorlandDelphi50KOLMCKAnorganix
-{
+rule PseudoSigner01BorlandDelphi50KOLMCKAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -14141,9 +11810,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FlyCrypter10ut1lz
-{
+rule FlyCrypter10ut1lz {
       meta:
 		author="malware-lu"
 strings:
@@ -14154,9 +11821,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule MSLRHv032afakePECompact14xemadicius
-{
+rule MSLRHv032afakePECompact14xemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -14166,9 +11831,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule muckisprotectorIImucki
-{
+rule muckisprotectorIImucki {
       meta:
 		author="malware-lu"
 strings:
@@ -14178,9 +11841,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VcasmProtector10
-{
+rule VcasmProtector10 {
       meta:
 		author="malware-lu"
 strings:
@@ -14190,9 +11851,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NullsoftInstallSystemv20b2v20b3
-{
+rule NullsoftInstallSystemv20b2v20b3 {
       meta:
 		author="malware-lu"
 strings:
@@ -14202,9 +11861,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VProtectorV10Dvcasm
-{
+rule VProtectorV10Dvcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -14214,9 +11871,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule GardianAngel10
-{
+rule GardianAngel10 {
       meta:
 		author="malware-lu"
 strings:
@@ -14226,9 +11881,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXpressorv12CGSoftLabs
-{
+rule eXpressorv12CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -14238,9 +11891,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RSCsProcessPatcherv14
-{
+rule RSCsProcessPatcherv14 {
       meta:
 		author="malware-lu"
 strings:
@@ -14250,9 +11901,7 @@ condition:
 		$a0
 }
 
-
-rule Armadillov190b1
-{
+rule Armadillov190b1 {
       meta:
 		author="malware-lu"
 strings:
@@ -14262,9 +11911,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov190b2
-{
+rule Armadillov190b2 {
       meta:
 		author="malware-lu"
 strings:
@@ -14274,9 +11921,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov190b3
-{
+rule Armadillov190b3 {
       meta:
 		author="malware-lu"
 strings:
@@ -14286,9 +11931,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtBorlandDelphiMicrosoftVisualCASM
-{
+rule FSGv110EngdulekxtBorlandDelphiMicrosoftVisualCASM {
       meta:
 		author="malware-lu"
 strings:
@@ -14298,9 +11941,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Thinstall25xxJtit
-{
+rule Thinstall25xxJtit {
       meta:
 		author="malware-lu"
 strings:
@@ -14311,9 +11952,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule hmimysPacker10hmimys
-{
+rule hmimysPacker10hmimys {
       meta:
 		author="malware-lu"
 strings:
@@ -14323,9 +11962,7 @@ condition:
 		$a0
 }
 
-
-rule ACProtectV20risco
-{
+rule ACProtectV20risco {
       meta:
 		author="malware-lu"
 strings:
@@ -14335,9 +11972,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV112V114LZMA430ap0x
-{
+rule RLPackV112V114LZMA430ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -14347,9 +11982,7 @@ condition:
 		$a0
 }
 
-
-rule JDPack: Packer PEiD
-{
+rule JDPack: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -14359,9 +11992,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PESpinv1304Cyberbob
-{
+rule PESpinv1304Cyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -14371,9 +12002,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ScObfuscatorSuperCRacker
-{
+rule ScObfuscatorSuperCRacker {
       meta:
 		author="malware-lu"
 strings:
@@ -14383,9 +12012,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElock098SpecialBuildforgotheXer
-{
+rule tElock098SpecialBuildforgotheXer {
       meta:
 		author="malware-lu"
 strings:
@@ -14395,9 +12022,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01DEF10Anorganix
-{
+rule PseudoSigner01DEF10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -14407,9 +12032,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02REALBasicAnorganix
-{
+rule PseudoSigner02REALBasicAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -14419,9 +12042,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov260c
-{
+rule Armadillov260c {
       meta:
 		author="malware-lu"
 strings:
@@ -14431,9 +12052,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov260a
-{
+rule Armadillov260a {
       meta:
 		author="malware-lu"
 strings:
@@ -14443,9 +12062,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThemidaWinLicenseV10XV17XDLLOreansTechnologies
-{
+rule ThemidaWinLicenseV10XV17XDLLOreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -14455,9 +12072,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressor12CGSoftLabs
-{
+rule eXPressor12CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -14467,9 +12082,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NeoLitev10
-{
+rule NeoLitev10 {
       meta:
 		author="malware-lu"
 strings:
@@ -14479,9 +12092,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeBundlev30standardloader
-{
+rule ExeBundlev30standardloader {
       meta:
 		author="malware-lu"
 strings:
@@ -14491,9 +12102,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ProtectionPlusvxx
-{
+rule ProtectionPlusvxx {
       meta:
 		author="malware-lu"
 strings:
@@ -14503,9 +12112,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptorV22Xsoftcompletecom
-{
+rule EXECryptorV22Xsoftcompletecom {
       meta:
 		author="malware-lu"
 strings:
@@ -14515,9 +12122,7 @@ condition:
 		$a0
 }
 
-
-rule ThinstallVirtualizationSuite30353043ThinstallCompany
-{
+rule ThinstallVirtualizationSuite30353043ThinstallCompany {
       meta:
 		author="malware-lu"
 strings:
@@ -14527,9 +12132,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01CrunchPEHeuristicAnorganix
-{
+rule PseudoSigner01CrunchPEHeuristicAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -14539,9 +12142,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv120EngdulekxtBorlandC
-{
+rule FSGv120EngdulekxtBorlandC {
       meta:
 		author="malware-lu"
 strings:
@@ -14551,9 +12152,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEPACKv405v406
-{
+rule EXEPACKv405v406 {
       meta:
 		author="malware-lu"
 strings:
@@ -14563,9 +12162,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PeStubOEPv1x
-{
+rule PeStubOEPv1x {
       meta:
 		author="malware-lu"
 strings:
@@ -14576,9 +12173,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule EXEShieldv01bv03bv03SMoKE
-{
+rule EXEShieldv01bv03bv03SMoKE {
       meta:
 		author="malware-lu"
 strings:
@@ -14588,9 +12183,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEArmor049Hying
-{
+rule PEArmor049Hying {
       meta:
 		author="malware-lu"
 strings:
@@ -14600,9 +12193,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv14x
-{
+rule PECompactv14x {
       meta:
 		author="malware-lu"
 strings:
@@ -14612,9 +12203,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PocketPCSHA
-{
+rule PocketPCSHA {
       meta:
 		author="malware-lu"
 strings:
@@ -14624,9 +12213,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressorV1451CGSoftLabs
-{
+rule eXPressorV1451CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -14636,9 +12223,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Thinstall25
-{
+rule Thinstall25 {
       meta:
 		author="malware-lu"
 strings:
@@ -14648,9 +12233,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SuckStopv111
-{
+rule SuckStopv111 {
       meta:
 		author="malware-lu"
 strings:
@@ -14660,9 +12243,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DEFv10
-{
+rule DEFv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -14673,9 +12254,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule UnnamedScrambler251Beta2252p0ke
-{
+rule UnnamedScrambler251Beta2252p0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -14685,9 +12264,7 @@ condition:
 		$a0
 }
 
-
-rule Crunchv40
-{
+rule Crunchv40 {
       meta:
 		author="malware-lu"
 strings:
@@ -14697,9 +12274,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PrivateEXEProtector18SetiSoft
-{
+rule PrivateEXEProtector18SetiSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -14709,9 +12284,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02Armadillo300Anorganix
-{
+rule PseudoSigner02Armadillo300Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -14721,9 +12294,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule hmimyssPEPack01hmimys
-{
+rule hmimyssPEPack01hmimys {
       meta:
 		author="malware-lu"
 strings:
@@ -14733,9 +12304,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv146
-{
+rule PECompactv146 {
       meta:
 		author="malware-lu"
 strings:
@@ -14745,9 +12314,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02XCR011Anorganix
-{
+rule PseudoSigner02XCR011Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -14757,9 +12324,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEPACKLINKv360v364v365or50121
-{
+rule EXEPACKLINKv360v364v365or50121 {
       meta:
 		author="malware-lu"
 strings:
@@ -14769,9 +12334,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SpecialEXEPasswordProtectorv10
-{
+rule SpecialEXEPasswordProtectorv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -14781,9 +12344,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptor15Vaska
-{
+rule RCryptor15Vaska {
       meta:
 		author="malware-lu"
 strings:
@@ -14793,9 +12354,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeJoiner10Yoda
-{
+rule ExeJoiner10Yoda {
       meta:
 		author="malware-lu"
 strings:
@@ -14805,9 +12364,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV119DllaPlib043ap0x
-{
+rule RLPackV119DllaPlib043ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -14817,9 +12374,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrypKeyV56XKenonicControlsLtd
-{
+rule CrypKeyV56XKenonicControlsLtd {
       meta:
 		author="malware-lu"
 strings:
@@ -14829,9 +12384,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Safe20
-{
+rule Safe20 {
       meta:
 		author="malware-lu"
 strings:
@@ -14841,9 +12394,7 @@ condition:
 		$a0
 }
 
-
-rule MicrosoftVisualCV80
-{
+rule MicrosoftVisualCV80 {
       meta:
 		author="malware-lu"
 strings:
@@ -14853,9 +12404,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MZ_Crypt10byBrainSt0rm
-{
+rule MZ_Crypt10byBrainSt0rm {
       meta:
 		author="malware-lu"
 strings:
@@ -14865,9 +12414,7 @@ condition:
 		$a0
 }
 
-
-rule EPWv130
-{
+rule EPWv130 {
       meta:
 		author="malware-lu"
 strings:
@@ -14877,9 +12424,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WindofCrypt10byDarkPressure
-{
+rule WindofCrypt10byDarkPressure {
       meta:
 		author="malware-lu"
 strings:
@@ -14889,9 +12434,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NTKrnlPackerAshkbizDanehkar
-{
+rule NTKrnlPackerAshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -14901,9 +12444,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner01LCCWin321xAnorganix
-{
+rule PseudoSigner01LCCWin321xAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -14913,9 +12454,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NME11Publicbyredlime
-{
+rule NME11Publicbyredlime {
       meta:
 		author="malware-lu"
 strings:
@@ -14925,9 +12464,7 @@ condition:
 		$a0
 }
 
-
-rule PEtitev13
-{
+rule PEtitev13 {
       meta:
 		author="malware-lu"
 strings:
@@ -14937,9 +12474,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEtitev12
-{
+rule PEtitev12 {
       meta:
 		author="malware-lu"
 strings:
@@ -14949,9 +12484,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv134v140b1
-{
+rule PECompactv134v140b1 {
       meta:
 		author="malware-lu"
 strings:
@@ -14961,9 +12494,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeMSVC70DLLMethod3emadicius
-{
+rule MSLRHv032afakeMSVC70DLLMethod3emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -14973,9 +12504,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEtitev14
-{
+rule PEtitev14 {
       meta:
 		author="malware-lu"
 strings:
@@ -14986,9 +12515,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule SoftProtectSoftProtectbyru
-{
+rule SoftProtectSoftProtectbyru {
       meta:
 		author="malware-lu"
 strings:
@@ -14998,9 +12525,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02CDCopsIIAnorganix
-{
+rule PseudoSigner02CDCopsIIAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -15010,9 +12535,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPack118LZMA430ap0x
-{
+rule RLPack118LZMA430ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -15022,9 +12545,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv108xAlexeySolodovnikov
-{
+rule ASPackv108xAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -15034,9 +12555,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02BorlandCDLLMethod2Anorganix
-{
+rule PseudoSigner02BorlandCDLLMethod2Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -15046,9 +12565,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ARMProtector01bySMoKE
-{
+rule ARMProtector01bySMoKE {
       meta:
 		author="malware-lu"
 strings:
@@ -15058,9 +12575,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElock099cPrivateECLIPSEtE
-{
+rule tElock099cPrivateECLIPSEtE {
       meta:
 		author="malware-lu"
 strings:
@@ -15070,9 +12585,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule XPack152164
-{
+rule XPack152164 {
       meta:
 		author="malware-lu"
 strings:
@@ -15082,9 +12595,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv123RC4build0807dllAlexeySolodovnikov
-{
+rule ASProtectv123RC4build0807dllAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -15094,9 +12605,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov253b3
-{
+rule Armadillov253b3 {
       meta:
 		author="malware-lu"
 strings:
@@ -15106,9 +12615,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Imploderv104BoBBobSoft
-{
+rule Imploderv104BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -15118,9 +12625,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEiDBundlev100v101BoBBobSoft
-{
+rule PEiDBundlev100v101BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -15130,9 +12635,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule JExeCompressor10byArashVeyskarami
-{
+rule JExeCompressor10byArashVeyskarami {
       meta:
 		author="malware-lu"
 strings:
@@ -15142,9 +12645,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Alloy4xPGWareLLC
-{
+rule Alloy4xPGWareLLC {
       meta:
 		author="malware-lu"
 strings:
@@ -15154,9 +12655,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ThinstallV2403Jitit
-{
+rule ThinstallV2403Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -15167,9 +12666,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule FakeNinjav28AntiDebugSpirit
-{
+rule FakeNinjav28AntiDebugSpirit {
       meta:
 		author="malware-lu"
 strings:
@@ -15179,9 +12676,7 @@ condition:
 		$a0
 }
 
-
-rule ExeLockv100
-{
+rule ExeLockv100 {
       meta:
 		author="malware-lu"
 strings:
@@ -15191,9 +12686,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEtitevxx
-{
+rule PEtitevxx {
       meta:
 		author="malware-lu"
 strings:
@@ -15203,9 +12696,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EnigmaProtector10XSukhovVladimir
-{
+rule EnigmaProtector10XSukhovVladimir {
       meta:
 		author="malware-lu"
 strings:
@@ -15215,9 +12706,7 @@ condition:
 		$a0
 }
 
-
-rule ThinstallEmbedded27172719Jitit
-{
+rule ThinstallEmbedded27172719Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -15227,9 +12716,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv102bAlexeySolodovnikov
-{
+rule ASPackv102bAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -15240,9 +12727,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PEProtect09byCristophGabler1998
-{
+rule PEProtect09byCristophGabler1998 {
       meta:
 		author="malware-lu"
 strings:
@@ -15252,9 +12737,7 @@ condition:
 		$a0
 }
 
-
-rule VxPredator2448
-{
+rule VxPredator2448 {
       meta:
 		author="malware-lu"
 strings:
@@ -15264,9 +12747,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeMSVC60DLLemadicius
-{
+rule MSLRHv032afakeMSVC60DLLemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -15276,9 +12757,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv16dVaska
-{
+rule RCryptorv16dVaska {
       meta:
 		author="malware-lu"
 strings:
@@ -15289,9 +12768,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule Enigmaprotector112VladimirSukhov
-{
+rule Enigmaprotector112VladimirSukhov {
       meta:
 		author="malware-lu"
 strings:
@@ -15301,9 +12778,7 @@ condition:
 		$a0
 }
 
-
-rule hyingsPEArmorV076hying
-{
+rule hyingsPEArmorV076hying {
       meta:
 		author="malware-lu"
 strings:
@@ -15313,9 +12788,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule JDPackV200JDPack
-{
+rule JDPackV200JDPack {
       meta:
 		author="malware-lu"
 strings:
@@ -15325,9 +12798,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv01xv02xDwing
-{
+rule Upackv01xv02xDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -15337,9 +12808,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VcasmProtectorV1Xvcasm
-{
+rule VcasmProtectorV1Xvcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -15349,9 +12818,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule kkrunchy023alpha2Ryd
-{
+rule kkrunchy023alpha2Ryd {
       meta:
 		author="malware-lu"
 strings:
@@ -15362,9 +12829,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PolyEnEV001LennartHedlund
-{
+rule PolyEnEV001LennartHedlund {
       meta:
 		author="malware-lu"
 strings:
@@ -15374,9 +12839,7 @@ condition:
 		$a0
 }
 
-
-rule Winkriptv10
-{
+rule Winkriptv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -15386,9 +12849,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule TrainerCreationKitv5Trainer
-{
+rule TrainerCreationKitv5Trainer {
       meta:
 		author="malware-lu"
 strings:
@@ -15398,9 +12859,7 @@ condition:
 		$a0
 }
 
-
-rule EXEStealthv272
-{
+rule EXEStealthv272 {
       meta:
 		author="malware-lu"
 strings:
@@ -15410,9 +12869,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEStealthv273
-{
+rule EXEStealthv273 {
       meta:
 		author="malware-lu"
 strings:
@@ -15422,9 +12879,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02DEF10Anorganix
-{
+rule PseudoSigner02DEF10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -15434,9 +12889,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHpack01FEUERRADER
-{
+rule AHpack01FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -15446,9 +12899,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEStealthv274
-{
+rule EXEStealthv274 {
       meta:
 		author="malware-lu"
 strings:
@@ -15458,9 +12909,7 @@ condition:
 		$a0
 }
 
-
-rule ThinstallEmbedded22X2308Jitit
-{
+rule ThinstallEmbedded22X2308Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -15470,9 +12919,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PolyCryptorbySMTVersionv3v4
-{
+rule PolyCryptorbySMTVersionv3v4 {
       meta:
 		author="malware-lu"
 strings:
@@ -15482,9 +12929,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ProtectSharewareV11eCompservCMS
-{
+rule ProtectSharewareV11eCompservCMS {
       meta:
 		author="malware-lu"
 strings:
@@ -15494,9 +12939,7 @@ condition:
 		$a0
 }
 
-
-rule Upackv035alphaDwing
-{
+rule Upackv035alphaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -15506,9 +12949,7 @@ condition:
 		$a0
 }
 
-
-rule ASPackv10801AlexeySolodovnikov
-{
+rule ASPackv10801AlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -15520,9 +12961,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule ENIGMAProtectorV11SukhovVladimir
-{
+rule ENIGMAProtectorV11SukhovVladimir {
       meta:
 		author="malware-lu"
 strings:
@@ -15532,9 +12971,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEncrypt20junkcode
-{
+rule PEncrypt20junkcode {
       meta:
 		author="malware-lu"
 strings:
@@ -15544,9 +12981,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimbiOZExtranger
-{
+rule SimbiOZExtranger {
       meta:
 		author="malware-lu"
 strings:
@@ -15556,9 +12991,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule InnoSetupModulev304betav306v307
-{
+rule InnoSetupModulev304betav306v307 {
       meta:
 		author="malware-lu"
 strings:
@@ -15568,9 +13001,7 @@ condition:
 		$a0
 }
 
-
-rule ASPackv107bAlexeySolodovnikov
-{
+rule ASPackv107bAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -15580,9 +13011,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PROPACKv208emphasisonpackedsizelocked
-{
+rule PROPACKv208emphasisonpackedsizelocked {
       meta:
 		author="malware-lu"
 strings:
@@ -15592,9 +13021,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HACKSTOPv110p1
-{
+rule HACKSTOPv110p1 {
       meta:
 		author="malware-lu"
 strings:
@@ -15604,9 +13031,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AdysGlue110
-{
+rule AdysGlue110 {
       meta:
 		author="malware-lu"
 strings:
@@ -15616,9 +13041,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxEddiebased1745
-{
+rule VxEddiebased1745 {
       meta:
 		author="malware-lu"
 strings:
@@ -15628,9 +13051,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASDPackv10asd
-{
+rule ASDPackv10asd {
       meta:
 		author="malware-lu"
 strings:
@@ -15640,9 +13061,7 @@ condition:
 		$a0
 }
 
-
-rule ORiENV1XV2XFisunAV
-{
+rule ORiENV1XV2XFisunAV {
       meta:
 		author="malware-lu"
 strings:
@@ -15652,9 +13071,7 @@ condition:
 		$a0
 }
 
-
-rule StonesPEEncryptorv113
-{
+rule StonesPEEncryptorv113 {
       meta:
 		author="malware-lu"
 strings:
@@ -15664,9 +13081,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv302v302aExtractable
-{
+rule WWPACKv302v302aExtractable {
       meta:
 		author="malware-lu"
 strings:
@@ -15676,9 +13091,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ARMProtector03bySMoKE
-{
+rule ARMProtector03bySMoKE {
       meta:
 		author="malware-lu"
 strings:
@@ -15688,9 +13101,7 @@ condition:
 		$a0
 }
 
-
-rule VxSlowload
-{
+rule VxSlowload {
       meta:
 		author="malware-lu"
 strings:
@@ -15700,9 +13111,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AntiDote10BetaSISTeam
-{
+rule AntiDote10BetaSISTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -15712,9 +13121,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DzAPatcherv13Loader
-{
+rule DzAPatcherv13Loader {
       meta:
 		author="malware-lu"
 strings:
@@ -15724,9 +13131,7 @@ condition:
 		$a0
 }
 
-
-rule CDSSS10beta1CyberDoom
-{
+rule CDSSS10beta1CyberDoom {
       meta:
 		author="malware-lu"
 strings:
@@ -15736,9 +13141,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule y0dasCrypterv10
-{
+rule y0dasCrypterv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -15748,9 +13151,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule y0dasCrypterv11
-{
+rule y0dasCrypterv11 {
       meta:
 		author="malware-lu"
 strings:
@@ -15760,9 +13161,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NullsoftPiMPInstallSystemv1x
-{
+rule NullsoftPiMPInstallSystemv1x {
       meta:
 		author="malware-lu"
 strings:
@@ -15772,9 +13171,7 @@ condition:
 		$a0
 }
 
-
-rule ExeBundlev30smallloader
-{
+rule ExeBundlev30smallloader {
       meta:
 		author="malware-lu"
 strings:
@@ -15784,9 +13181,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXAlternativestub
-{
+rule UPXAlternativestub {
       meta:
 		author="malware-lu"
 strings:
@@ -15796,9 +13191,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EmbedPE113cyclotron
-{
+rule EmbedPE113cyclotron {
       meta:
 		author="malware-lu"
 strings:
@@ -15808,9 +13201,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor2223protectedIAT
-{
+rule EXECryptor2223protectedIAT {
       meta:
 		author="malware-lu"
 strings:
@@ -15820,9 +13211,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner01Armadillo300Anorganix
-{
+rule PseudoSigner01Armadillo300Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -15832,9 +13221,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptorvxxxx
-{
+rule EXECryptorvxxxx {
       meta:
 		author="malware-lu"
 strings:
@@ -15844,9 +13231,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Morphinev33SilentSoftwareSilentShieldc2005
-{
+rule Morphinev33SilentSoftwareSilentShieldc2005 {
       meta:
 		author="malware-lu"
 strings:
@@ -15857,9 +13242,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule DEF10bartxt
-{
+rule DEF10bartxt {
       meta:
 		author="malware-lu"
 strings:
@@ -15869,9 +13252,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv0971v0976
-{
+rule PECompactv0971v0976 {
       meta:
 		author="malware-lu"
 strings:
@@ -15881,9 +13262,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCShrinkv040b
-{
+rule PCShrinkv040b {
       meta:
 		author="malware-lu"
 strings:
@@ -15893,9 +13272,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakePECrypt102emadicius
-{
+rule MSLRHv032afakePECrypt102emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -15905,9 +13282,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ORiENv211212FisunAlexander
-{
+rule ORiENv211212FisunAlexander {
       meta:
 		author="malware-lu"
 strings:
@@ -15917,9 +13292,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule StonesPEEncruptorv113
-{
+rule StonesPEEncruptorv113 {
       meta:
 		author="malware-lu"
 strings:
@@ -15929,9 +13302,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv11MTEc
-{
+rule ASProtectv11MTEc {
       meta:
 		author="malware-lu"
 strings:
@@ -15941,9 +13312,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CreateInstallStubvxx
-{
+rule CreateInstallStubvxx {
       meta:
 		author="malware-lu"
 strings:
@@ -15953,9 +13322,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WinZip32bitSFXv8xmodule
-{
+rule WinZip32bitSFXv8xmodule {
       meta:
 		author="malware-lu"
 strings:
@@ -15965,9 +13332,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upxv12MarcusLazlo
-{
+rule Upxv12MarcusLazlo {
       meta:
 		author="malware-lu"
 strings:
@@ -15977,9 +13342,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEPACKv10byANAKiN1998
-{
+rule PEPACKv10byANAKiN1998 {
       meta:
 		author="malware-lu"
 strings:
@@ -15989,9 +13352,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NeoLitev20
-{
+rule NeoLitev20 {
       meta:
 		author="malware-lu"
 strings:
@@ -16001,9 +13362,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakeSpalsher1x3xFEUERRADER
-{
+rule AHTeamEPProtector03fakeSpalsher1x3xFEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -16013,9 +13372,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv10803AlexeySolodovnikov
-{
+rule ASPackv10803AlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -16028,9 +13385,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point or $a3 at pe.entry_point
 }
 
-
-rule VMProtect07x08PolyTech
-{
+rule VMProtect07x08PolyTech {
       meta:
 		author="malware-lu"
 strings:
@@ -16040,9 +13395,7 @@ condition:
 		$a0
 }
 
-
-rule ExeShieldProtectorV36wwwexeshieldcom
-{
+rule ExeShieldProtectorV36wwwexeshieldcom {
       meta:
 		author="malware-lu"
 strings:
@@ -16052,9 +13405,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WerusCrypter10Kas
-{
+rule WerusCrypter10Kas {
       meta:
 		author="malware-lu"
 strings:
@@ -16064,9 +13415,7 @@ condition:
 		$a0
 }
 
-
-rule Themida10xx1800compressedengineOreansTechnologies
-{
+rule Themida10xx1800compressedengineOreansTechnologies {
       meta:
 		author="malware-lu"
 strings:
@@ -16077,9 +13426,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule CHECKPRGc1992
-{
+rule CHECKPRGc1992 {
       meta:
 		author="malware-lu"
 strings:
@@ -16089,9 +13436,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressor11CGSoftLabs
-{
+rule eXPressor11CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -16101,9 +13446,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxEddie1028
-{
+rule VxEddie1028 {
       meta:
 		author="malware-lu"
 strings:
@@ -16113,9 +13456,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEQuakev006byfORGAT
-{
+rule PEQuakev006byfORGAT {
       meta:
 		author="malware-lu"
 strings:
@@ -16125,9 +13466,7 @@ condition:
 		$a0
 }
 
-
-rule LTCv13
-{
+rule LTCv13 {
       meta:
 		author="malware-lu"
 strings:
@@ -16137,9 +13476,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv071b7
-{
+rule tElockv071b7 {
       meta:
 		author="malware-lu"
 strings:
@@ -16149,9 +13486,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv071b2
-{
+rule tElockv071b2 {
       meta:
 		author="malware-lu"
 strings:
@@ -16161,9 +13496,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnknownJoinersignfrompinch260320070212
-{
+rule UnknownJoinersignfrompinch260320070212 {
       meta:
 		author="malware-lu"
 strings:
@@ -16173,9 +13506,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DIETv100v100d
-{
+rule DIETv100v100d {
       meta:
 		author="malware-lu"
 strings:
@@ -16185,9 +13516,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule APEX_CBLTApex40500mhz
-{
+rule APEX_CBLTApex40500mhz {
       meta:
 		author="malware-lu"
 strings:
@@ -16197,9 +13526,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule StealthPEv11
-{
+rule StealthPEv11 {
       meta:
 		author="malware-lu"
 strings:
@@ -16209,9 +13536,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackFullEdition117DLLAp0x
-{
+rule RLPackFullEdition117DLLAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -16221,9 +13546,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Anti007V26LiuXingPing
-{
+rule Anti007V26LiuXingPing {
       meta:
 		author="malware-lu"
 strings:
@@ -16233,9 +13556,7 @@ condition:
 		$a0
 }
 
-
-rule AppEncryptorSilentTeam
-{
+rule AppEncryptorSilentTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -16245,9 +13566,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VirogenCryptv075
-{
+rule VirogenCryptv075 {
       meta:
 		author="malware-lu"
 strings:
@@ -16257,9 +13576,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov300a
-{
+rule Armadillov300a {
       meta:
 		author="malware-lu"
 strings:
@@ -16269,9 +13586,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv300v301Extractable
-{
+rule WWPACKv300v301Extractable {
       meta:
 		author="malware-lu"
 strings:
@@ -16281,9 +13596,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxUddy2617
-{
+rule VxUddy2617 {
       meta:
 		author="malware-lu"
 strings:
@@ -16293,9 +13606,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PLINK8619841985
-{
+rule PLINK8619841985 {
       meta:
 		author="malware-lu"
 strings:
@@ -16305,9 +13616,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv10804AlexeySolodovnikov
-{
+rule ASPackv10804AlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -16317,9 +13626,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule aPackv098m
-{
+rule aPackv098m {
       meta:
 		author="malware-lu"
 strings:
@@ -16329,9 +13636,7 @@ condition:
 		$a0
 }
 
-
-rule BamBamv001Bedrock
-{
+rule BamBamv001Bedrock {
       meta:
 		author="malware-lu"
 strings:
@@ -16341,9 +13646,7 @@ condition:
 		$a0
 }
 
-
-rule PESHiELDv02v02bv02b2
-{
+rule PESHiELDv02v02bv02b2 {
       meta:
 		author="malware-lu"
 strings:
@@ -16353,9 +13656,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEStealthv27
-{
+rule EXEStealthv27 {
       meta:
 		author="malware-lu"
 strings:
@@ -16365,9 +13666,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEStealthv25
-{
+rule EXEStealthv25 {
       meta:
 		author="malware-lu"
 strings:
@@ -16377,9 +13676,7 @@ condition:
 		$a0
 }
 
-
-rule VxHaryanto
-{
+rule VxHaryanto {
       meta:
 		author="malware-lu"
 strings:
@@ -16389,9 +13686,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPRStripperv2xunpacked
-{
+rule ASPRStripperv2xunpacked {
       meta:
 		author="malware-lu"
 strings:
@@ -16401,9 +13696,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01UPX06Anorganix
-{
+rule PseudoSigner01UPX06Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -16413,9 +13706,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Shrinker33
-{
+rule Shrinker33 {
       meta:
 		author="malware-lu"
 strings:
@@ -16425,9 +13716,7 @@ condition:
 		$a0
 }
 
-
-rule Shrinker32
-{
+rule Shrinker32 {
       meta:
 		author="malware-lu"
 strings:
@@ -16437,9 +13726,7 @@ condition:
 		$a0
 }
 
-
-rule Shrinker34
-{
+rule Shrinker34 {
       meta:
 		author="malware-lu"
 strings:
@@ -16449,9 +13736,7 @@ condition:
 		$a0
 }
 
-
-rule PESPinv13Cyberbob
-{
+rule PESPinv13Cyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -16461,9 +13746,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv160v165
-{
+rule PECompactv160v165 {
       meta:
 		author="malware-lu"
 strings:
@@ -16473,9 +13756,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressorv120b
-{
+rule eXPressorv120b {
       meta:
 		author="malware-lu"
 strings:
@@ -16485,9 +13766,7 @@ condition:
 		$a0
 }
 
-
-rule EPWv12
-{
+rule EPWv12 {
       meta:
 		author="malware-lu"
 strings:
@@ -16497,9 +13776,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv12x
-{
+rule ASProtectv12x {
       meta:
 		author="malware-lu"
 strings:
@@ -16509,9 +13786,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Packanoidv1Arkanoid
-{
+rule Packanoidv1Arkanoid {
       meta:
 		author="malware-lu"
 strings:
@@ -16521,9 +13796,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EscargotV01Meat
-{
+rule EscargotV01Meat {
       meta:
 		author="malware-lu"
 strings:
@@ -16533,9 +13806,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SCObfuscatorSuperCRacker
-{
+rule SCObfuscatorSuperCRacker {
       meta:
 		author="malware-lu"
 strings:
@@ -16545,9 +13816,7 @@ condition:
 		$a0
 }
 
-
-rule EXEStealth275WebtoolMaster
-{
+rule EXEStealth275WebtoolMaster {
       meta:
 		author="malware-lu"
 strings:
@@ -16557,9 +13826,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PasswordProtectorcMiniSoft1992
-{
+rule PasswordProtectorcMiniSoft1992 {
       meta:
 		author="malware-lu"
 strings:
@@ -16569,9 +13836,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxEddie2000
-{
+rule VxEddie2000 {
       meta:
 		author="malware-lu"
 strings:
@@ -16581,9 +13846,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VideoLanClientUnknownCompiler
-{
+rule VideoLanClientUnknownCompiler {
       meta:
 		author="malware-lu"
 strings:
@@ -16593,9 +13856,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressorv14CGSoftLabs
-{
+rule eXPressorv14CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -16606,9 +13867,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule SkDUndetectablerPro20NoUPXMethodSkD
-{
+rule SkDUndetectablerPro20NoUPXMethodSkD {
       meta:
 		author="malware-lu"
 strings:
@@ -16618,9 +13877,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RJcrushv100
-{
+rule RJcrushv100 {
       meta:
 		author="malware-lu"
 strings:
@@ -16630,9 +13887,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeShieldv27
-{
+rule ExeShieldv27 {
       meta:
 		author="malware-lu"
 strings:
@@ -16642,9 +13897,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeShieldv29
-{
+rule ExeShieldv29 {
       meta:
 		author="malware-lu"
 strings:
@@ -16654,9 +13907,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEiDBundlev102v103BoBBobSoft
-{
+rule PEiDBundlev102v103BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -16666,9 +13917,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtMicrosoftVisualC5060
-{
+rule FSGv110EngdulekxtMicrosoftVisualC5060 {
       meta:
 		author="malware-lu"
 strings:
@@ -16678,9 +13927,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PUNiSHERV15FEUERRADER
-{
+rule PUNiSHERV15FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -16690,9 +13937,7 @@ condition:
 		$a0
 }
 
-
-rule ExcaliburV103forgot
-{
+rule ExcaliburV103forgot {
       meta:
 		author="malware-lu"
 strings:
@@ -16702,9 +13947,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPack10betaap0x
-{
+rule RLPack10betaap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -16715,9 +13958,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule nMacrorecorder10
-{
+rule nMacrorecorder10 {
       meta:
 		author="malware-lu"
 strings:
@@ -16727,9 +13968,7 @@ condition:
 		$a0
 }
 
-
-rule PrivateEXEv20a
-{
+rule PrivateEXEv20a {
       meta:
 		author="malware-lu"
 strings:
@@ -16741,9 +13980,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule PackmanV10BrandonLaCombe
-{
+rule PackmanV10BrandonLaCombe {
       meta:
 		author="malware-lu"
 strings:
@@ -16753,9 +13990,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01PEX099Anorganix
-{
+rule PseudoSigner01PEX099Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -16765,9 +14000,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PAKSFXArchive
-{
+rule PAKSFXArchive {
       meta:
 		author="malware-lu"
 strings:
@@ -16777,9 +14010,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv2xxAlexeySolodovnikov
-{
+rule ASPackv2xxAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -16790,9 +14021,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule SimbiOZ13Extranger
-{
+rule SimbiOZ13Extranger {
       meta:
 		author="malware-lu"
 strings:
@@ -16802,9 +14031,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule muckisprotectorImucki
-{
+rule muckisprotectorImucki {
       meta:
 		author="malware-lu"
 strings:
@@ -16814,9 +14041,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1339ObsidiumSoftware
-{
+rule Obsidium1339ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -16826,9 +14051,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule LOCK98V10028keenvim
-{
+rule LOCK98V10028keenvim {
       meta:
 		author="malware-lu"
 strings:
@@ -16838,9 +14061,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule iPBProtectv013
-{
+rule iPBProtectv013 {
       meta:
 		author="malware-lu"
 strings:
@@ -16850,9 +14071,7 @@ condition:
 		$a0
 }
 
-
-rule PrivateEXEProtector197SetiSoft
-{
+rule PrivateEXEProtector197SetiSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -16862,9 +14081,7 @@ condition:
 		$a0
 }
 
-
-rule ASPackv21AlexeySolodovnikov
-{
+rule ASPackv21AlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -16874,9 +14091,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv103bAlexeySolodovnikov
-{
+rule ASPackv103bAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -16886,9 +14101,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv20
-{
+rule FSGv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -16898,9 +14111,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner01PEIntro10Anorganix
-{
+rule PseudoSigner01PEIntro10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -16910,9 +14121,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv099SpecialBuildheXerforgot
-{
+rule tElockv099SpecialBuildheXerforgot {
       meta:
 		author="malware-lu"
 strings:
@@ -16923,9 +14132,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule VxBackfont900
-{
+rule VxBackfont900 {
       meta:
 		author="malware-lu"
 strings:
@@ -16935,9 +14142,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrunchPEv20xx
-{
+rule CrunchPEv20xx {
       meta:
 		author="malware-lu"
 strings:
@@ -16947,9 +14152,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Litev003a
-{
+rule Litev003a {
       meta:
 		author="malware-lu"
 strings:
@@ -16959,9 +14162,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimplePack1XMethod2bagie
-{
+rule SimplePack1XMethod2bagie {
       meta:
 		author="malware-lu"
 strings:
@@ -16971,9 +14172,7 @@ condition:
 		$a0
 }
 
-
-rule PEncryptv10
-{
+rule PEncryptv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -16983,9 +14182,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BJFntv12RC
-{
+rule BJFntv12RC {
       meta:
 		author="malware-lu"
 strings:
@@ -16995,9 +14192,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FishPEShield112116HellFish
-{
+rule FishPEShield112116HellFish {
       meta:
 		author="malware-lu"
 strings:
@@ -17008,9 +14203,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule CodeCryptv016bv0163b
-{
+rule CodeCryptv016bv0163b {
       meta:
 		author="malware-lu"
 strings:
@@ -17020,9 +14213,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VOBProtectCD
-{
+rule VOBProtectCD {
       meta:
 		author="malware-lu"
 strings:
@@ -17032,9 +14223,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule diProtectorV1XdiProtectorSoftware
-{
+rule diProtectorV1XdiProtectorSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -17044,9 +14233,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PrivateexeProtector20SetiSoftTeam
-{
+rule PrivateexeProtector20SetiSoftTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -17056,9 +14243,7 @@ condition:
 		$a0
 }
 
-
-rule AHTeamEPProtector03fakekkryptor9kryptoraFEUERRADER
-{
+rule AHTeamEPProtector03fakekkryptor9kryptoraFEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -17068,9 +14253,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEBundlev310
-{
+rule PEBundlev310 {
       meta:
 		author="malware-lu"
 strings:
@@ -17080,9 +14263,7 @@ condition:
 		$a0
 }
 
-
-rule NsPack34NorthStar
-{
+rule NsPack34NorthStar {
       meta:
 		author="malware-lu"
 strings:
@@ -17092,9 +14273,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PellesC280290EXEX86CRTLIB
-{
+rule PellesC280290EXEX86CRTLIB {
       meta:
 		author="malware-lu"
 strings:
@@ -17104,9 +14283,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV115V117Dllap0x
-{
+rule RLPackV115V117Dllap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -17116,9 +14293,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PellesC28x45xPelleOrinius
-{
+rule PellesC28x45xPelleOrinius {
       meta:
 		author="malware-lu"
 strings:
@@ -17128,9 +14303,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Thinstallv2460Jitit
-{
+rule Thinstallv2460Jitit {
       meta:
 		author="malware-lu"
 strings:
@@ -17140,9 +14313,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110Engdulekxt
-{
+rule FSGv110Engdulekxt {
       meta:
 		author="malware-lu"
 strings:
@@ -17154,9 +14325,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule PECompactv2xx
-{
+rule PECompactv2xx {
       meta:
 		author="malware-lu"
 strings:
@@ -17166,9 +14335,7 @@ condition:
 		$a0
 }
 
-
-rule ASPackv10802AlexeySolodovnikov
-{
+rule ASPackv10802AlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -17178,9 +14345,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillo440SiliconRealmsToolworks
-{
+rule Armadillo440SiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -17190,9 +14355,7 @@ condition:
 		$a0
 }
 
-
-rule Armadillov1xxv2xx
-{
+rule Armadillov1xxv2xx {
       meta:
 		author="malware-lu"
 strings:
@@ -17202,9 +14365,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HACKSTOPv111c
-{
+rule HACKSTOPv111c {
       meta:
 		author="malware-lu"
 strings:
@@ -17214,9 +14375,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEStealth276UnregisteredWebtoolMaster
-{
+rule EXEStealth276UnregisteredWebtoolMaster {
       meta:
 		author="malware-lu"
 strings:
@@ -17226,9 +14385,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02LCCWin32DLLAnorganix
-{
+rule PseudoSigner02LCCWin32DLLAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -17238,9 +14395,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CDSSSv10Beta1CyberDoomTeamX
-{
+rule CDSSSv10Beta1CyberDoomTeamX {
       meta:
 		author="malware-lu"
 strings:
@@ -17250,9 +14405,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv041x
-{
+rule tElockv041x {
       meta:
 		author="malware-lu"
 strings:
@@ -17262,9 +14415,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ZCodeWin32PEProtectorv101
-{
+rule ZCodeWin32PEProtectorv101 {
       meta:
 		author="malware-lu"
 strings:
@@ -17274,9 +14425,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ABCCryptor10byZloY
-{
+rule ABCCryptor10byZloY {
       meta:
 		author="malware-lu"
 strings:
@@ -17286,9 +14435,7 @@ condition:
 		$a0
 }
 
-
-rule FSGv120EngdulekxtMicrosoftVisualC60
-{
+rule FSGv120EngdulekxtMicrosoftVisualC60 {
       meta:
 		author="malware-lu"
 strings:
@@ -17298,9 +14445,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SLVc0deProtectorv061SLV
-{
+rule SLVc0deProtectorv061SLV {
       meta:
 		author="malware-lu"
 strings:
@@ -17311,9 +14456,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule FSG131dulekxt
-{
+rule FSG131dulekxt {
       meta:
 		author="malware-lu"
 strings:
@@ -17323,9 +14466,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV112V114aPlib043ap0x
-{
+rule RLPackV112V114aPlib043ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -17335,9 +14476,7 @@ condition:
 		$a0
 }
 
-
-rule Crypter31SLESH
-{
+rule Crypter31SLESH {
       meta:
 		author="malware-lu"
 strings:
@@ -17347,9 +14486,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner01VBOX43MTEAnorganix
-{
+rule PseudoSigner01VBOX43MTEAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -17359,9 +14496,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeBJFNT13emadicius
-{
+rule MSLRHv032afakeBJFNT13emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -17371,9 +14506,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeCryptor02build002GlOFF
-{
+rule FreeCryptor02build002GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -17383,9 +14516,7 @@ condition:
 		$a0
 }
 
-
-rule PackItBitchV10archphase
-{
+rule PackItBitchV10archphase {
       meta:
 		author="malware-lu"
 strings:
@@ -17395,9 +14526,7 @@ condition:
 		$a0
 }
 
-
-rule nPackv11250BetaNEOx
-{
+rule nPackv11250BetaNEOx {
       meta:
 		author="malware-lu"
 strings:
@@ -17407,9 +14536,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnpackedBSSFXArchivev19
-{
+rule UnpackedBSSFXArchivev19 {
       meta:
 		author="malware-lu"
 strings:
@@ -17419,9 +14546,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01VideoLanClientAnorganix
-{
+rule PseudoSigner01VideoLanClientAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -17431,9 +14556,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01PECompact14Anorganix
-{
+rule PseudoSigner01PECompact14Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -17443,9 +14566,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01DxPack10Anorganix
-{
+rule PseudoSigner01DxPack10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -17455,9 +14576,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Splice11byTw1stedL0gic
-{
+rule Splice11byTw1stedL0gic {
       meta:
 		author="malware-lu"
 strings:
@@ -17467,9 +14586,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv140v145
-{
+rule PECompactv140v145 {
       meta:
 		author="malware-lu"
 strings:
@@ -17479,9 +14596,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillo300aSiliconRealmsToolworks
-{
+rule Armadillo300aSiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -17491,9 +14606,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NullsoftInstallSystemv20b4
-{
+rule NullsoftInstallSystemv20b4 {
       meta:
 		author="malware-lu"
 strings:
@@ -17504,9 +14617,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule PESHiELDv01bMTE
-{
+rule PESHiELDv01bMTE {
       meta:
 		author="malware-lu"
 strings:
@@ -17516,9 +14627,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BeRoEXEPackerV100BeRo
-{
+rule BeRoEXEPackerV100BeRo {
       meta:
 		author="malware-lu"
 strings:
@@ -17528,9 +14637,7 @@ condition:
 		$a0
 }
 
-
-rule MSLRHv32aemadicius
-{
+rule MSLRHv32aemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -17540,9 +14647,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SpecialEXEPaswordProtectorv101EngPavolCerven
-{
+rule SpecialEXEPaswordProtectorv101EngPavolCerven {
       meta:
 		author="malware-lu"
 strings:
@@ -17552,9 +14657,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv166
-{
+rule PECompactv166 {
       meta:
 		author="malware-lu"
 strings:
@@ -17564,9 +14667,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv167
-{
+rule PECompactv167 {
       meta:
 		author="malware-lu"
 strings:
@@ -17576,9 +14677,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VIRUSIWormHybris
-{
+rule VIRUSIWormHybris {
       meta:
 		author="malware-lu"
 strings:
@@ -17588,9 +14687,7 @@ condition:
 		$a0
 }
 
-
-rule GPInstallv50332
-{
+rule GPInstallv50332 {
       meta:
 		author="malware-lu"
 strings:
@@ -17600,9 +14697,7 @@ condition:
 		$a0
 }
 
-
-rule PseudoSigner02PEIntro10Anorganix
-{
+rule PseudoSigner02PEIntro10Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -17612,9 +14707,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov410SiliconRealmsToolworks
-{
+rule Armadillov410SiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -17624,9 +14717,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AverCryptor102betaos1r1s
-{
+rule AverCryptor102betaos1r1s {
       meta:
 		author="malware-lu"
 strings:
@@ -17636,9 +14727,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv131
-{
+rule FSGv131 {
       meta:
 		author="malware-lu"
 strings:
@@ -17648,9 +14737,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv133
-{
+rule FSGv133 {
       meta:
 		author="malware-lu"
 strings:
@@ -17660,9 +14747,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HidePE101BGCorp
-{
+rule HidePE101BGCorp {
       meta:
 		author="malware-lu"
 strings:
@@ -17672,9 +14757,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXEStealthv11
-{
+rule EXEStealthv11 {
       meta:
 		author="malware-lu"
 strings:
@@ -17684,9 +14767,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Thinstallvxx
-{
+rule Thinstallvxx {
       meta:
 		author="malware-lu"
 strings:
@@ -17696,9 +14777,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidium1200ObsidiumSoftware
-{
+rule Obsidium1200ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -17708,9 +14787,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PrivatePersonalPackerPPP103ConquestOfTroycom
-{
+rule PrivatePersonalPackerPPP103ConquestOfTroycom {
       meta:
 		author="malware-lu"
 strings:
@@ -17720,9 +14797,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VIRUSIWormBagle
-{
+rule VIRUSIWormBagle {
       meta:
 		author="malware-lu"
 strings:
@@ -17732,9 +14807,7 @@ condition:
 		$a0
 }
 
-
-rule RLPackv118BasicLZMAAp0x
-{
+rule RLPackv118BasicLZMAAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -17744,9 +14817,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule StonesPEEncryptorv20
-{
+rule StonesPEEncryptorv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -17756,9 +14827,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv029betaDwing
-{
+rule Upackv029betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -17768,9 +14837,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02BJFNT11bAnorganix
-{
+rule PseudoSigner02BJFNT11bAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -17780,9 +14847,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXScramblerRCv1x
-{
+rule UPXScramblerRCv1x {
       meta:
 		author="malware-lu"
 strings:
@@ -17792,9 +14857,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECrypt15BitShapeSoftware
-{
+rule PECrypt15BitShapeSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -17804,9 +14867,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Upackv021BetaDwing
-{
+rule Upackv021BetaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -17816,9 +14877,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPXFreakV01HMX0101
-{
+rule UPXFreakV01HMX0101 {
       meta:
 		author="malware-lu"
 strings:
@@ -17828,9 +14887,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnnamedScrambler20p0ke
-{
+rule UnnamedScrambler20p0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -17840,9 +14897,7 @@ condition:
 		$a0
 }
 
-
-rule HACKSTOPv100
-{
+rule HACKSTOPv100 {
       meta:
 		author="malware-lu"
 strings:
@@ -17852,9 +14907,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ExeShield36wwwexeshieldcom
-{
+rule ExeShield36wwwexeshieldcom {
       meta:
 		author="malware-lu"
 strings:
@@ -17864,9 +14917,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Pe123v200644
-{
+rule Pe123v200644 {
       meta:
 		author="malware-lu"
 strings:
@@ -17876,9 +14927,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SDProtectorV11xRandyLi
-{
+rule SDProtectorV11xRandyLi {
       meta:
 		author="malware-lu"
 strings:
@@ -17888,9 +14937,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BobPackv100BoBBobSoft
-{
+rule BobPackv100BoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -17900,9 +14947,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DBPEv210
-{
+rule DBPEv210 {
       meta:
 		author="malware-lu"
 strings:
@@ -17912,9 +14957,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NsPackv31NorthStar
-{
+rule NsPackv31NorthStar {
       meta:
 		author="malware-lu"
 strings:
@@ -17925,9 +14968,7 @@ condition:
 		$a0 at pe.entry_point or $a1
 }
 
-
-rule SVKProtectorV13XPavolCerven
-{
+rule SVKProtectorV13XPavolCerven {
       meta:
 		author="malware-lu"
 strings:
@@ -17937,9 +14978,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakePECrypt102FEUERRADER
-{
+rule AHTeamEPProtector03fakePECrypt102FEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -17949,9 +14988,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02WATCOMCCEXEAnorganix
-{
+rule PseudoSigner02WATCOMCCEXEAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -17961,9 +14998,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PENinja: Packer PEiD
-{
+rule PENinja: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -17973,9 +15008,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UpackV036Dwing
-{
+rule UpackV036Dwing {
       meta:
 		author="malware-lu"
 strings:
@@ -17986,9 +15019,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule yodasProtectorv101AshkbizDanehkar
-{
+rule yodasProtectorv101AshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -17998,9 +15029,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPX050070
-{
+rule UPX050070 {
       meta:
 		author="malware-lu"
 strings:
@@ -18010,9 +15039,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxVCLencrypted
-{
+rule VxVCLencrypted {
       meta:
 		author="malware-lu"
 strings:
@@ -18023,9 +15050,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule VxXRCV1015
-{
+rule VxXRCV1015 {
       meta:
 		author="malware-lu"
 strings:
@@ -18035,9 +15060,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackv118BasicDLLaPLibAp0x
-{
+rule RLPackv118BasicDLLaPLibAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -18047,9 +15070,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PellesC290300400DLLX86CRTLIB
-{
+rule PellesC290300400DLLX86CRTLIB {
       meta:
 		author="malware-lu"
 strings:
@@ -18059,9 +15080,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnnamedScrambler13Bp0ke
-{
+rule UnnamedScrambler13Bp0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -18071,9 +15090,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HyingsPEArmor075exeHyingCCG
-{
+rule HyingsPEArmor075exeHyingCCG {
       meta:
 		author="malware-lu"
 strings:
@@ -18083,9 +15100,7 @@ condition:
 		$a0
 }
 
-
-rule SimbiOZPolyCryptorvxxExtranger
-{
+rule SimbiOZPolyCryptorvxxExtranger {
       meta:
 		author="malware-lu"
 strings:
@@ -18095,9 +15110,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AVPACKv120
-{
+rule AVPACKv120 {
       meta:
 		author="malware-lu"
 strings:
@@ -18107,9 +15120,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov220
-{
+rule Armadillov220 {
       meta:
 		author="malware-lu"
 strings:
@@ -18119,9 +15130,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule XPack167
-{
+rule XPack167 {
       meta:
 		author="malware-lu"
 strings:
@@ -18131,9 +15140,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NullsoftInstallSystemv1xx
-{
+rule NullsoftInstallSystemv1xx {
       meta:
 		author="malware-lu"
 strings:
@@ -18144,9 +15151,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule BobSoftMiniDelphiBoBBobSoft
-{
+rule BobSoftMiniDelphiBoBBobSoft {
       meta:
 		author="malware-lu"
 strings:
@@ -18158,9 +15163,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point or $a2 at pe.entry_point
 }
 
-
-rule UltraProV10SafeNet
-{
+rule UltraProV10SafeNet {
       meta:
 		author="malware-lu"
 strings:
@@ -18170,9 +15173,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv1242v1243
-{
+rule PECompactv1242v1243 {
       meta:
 		author="malware-lu"
 strings:
@@ -18182,9 +15183,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SimplePack121build0909Method2bagie
-{
+rule SimplePack121build0909Method2bagie {
       meta:
 		author="malware-lu"
 strings:
@@ -18194,9 +15193,7 @@ condition:
 		$a0
 }
 
-
-rule Obsidium13037ObsidiumSoftware
-{
+rule Obsidium13037ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -18206,9 +15203,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxPhoenix927
-{
+rule VxPhoenix927 {
       meta:
 		author="malware-lu"
 strings:
@@ -18218,9 +15213,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petite14c199899IanLuck
-{
+rule Petite14c199899IanLuck {
       meta:
 		author="malware-lu"
 strings:
@@ -18230,9 +15223,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressorV10CGSoftLabs
-{
+rule eXPressorV10CGSoftLabs {
       meta:
 		author="malware-lu"
 strings:
@@ -18242,9 +15233,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RECryptv07xCruddRETh2
-{
+rule RECryptv07xCruddRETh2 {
       meta:
 		author="malware-lu"
 strings:
@@ -18254,9 +15243,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PassEXEv20
-{
+rule PassEXEv20 {
       meta:
 		author="malware-lu"
 strings:
@@ -18266,9 +15253,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RECryptv07xCruddRETh1
-{
+rule RECryptv07xCruddRETh1 {
       meta:
 		author="malware-lu"
 strings:
@@ -18278,9 +15263,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WIBUKeyV410Ahttpwibucomus
-{
+rule WIBUKeyV410Ahttpwibucomus {
       meta:
 		author="malware-lu"
 strings:
@@ -18290,9 +15273,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Mew501NorthFoxHCC
-{
+rule Mew501NorthFoxHCC {
       meta:
 		author="malware-lu"
 strings:
@@ -18302,9 +15283,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01ExeSmasherAnorganix
-{
+rule PseudoSigner01ExeSmasherAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -18314,9 +15293,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UnnamedScrambler12C12Dp0ke
-{
+rule UnnamedScrambler12C12Dp0ke {
       meta:
 		author="malware-lu"
 strings:
@@ -18326,9 +15303,7 @@ condition:
 		$a0
 }
 
-
-rule AlexProtectorv04beta1byAlex
-{
+rule AlexProtectorv04beta1byAlex {
       meta:
 		author="malware-lu"
 strings:
@@ -18338,9 +15313,7 @@ condition:
 		$a0
 }
 
-
-rule UG2002Cruncherv03b3
-{
+rule UG2002Cruncherv03b3 {
       meta:
 		author="malware-lu"
 strings:
@@ -18350,9 +15323,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FishPEShield101HellFish
-{
+rule FishPEShield101HellFish {
       meta:
 		author="malware-lu"
 strings:
@@ -18363,9 +15334,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule PseudoSigner01Neolite20Anorganix
-{
+rule PseudoSigner01Neolite20Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -18375,9 +15344,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEIntrov10
-{
+rule PEIntrov10 {
       meta:
 		author="malware-lu"
 strings:
@@ -18387,9 +15354,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Obsidiumv1250ObsidiumSoftware
-{
+rule Obsidiumv1250ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -18399,9 +15364,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DevC4992BloodshedSoftware
-{
+rule DevC4992BloodshedSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -18411,9 +15374,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackV119DllLZMA430ap0x
-{
+rule RLPackV119DllLZMA430ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -18423,9 +15384,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule XJXPALLiNSoN
-{
+rule XJXPALLiNSoN {
       meta:
 		author="malware-lu"
 strings:
@@ -18435,9 +15394,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov220b1
-{
+rule Armadillov220b1 {
       meta:
 		author="malware-lu"
 strings:
@@ -18447,9 +15404,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptor20Vaska
-{
+rule RCryptor20Vaska {
       meta:
 		author="malware-lu"
 strings:
@@ -18459,9 +15414,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SentinelSuperProAutomaticProtectionv641Safenet
-{
+rule SentinelSuperProAutomaticProtectionv641Safenet {
       meta:
 		author="malware-lu"
 strings:
@@ -18471,9 +15424,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule TMTPascalv040
-{
+rule TMTPascalv040 {
       meta:
 		author="malware-lu"
 strings:
@@ -18483,9 +15434,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02CrunchPEHeuristicAnorganix
-{
+rule PseudoSigner02CrunchPEHeuristicAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -18495,9 +15444,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeMSVCDLLMethod4emadicius
-{
+rule MSLRHv032afakeMSVCDLLMethod4emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -18507,9 +15454,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VcAsmProtectorV10XVcAsm
-{
+rule VcAsmProtectorV10XVcAsm {
       meta:
 		author="malware-lu"
 strings:
@@ -18519,9 +15464,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VBOXv42MTE
-{
+rule VBOXv42MTE {
       meta:
 		author="malware-lu"
 strings:
@@ -18531,9 +15474,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeUPX0896102105124emadicius
-{
+rule MSLRHv032afakeUPX0896102105124emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -18543,9 +15484,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtBorlandDelphiMicrosoftVisualC
-{
+rule FSGv110EngdulekxtBorlandDelphiMicrosoftVisualC {
       meta:
 		author="malware-lu"
 strings:
@@ -18556,9 +15495,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule VxHafen809
-{
+rule VxHafen809 {
       meta:
 		author="malware-lu"
 strings:
@@ -18568,9 +15505,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackFullEdition117LZMAAp0x
-{
+rule RLPackFullEdition117LZMAAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -18580,9 +15515,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01LTC13Anorganix
-{
+rule PseudoSigner01LTC13Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -18592,9 +15525,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ACProtectv141
-{
+rule ACProtectv141 {
       meta:
 		author="malware-lu"
 strings:
@@ -18604,9 +15535,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yodasProtectorV1031AshkbizDanehkar
-{
+rule yodasProtectorV1031AshkbizDanehkar {
       meta:
 		author="malware-lu"
 strings:
@@ -18616,9 +15545,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElock096tE
-{
+rule tElock096tE {
       meta:
 		author="malware-lu"
 strings:
@@ -18628,9 +15555,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WerusCrypter10byKas
-{
+rule WerusCrypter10byKas {
       meta:
 		author="malware-lu"
 strings:
@@ -18640,9 +15565,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HEALTHv51byMuslimMPolyak
-{
+rule HEALTHv51byMuslimMPolyak {
       meta:
 		author="malware-lu"
 strings:
@@ -18652,9 +15575,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PCGuardv303dv305d
-{
+rule PCGuardv303dv305d {
       meta:
 		author="malware-lu"
 strings:
@@ -18664,9 +15585,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxNovember17768
-{
+rule VxNovember17768 {
       meta:
 		author="malware-lu"
 strings:
@@ -18676,9 +15595,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BeRoTinyPascalBeRo
-{
+rule BeRoTinyPascalBeRo {
       meta:
 		author="malware-lu"
 strings:
@@ -18688,9 +15605,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PrivateexeProtector21522XSetiSoftTeam
-{
+rule PrivateexeProtector21522XSetiSoftTeam {
       meta:
 		author="malware-lu"
 strings:
@@ -18700,9 +15615,7 @@ condition:
 		$a0
 }
 
-
-rule Protectorv1111DDeMPEEnginev09DDeMCIv092
-{
+rule Protectorv1111DDeMPEEnginev09DDeMCIv092 {
       meta:
 		author="malware-lu"
 strings:
@@ -18712,9 +15625,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01XCR011Anorganix
-{
+rule PseudoSigner01XCR011Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -18724,9 +15635,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Trivial173bySMTSMF
-{
+rule Trivial173bySMTSMF {
       meta:
 		author="malware-lu"
 strings:
@@ -18736,9 +15645,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASProtectv11MTE
-{
+rule ASProtectv11MTE {
       meta:
 		author="malware-lu"
 strings:
@@ -18748,9 +15655,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WARNINGTROJANRobinPE
-{
+rule WARNINGTROJANRobinPE {
       meta:
 		author="malware-lu"
 strings:
@@ -18760,9 +15665,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PiCryptor10byScofield
-{
+rule PiCryptor10byScofield {
       meta:
 		author="malware-lu"
 strings:
@@ -18774,9 +15677,7 @@ condition:
 		$a0 or $a1 at pe.entry_point or $a2
 }
 
-
-rule PseudoSigner02MacromediaFlashProjector60Anorganix
-{
+rule PseudoSigner02MacromediaFlashProjector60Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -18786,9 +15687,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeWWPack321xemadicius
-{
+rule MSLRHv032afakeWWPack321xemadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -18798,9 +15697,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEArmor07600765hying
-{
+rule PEArmor07600765hying {
       meta:
 		author="malware-lu"
 strings:
@@ -18810,9 +15707,7 @@ condition:
 		$a0
 }
 
-
-rule PECryptv102
-{
+rule PECryptv102 {
       meta:
 		author="malware-lu"
 strings:
@@ -18822,9 +15717,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ILUCRYPTv4015exe
-{
+rule ILUCRYPTv4015exe {
       meta:
 		author="malware-lu"
 strings:
@@ -18834,9 +15727,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NJoy13NEX
-{
+rule NJoy13NEX {
       meta:
 		author="malware-lu"
 strings:
@@ -18846,9 +15737,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VBOXv43v46
-{
+rule VBOXv43v46 {
       meta:
 		author="malware-lu"
 strings:
@@ -18859,9 +15748,7 @@ condition:
 		$a0 or $a1
 }
 
-
-rule CodeLockvxx
-{
+rule CodeLockvxx {
       meta:
 		author="malware-lu"
 strings:
@@ -18871,9 +15758,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CipherWallSelfExtratorDecryptorGUIv15
-{
+rule CipherWallSelfExtratorDecryptorGUIv15 {
       meta:
 		author="malware-lu"
 strings:
@@ -18883,9 +15768,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ARMProtectorv01bySMoKE
-{
+rule ARMProtectorv01bySMoKE {
       meta:
 		author="malware-lu"
 strings:
@@ -18895,9 +15778,7 @@ condition:
 		$a0
 }
 
-
-rule Upackv037betaDwing
-{
+rule Upackv037betaDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -18908,9 +15789,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule PrivateExeProtector1xsetisoft
-{
+rule PrivateExeProtector1xsetisoft {
       meta:
 		author="malware-lu"
 strings:
@@ -18920,9 +15799,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Petitev14
-{
+rule Petitev14 {
       meta:
 		author="malware-lu"
 strings:
@@ -18932,9 +15809,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule NullsoftInstallSystemv20a0
-{
+rule NullsoftInstallSystemv20a0 {
       meta:
 		author="malware-lu"
 strings:
@@ -18944,9 +15819,7 @@ condition:
 		$a0
 }
 
-
-rule Obsidium1332ObsidiumSoftware
-{
+rule Obsidium1332ObsidiumSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -18956,9 +15829,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule modifiedHACKSTOPv111f
-{
+rule modifiedHACKSTOPv111f {
       meta:
 		author="malware-lu"
 strings:
@@ -18968,9 +15839,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxKuku886
-{
+rule VxKuku886 {
       meta:
 		author="malware-lu"
 strings:
@@ -18980,9 +15849,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxCIHVersion12TTITWIN95CIH
-{
+rule VxCIHVersion12TTITWIN95CIH {
       meta:
 		author="malware-lu"
 strings:
@@ -18992,9 +15859,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ShegerdDongleV478MSCo
-{
+rule ShegerdDongleV478MSCo {
       meta:
 		author="malware-lu"
 strings:
@@ -19004,9 +15869,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SDProtectRandyLi
-{
+rule SDProtectRandyLi {
       meta:
 		author="malware-lu"
 strings:
@@ -19016,9 +15879,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule SmokesCryptv12
-{
+rule SmokesCryptv12 {
       meta:
 		author="malware-lu"
 strings:
@@ -19028,9 +15889,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEncryptv31
-{
+rule PEncryptv31 {
       meta:
 		author="malware-lu"
 strings:
@@ -19040,9 +15899,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEncryptv30
-{
+rule PEncryptv30 {
       meta:
 		author="malware-lu"
 strings:
@@ -19052,9 +15909,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RJoiner12byVaska250320071658
-{
+rule RJoiner12byVaska250320071658 {
       meta:
 		author="malware-lu"
 strings:
@@ -19064,9 +15919,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Minke101byCodius
-{
+rule Minke101byCodius {
       meta:
 		author="malware-lu"
 strings:
@@ -19076,9 +15929,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CrypWrapvxx
-{
+rule CrypWrapvxx {
       meta:
 		author="malware-lu"
 strings:
@@ -19088,9 +15939,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WarningmaybeSimbyOZpolycryptorby3xpl01tver2xx250320072200
-{
+rule WarningmaybeSimbyOZpolycryptorby3xpl01tver2xx250320072200 {
       meta:
 		author="malware-lu"
 strings:
@@ -19100,9 +15949,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WARNINGTROJANHuiGeZi
-{
+rule WARNINGTROJANHuiGeZi {
       meta:
 		author="malware-lu"
 strings:
@@ -19112,9 +15959,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeyodascryptor12emadicius
-{
+rule MSLRHv032afakeyodascryptor12emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -19124,9 +15969,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EPv10
-{
+rule EPv10 {
       meta:
 		author="malware-lu"
 strings:
@@ -19136,9 +15979,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule D1S1Gv11betaD1N
-{
+rule D1S1Gv11betaD1N {
       meta:
 		author="malware-lu"
 strings:
@@ -19148,9 +15989,7 @@ condition:
 		$a0
 }
 
-
-rule PROPACKv208
-{
+rule PROPACKv208 {
       meta:
 		author="malware-lu"
 strings:
@@ -19160,9 +15999,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule BlackEnergyDDoSBotCrypter
-{
+rule BlackEnergyDDoSBotCrypter {
       meta:
 		author="malware-lu"
 strings:
@@ -19172,9 +16009,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HACKSTOPv113
-{
+rule HACKSTOPv113 {
       meta:
 		author="malware-lu"
 strings:
@@ -19184,9 +16019,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FreeJoiner151GlOFF
-{
+rule FreeJoiner151GlOFF {
       meta:
 		author="malware-lu"
 strings:
@@ -19196,9 +16029,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PeXv099EngbartCrackPl
-{
+rule PeXv099EngbartCrackPl {
       meta:
 		author="malware-lu"
 strings:
@@ -19208,9 +16039,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HACKSTOPv119
-{
+rule HACKSTOPv119 {
       meta:
 		author="malware-lu"
 strings:
@@ -19220,9 +16049,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule HACKSTOPv118
-{
+rule HACKSTOPv118 {
       meta:
 		author="malware-lu"
 strings:
@@ -19232,9 +16059,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv200b
-{
+rule PKLITEv200b {
       meta:
 		author="malware-lu"
 strings:
@@ -19244,9 +16069,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PKLITEv200c
-{
+rule PKLITEv200c {
       meta:
 		author="malware-lu"
 strings:
@@ -19256,9 +16079,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv032afakeNeolite20emadicius
-{
+rule MSLRHv032afakeNeolite20emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -19268,9 +16089,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv300v301Relocationspack
-{
+rule WWPACKv300v301Relocationspack {
       meta:
 		author="malware-lu"
 strings:
@@ -19280,9 +16099,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02CodeSafe20Anorganix
-{
+rule PseudoSigner02CodeSafe20Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -19292,9 +16109,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner02ZCode101Anorganix
-{
+rule PseudoSigner02ZCode101Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -19304,9 +16119,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxCaz1204
-{
+rule VxCaz1204 {
       meta:
 		author="malware-lu"
 strings:
@@ -19316,9 +16129,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ZealPack10Zeal
-{
+rule ZealPack10Zeal {
       meta:
 		author="malware-lu"
 strings:
@@ -19328,9 +16139,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule CPAV: Packer PEiD
-{
+rule CPAV: Packer PEiD {
       meta:
 		author="malware-lu"
 strings:
@@ -19340,9 +16149,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackFullEdition117iBoxLZMAAp0x
-{
+rule RLPackFullEdition117iBoxLZMAAp0x {
       meta:
 		author="malware-lu"
 strings:
@@ -19352,9 +16159,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule INCrypter03INinYbyz3e_NiFe
-{
+rule INCrypter03INinYbyz3e_NiFe {
       meta:
 		author="malware-lu"
 strings:
@@ -19364,9 +16169,7 @@ condition:
 		$a0
 }
 
-
-rule MorphineV27Holy_FatherRatter29A
-{
+rule MorphineV27Holy_FatherRatter29A {
       meta:
 		author="malware-lu"
 strings:
@@ -19376,9 +16179,7 @@ condition:
 		$a0
 }
 
-
-rule nBinderv361
-{
+rule nBinderv361 {
       meta:
 		author="malware-lu"
 strings:
@@ -19388,9 +16189,7 @@ condition:
 		$a0
 }
 
-
-rule MatrixDongleTDiGmbH
-{
+rule MatrixDongleTDiGmbH {
       meta:
 		author="malware-lu"
 strings:
@@ -19401,9 +16200,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule NullsoftInstallSystemv20RC2
-{
+rule NullsoftInstallSystemv20RC2 {
       meta:
 		author="malware-lu"
 strings:
@@ -19413,9 +16210,7 @@ condition:
 		$a0
 }
 
-
-rule UnoPiX075BaGiE
-{
+rule UnoPiX075BaGiE {
       meta:
 		author="malware-lu"
 strings:
@@ -19425,9 +16220,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule WWPACKv305c4UnextractablePasswordchecking
-{
+rule WWPACKv305c4UnextractablePasswordchecking {
       meta:
 		author="malware-lu"
 strings:
@@ -19437,9 +16230,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule FSGv110EngdulekxtBorlandDelphi20
-{
+rule FSGv110EngdulekxtBorlandDelphi20 {
       meta:
 		author="malware-lu"
 strings:
@@ -19449,9 +16240,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Reg2Exe225byJanVorel
-{
+rule Reg2Exe225byJanVorel {
       meta:
 		author="malware-lu"
 strings:
@@ -19461,9 +16250,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov420SiliconRealmsToolworks
-{
+rule Armadillov420SiliconRealmsToolworks {
       meta:
 		author="malware-lu"
 strings:
@@ -19473,9 +16260,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule DalKrypt10byDalKiT
-{
+rule DalKrypt10byDalKiT {
       meta:
 		author="malware-lu"
 strings:
@@ -19485,9 +16270,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv15Vaska
-{
+rule RCryptorv15Vaska {
       meta:
 		author="malware-lu"
 strings:
@@ -19497,9 +16280,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor239compressedresources
-{
+rule EXECryptor239compressedresources {
       meta:
 		author="malware-lu"
 strings:
@@ -19509,9 +16290,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule GameGuardv20065xxexesignbyhot_UNP
-{
+rule GameGuardv20065xxexesignbyhot_UNP {
       meta:
 		author="malware-lu"
 strings:
@@ -19521,9 +16300,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EnigmaProtectorv112LITE
-{
+rule EnigmaProtectorv112LITE {
       meta:
 		author="malware-lu"
 strings:
@@ -19533,9 +16310,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MSLRHv01emadicius
-{
+rule MSLRHv01emadicius {
       meta:
 		author="malware-lu"
 strings:
@@ -19546,9 +16321,7 @@ condition:
 		$a0 or $a1 at pe.entry_point
 }
 
-
-rule Apex_cbeta500mhz
-{
+rule Apex_cbeta500mhz {
       meta:
 		author="malware-lu"
 strings:
@@ -19558,9 +16331,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VProtector11A12vcasm
-{
+rule VProtector11A12vcasm {
       meta:
 		author="malware-lu"
 strings:
@@ -19570,9 +16341,7 @@ condition:
 		$a0
 }
 
-
-rule codeCrypter031
-{
+rule codeCrypter031 {
       meta:
 		author="malware-lu"
 strings:
@@ -19582,9 +16351,7 @@ condition:
 		$a0
 }
 
-
-rule PKTINYv10withTINYPROGv38
-{
+rule PKTINYv10withTINYPROGv38 {
       meta:
 		author="malware-lu"
 strings:
@@ -19594,9 +16361,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule AHTeamEPProtector03fakePESHiELD2xFEUERRADER
-{
+rule AHTeamEPProtector03fakePESHiELD2xFEUERRADER {
       meta:
 		author="malware-lu"
 strings:
@@ -19606,9 +16371,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPackFullEditionV11Xap0x
-{
+rule RLPackFullEditionV11Xap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -19618,9 +16381,7 @@ condition:
 		$a0
 }
 
-
-rule Excalibur103forgot
-{
+rule Excalibur103forgot {
       meta:
 		author="malware-lu"
 strings:
@@ -19630,9 +16391,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RLPack118DllaPlib043ap0x
-{
+rule RLPack118DllaPlib043ap0x {
       meta:
 		author="malware-lu"
 strings:
@@ -19642,9 +16401,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01MicrosoftVisualC50MFCAnorganix
-{
+rule PseudoSigner01MicrosoftVisualC50MFCAnorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -19654,9 +16411,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Pohernah101byKas
-{
+rule Pohernah101byKas {
       meta:
 		author="malware-lu"
 strings:
@@ -19666,9 +16421,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Armadillov25xv26x
-{
+rule Armadillov25xv26x {
       meta:
 		author="malware-lu"
 strings:
@@ -19678,9 +16431,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PESpinv11Cyberbob
-{
+rule PESpinv11Cyberbob {
       meta:
 		author="malware-lu"
 strings:
@@ -19690,9 +16441,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Escargot01byueMeat
-{
+rule Escargot01byueMeat {
       meta:
 		author="malware-lu"
 strings:
@@ -19702,9 +16451,7 @@ condition:
 		$a0
 }
 
-
-rule EncryptPE2200461622006630WFS
-{
+rule EncryptPE2200461622006630WFS {
       meta:
 		author="malware-lu"
 strings:
@@ -19714,9 +16461,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule tElockv060
-{
+rule tElockv060 {
       meta:
 		author="malware-lu"
 strings:
@@ -19726,9 +16471,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01BorlandDelphi30Anorganix
-{
+rule PseudoSigner01BorlandDelphi30Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -19738,9 +16481,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ActiveMARKTMR5311140Trymedia
-{
+rule ActiveMARKTMR5311140Trymedia {
       meta:
 		author="malware-lu"
 strings:
@@ -19750,9 +16491,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PEBundlev244
-{
+rule PEBundlev244 {
       meta:
 		author="malware-lu"
 strings:
@@ -19762,9 +16501,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv120v1201
-{
+rule PECompactv120v1201 {
       meta:
 		author="malware-lu"
 strings:
@@ -19774,9 +16511,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ASPackv104bAlexeySolodovnikov
-{
+rule ASPackv104bAlexeySolodovnikov {
       meta:
 		author="malware-lu"
 strings:
@@ -19786,9 +16521,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule MESSv120
-{
+rule MESSv120 {
       meta:
 		author="malware-lu"
 strings:
@@ -19798,9 +16531,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule RCryptorv13v14Vaska
-{
+rule RCryptorv13v14Vaska {
       meta:
 		author="malware-lu"
 strings:
@@ -19811,9 +16542,7 @@ condition:
 		$a0 at pe.entry_point or $a1 at pe.entry_point
 }
 
-
-rule ThinstallV27XJitit
-{
+rule ThinstallV27XJitit {
       meta:
 		author="malware-lu"
 strings:
@@ -19823,9 +16552,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule eXPressor120BetaPEPacker
-{
+rule eXPressor120BetaPEPacker {
       meta:
 		author="malware-lu"
 strings:
@@ -19835,9 +16562,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule Packanoid10ackanoid
-{
+rule Packanoid10ackanoid {
       meta:
 		author="malware-lu"
 strings:
@@ -19847,9 +16572,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EncryptPE1200331812003518WFS
-{
+rule EncryptPE1200331812003518WFS {
       meta:
 		author="malware-lu"
 strings:
@@ -19859,9 +16582,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv09781
-{
+rule PECompactv09781 {
       meta:
 		author="malware-lu"
 strings:
@@ -19871,9 +16592,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PECompactv09782
-{
+rule PECompactv09782 {
       meta:
 		author="malware-lu"
 strings:
@@ -19883,9 +16602,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule PseudoSigner01Gleam100Anorganix
-{
+rule PseudoSigner01Gleam100Anorganix {
       meta:
 		author="malware-lu"
 strings:
@@ -19895,9 +16612,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule UPackAltStubDwing
-{
+rule UPackAltStubDwing {
       meta:
 		author="malware-lu"
 strings:
@@ -19907,9 +16622,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule VxModificationofHi924
-{
+rule VxModificationofHi924 {
       meta:
 		author="malware-lu"
 strings:
@@ -19919,9 +16632,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule EXECryptor226DLLminimumprotection
-{
+rule EXECryptor226DLLminimumprotection {
       meta:
 		author="malware-lu"
 strings:
@@ -19931,9 +16642,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule yodasProtector102AshkibizDanehlar
-{
+rule yodasProtector102AshkibizDanehlar {
       meta:
 		author="malware-lu"
 strings:
@@ -19943,9 +16652,7 @@ condition:
 		$a0 at pe.entry_point
 }
 
-
-rule ACProtectv135riscosoftwareIncAnticrackSoftware
-{
+rule ACProtectv135riscosoftwareIncAnticrackSoftware {
       meta:
 		author="malware-lu"
 strings:
@@ -19955,9 +16662,7 @@ condition:
 		$a0
 }
 
-
-rule upx_0_80_to_1_24 : Packer
-{
+rule upx_0_80_to_1_24 : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="25/02/2013"
@@ -19970,8 +16675,7 @@ rule upx_0_80_to_1_24 : Packer
 		$str1 at pe.entry_point
 }
 
-rule upx_1_00_to_1_07 : Packer
-{
+rule upx_1_00_to_1_07 : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="19/03/2013"
@@ -19984,8 +16688,7 @@ rule upx_1_00_to_1_07 : Packer
 		$str1 at pe.entry_point
 }
 
-rule upx_3 : Packer
-{
+rule upx_3 : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="25/02/2013"
@@ -19998,8 +16701,7 @@ rule upx_3 : Packer
 		$str1 at pe.entry_point
 }
 
-rule obsidium : Packer
-{
+rule obsidium : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="21/01/2013"
@@ -20013,8 +16715,7 @@ rule obsidium : Packer
 		$str1 at pe.entry_point
 }
 
-rule pecompact2 : Packer
-{
+rule pecompact2 : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="25/02/2013"
@@ -20027,8 +16728,7 @@ rule pecompact2 : Packer
 		$str1 at pe.entry_point
 }
 
-rule aspack : Packer
-{
+rule aspack : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="25/02/2013"
@@ -20041,8 +16741,7 @@ rule aspack : Packer
 		$str1 at pe.entry_point
 }
 
-rule execryptor : Protector
-{
+rule execryptor : Protector {
 	meta:
 		author="Kevin Falcoz"
 		date_create="25/02/2013"
@@ -20055,8 +16754,7 @@ rule execryptor : Protector
 		$str1 at pe.entry_point
 }
 
-rule winrar_sfx : Packer
-{
+rule winrar_sfx : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="18/03/2013"
@@ -20069,8 +16767,7 @@ rule winrar_sfx : Packer
 		$signature1
 }
 
-rule mpress_2_xx_x86 : Packer
-{
+rule mpress_2_xx_x86 : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="19/03/2013"
@@ -20084,8 +16781,7 @@ rule mpress_2_xx_x86 : Packer
 		$signature1 at pe.entry_point
 }
 
-rule mpress_2_xx_x64 : Packer
-{
+rule mpress_2_xx_x64 : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="19/03/2013"
@@ -20099,8 +16795,7 @@ rule mpress_2_xx_x64 : Packer
 		$signature1 at pe.entry_point
 }
 
-rule mpress_2_xx_net : Packer
-{
+rule mpress_2_xx_net : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="24/03/2013"
@@ -20113,8 +16808,7 @@ rule mpress_2_xx_net : Packer
 		$signature1
 }
 
-rule rpx_1_xx : Packer
-{
+rule rpx_1_xx : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="24/03/2013"
@@ -20128,8 +16822,7 @@ rule rpx_1_xx : Packer
 		$signature1 and $signature2
 }
 
-rule mew_11_xx : Packer
-{
+rule mew_11_xx : Packer {
 	meta:
 		author="Kevin Falcoz"
 		date_create="25/03/2013"
@@ -20143,8 +16836,7 @@ rule mew_11_xx : Packer
 		$signature1 and $signature2
 }
 
-rule yoda_crypter_1_2 : Crypter
-{
+rule yoda_crypter_1_2 : Crypter {
 	meta:
 		author="Kevin Falcoz"
 		date_create="15/04/2013"
@@ -20157,8 +16849,7 @@ rule yoda_crypter_1_2 : Crypter
 		$signature1 at pe.entry_point
 }
 
-rule yoda_crypter_1_3 : Crypter
-{
+rule yoda_crypter_1_3 : Crypter {
 	meta:
 		author="Kevin Falcoz"
 		date_create="15/04/2013"
@@ -20170,8 +16861,8 @@ rule yoda_crypter_1_3 : Crypter
 	condition:
 		$signature1 at pe.entry_point
 }
-rule dotfuscator : packer
-{
+
+rule  dotfuscator : packer {
 	meta:
 		author = "Jean-Philippe Teissier / @Jipe_"
 		description = "Dotfuscator"
@@ -20185,8 +16876,8 @@ rule dotfuscator : packer
 	condition:
 		$a
 }
-rule AutoIt_2 : packer
-{
+
+rule  AutoIt_2 : packer {
 	meta:
 		author = "Jean-Philippe Teissier / @Jipe_"
 		description = "AutoIT packer"
@@ -20200,8 +16891,8 @@ rule AutoIt_2 : packer
 	condition:
 		$a
 }
-rule mumblehard_packer
-{
+
+rule  mumblehard_packer {
     meta:
         description = "Mumblehard i386 assembly code responsible for decrypting Perl code"
         author = "Marc-Etienne M.Leveille"
