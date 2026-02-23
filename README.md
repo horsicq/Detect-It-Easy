@@ -111,6 +111,16 @@ For detailed usage, refer to the [RUN.md](docs/RUN.md).
 -   🛡 **Security Audits**: Determine executable file types and potential security risks.
 -   🔎 **Software Forensics**: Inspect software components and validate compliance.
 
+## 💬 Community
+
+👋 **Hello! / Привет!** Welcome to the Detect It Easy community!
+
+Have questions, ideas, or just want to chat? Here's where to find us:
+
+-   **Telegram Bot**: Send a file or just say hello to [**@detectiteasy_bot**](https://t.me/detectiteasy_bot)
+-   **GitHub Discussions**: Start a conversation in [Discussions](https://github.com/horsicq/Detect-It-Easy/discussions)
+-   **GitHub Issues**: Report bugs or request features via [Issues](https://github.com/horsicq/Detect-It-Easy/issues)
+
 ## 🏆 Special thanks
 
 -   ⭐️ **Thanks to [DosX](https://github.com/DosX-dev)**
