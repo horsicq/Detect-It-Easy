@@ -255,3 +255,28 @@ chmod a+x build_dpkg.sh
 ./build_dpkg.sh
 ```
 
+# How to build on Linux(Debug)
+
+### Qt framework has to be installed on the system.
+
+#### (Ubuntu) Install Qt Framework:
+
+```bash
+sudo apt-get install --quiet --assume-yes build-essential qt5-default qtbase5-dev qttools5-dev-tools qtscript5-dev libqt5svg5-dev
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+#### Build
+
+```bash
+mkdir build
+cd build
+qmake ../die_source.pro CONFIG+=debug CONFIG-=release
+make
+```
