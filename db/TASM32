@@ -1,0 +1,28 @@
+// Detect It Easy: DiE-JS framework file
+// Don't change anything unless you're sure about what you're doing
+
+// TASM32 uses TLINK32 (Turbo Linker), which is the same linker used by
+// Borland C++ and Delphi. The TASM32 script runs after the Borland script
+// so that bBorlandC is available for exclusion.
+
+var bTASM32;
+if (typeof bTASM32 === "undefined") {
+    bTASM32 = false;
+
+    if (PE) {
+        // TLINK32 leaves a characteristic DOS stub:
+        // "This program must be run under Win32\r\n$" at file offset 0x50.
+        // The four wildcard bytes cover the version-specific field.
+        if (PE.compare("'This program must be run under Win'....0D0A24..00", 0x50)) {
+            // Exclude Borland C++ (same linker, but has a distinct runtime stub
+            // or C++-hook marker at the entry point detected by bBorlandC).
+            if (!bBorlandC) {
+                // Exclude Delphi / C++ Builder: both embed PACKAGEINFO and/or
+                // DVCLAL resources, and Delphi uses a TLS directory.
+                if (!PE.resource["PACKAGEINFO"] && !PE.resource["DVCLAL"]) {
+                    bTASM32 = true;
+                }
+            }
+        }
+    }
+}
