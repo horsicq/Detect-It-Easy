@@ -142,6 +142,32 @@ make -j4
 sudo make install
 ```
 
+# How to build on Linux(QT6)
+
+### Qt framework has to be installed on the system.
+
+#### (Ubuntu) Install Qt Framework:
+
+```bash
+sudo apt-get install --quiet --assume-yes build-essential qt6-base-dev qt6-base-dev-tools qt6-tools-dev-tools qt6-5compat-dev libqt6svg6-dev qt6-declarative-dev
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+#### Build
+
+```bash
+mkdir build
+cd build
+qmake6 ../die_source.pro CONFIG+=release
+make
+```
+
 # How to build on macOS
 
 Install Qt 5.15.2: https://github.com/horsicq/build_tools
@@ -278,5 +304,31 @@ cd DIE-engine
 mkdir build
 cd build
 qmake ../die_source.pro CONFIG+=debug CONFIG-=release
+make
+```
+
+# How to build on Linux(QT6/Debug)
+
+### Qt framework has to be installed on the system.
+
+#### (Ubuntu) Install Qt Framework:
+
+```bash
+sudo apt-get install --quiet --assume-yes build-essential qt6-base-dev qt6-base-dev-tools qt6-tools-dev-tools qt6-5compat-dev libqt6svg6-dev qt6-declarative-dev
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+#### Build
+
+```bash
+mkdir build
+cd build
+qmake6 ../die_source.pro CONFIG+=debug CONFIG-=release
 make
 ```

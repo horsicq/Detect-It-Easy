@@ -429,8 +429,92 @@ function detect() {
         }
     }
 
-    else if ((X.c("'SEGA 32X '", 0x100) || X.c("'SEGA GENESIS'", 0x100)) && X.c("'(C)'", 0x110)) {
-        sName = "Sega MD/Genesis/32X (.MD,.32X)"; bDetected = true
+
+    function isSega100h() {
+        if (X.Sz() < 0x1000 || !X.c("'SEGA '",0x100)) return [false];
+        sus = 0; if(!['  ','RA'].includes(X.SA(0x1B0,2))) sus++;
+        sn = X.SA(0x180, 14); if(sn[11] != '-' ) sus++; if(!['GM ', 'AI ', 'OS ', 'BR '].includes(sn.slice(0, 3))) sus++;
+        ar = [[X.U32(0x1A0,_BE),X.U32(0x1A4,_BE)+1], [X.U32(0x1A8,_BE),X.U32(0x1AC,_BE)+1]]; //ROM & RAM address ranges
+        if (ar[0][1] & 0xFF != 0xFF) sus++; if (ar[1][1] & 0xFF != 0xFF) sus++;
+        if (!isWithin(ar[0][1], 0x1000, 0x7FFFFFFF)) sus++; if (!isWithin(ar[1][0], 0xFF0000, 0x7FFFFFFF)) sus++;
+        if (sus > 3) return [false];
+        if (X.c("'MEGA DRIVE'", 0x100) || X.c("'GENESIS'", 0x100)) return [true, "Sega Mega Drive/Genesis (.MD)"]
+        else if (X.c("'32X '", 0x105)) return [true, "Sega Mega Drive + 32X (.32X)"]
+        else if (X.c("'EVERDRIVE '", 0x105)) return [true, "Sega Mega Drive (Everdrive ext.)"]
+        else if (X.c("'SSF '", 0x105)) return [true, "Sega Mega Drive (Mega Everdrive ext.)"]
+        else if (X.c("'MEGAWIFI'", 0x105)) return [true, "Sega Mega Drive (Mega Wifi ext.)"]
+        else if (X.c("'PICO '", 0x105)) return [true, "Sega PICO"]
+        else if (X.c("'TERA68k", 0x105) || X.c("'TERA286'", 0x105)) return [true, "Sega Tera Drive (.TD)"];
+        return [false];
+    }
+    if ((t=isSega100h())[0]) {
+        //ref https://plutiedev.com/rom-header
+        sName = t[1]; bDetected = true;
+        if((t=sn.slice(12,14)) == [0] || t == '00') sVersion = 'initial'; else sVersion = 'v'+t[0]+'.'+t[1];
+        switch (sn.slice(0,2)) {
+        case 'GM': sVersion += '/Game'; break;
+        case 'AI': sVersion += '/Aid'; break;
+        case 'OS': sVersion += '/Boot ROM (TMSS)'; break;
+        case 'BR': sVersion += '/Boot ROM (Sega CD)'
+        }
+        if(X.isVerbose()) {
+            title = X.SC(0x120, 0x30, "SJIS").trim(); t = X.SC(0x120, 0x30, "SJIS").trim();
+            if(title != t) sOption(title+' / '+t); else sOption(title);
+            sOption('ROM@'+Hex(ar[0][0])); if(X.SA(0x1B0,2) === 'RA') sOption('extra RAM');
+            ft = '';
+            for(i=0x190; i < 0x1A0;) {
+                c = X.SA(i++,1); if(c == ' ') break;
+                if (c === 'J') { if(X.SA(i++,1) == '6') ft += '#6-button pad'; else ft += '#3-button pad' }
+                else if (c === '0') ft += '#Master System pad';
+                else if (c === 'A') ft += '#Analog stick';
+                else if (c === '4') ft += '#Multitap';
+                else if (c === 'A') ft += '#Lightgun';
+                else if (c === 'A') ft += '#Activator';
+                else if (c === 'A') ft += '#Mouse';
+                else if (c === 'A') ft += '#Trackball';
+                else if (c === 'A') ft += '#Tablet';
+                else if (c === 'A') ft += '#Paddle';
+                else if (c === 'A') ft += '#Keyboard/keypad';
+                else if (c === 'A') ft += '#RS-232';
+                else if (c === 'A') ft += '#Printer';
+                else if (c === 'A') ft += '#Sega CD';
+                else if (c === 'A') ft += '#Floppy';
+                else if (c === 'A') ft += '#Download(?)';
+            }
+            sOptionT('devices:'+ft);
+            sOption('sz:'+outSz(ar[0][1]))
+        }
+    }
+
+
+    function isMDR() {
+        //ref https://github.com/TomDDG/Z80onMDR_lite/blob/main/Z80onMDR_Lite.c
+        if(!X.c("01 ?? 00 00")) return;
+        const mdrhdsz = 0xF, mdrdtsz = 0x200, mdrblksz = 0x21F, mdrmaxblk = 0xFE, mdrcartsz = mdrmaxblk*mdrblksz;
+        blk = 0;
+        var p;
+        function chkblk(blkn) {
+            var i, crc; p = blkn*mdrblksz;
+            if((X.U8(p+15) & 2) && !X.U16(p+17)) return;
+            for(crc=i=0; i < mdrhdsz-1; i++) crc = (crc+X.U8(p++)) % 0xFF;  if(crc != X.U8(p++)) return;
+            for(crc=i=0; i < mdrhdsz-1; i++) crc = (crc+X.U8(p++)) % 0xFF;  if(crc != X.U8(p++)) return;
+            if(!X.U16(p-13)) { p += mdrdtsz+2; return true } //deleted block, skip
+            for(crc=i=0; i < mdrdtsz; i++) crc = (crc+X.U8(p++)) % 0xFF;  if(crc != X.U8(p)) return;
+            blk++;
+            return true
+        }
+        var sec = m = X.U8(1); if(!sec) return; if(!X.isDeepScan()) m = Math.min(sec,5);
+        for(var i=0; i < m && i*mdrblksz < X.Sz(); i++) if(!chkblk(i)) return;
+        if(blk < 2) return;
+        name = decAnsi(4,10,CPSpeccy); if(X.isDeepScan()) sz = p; else sz = sec*mdrblksz;
+        return true
+    }
+    if(!bDetected && isMDR()) {
+        sName = "ZX Microdrive cartridge image (.MDR)"; bDetected = true;
+        if(X.isVerbose()) {
+            sOption(name);
+            sOption((X.isDeepScan()?'blks:'+blk+' ':'')+'sz:'+outSz(sz));
+        }
     }
 
     function isMGT() {
