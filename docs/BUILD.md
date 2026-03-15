@@ -365,6 +365,9 @@ cd DIE-engine
 #### Build
 
 ```bash
+chmod a+x configure
+./configure
+make
 chmod a+x create_appimage.sh
 ./create_appimage.sh
 ```
