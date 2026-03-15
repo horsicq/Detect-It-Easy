@@ -332,3 +332,42 @@ cd build
 qmake6 ../die_source.pro CONFIG+=debug CONFIG-=release
 make
 ```
+
+# How to build on Linux(QT5/AppImage)
+
+### Qt framework has to be installed on the system.
+
+#### (Ubuntu) Install Qt Framework:
+
+```bash
+sudo apt-get install --quiet --assume-yes build-essential qt5-default qtbase5-dev qttools5-dev-tools qtscript5-dev libqt5svg5-dev
+```
+
+#### Setup linuxdeploy ####
+```bash
+wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+chmod +x linuxdeploy-x86_64.AppImage
+sudo mv linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
+sudo chmod +x /usr/local/bin/linuxdeploy
+
+wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+chmod +x linuxdeploy-plugin-qt-x86_64.AppImage
+sudo mv linuxdeploy-plugin-qt-x86_64.AppImage /usr/local/bin/linuxdeploy-plugin-qt
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+#### Build
+
+```bash
+chmod a+x configure
+./configure
+make
+chmod a+x create_appimage.sh
+./create_appimage.sh
+```
