@@ -136,6 +136,9 @@ function main() {
         if (PE.isVerbose()) {
             // Detection of programming language, compiler, linker
             scanForLanguagesAndCompilers_NET_and_Native();
+
+            // Detection of specific markers and pointers that are read by the operating system
+            scanForInterestingMarkers_NET_and_Native();
         }
 
         // >> Happy end <<
@@ -3376,6 +3379,8 @@ function scanForBadFileFormat_NET_and_Native() {
 
 // #region "debug data (.NET and Native)"
 function scanForDebugData_NET_and_Native() { // For .NET and Native apps
+    log(logType.nothing, "Scanning for debug data...");
+
     var options = String();
 
     var isDetected = Boolean();
@@ -6674,6 +6679,45 @@ function scanForMaliciousCode_NET_and_Native() {
         var verdict = verdicts[v];
 
         _setResult("~malware", verdict.type, verdict.version, verdict.details);
+    }
+}
+// #endregion
+
+
+
+// #region "interesting markers (.NET and Native)"
+function scanForInterestingMarkers_NET_and_Native() {
+    log(logType.nothing, "Scanning for interesting markers...");
+
+    var options = String();
+
+    var isDetected = Boolean();
+
+
+
+
+    // https://learn.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ee417681(v=vs.85)#:~:text=Root%20Element:%20GameDefinitionFile,GameDefinition%20Attributes
+
+    var isGdfSchemaPresent = false;
+
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isGdfSchemaPresent; i++) {
+        if (PE.getResourceNameByNumber(i) === "__GDF_XML") {
+            if (PE.isSignaturePresent(PE.getResourceOffsetByNumber(i), PE.getResourceSizeByNumber(i), generateUnicodeSignatureMask("GameDefinitionFile"))) {
+                isGdfSchemaPresent = true;
+            }
+        }
+    }
+
+    if (isGdfSchemaPresent) options = "GDF Schema";
+
+
+
+
+    if (options.length != 0) isDetected = true;
+
+
+    if (isDetected) {
+        _setResult("~marker", "Contains", String(), PE.isVerbose() ? options : String());
     }
 }
 // #endregion
