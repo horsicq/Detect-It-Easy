@@ -1,0 +1,47 @@
+// Detect It Easy: detection rule file
+// Reports each PE Debug Directory entry as a separate detection result.
+// For UNKNOWN-typed entries the raw data is inspected to identify the format.
+
+meta("debug data", "Records");
+
+function detect() {
+    var numOfDebugDataRecords = PE.getNumberOfDebugDataRecords();
+
+    if (numOfDebugDataRecords > 0) {
+        bDetected = true;
+    }
+
+    for (var i = 0; i < numOfDebugDataRecords; i++) {
+        var sType = PE.getDebugDataType(i);
+
+        if (sType === "UNKNOWN") {
+            detectUnknownDebugData(PE.getDebugDataOffset(i), PE.getDebugDataSize(i));
+        } else {
+            sOptions = sOptions.append(sType.toLowerCase());
+        }
+    }
+
+    return result();
+}
+
+function detectUnknownDebugData(nDataOffset, nDataSize) {
+    if (nDataSize < 2) {
+        return;
+    }
+
+    // Borland TDS (Turbo Debugger Symbols)
+    if (PE.readWord(nDataOffset) === 0x52FB) {
+        var minor = PE.readByte(nDataOffset + 2),
+            major = PE.readByte(nDataOffset + 3),
+            minorStr = ((minor >> 4) * 10 + (minor & 0x0F)).toString(),
+            majorStr = ((major >> 4) * 10 + (major & 0x0F)).toString(),
+            sVer = majorStr + "." + minorStr,
+            nSymbols = PE.readWord(nDataOffset + 0xE);
+
+        _setResult("debug data", "Borland TDS", sVer, nSymbols ? (nSymbols + " symbols") : "");
+    } else if (PE.compare("'FB09'", nDataOffset)) {
+        _setResult("debug data", "Borland TDS", "", "Delphi TDS");
+    } else if (PE.compare("'FB0A'", nDataOffset)) {
+        _setResult("debug data", "Borland TDS", "", "C++ TDS");
+    }
+}
