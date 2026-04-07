@@ -97,11 +97,11 @@ if (Binary.compare("?? 0D 0D 0A") && Binary.read_uint16(0x02) == 0x0A0D) {
 
 **Examples:**
 ```javascript
-if (PE.compareEP("2C81", 8)) {
+if (Binary.compareEP("2C81", 8)) {
     sVersion = "1.98";
 }
 
-if (PE.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24")) {
+if (Binary.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24")) {
     bDetected = true;
 }
 ```
@@ -883,9 +883,9 @@ For convenience, shorter method names are available:
 ### String Shortcuts
 - `X.SA(a, b)` = `File.read_ansiString(a, b)`
 - `X.SC(a, b, c)` = `File.read_codePageString(a, b, c)`
-- `X.UСSD(a, b)` = `File.read_ucsdString(a, b)`
-- `X.SU8(a, b, c)` = `File.read_utf8String(a, b, c)`
-- `X.SU16(a, b, c)` = `File.read_unicodeString(a, b, c)`
+- `X.UCSD(a)` = `File.read_ucsdString(a)`
+- `X.SU8(a, b)` = `File.read_utf8String(a, b)`
+- `X.SU16(a, b)` = `File.read_unicodeString(a, b)`
 
 ### Utility Shortcuts
 - `X.Sz()` = `File.getSize()`
