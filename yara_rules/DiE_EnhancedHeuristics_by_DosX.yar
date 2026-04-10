@@ -466,3 +466,64 @@ rule Anomaly__ResourceDominatedBinary {
             pe.sections[i].raw_data_size > filesize * 9 / 10
         )
 }
+
+// ============================================================================
+//  Structural / whole-file anomalies
+// ============================================================================
+
+rule Anomaly__TinyPE {
+    // Legitimate PE minimum is typically >4KB. Under 1KB is deeply abnormal.
+    condition:
+        IsPE and filesize < 1024
+}
+
+rule Anomaly__DOSStubMissing {
+    // PE offset (e_lfanew) points right after the DOS header with no stub.
+    // Normal MSVC/MinGW binaries include the "This program cannot be run in DOS mode" stub.
+    // Missing stub = hand-crafted or size-optimized PE.
+    condition:
+        IsPE and
+        uint32(0x3C) < 0x50  // PE header at less than 80 bytes — no room for DOS stub
+}
+
+rule Anomaly__DOSStubCustom {
+    // Standard DOS stub contains "This program cannot be run in DOS mode".
+    // A different or missing message = custom tooling.
+    strings:
+        $std_stub = "This program cannot be run in DOS mode"
+        $std_stub2 = "This program must be run under Win32"
+    condition:
+        IsPE and
+        uint32(0x3C) >= 0x80 and  // there is space for a stub
+        not $std_stub in (0..uint32(0x3C)) and
+        not $std_stub2 in (0..uint32(0x3C))
+}
+
+rule Anomaly__SelfModifyingHeaders {
+    // PE header in a writable section — allows runtime header modification
+    condition:
+        IsPE and
+        pe.number_of_sections > 0 and
+        pe.sections[0].virtual_address <= pe.entry_point and
+        pe.sections[0].characteristics & 0x80000000 != 0 and  // MEM_WRITE
+        pe.sections[0].virtual_address == 0x1000
+}
+
+rule Anomaly__WholeFileHighEntropy {
+    // Overall file entropy >7.0 strongly suggests compression/encryption.
+    // pe.is_pe already ensures valid structure.
+    condition:
+        IsPE and
+        filesize > 4096 and
+        math.entropy(0, filesize) > 7.0
+}
+
+rule Anomaly__VersionInfoMissing {
+    // Native PE without any version info resource — common for packers,
+    // less common for production software.
+    condition:
+        IsPE and
+        IsNative and
+        pe.characteristics & 0x2000 == 0 and  // not DLL
+        pe.number_of_resources == 0
+}
