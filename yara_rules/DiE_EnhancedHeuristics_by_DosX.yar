@@ -351,3 +351,27 @@ rule Anomaly__SuspiciousMinimalImports {
         ($loadlib or $loadlibW) and
         $getproc
 }
+
+// ============================================================================
+//  Overlay / data appending anomalies
+// ============================================================================
+
+rule Anomaly__LargeOverlay {
+    // Overlay is data appended after the last section's raw data.
+    // A large overlay (>50% of file) often means embedded payloads.
+    condition:
+        IsPE and
+        pe.number_of_sections > 0 and
+        pe.overlay.offset > 0 and
+        pe.overlay.size > filesize / 2
+}
+
+rule Anomaly__OverlayPresent {
+    // Overlay presence alone isn't an anomaly, but it's of interest when
+    // combined with high entropy (embedded encrypted/compressed data).
+    condition:
+        IsPE and
+        pe.overlay.offset > 0 and
+        pe.overlay.size > 1024 and
+        math.entropy(pe.overlay.offset, pe.overlay.size) > 7.0
+}
