@@ -402,3 +402,37 @@ rule Anomaly__ZeroTimestamp {
         IsPE and
         pe.timestamp == 0
 }
+
+// ============================================================================
+//  Data directory anomalies
+// ============================================================================
+
+rule Anomaly__TLSCallbackPresent {
+    // TLS callbacks execute before the entry point — used for anti-debug/evasion.
+    // Not inherently malicious, but uncommon in benign software.
+    condition:
+        IsPE and
+        IsNative and
+        pe.data_directories[9].virtual_address != 0 and  // IMAGE_DIRECTORY_ENTRY_TLS
+        pe.data_directories[9].size > 0
+}
+
+rule Anomaly__DebugDirectoryStripped {
+    // Native PE with Rich header but no debug directory — info was stripped
+    strings:
+        $rich = { 52 69 63 68 }  // "Rich"
+    condition:
+        IsPE and
+        IsNative and
+        $rich in (0x40..0x400) and
+        pe.data_directories[6].virtual_address == 0  // IMAGE_DIRECTORY_ENTRY_DEBUG
+}
+
+rule Anomaly__CLRHeaderInNativePE {
+    // .NET metadata directory (index 14) present but PE also imports
+    // heavy native API — confused tooling or .NET loader with native stubs
+    condition:
+        IsPE and
+        pe.data_directories[14].virtual_address != 0 and
+        pe.number_of_imports > 5
+}
