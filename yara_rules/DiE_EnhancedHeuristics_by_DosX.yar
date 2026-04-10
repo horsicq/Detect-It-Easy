@@ -375,3 +375,30 @@ rule Anomaly__OverlayPresent {
         pe.overlay.size > 1024 and
         math.entropy(pe.overlay.offset, pe.overlay.size) > 7.0
 }
+
+// ============================================================================
+//  Timestamp anomalies
+// ============================================================================
+
+rule Anomaly__FutureTimestamp {
+    // TimeDateStamp in the future (>2026) — likely forged
+    condition:
+        IsPE and
+        pe.timestamp > 1767225600  // Jan 1, 2026 UTC
+}
+
+rule Anomaly__AncientTimestamp {
+    // TimeDateStamp before 1990 — PE format didn't exist before ~1993.
+    // Also catches zero timestamps (Jan 1, 1970).
+    condition:
+        IsPE and
+        pe.timestamp < 631152000 and  // Jan 1, 1990 UTC
+        pe.timestamp != 0
+}
+
+rule Anomaly__ZeroTimestamp {
+    // Zero timestamp — intentionally stripped (privacy or evasion)
+    condition:
+        IsPE and
+        pe.timestamp == 0
+}
