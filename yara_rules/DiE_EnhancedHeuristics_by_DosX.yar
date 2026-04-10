@@ -527,3 +527,24 @@ rule Anomaly__VersionInfoMissing {
         pe.characteristics & 0x2000 == 0 and  // not DLL
         pe.number_of_resources == 0
 }
+
+// ============================================================================
+//  Signature / trust anomalies
+// ============================================================================
+
+rule Anomaly__AuthenticodeCorrupt {
+    // Security directory is present (claims to be signed) but has
+    // size smaller than minimal PKCS#7 structure (~8 bytes minimum header).
+    condition:
+        IsPE and
+        pe.data_directories[4].virtual_address != 0 and
+        pe.data_directories[4].size < 8
+}
+
+rule Anomaly__SecurityDirPointsBeyondFile {
+    // Security dir offset + size exceeds actual file size — appended or corrupt
+    condition:
+        IsPE and
+        pe.data_directories[4].virtual_address != 0 and
+        pe.data_directories[4].virtual_address + pe.data_directories[4].size > filesize
+}
