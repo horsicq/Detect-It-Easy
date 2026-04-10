@@ -436,3 +436,33 @@ rule Anomaly__CLRHeaderInNativePE {
         pe.data_directories[14].virtual_address != 0 and
         pe.number_of_imports > 5
 }
+
+// ============================================================================
+//  Resource anomalies
+// ============================================================================
+
+rule Anomaly__ResourceHighEntropy {
+    // High-entropy resource section often indicates encrypted payload.
+    // Legitimate high-entropy resources: PNG, JPEG, compressed icons.
+    // We look for suspiciously high entropy (>7.4) which exceeds even PNG.
+    condition:
+        IsPE and
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].name == ".rsrc" and
+            pe.sections[i].raw_data_size > 4096 and
+            math.entropy(pe.sections[i].raw_data_offset, pe.sections[i].raw_data_size) > 7.4
+        )
+}
+
+rule Anomaly__ResourceDominatedBinary {
+    // Resources make up >90% of the file — possible embedded payload binary.
+    // Legit cases: icon editors, resource-only DLLs.
+    // We exclude DLLs to reduce false positives.
+    condition:
+        IsPE and
+        pe.characteristics & 0x2000 == 0 and  // not DLL
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].name == ".rsrc" and
+            pe.sections[i].raw_data_size > filesize * 9 / 10
+        )
+}
