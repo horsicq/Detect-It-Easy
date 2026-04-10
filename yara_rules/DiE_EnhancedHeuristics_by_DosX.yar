@@ -313,3 +313,41 @@ rule Anomaly__EPStartsWithInt3 {
         IsNative and
         $int3 at pe.entry_point
 }
+
+// ============================================================================
+//  Import anomalies
+// ============================================================================
+
+rule Anomaly__NoImports {
+    // Native PE with zero imports — almost impossible for legit PE, typical packer trait.
+    // Exclude DLLs (they can be pure export-only).
+    condition:
+        IsPE and
+        IsNative and
+        pe.characteristics & 0x2000 == 0 and  // not DLL
+        pe.number_of_imports == 0
+}
+
+rule Anomaly__SingleImportDll {
+    // Only one import DLL (usually kernel32) — packer manually resolves everything else
+    condition:
+        IsPE and
+        IsNative and
+        pe.characteristics & 0x2000 == 0 and
+        pe.number_of_imports == 1
+}
+
+rule Anomaly__SuspiciousMinimalImports {
+    // Only LoadLibrary + GetProcAddress imported — classic manual resolve setup.
+    // Often seen in packed/crypted executables.
+    strings:
+        $loadlib  = "LoadLibraryA"
+        $loadlibW = "LoadLibraryW"
+        $getproc  = "GetProcAddress"
+    condition:
+        IsPE and
+        IsNative and
+        pe.number_of_imports <= 2 and
+        ($loadlib or $loadlibW) and
+        $getproc
+}
