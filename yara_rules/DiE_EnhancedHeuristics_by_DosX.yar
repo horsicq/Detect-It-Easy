@@ -130,3 +130,112 @@ rule Anomaly__DllCharacteristicsForcedIntegrity {
         pe.dll_characteristics & 0x0080 != 0 and
         pe.subsystem != 1  // not NATIVE (driver)
 }
+
+// ============================================================================
+//  Section anomalies
+// ============================================================================
+
+rule Anomaly__WritableCodeSection {
+    // A section that is both executable AND writable is a classic packer indicator.
+    // .text should normally be RX, not RWX.
+    condition:
+        IsPE and
+        IsNative and
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].characteristics & 0x20000000 != 0 and  // MEM_EXECUTE
+            pe.sections[i].characteristics & 0x80000000 != 0 and  // MEM_WRITE
+            pe.sections[i].characteristics & 0x20 != 0            // CNT_CODE
+        )
+}
+
+rule Anomaly__ExecutableDataSection {
+    // .data, .rdata, .bss being executable is suspicious
+    condition:
+        IsPE and
+        IsNative and
+        for any i in (0..pe.number_of_sections - 1) : (
+            (pe.sections[i].name == ".data" or
+             pe.sections[i].name == ".rdata" or
+             pe.sections[i].name == ".bss") and
+            pe.sections[i].characteristics & 0x20000000 != 0  // MEM_EXECUTE
+        )
+}
+
+rule Anomaly__SectionNameEmpty {
+    // Sections without names are suspicious (packers strip section names)
+    condition:
+        IsPE and
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].name == ""
+        )
+}
+
+rule Anomaly__SectionNameNonPrintable {
+    // Non-printable characters in section names indicate hand-crafting
+    strings:
+        $np = /[\x01-\x1f\x7f-\xff]{1}/ // at least one non-printable
+    condition:
+        IsPE and
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].name matches /[^\x20-\x7e]/
+        )
+}
+
+rule Anomaly__SectionZeroRawSize {
+    // A section with zero raw size but non-zero virtual size
+    // that also has executable permissions — shellcode/packer technique
+    condition:
+        IsPE and
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].raw_data_size == 0 and
+            pe.sections[i].virtual_size > 0 and
+            pe.sections[i].characteristics & 0x20000000 != 0  // MEM_EXECUTE
+        )
+}
+
+rule Anomaly__SectionRawSizeExceedsFile {
+    // Raw data extends beyond physical file — corrupt or tampered
+    condition:
+        IsPE and
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].raw_data_offset + pe.sections[i].raw_data_size > filesize and
+            pe.sections[i].raw_data_size > 0
+        )
+}
+
+rule Anomaly__SectionVirtualSizeMuchLarger {
+    // VirtualSize >> RawDataSize (>10x) — unpacking stub pattern.
+    // Excludes .bss (legitimately has zero raw, large virtual).
+    condition:
+        IsPE and
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].raw_data_size > 0 and
+            pe.sections[i].virtual_size > pe.sections[i].raw_data_size * 10 and
+            pe.sections[i].name != ".bss"
+        )
+}
+
+rule Anomaly__SectionHighEntropy {
+    // Entropy > 7.2 for any section indicates compressed or encrypted data.
+    // .rsrc can legitimately be high-entropy (PNG/JPEG), so we exclude it.
+    condition:
+        IsPE and
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].name != ".rsrc" and
+            pe.sections[i].raw_data_size > 256 and
+            math.entropy(pe.sections[i].raw_data_offset, pe.sections[i].raw_data_size) > 7.2
+        )
+}
+
+rule Anomaly__DuplicateSectionNames {
+    // Two or more sections sharing the same name — hand-crafted PE
+    condition:
+        IsPE and
+        pe.number_of_sections >= 2 and
+        for any i in (0..pe.number_of_sections - 2) : (
+            for any j in (i + 1..pe.number_of_sections - 1) : (
+                pe.sections[i].name == pe.sections[j].name and
+                pe.sections[i].name != ""
+            )
+        )
+}
