@@ -239,3 +239,77 @@ rule Anomaly__DuplicateSectionNames {
             )
         )
 }
+
+// ============================================================================
+//  Entry point anomalies
+// ============================================================================
+
+rule Anomaly__EntryPointInLastSection {
+    // EP in the last section is a classic indicator of appended code/packing.
+    // Legitimate binaries almost always have EP in the first code section.
+    // NOTE: pe.entry_point is a raw file offset (not RVA) when scanning files,
+    // so we compare with raw_data_offset/raw_data_size, not virtual_address/virtual_size.
+    condition:
+        IsPE and
+        IsNative and
+        pe.number_of_sections >= 2 and
+        pe.sections[pe.number_of_sections - 1].raw_data_size > 0 and
+        pe.entry_point >= pe.sections[pe.number_of_sections - 1].raw_data_offset and
+        pe.entry_point < pe.sections[pe.number_of_sections - 1].raw_data_offset +
+                         pe.sections[pe.number_of_sections - 1].raw_data_size
+}
+
+rule Anomaly__EntryPointInNonCodeSection {
+    // EP within a section that lacks the CODE flag.
+    // Uses raw file offsets — pe.entry_point is a file offset, not RVA.
+    condition:
+        IsPE and
+        IsNative and
+        for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].raw_data_size > 0 and
+            pe.entry_point >= pe.sections[i].raw_data_offset and
+            pe.entry_point < pe.sections[i].raw_data_offset + pe.sections[i].raw_data_size and
+            pe.sections[i].characteristics & 0x20 == 0  // no CNT_CODE
+        )
+}
+
+rule Anomaly__EntryPointOutsideAnySections {
+    // EP doesn't fall within any defined section — header trick or packer stub.
+    // Exclusions to prevent false positives:
+    //   - EP == 0  → valid for DLLs without DllMain (caught separately by Anomaly__ZeroEntryPoint for EXEs)
+    //   - DLLs     → AddressOfEntryPoint == 0 is fully legitimate, skip entirely
+    //   - sections with VirtualSize == 0 are skipped to avoid miscalculated boundaries
+    // NOTE: pe.entry_point is a raw file offset; virtual_address is RVA — different spaces.
+    // We check raw file offset ranges. Sections with no raw data (e.g. .bss) are skipped.
+    condition:
+        IsPE and
+        IsNative and
+        pe.characteristics & 0x2000 == 0 and  // not DLL
+        pe.entry_point != 0 and
+        pe.number_of_sections > 0 and
+        not for any i in (0..pe.number_of_sections - 1) : (
+            pe.sections[i].raw_data_size > 0 and
+            pe.entry_point >= pe.sections[i].raw_data_offset and
+            pe.entry_point < pe.sections[i].raw_data_offset + pe.sections[i].raw_data_size
+        )
+}
+
+rule Anomaly__EPStartsWithNops {
+    // EP begins with a NOP sled (4+ NOPs) — shellcode/packer trick
+    strings:
+        $nopsled = { 90 90 90 90 }
+    condition:
+        IsPE and
+        IsNative and
+        $nopsled at pe.entry_point
+}
+
+rule Anomaly__EPStartsWithInt3 {
+    // EP begins with INT 3 (0xCC) — debug trap or anti-debug trick
+    strings:
+        $int3 = { CC }
+    condition:
+        IsPE and
+        IsNative and
+        $int3 at pe.entry_point
+}
