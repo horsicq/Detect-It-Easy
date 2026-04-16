@@ -1,0 +1,73 @@
+name: DB Release
+
+on:
+    push:
+        branches: ["master"]
+    workflow_dispatch:
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Clone Detect-It-Easy
+              run: |
+                  git clone https://github.com/horsicq/Detect-It-Easy DIE
+
+            - name: Release db
+              if: ${{ hashFiles('DIE/db/info.ini') != '' }}
+              run: |
+                  cd DIE
+                  zip -r ../db.zip db
+                  cd ..
+
+            - name: Read db/info.ini
+              if: ${{ hashFiles('DIE/db/info.ini') != '' }}
+              id: db_info
+              run: |
+                  DB_INFO=$(cat DIE/db/info.ini)
+                  echo "DB_INFO<<EOF" >> $GITHUB_OUTPUT
+                  echo "$DB_INFO" >> $GITHUB_OUTPUT
+                  echo "EOF" >> $GITHUB_OUTPUT
+
+            - name: Update db release
+              if: ${{ hashFiles('DIE/db/info.ini') != '' }}
+              uses: softprops/action-gh-release@v1
+              with:
+                  files: db.zip
+                  name: "db"
+                  tag_name: db
+                  body: ${{ steps.db_info.outputs.DB_INFO }}
+                  draft: false
+                  prerelease: true
+              env:
+                  GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+            - name: Create db_extra.zip
+              if: ${{ hashFiles('DIE/db_extra/info.ini') != '' }}
+              run: |
+                  cd DIE
+                  zip -r ../db_extra.zip db_extra
+                  cd ..
+
+            - name: Read db_extra/info.ini
+              if: ${{ hashFiles('DIE/db_extra/info.ini') != '' }}
+              id: db_extra_info
+              run: |
+                  DB_EXTRA_INFO=$(cat DIE/db_extra/info.ini)
+                  echo "DB_EXTRA_INFO<<EOF" >> $GITHUB_OUTPUT
+                  echo "$DB_EXTRA_INFO" >> $GITHUB_OUTPUT
+                  echo "EOF" >> $GITHUB_OUTPUT
+
+            - name: Update db_extra release
+              if: ${{ hashFiles('DIE/db_extra/info.ini') != '' }}
+              uses: softprops/action-gh-release@v1
+              with:
+                  files: db_extra.zip
+                  name: "db_extra"
+                  tag_name: db_extra
+                  body: ${{ steps.db_extra_info.outputs.DB_EXTRA_INFO }}
+                  draft: false
+                  prerelease: true
+              env:
+                  GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
