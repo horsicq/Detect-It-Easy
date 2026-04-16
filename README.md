@@ -10,8 +10,7 @@
 ## 🚀 Getting Started
 
 -   **[💎 Download release/beta](https://github.com/horsicq/DIE-engine/releases)**
-<!--  -   **[🧪 Download dev/beta](https://github.com/horsicq/DIE-engine/releases/tag/Beta)** -->
--   **[🚀 DIE API Library (for Developers)](https://github.com/horsicq/die_library)**
+-   **[🧪  DiE API Library (for Developers)](https://github.com/horsicq/die_library)**
 -   [📋 Changelog](https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt)
 -   [💬 Contribute to Translations](https://github.com/horsicq/XTranslation)
 
@@ -149,4 +148,5 @@ Have questions, ideas, or just want to chat? Here's where to find us:
   `- - ~ ~ -._|      /_ - ~ ~ ^|      /- _      `.
               |     /          |     /     ~-.     ~- _
               |_____|          |_____|         ~ - . _ _~_-_
+(Grr-r-r!)
 -->
