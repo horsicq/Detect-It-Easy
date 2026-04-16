@@ -2101,6 +2101,19 @@ function getFileNameWithoutExtension(fileName) {
 
 
 
+const
+    SECTION_FLAGS_EXECUTE = 0x20000000, // IMAGE_SCN_MEM_EXECUTE
+    SECTION_FLAGS_READ = 0x40000000,    // IMAGE_SCN_MEM_READ
+    SECTION_FLAGS_WRITE = 0x80000000,   // IMAGE_SCN_MEM_WRITE
+    SECTION_FLAGS_CODE = 0x00000020;    // IMAGE_SCN_CNT_CODE
+
+const
+    SECTION_FLAGS_RWX_MASK = SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ | SECTION_FLAGS_WRITE,
+    SECTION_FLAGS_RWX_CODE_MASK = SECTION_FLAGS_RWX_MASK | SECTION_FLAGS_CODE;
+
+
+
+
 // #region "packers and cryptors (.NET and Native)"
 function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native apps
     log(logType.nothing, "Scanning for packers and cryptors...");
@@ -2364,6 +2377,29 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     if (entryLikePacker) options = addOption(options, "EntryPoint");
+
+
+
+
+    // Check for UPX-like structure: 3 sections with specific characteristics and specific imports 
+    // (common for UPX, but can be used by other packers as well)
+
+    var isUpxLikeStructure = false;
+
+    if (PE_Cached.numberOfSections === 3 &&
+        (PE.section[0].Characteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK &&
+        (PE.section[1].Characteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK &&
+        (PE.section[2].Characteristics & SECTION_FLAGS_READ) === SECTION_FLAGS_READ &&
+        PE.isFunctionPresent("VirtualProtect") &&
+        PE.isFunctionPresent("GetProcAddress") &&
+        PE.isFunctionPresent("ExitProcess")
+    ) {
+        log(logType.nothing, "UPX-like structure detected: [0]RWX/[1]RWX/[2]R");
+
+        isUpxLikeStructure = true;
+    }
+
+    if (isUpxLikeStructure) options = addOption(options, "Structure and IAT like UPX");
 
 
 
@@ -3082,34 +3118,41 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    var isPackerOrProtectionNotDetected = !_getNumberOfResults("packer") && !_getNumberOfResults("cryptor") && !_getNumberOfResults("protector") && !_getNumberOfResults("protection");
 
-    if (isImportsLikePacker && !_getNumberOfResults("packer") && !_getNumberOfResults("cryptor") && !_getNumberOfResults("protector") && !_getNumberOfResults("protection")) {
-        var typeOfDetectedItem = String();
 
-        switch (importValidatingResult[4]) {
-            case 0: typeOfDetectedItem = "packer"; break;
-            case 1: typeOfDetectedItem = "cryptor"; break;
-            case 2: typeOfDetectedItem = "protector"; break;
-            case 3: typeOfDetectedItem = "protection"; break;
-        }
 
-        if (typeOfDetectedItem) {
-            var version = String(),
-                importAndSectionValidationVerdictsDiffer = false;
+    if (isPackerOrProtectionNotDetected) {
+        if (isImportsLikePacker) {
+            var typeOfDetectedItem = String();
 
-            if (importValidatingResult[1]) {
-                version = importValidatingResult[1];
-            } else if (isSectionNameLikePacker && !/^(a [pc]|fake )$/.test(sectionNamesValidatingResult[0])) {
-                if (importValidatingResult[0] === sectionNamesValidatingResult[0]) { // is same result
-                    if (sectionNamesValidatingResult[1]) {
-                        version = sectionNamesValidatingResult[1];
-                    }
-                } else { // Inconsistency of verdicts
-                    importAndSectionValidationVerdictsDiffer = true;
-                }
+            switch (importValidatingResult[4]) {
+                case 0: typeOfDetectedItem = "packer"; break;
+                case 1: typeOfDetectedItem = "cryptor"; break;
+                case 2: typeOfDetectedItem = "protector"; break;
+                case 3: typeOfDetectedItem = "protection"; break;
             }
 
-            _setResult("~" + typeOfDetectedItem, importValidatingResult[0] + (importAndSectionValidationVerdictsDiffer ? "-like" : String()), version, "Suspicion only");
+            if (typeOfDetectedItem) {
+                var version = String(),
+                    importAndSectionValidationVerdictsDiffer = false;
+
+                if (importValidatingResult[1]) {
+                    version = importValidatingResult[1];
+                } else if (isSectionNameLikePacker && !/^(a [pc]|fake )$/.test(sectionNamesValidatingResult[0])) {
+                    if (importValidatingResult[0] === sectionNamesValidatingResult[0]) { // is same result
+                        if (sectionNamesValidatingResult[1]) {
+                            version = sectionNamesValidatingResult[1];
+                        }
+                    } else { // Inconsistency of verdicts
+                        importAndSectionValidationVerdictsDiffer = true;
+                    }
+                }
+
+                _setResult("~" + typeOfDetectedItem, importValidatingResult[0] + (importAndSectionValidationVerdictsDiffer ? "-like" : String()), version, "Suspicion only");
+            }
+        } else if (isUpxLikeStructure) {
+            _setResult("~packer", "UPX-like", String(), "Suspicion only");
         }
     }
 
@@ -4522,22 +4565,11 @@ function scanForObfuscations_Native() {
 
     var rwxSectionIndex = -1;
 
-    const
-        SECTION_FLAGS_EXECUTE = 0x20000000, // IMAGE_SCN_MEM_EXECUTE
-        SECTION_FLAGS_READ = 0x40000000,    // IMAGE_SCN_MEM_READ
-        SECTION_FLAGS_WRITE = 0x80000000,   // IMAGE_SCN_MEM_WRITE
-        SECTION_FLAGS_CODE = 0x00000020;    // IMAGE_SCN_CNT_CODE
-
-    const
-        RWX_MASK = SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ | SECTION_FLAGS_WRITE,
-        RWX_CODE_MASK = RWX_MASK | SECTION_FLAGS_CODE;
-
-
     for (var i = 0; i < PE_Cached.numberOfSections && !isRwxSectionPresent; i++) {
         var currentSectionCharacteristics = PE.section[i].Characteristics;
 
-        if ((currentSectionCharacteristics & RWX_MASK) === RWX_MASK ||
-            (currentSectionCharacteristics & RWX_CODE_MASK) === RWX_CODE_MASK) {
+        if ((currentSectionCharacteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK ||
+            (currentSectionCharacteristics & SECTION_FLAGS_RWX_CODE_MASK) === SECTION_FLAGS_RWX_CODE_MASK) {
             isRwxSectionPresent = true;
             rwxSectionIndex = i;
         }
