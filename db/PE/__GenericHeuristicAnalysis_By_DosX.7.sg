@@ -2386,24 +2386,30 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isUpxLikeStructure = false;
 
+    var isUpxLikeImports = false;
+
     if (PE_Cached.numberOfSections === 3 &&
         (PE.section[0].Characteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK &&
         (PE.section[1].Characteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK && (
             (PE.section[2].Characteristics & SECTION_FLAGS_READ) === SECTION_FLAGS_READ ||
             (PE.section[2].Characteristics & (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)
-        ) &&
-        PE.isFunctionPresent("VirtualProtect") &&
-        PE.isFunctionPresent("GetProcAddress") && (
-            PE.isFunctionPresent("ExitProcess") || // Original
-            PE.isFunctionPresent("CopyContext")    // https://github.com/DosX-dev/UPX-Patcher
         )
     ) {
-        log(logType.nothing, "UPX-like structure detected: [0]RWX/[1]RWX/[2]R");
+        log(logType.nothing, "UPX-like structure detected: [0]RWX/[1]RWX/[2]R(W)");
 
         isUpxLikeStructure = true;
+
+        if (PE.isFunctionPresent("VirtualProtect") &&
+            PE.isFunctionPresent("GetProcAddress") && (
+                PE.isFunctionPresent("ExitProcess") || // Original
+                PE.isFunctionPresent("CopyContext")    // https://github.com/DosX-dev/UPX-Patcher
+            )
+        ) {
+            isUpxLikeImports = true;
+        }
     }
 
-    if (isUpxLikeStructure) options = addOption(options, "Structure and IAT like UPX");
+    if (isUpxLikeStructure) options = addOption(options, "Structure" + (isUpxLikeImports ? " and IAT " : " ") + "like UPX");
 
 
 
@@ -3157,7 +3163,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
                 _setResult("~" + typeOfDetectedItem, importValidatingResult[0] + (importAndSectionValidationVerdictsDiffer ? "-like" : String()), version, "Suspicion only");
             }
-        } else if (isUpxLikeStructure) {
+        } else if (isUpxLikeStructure && isUpxLikeImports) {
             _setResult("~packer", "UPX-like", String(), "Suspicion only");
         }
     }
@@ -4247,7 +4253,7 @@ function scanForObfuscations_Native() {
         isTextSectionNotFirst = true;
     }
 
-    if (isTextSectionNotFirst) options = addOption(options, "\".text\" section is not first");
+    if (isTextSectionNotFirst) options = addOption(options, "Text section is not first");
 
 
 
