@@ -2722,7 +2722,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Inquartos Obfuscator", null, ".inq"],                                      // http://www.vbnet.ru/forum/show.aspx?id=175877
         ["WinUPack", null, [".ByDwing", ".Upack"]],                                  // https://www.softpedia.com/get/PORTABLE-SOFTWARE/Compression-Tools/Windows-Portable-Applications-Portable-WinUpack.shtml
         ["Xenocode Postbuild", null, ".xcpad"],                                      // https://download.cnet.com/xenocode-postbuild/3000-10250_4-10506240.html
-        ["Denuvo", null, [/^\.[ex]code$/, ".ooa"]],                                  // https://en.wikipedia.org/wiki/Denuvo
+        ["Denuvo", null, [/^\.[ex](code|text)$/, ".ooa"]],                           // https://en.wikipedia.org/wiki/Denuvo
         ["SteamStub", null, ".bind"],                                                // https://gameindustry.eu/blog/steamstub-drm/
         ["Alloy", null, ".alloy32"],
         ["Crinkler", null, "lz32.dll"],
@@ -3244,6 +3244,38 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
 
 
+    // https://en.wikipedia.org/wiki/Denuvo
+
+    var isDenuvoLibraryPresent = false;
+
+    if (PE.isLibraryPresentExp(/^(Core[\\/]Activation(64)?\.dll)$/i) || (
+        PE_Cached.numberOfSections > 10 &&
+        PE_Cached.numberOfUnmanagedImports > 10 && (
+            PE.isSectionNamePresentExp(/^\.[ex](code|text)$/) ||
+            PE.isExportFunctionPresentExp(/^GetDenuvo(TimeTicketRequest|TicketLocation)$/)
+        )
+    )) {
+        isDenuvoLibraryPresent = true;
+    }
+
+    if (isDenuvoLibraryPresent) options = addOption(options, "Denuvo DRM");
+
+
+
+
+    // https://gameindustry.eu/blog/steamstub-drm/
+
+    var isSteamStubPresent = false;
+
+    if (PE.compareEP("E800000000") && PE.section[PE_Cached.numberOfSections - 1].Name === ".bind") {
+        isSteamStubPresent = true;
+    }
+
+    if (isSteamStubPresent) options = addOption(options, "SteamStub DRM");
+
+
+
+
     // Check for licensing strings
 
     var isInterestingStringsFound = false;
@@ -3273,32 +3305,6 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
     }
 
     if (isInterestingStringsFound) options = addOption(options, "Strings");
-
-
-
-
-    // https://en.wikipedia.org/wiki/Denuvo
-
-    var isDenuvoLibraryPresent = false;
-
-    if (PE.isLibraryPresentExp(/^(Core[\\/]Activation(64)?\.dll)$/i)) {
-        isDenuvoLibraryPresent = true;
-    }
-
-    if (isDenuvoLibraryPresent) options = addOption(options, "Denuvo DRM");
-
-
-
-
-    // https://gameindustry.eu/blog/steamstub-drm/
-
-    var isSteamStubPresent = false;
-
-    if (PE.compareEP("E800000000") && PE.section[PE_Cached.numberOfSections - 1].Name === ".bind") {
-        isSteamStubPresent = true;
-    }
-
-    if (isSteamStubPresent) options = addOption(options, "SteamStub DRM");
 
 
 
