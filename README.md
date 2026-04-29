@@ -10,7 +10,7 @@
 ## 🚀 Getting Started
 
 -   **[💎 Download release/beta](https://github.com/horsicq/DIE-engine/releases)**
--   **[🧪  DiE API Library (for Developers)](https://github.com/horsicq/die_library)**
+-   **[🧪 DiE API Library (for Developers)](https://github.com/horsicq/die_library)**
 -   [📋 Changelog](https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt)
 -   [💬 Contribute to Translations](https://github.com/horsicq/XTranslation)
 
@@ -116,7 +116,6 @@ For detailed usage, refer to the [RUN.md](docs/RUN.md).
 
 Have questions, ideas, or just want to chat? Here's where to find us:
 
--   **Telegram Bot**: Send a file or just say hello to [**@detectiteasy_bot**](https://t.me/detectiteasy_bot)
 -   **GitHub Discussions**: Start a conversation in [Discussions](https://github.com/horsicq/Detect-It-Easy/discussions)
 -   **GitHub Issues**: Report bugs or request features via [Issues](https://github.com/horsicq/Detect-It-Easy/issues)
 
