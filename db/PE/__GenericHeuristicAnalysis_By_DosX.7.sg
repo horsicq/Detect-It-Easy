@@ -382,7 +382,7 @@ function scanForObfuscations_NET() {
 
             if (firstOpCode !== "JMP") {
                 if (PE.VAToOffset(PE.getAddressOfEntryPoint()) !== -1) {
-                    log(logType.net, "Very strange EP pattern: " + getEpAsmPattern(true, 4).split("|").join(" .. "));
+                    log(logType.net, "Very strange EP pattern: " + emulateAndGetEpAsmPattern(true, 4).split("|").join(" .. "));
                 } else {
                     log(logType.net, "No native entry point");
                 }
@@ -4501,7 +4501,7 @@ function scanForObfuscations_Native() {
         // This trick uses "CALL $+5" (E8 00 00 00 00) to push next instruction address on stack
         if (!PE_Cached.isDynamicLinkLibrary) {
             for (var i = 0; i < 32 && !isAddrToStackTrickPresent; i++) {
-                var asmInstruction = getAsmInstructionByIndex(i);
+                var asmInstruction = emulateAndGetAsmInstructionByIndex(i);
 
                 if (!asmInstruction) break; // Safety check
 
@@ -4545,7 +4545,7 @@ function scanForObfuscations_Native() {
             // Check first 15 instructions for CPUID instruction
             if (!PE_Cached.isDynamicLinkLibrary) {
                 for (var i = 0; i < 15 && !isStrangeOpCodeNearEpPresent; i++) {
-                    var asmInstruction = getAsmInstructionByIndex(i);
+                    var asmInstruction = emulateAndGetAsmInstructionByIndex(i);
 
                     if (!asmInstruction) break; // Safety check
 
@@ -4616,7 +4616,7 @@ function scanForObfuscations_Native() {
     var isNopPaddingPresent = false;
 
     // Condition to check for NOP padding
-    if (!isStartsWithNop && getEpAsmPattern(true, 5).indexOf(getInstructionsAsmPattern(["NOP", "NOP"])) !== -1) {
+    if (!isStartsWithNop && emulateAndGetEpAsmPattern(true, 5).indexOf(getInstructionsAsmPattern(["NOP", "NOP"])) !== -1) {
         isNopPaddingPresent = true;
     }
 
@@ -4882,7 +4882,7 @@ const _patternSplitter = "|";
  * @param {number} numberOf - The number of instructions to include in the pattern.
  * @returns {string} The generated assembly pattern.
  */
-function getEpAsmPattern(onlyOpCodes, numberOf) {
+function emulateAndGetEpAsmPattern(onlyOpCodes, numberOf) {
     // Initialize the result with a pattern splitter
     var result = _patternSplitter;
 
@@ -4922,7 +4922,7 @@ var epAsmInstructions = [];
  * @param {number} index - The index of the assembly instruction to retrieve.
  * @returns {string} The assembly instruction at the specified index.
  */
-function getAsmInstructionByIndex(index) {
+function emulateAndGetAsmInstructionByIndex(index) {
     // Check if the instruction is already cached
     if (epAsmInstructions[index] !== undefined) {
         return epAsmInstructions[index];
@@ -4987,7 +4987,7 @@ function getInstructionsAsmPattern(instruction) {
  * @returns {string} The disassembled string of the first instruction at the entry point.
  */
 function getFirstEpAsmInstruction() {
-    return getAsmInstructionByIndex(0);
+    return emulateAndGetAsmInstructionByIndex(0);
     // return PE.getDisasmString(PE.OffsetToVA(PE.getEntryPointOffset()));
 }
 
