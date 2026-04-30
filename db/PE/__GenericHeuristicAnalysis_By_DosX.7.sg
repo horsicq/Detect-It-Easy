@@ -4534,27 +4534,35 @@ function scanForObfuscations_Native() {
 
     // Check for CPUID at entry point
 
-    var isCpuidNearEpPresent = false;
+    var isStrangeOpCodeNearEpPresent = false;
+
+    var strangeReadableOpCodesNearEp = ["Cpuid", "Rdrsc", "Rdtsc"],
+        strangeOpCodeDetected = String();
 
     if (PE_Cached.isArchX86) {
-        // Check first 15 instructions for CPUID instruction
-        if (!PE_Cached.isDynamicLinkLibrary) {
-            for (var i = 0; i < 15 && !isCpuidNearEpPresent; i++) {
-                var asmInstruction = getAsmInstructionByIndex(i);
+        for (var x = 0; x < strangeReadableOpCodesNearEp.length; x++) {
+            const opCodeToCheck = strangeReadableOpCodesNearEp[x];
+            // Check first 15 instructions for CPUID instruction
+            if (!PE_Cached.isDynamicLinkLibrary) {
+                for (var i = 0; i < 15 && !isStrangeOpCodeNearEpPresent; i++) {
+                    var asmInstruction = getAsmInstructionByIndex(i);
 
-                if (!asmInstruction) break; // Safety check
+                    if (!asmInstruction) break; // Safety check
 
-                // Check if instruction is CPUID
-                if (getAsmOpCode(asmInstruction) === "CPUID") {
-                    log(logType.any, "CPUID near EP found at instruction index: " + i);
+                    // Check if instruction is CPUID
+                    if (getAsmOpCode(asmInstruction) === opCodeToCheck.toUpperCase()) {
+                        log(logType.any, opCodeToCheck + " near EP found at instruction index: " + i);
 
-                    isCpuidNearEpPresent = true;
+                        strangeOpCodeDetected = opCodeToCheck;
+
+                        isStrangeOpCodeNearEpPresent = true;
+                    }
                 }
             }
         }
     }
 
-    if (isCpuidNearEpPresent) options = addOption(options, "Cpuid near EP");
+    if (isStrangeOpCodeNearEpPresent) options = addOption(options, strangeOpCodeDetected + " near EP");
 
 
 
