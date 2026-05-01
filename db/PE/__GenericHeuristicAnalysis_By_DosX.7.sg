@@ -27,8 +27,8 @@
 //       │     information, file integrity issues, or even potential   │
 //       │     malicious code using advanced and complex checks. It    │
 //       │     includes pinpoint scanning, intelligent inspections,    │
-//       │     signature-based analysis, thorough file content         │
-//       │     evaluation, and much more! >:)                          │
+//       │     signature-based analysis, native code emulation,        │
+//       │     thorough file content evaluation, and much more! >:)    │
 //       │                                                             │
 //       │     Supported archictures:                                  │
 //       │      1.  I386 (x86_32)            2.  AMD64 (x86_64)        │
@@ -382,7 +382,7 @@ function scanForObfuscations_NET() {
 
             if (firstOpCode !== "JMP") {
                 if (PE.VAToOffset(PE.getAddressOfEntryPoint()) !== -1) {
-                    log(logType.net, "Very strange EP pattern: " + getEpAsmPattern(true, 4).split("|").join(" .. "));
+                    log(logType.net, "Very strange EP pattern: " + emulateAndGetEpAsmPattern(true, 4).split("|").join(" .. "));
                 } else {
                     log(logType.net, "No native entry point");
                 }
@@ -2325,6 +2325,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     const entries = [
         "53565755488D35........488DBE",  // samples by: UPX (x64)
+        "6A6068........E8........BF94",  // samples by: PELock (x32)
+        "68........E8........C3C3",      // samples by: KByS (x32)
         "B8........68........64",        // samples by: Petite (x32)
         "60..................E8",        // samples by: Anticrack Software (x32)
         "33C08BC068........68",          // samples by: ExE Pack (x32)
@@ -2346,6 +2348,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         "E8........53",                  // samples by: Themida (x32), Safengine Shielden
         "8CC0FA8ED0BC",                  // samples by: PACKWIN (x32)
         "B8........60",                  // samples by: Petite, Themida (x32)
+        "60FC0FB605",                    // samples by: NakedPacker (x32)
         "8B44240456",                    // samples by: ASDPack (x32)
         "1E068CC88E",                    // samples by: aPack (x32)
         "1E068CCBBA",                    // samples by: aPack (x32)
@@ -2360,6 +2363,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         "EB..60",                        // samples by: kkryptor, dePACK (x32)
         "60E8",                          // samples by: mpress, Packman, Pack Master, Yodas Crypter, DxPack, ASPack, MSLRH, tElock (x32), WinUPack
         "6068",                          // samples by: BeRo, ExE Pack, AHPacker (x32)
+        "60B8",                          // samples by: NakedPacker (x32)
         "9C60"                           // samples by: PEBundle (x32)
     ];
 
@@ -2667,7 +2671,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var dbCollectionOfSectionNamesDict = [
         ["DBPE", null, "        "],
         ["Themida", "2.XX", "   "],                                                  // https://www.oreans.com/Themida.php
-        ["Themida", "3.XX", [".imports", ".loadcon", ".themida", ".winlice"]],       // .
+        ["Themida", "3.XX", [".loadcon", ".themida", ".winlice"]],       // .
         ["Themida", null, [".stub01", "WinLicen", ".v-lizer", "Themida "]],          // .
         ["PEBundle", null, /^(PEB|peb)undle$/],                                      // https://bitsum.com/pebundle.htm
         ["DZA Patcher", null, "yoda"],
@@ -4497,7 +4501,7 @@ function scanForObfuscations_Native() {
         // This trick uses "CALL $+5" (E8 00 00 00 00) to push next instruction address on stack
         if (!PE_Cached.isDynamicLinkLibrary) {
             for (var i = 0; i < 32 && !isAddrToStackTrickPresent; i++) {
-                var asmInstruction = getAsmInstructionByIndex(i);
+                var asmInstruction = emulateAndGetAsmInstructionByIndex(i);
 
                 if (!asmInstruction) break; // Safety check
 
@@ -4528,29 +4532,42 @@ function scanForObfuscations_Native() {
 
 
 
-    // Check for CPUID at entry point
+    // Check for strange opcodes at entry point
 
-    var isCpuidNearEpPresent = false;
+    var isStrangeOpCodeNearEpPresent = false;
+
+    var strangeReadableOpCodesNearEp = [
+        "Cpuid",  // 0F A2
+        "Rdtsc",  // 0F 31
+        "Rdtscp", // 0F 01 F9
+        "Rdrand", // 0F C7 /6
+        "Rdseed"  // 0F C7 /7
+    ], strangeOpCodeDetected = String();
 
     if (PE_Cached.isArchX86) {
-        // Check first 15 instructions for CPUID instruction
-        if (!PE_Cached.isDynamicLinkLibrary) {
-            for (var i = 0; i < 15 && !isCpuidNearEpPresent; i++) {
-                var asmInstruction = getAsmInstructionByIndex(i);
+        for (var x = 0; x < strangeReadableOpCodesNearEp.length; x++) {
+            const opCodeToCheck = strangeReadableOpCodesNearEp[x];
+            // Check first 15 instructions for CPUID instruction
+            if (!PE_Cached.isDynamicLinkLibrary) {
+                for (var i = 0; i < 15 && !isStrangeOpCodeNearEpPresent; i++) {
+                    var asmInstruction = emulateAndGetAsmInstructionByIndex(i);
 
-                if (!asmInstruction) break; // Safety check
+                    if (!asmInstruction) break; // Safety check
 
-                // Check if instruction is CPUID
-                if (getAsmOpCode(asmInstruction) === "CPUID") {
-                    log(logType.any, "CPUID near EP found at instruction index: " + i);
+                    // Check if instruction is CPUID
+                    if (getAsmOpCode(asmInstruction) === opCodeToCheck.toUpperCase()) {
+                        log(logType.any, opCodeToCheck + " near EP found at instruction index: " + i);
 
-                    isCpuidNearEpPresent = true;
+                        strangeOpCodeDetected = opCodeToCheck;
+
+                        isStrangeOpCodeNearEpPresent = true;
+                    }
                 }
             }
         }
     }
 
-    if (isCpuidNearEpPresent) options = addOption(options, "Cpuid near EP");
+    if (isStrangeOpCodeNearEpPresent) options = addOption(options, strangeOpCodeDetected + " near EP");
 
 
 
@@ -4604,7 +4621,7 @@ function scanForObfuscations_Native() {
     var isNopPaddingPresent = false;
 
     // Condition to check for NOP padding
-    if (!isStartsWithNop && getEpAsmPattern(true, 5).indexOf(getInstructionsAsmPattern(["NOP", "NOP"])) !== -1) {
+    if (!isStartsWithNop && emulateAndGetEpAsmPattern(true, 5).indexOf(getInstructionsAsmPattern(["NOP", "NOP"])) !== -1) {
         isNopPaddingPresent = true;
     }
 
@@ -4870,7 +4887,7 @@ const _patternSplitter = "|";
  * @param {number} numberOf - The number of instructions to include in the pattern.
  * @returns {string} The generated assembly pattern.
  */
-function getEpAsmPattern(onlyOpCodes, numberOf) {
+function emulateAndGetEpAsmPattern(onlyOpCodes, numberOf) {
     // Initialize the result with a pattern splitter
     var result = _patternSplitter;
 
@@ -4910,7 +4927,7 @@ var epAsmInstructions = [];
  * @param {number} index - The index of the assembly instruction to retrieve.
  * @returns {string} The assembly instruction at the specified index.
  */
-function getAsmInstructionByIndex(index) {
+function emulateAndGetAsmInstructionByIndex(index) {
     // Check if the instruction is already cached
     if (epAsmInstructions[index] !== undefined) {
         return epAsmInstructions[index];
@@ -4975,7 +4992,7 @@ function getInstructionsAsmPattern(instruction) {
  * @returns {string} The disassembled string of the first instruction at the entry point.
  */
 function getFirstEpAsmInstruction() {
-    return getAsmInstructionByIndex(0);
+    return emulateAndGetAsmInstructionByIndex(0);
     // return PE.getDisasmString(PE.OffsetToVA(PE.getEntryPointOffset()));
 }
 
