@@ -7,47 +7,47 @@ meta("audio", "Audio Interchange file (");
 
 /* beautify ignore:start */
 function detect() {
-	if (!X.c("'FORM' ........ 'AIF'") || !['F','C'].includes(fc=X.SA(0xB,1))) return;
+    if (!X.c("'FORM' ........ 'AIF'") || !['F', 'C'].includes(fc = X.SA(0xB, 1))) return;
 
-	if (fc == 'F') sName += '.AIF,.aiff)'; else sName += '.aifc)';
+    if (fc == 'F') sName += '.AIF,.aiff)'; else sName += '.aifc)';
 
-	var bad = '', dur = -1, p = 0xC, end = false, sz = X.U32(4,_BE)+0x8,
-	  comm = ssnd = -1,
-	  ch = sr = smp = smpsz = bps = 0, co = '';
+    var bad = '', dur = -1, p = 0xC, end = false, sz = X.U32(4, _BE) + 0x8,
+        comm = ssnd = -1,
+        ch = sr = smp = smpsz = bps = 0, co = '';
 
-	while(p < sz) {
-		var hkhd = X.SA(p,4), hksz = X.U32(p+4,_BE), fubar = false;
-		if (hksz > 0xFFFF)
-			if(hkhd != "SSND")
-				if(hkhd == "NONE") {
-					// https://www.mmsp.ece.mcgill.ca/Documents/AudioFormats/AIFF/Samples/CCRMA/digit0v0.aiff has a F.U.B.A.R. chunk
-					hksz = X.U8(p+4); fubar = true
-				}
-				else { bad = bad.addIfNone('!badchunk'); break }
+    while (p < sz) {
+        var hkhd = X.SA(p, 4), hksz = X.U32(p + 4, _BE), fubar = false;
+        if (hksz > 0xFFFF)
+            if (hkhd != "SSND")
+                if (hkhd == "NONE") {
+                    // https://www.mmsp.ece.mcgill.ca/Documents/AudioFormats/AIFF/Samples/CCRMA/digit0v0.aiff has a F.U.B.A.R. chunk
+                    hksz = X.U8(p + 4); fubar = true
+                }
+                else { bad = bad.addIfNone('!badchunk'); break }
 
-//_l2r('aif',p,hkhd+' -> '+Hex(p+(fubar ? 5 : 8)+hksz));
-		if(!charStat(hkhd,1).includes('allasc')) break; p += fubar ? 6+(hksz & 1) : 8;
-		switch(hkhd) {
-		case "COMM": if (comm > 0) bad = bad.addIfNone('!manyCOMMs');
-			comm = p; if (hksz < 0x12) return;
-			ch = X.I16(p,_BE); smp = X.U32(p+2,_BE); smpsz = X.I16(p+6,_BE); sr = readFloat80(p+8,_BE);
-			if (hksz > 0x12) co = X.SA(p+0x12,hksz-0x12);
-			break;
-		case "SSND": ssnd = p; break
-		}
-		p += hksz + (hksz & 1)
-	}
-//_l2r('aif',p,'sr:'+sr+' smp:'+smp+' comm:'+comm+' ssnd:'+ssnd+' bad:'+bad);
-	if(comm < 0 || ssnd < 0) return;
+        //_l2r('aif',p,hkhd+' -> '+Hex(p+(fubar ? 5 : 8)+hksz));
+        if (!charStat(hkhd, 1).includes('allasc')) break; p += fubar ? 6 + (hksz & 1) : 8;
+        switch (hkhd) {
+            case "COMM": if (comm > 0) bad = bad.addIfNone('!manyCOMMs');
+                comm = p; if (hksz < 0x12) return;
+                ch = X.I16(p, _BE); smp = X.U32(p + 2, _BE); smpsz = X.I16(p + 6, _BE); sr = readFloat80(p + 8, _BE);
+                if (hksz > 0x12) co = X.SA(p + 0x12, hksz - 0x12);
+                break;
+            case "SSND": ssnd = p; break
+        }
+        p += hksz + (hksz & 1)
+    }
+    //_l2r('aif',p,'sr:'+sr+' smp:'+smp+' comm:'+comm+' ssnd:'+ssnd+' bad:'+bad);
+    if (comm < 0 || ssnd < 0) return;
 
-	bDetected = true;
+    bDetected = true;
 
-	if(X.isVerbose()) {
-		var nmSeconds = Math.round(smp / sr * 10000) / 10;
-		dur = new Date(nmSeconds).toISOString().substr(11, 8);
-		sOption('ch:' + ch + ' s/r:' + Math.round(sr) + 'Hz '+ (dur !== -1 ? ' len: '+dur : '') +' co:' + co + ' sz:' + outSz(sz))
-	}
+    if (X.isVerbose()) {
+        var nmSeconds = Math.round(smp / sr * 10000) / 10;
+        dur = new Date(nmSeconds).toISOString().substr(11, 8);
+        sOption('ch:' + ch + ' s/r:' + Math.round(sr) + 'Hz ' + (dur !== -1 ? ' len: ' + dur : '') + ' co:' + co + ' sz:' + outSz(sz))
+    }
 
-	return result();
+    return result();
 }
 /* beautify ignore:end */
