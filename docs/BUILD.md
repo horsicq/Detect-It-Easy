@@ -448,3 +448,40 @@ cd build
 qmake ../die_source.pro CONFIG+=debug
 make
 ```
+
+# How to build on openBSD(QT5)
+
+### Qt framework has to be installed on the system.
+
+#### Download dependencies
+
+```bash
+su -
+pkg_add git gmake cmake qtbase qtsvg qtscript qttools
+exit
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+#### Build (Release)
+
+```bash
+mkdir build
+cd build
+qmake-qt5 ../die_source.pro CONFIG+=release
+gmake
+```
+
+#### Build (Debug)
+
+```bash
+mkdir build
+cd build
+qmake-qt5 ../die_source.pro CONFIG+=debug
+gmake
+```
