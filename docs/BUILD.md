@@ -412,3 +412,39 @@ make
 export QT_QPA_PLATFORM=wayland
 ./die
 ```
+
+# How to build on Alpine Linux(QT5)
+
+### Qt framework has to be installed on the system.
+
+#### Download dependencies
+
+```bash
+apk update
+apk add qt5-qtbase-dev qt5-qtscript-dev qt5-qttools-dev qt5-qtsvg-dev git build-base pkgconf
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+#### Build (Release)
+
+```bash
+mkdir build
+cd build
+qmake ../die_source.pro CONFIG+=release
+make
+```
+
+#### Build (Debug)
+
+```bash
+mkdir build
+cd build
+qmake ../die_source.pro CONFIG+=debug
+make
+```
