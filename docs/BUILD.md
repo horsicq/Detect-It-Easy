@@ -371,3 +371,44 @@ make
 chmod a+x create_appimage.sh
 ./create_appimage.sh
 ```
+
+# How to build on nixOS(QT5)
+
+### Qt framework has to be installed on the system.
+
+#### Download dependencies
+
+```bash
+nix-shell -p git gcc gnumake pkg-config qt5.qtbase qt5.qtscript qt5.qttools qt5.qtsvg qt5.qtwayland
+```
+
+#### Clone this repo recursively:
+
+```bash
+git clone --recursive https://github.com/horsicq/DIE-engine.git
+cd DIE-engine
+```
+
+#### Build (Release)
+
+```bash
+mkdir build
+cd build
+qmake ../die_source.pro CONFIG+=release
+make
+```
+
+#### Build (Debug)
+
+```bash
+mkdir build
+cd build
+qmake ../die_source.pro CONFIG+=debug
+make
+```
+
+#### Run
+```bash
+export QT_QPA_PLATFORM=wayland
+./die
+```
