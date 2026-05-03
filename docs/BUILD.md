@@ -6,24 +6,24 @@ cd DIE-engine
 sudo docker build . -t horsicq:diec
 ```
 
-# How to build on Linux based on Debian 
+# How to build on Linux based on Debian
 
-* You can also watch tutorial on [YouTube](https://www.youtube.com/watch?v=hODcbA_1Tns)
-* For further Information you can look at [fr0stb1rd blogpost](https://fr0stb1rd.gitlab.io/posts/building-and-running-detect-it-easy-on-kali-linux-complete-tutorial/).
-  
+-   You can also watch tutorial on [YouTube](https://www.youtube.com/watch?v=hODcbA_1Tns)
+-   For further Information you can look at [fr0stb1rd blogpost](https://fr0stb1rd.gitlab.io/posts/building-and-running-detect-it-easy-on-kali-linux-complete-tutorial/).
+
 #### Install packages:
 
 ```bash
 sudo apt-get install qtbase5-dev qtscript5-dev qttools5-dev-tools libqt5svg5-dev git build-essential -y
 ```
 
-- Ubuntu 14.04-20.04:
+-   Ubuntu 14.04-20.04:
 
 ```bash
 sudo apt-get install qt5-default -y
 ```
 
-- Ubuntu 21.04-26.04
+-   Ubuntu 21.04-26.04
 
 ```bash
 sudo apt-get install qtchooser qt5-qmake pkg-config -y
@@ -48,8 +48,8 @@ bash -x build_dpkg.sh
 sudo dpkg -i release/$(ls release)
 ```
 
-# How to build on Linux based on Fedora (DNF) 
-  
+# How to build on Linux based on Fedora (DNF)
+
 #### Install packages:
 
 ```bash
@@ -62,6 +62,7 @@ sudo dnf install qt5-qtbase-devel qt5-qtscript-devel qt5-qttools-devel git make 
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 cd DIE-engine
 ```
+
 #### Build
 
 ```bash
@@ -70,8 +71,8 @@ chmod a+x configure
 make -j4
 ```
 
-# How to build on Linux based on openSuse (zypper) 
-  
+# How to build on Linux based on openSuse (zypper)
+
 #### Install packages:
 
 ```bash
@@ -84,6 +85,7 @@ sudo zypper install libqt5-qtbase-devel libqt5-qtscript-devel libqt5-qttools-dev
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 cd DIE-engine
 ```
+
 #### Build
 
 ```bash
@@ -92,8 +94,8 @@ chmod a+x configure
 make -j4
 ```
 
-# How to build on Linux based on Arch Linux (pacman) 
-  
+# How to build on Linux based on Arch Linux (pacman)
+
 #### Install packages:
 
 ```bash
@@ -106,6 +108,7 @@ sudo pacman -S --needed git base-devel qt5-base qt5-tools qt5-script
 git clone --recursive https://github.com/horsicq/DIE-engine.git
 cd DIE-engine
 ```
+
 #### Build
 
 ```bash
@@ -114,7 +117,7 @@ chmod a+x configure
 make -j4
 ```
 
-# How to build on Linux(Automake)
+# How to build on Linux (Automake)
 
 ### Qt framework has to be installed on the system.
 
@@ -142,7 +145,7 @@ make -j4
 sudo make install
 ```
 
-# How to build on Linux(QT6)
+# How to build on Linux (Qt6)
 
 ### Qt framework has to be installed on the system.
 
@@ -178,7 +181,7 @@ Edit build_mac.sh (check QMAKE_PATH variable)
 
 Run build script: bash -x build_mac.sh
 
-# How to build on Windows(XP)
+# How to build on Windows (XP)
 
 Install Visual Studio 2013: https://github.com/horsicq/build_tools
 
@@ -192,7 +195,7 @@ Edit build_winxp.bat (check VSVARS_PATH, SEVENZIP_PATH, QMAKE_PATH variables)
 
 Run build_winxp.bat
 
-# How to build on Windows(7-11)
+# How to build on Windows (7-11)
 
 Install Visual Studio 2019: https://github.com/horsicq/build_tools
 
@@ -258,8 +261,8 @@ make -j4
 
 # How to build with WSL
 
-- Activate Windows Subsystem for Linux
-- Download from the Microsoft Store any distribution
+-   Activate Windows Subsystem for Linux
+-   Download from the Microsoft Store any distribution
 
 #### Clone this repo recursively:
 
@@ -281,7 +284,7 @@ chmod a+x build_dpkg.sh
 ./build_dpkg.sh
 ```
 
-# How to build on Linux(Debug)
+# How to build on Linux (Debug)
 
 ### Qt framework has to be installed on the system.
 
@@ -307,7 +310,7 @@ qmake ../die_source.pro CONFIG+=debug CONFIG-=release
 make
 ```
 
-# How to build on Linux(QT6/Debug)
+# How to build on Linux (Qt6/Debug)
 
 ### Qt framework has to be installed on the system.
 
@@ -333,7 +336,7 @@ qmake6 ../die_source.pro CONFIG+=debug CONFIG-=release
 make
 ```
 
-# How to build on Linux(QT5/AppImage)
+# How to build on Linux (Qt5/AppImage)
 
 ### Qt framework has to be installed on the system.
 
@@ -343,7 +346,8 @@ make
 sudo apt-get install --quiet --assume-yes build-essential qt5-default qtbase5-dev qttools5-dev-tools qtscript5-dev libqt5svg5-dev
 ```
 
-#### Setup linuxdeploy ####
+#### Setup linuxdeploy
+
 ```bash
 wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
 chmod +x linuxdeploy-x86_64.AppImage
@@ -372,7 +376,7 @@ chmod a+x create_appimage.sh
 ./create_appimage.sh
 ```
 
-# How to build on nixOS(QT5)
+# How to build on nixOS (Qt5)
 
 ### Qt framework has to be installed on the system.
 
@@ -408,12 +412,13 @@ make
 ```
 
 #### Run
+
 ```bash
 export QT_QPA_PLATFORM=wayland
 ./die
 ```
 
-# How to build on Alpine Linux(QT5)
+# How to build on Alpine Linux (Qt5)
 
 ### Qt framework has to be installed on the system.
 
@@ -449,7 +454,7 @@ qmake ../die_source.pro CONFIG+=debug
 make
 ```
 
-# How to build on openBSD(QT5)
+# How to build on openBSD (Qt5)
 
 ### Qt framework has to be installed on the system.
 
