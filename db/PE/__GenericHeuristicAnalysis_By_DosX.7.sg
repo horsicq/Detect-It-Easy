@@ -6348,14 +6348,26 @@ function scanForMaliciousCode_NET_and_Native() {
         "55" +              // push ebp
         "8B EC"             // mov ebp, esp
     )) {
-        var rsrcSection = PE.section[".rsrc"];
+        var isWannaCryDetected = false;
 
-        if (rsrcSection && PE.isSignaturePresent(rsrcSection.FileOffset, rsrcSection.FileSize, "'cmd.exe /c ' 22 '%s' 22")) {
-            verdicts.push({
-                type: "WannaCry",
-                version: String(),
-                details: String()
-            });
+        if (PE_Cached.numberOfUnmanagedResources > 0 && /^[RW]$/.test(PE.getResourceNameByNumber(0))) {
+            if (PE.isSignaturePresent(PE.resource[0].FileOffset, 32, "'MZ' 90")) {
+                isWannaCryDetected = true;
+            } else {
+                var rsrcSection = PE.section[".rsrc"];
+
+                if (rsrcSection && PE.isSignaturePresent(rsrcSection.FileOffset, rsrcSection.FileSize, "'cmd.exe /c ' 22 '%s' 22")) {
+                    isWannaCryDetected = true;
+                }
+            }
+
+            if (isWannaCryDetected) {
+                verdicts.push({
+                    type: "WannaCry",
+                    version: String(),
+                    details: String()
+                });
+            }
         }
     }
 
