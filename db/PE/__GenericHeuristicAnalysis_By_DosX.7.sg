@@ -6350,13 +6350,20 @@ function scanForMaliciousCode_NET_and_Native() {
     )) {
         var isWannaCryDetected = false;
 
-        if (PE_Cached.numberOfUnmanagedResources > 0 && /^[RW]$/.test(PE.getResourceNameByNumber(0))) {
+        if (PE_Cached.numberOfUnmanagedResources > 0 && (
+            /^[RW]$/.test(PE.getResourceNameByNumber(0)) ||   // "R" or "W"
+            /^[A-Z]{3}$/.test(PE.getResourceNameByNumber(0))  // like "XIA"
+        )) {
             if (PE.isSignaturePresent(PE.resource[0].FileOffset, 32, "'MZ' 90")) {
                 isWannaCryDetected = true;
             } else {
-                var rsrcSection = PE.section[".rsrc"];
+                var rsrcSection = PE.section[".rsrc"],
+                    dataSection = PE.section[".data"];
 
-                if (rsrcSection && PE.isSignaturePresent(rsrcSection.FileOffset, rsrcSection.FileSize, "'cmd.exe /c ' 22 '%s' 22")) {
+                const cmdSignature = "'cmd.exe /c ' 22 '%s' 22";
+
+                if ((rsrcSection && PE.isSignaturePresent(rsrcSection.FileOffset, rsrcSection.FileSize, cmdSignature)) ||
+                    (dataSection && PE.isSignaturePresent(dataSection.FileOffset, dataSection.FileSize, cmdSignature))) {
                     isWannaCryDetected = true;
                 }
             }
