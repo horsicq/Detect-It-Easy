@@ -6350,7 +6350,7 @@ function scanForMaliciousCode_NET_and_Native() {
         "5B 81 EB ?? ?? ?? ??" +  // sub ebx, ...
         "83 EC 74" +              // sub esp, 0x74
         "8B EC" +                 // mov ebp, esp
-        "8B 83 ?? ?? ?? ??" +     // mov eax, dword ptr [ebx+...]
+        "8B 83 ?? ?? ?? ??" +     // mov eax, dword ptr [ebx + ...]
         "89 45 00"                // mov dword ptr [ebp], eax
     )) {
         verdicts.push({
@@ -6358,6 +6358,45 @@ function scanForMaliciousCode_NET_and_Native() {
             version: String(),
             details: "infected"
         });
+    }
+
+
+
+
+    // https://en.wikipedia.org/wiki/CIH_(computer_virus)
+
+    if (verdicts.length === 0 && PE_Cached.isArchX86 && PE.compareEP("55")) { // push ebp
+        const instructionsOfWin9xCih = [
+            "8D 44 24 F8" +     // lea eax, [esp - 8]
+            "?? DB",            // xor/sub/... ebx, ebx
+            // ===
+            "64 87 03",         // xchg byte ptr fs:[ebx], eax
+            // ===
+            "E8 00 00 00 00",   // call $+5
+            // ===
+            "51" +              // push ecx
+            "50"                // push eax
+        ];
+
+        var offsetSearchFrom = PE.VAToOffset(PE.getAddressOfEntryPoint());
+
+        for (var i = 0; i < instructionsOfWin9xCih.length; i++) {
+            var foundInstructionPatternAt = PE.findSignature(offsetSearchFrom, 0x30, instructionsOfWin9xCih[i]);
+
+            if (foundInstructionPatternAt === -1) {
+                break;
+            } else {
+                offsetSearchFrom = foundInstructionPatternAt + 1;
+            }
+
+            if (i === instructionsOfWin9xCih.length - 1) {
+                verdicts.push({
+                    type: "Win9X.CIH",
+                    version: String(),
+                    details: "infected"
+                });
+            }
+        }
     }
 
 
