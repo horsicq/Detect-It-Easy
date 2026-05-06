@@ -6354,13 +6354,14 @@ function scanForMaliciousCode_NET_and_Native() {
             /^[RW]$/.test(PE.getResourceNameByNumber(0)) ||   // "R" or "W"
             /^[A-Z]{3}$/.test(PE.getResourceNameByNumber(0))  // like "XIA"
         )) {
-            if (PE.isSignaturePresent(PE.resource[0].FileOffset, 32, "'MZ' 90")) {
+            if (PE.isSignaturePresent(PE.resource[0].FileOffset, 32, "'MZ' 90") && // Embedded PE
+                PE.isSignaturePresent(PE.resource[0].FileOffset, PE.resource[0].FileSize, "%% '.wnry'")) {
                 isWannaCryDetected = true;
-            } else {
+            } else { // Embedded ZIP and other modified variants
                 var rsrcSection = PE.section[".rsrc"],
                     dataSection = PE.section[".data"];
 
-                const cmdSignature = "'cmd.exe /c ' 22 '%s' 22";
+                const cmdSignature = generateUnicodeSignatureMask("%s\\ProgramData") + "00 00 00 00 00 'cmd.exe /c ' 22 '%s' 22";
 
                 if ((rsrcSection && PE.isSignaturePresent(rsrcSection.FileOffset, rsrcSection.FileSize, cmdSignature)) ||
                     (dataSection && PE.isSignaturePresent(dataSection.FileOffset, dataSection.FileSize, cmdSignature))) {
