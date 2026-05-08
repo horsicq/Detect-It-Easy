@@ -6406,6 +6406,52 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
+    // https://malpedia.caad.fkie.fraunhofer.de/details/win.parite
+
+    if (verdicts.length === 0 && PE_Cached.isArchX86) {
+        var pariteAddr = PE.getAddressOfEntryPoint(),
+            pariteLoopCount = 0,
+            pariteSubFound = false;
+
+        for (var i = 0; i < 300; i++) {
+            var currentInstruction = PE.getDisasmString(pariteAddr),
+                currentOpCode = getAsmOpCode(currentInstruction);
+
+            if (!currentInstruction) break; // Safety check
+
+            if (currentOpCode === "SUB" && currentInstruction.match(/^SUB E[A-Z]{2}, [2-4]$/)) {
+                pariteSubFound = true;
+            } else if (currentOpCode === "JNE") {
+                var jneTargetMatch = currentInstruction.match(/^JNE 0X([0-9A-F]+)$/);
+
+                if (jneTargetMatch) {
+                    var pariteTarget = parseInt(jneTargetMatch[1], 16);
+
+                    if (pariteTarget < pariteAddr && pariteSubFound) {
+                        if (/^(?:PUSH|XOR) DWORD PTR \[E[A-Z]{2} \+ E[A-Z]{2}\]/.test(PE.getDisasmString(pariteTarget))) {
+                            pariteLoopCount++;
+                        }
+                    }
+
+                    pariteSubFound = false;
+                }
+            }
+
+            pariteAddr = PE.getDisasmNextAddress(pariteAddr);
+        }
+
+        if (pariteLoopCount >= 0x20) {
+            verdicts.push({
+                type: "Parite",
+                version: String(),
+                details: "infected"
+            });
+        }
+    }
+
+
+
+
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.wannacryptor
 
     if (verdicts.length === 0 && PE_Cached.isArchX86 && PE.compareEP(
