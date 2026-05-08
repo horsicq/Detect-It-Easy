@@ -6866,6 +6866,43 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
+    // Check for fake copyright info that may indicate a builder was used or the malware is masquerading as a legitimate software.
+
+    const legalCopyrightInfo = PE.getVersionStringInfo("LegalCopyright");
+
+    if (legalCopyrightInfo && !/(\(C\)|©|\bcopyright\b)/i.test(legalCopyrightInfo)) {
+
+        const companyNames = [
+            // Big Tech — most commonly faked
+            "microsoft", "google", "apple", "amazon",
+            // Software & games
+            "adobe", "oracle", "mozilla", "vmware", "valve",
+            "rockstar", "blizzard", "ubisoft", "roblox",
+            "ea digital", "cd projekt",
+            // Messaging & social
+            "discord", "telegram", "whatsapp",
+            // Security vendors (faked to appear "trusted")
+            "kaspersky", "avast", "malwarebytes", "doctor web",
+            // Hardware
+            "nvidia", "intel"
+        ];
+
+        for (var i = 0; i < companyNames.length; i++) {
+            if (new RegExp("\\b" + companyNames[i] + "\\b").test(legalCopyrightInfo.toLowerCase())) {
+                verdicts.push({
+                    type: "Fake build info",
+                    version: String(),
+                    details: mayBeInfected
+                });
+
+                break;
+            }
+        }
+    }
+
+
+
+
     // Check for obfuscated names and anomalous signs in .NET and native assemblies
 
     if (PE_Cached.isDotNet && (
@@ -6882,7 +6919,7 @@ function scanForMaliciousCode_NET_and_Native() {
         PE.getVersionStringInfo("OriginalFilename").toLowerCase().indexOf("stub.") === 0 ||
         PE.getVersionStringInfo("InternalName").toLowerCase().indexOf("stub.") === 0 ||
         (function () {
-            var fieldsToCheck = [
+            const fieldsToCheck = [
                 "Comments",
                 "CompanyName",
                 "FileDescription",
