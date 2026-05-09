@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { Worker } = require("worker_threads");
 const zlib = require('zlib');
+const archiver = require('archiver');
 
 const inputDirs = ["db", "db_custom", "db_extra"];
 const outputDir = "dbs_min";
@@ -275,6 +276,22 @@ function syncDeleteOldFiles(expectedFiles) {
 }
 
 
+function createDieDb(srcDir, archivePath) {
+    return new Promise((resolve, reject) => {
+        const output = fs.createWriteStream(archivePath);
+        const archive = archiver('zip', {
+            zlib: { level: 9 }
+        });
+
+        output.on('close', () => resolve(archive.pointer()));
+        archive.on('error', reject);
+
+        archive.pipe(output);
+        archive.directory(srcDir, false);
+        archive.finalize();
+    });
+}
+
 function deleteEmptyDirs(dir) {
     if (!fs.existsSync(dir)) return;
 
@@ -366,4 +383,20 @@ function deleteEmptyDirs(dir) {
     }
 
     console.log(report);
+
+    // Create .die-db archives for each processed directory
+    console.log("[i] Creating .die-db archives...\n");
+    for (const dir of inputDirs) {
+        const srcDir = path.join(outputDir, path.basename(dir));
+        if (!fs.existsSync(srcDir)) continue;
+
+        const archivePath = path.join(outputDir, path.basename(dir) + '.die-db');
+        try {
+            const bytes = await createDieDb(srcDir, archivePath);
+            console.log(`[PACKED] ${archivePath} (${(bytes / 1024).toFixed(1)} KB)`);
+        } catch (e) {
+            console.warn(`[PACK FAILED] ${archivePath} — ${e.message}`);
+        }
+    }
+    console.log('');
 })();
