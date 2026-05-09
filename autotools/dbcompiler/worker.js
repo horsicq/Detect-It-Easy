@@ -21,6 +21,10 @@ function shouldMinify(filePath) {
     return ext === ".sg" || ext === "";
 }
 
+function isJson(filePath) {
+    return path.extname(filePath).toLowerCase() === ".json";
+}
+
 /**
  * Universal safe JavaScript parser
  * Skips strings, regular expressions and comments
@@ -347,6 +351,22 @@ try {
 
             fs.mkdirSync(path.dirname(dstFile), { recursive: true });
             const wasWritten = writeIfChanged(dstFile, legacyCompatibleCode);
+
+            result.success = true;
+            result.type = wasWritten ? 'minified' : 'skipped';
+        } catch (e) {
+            fs.mkdirSync(path.dirname(dstFile), { recursive: true });
+            const wasWritten = writeIfChanged(dstFile, text);
+
+            result.success = false;
+            result.type = wasWritten ? 'failed' : 'failed-skip';
+            result.error = e.message;
+        }
+    } else if (isJson(srcFile)) {
+        try {
+            const minified = JSON.stringify(JSON.parse(text));
+            fs.mkdirSync(path.dirname(dstFile), { recursive: true });
+            const wasWritten = writeIfChanged(dstFile, minified);
 
             result.success = true;
             result.type = wasWritten ? 'minified' : 'skipped';
