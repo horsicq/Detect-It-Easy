@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 # Newest version of DIE, check https://github.com/horsicq/DIE-engine/releases .
-ARG DIE_VERSION=3.20
+ARG DIE_VERSION=3.22
 RUN apt update -qq && apt upgrade -y  && apt install -y wget && \
     wget https://github.com/horsicq/DIE-engine/releases/download/Beta/die_${DIE_VERSION}_Ubuntu_24.04_amd64.deb && \
     apt install -y ./die_${DIE_VERSION}_Ubuntu_24.04_amd64.deb && \
