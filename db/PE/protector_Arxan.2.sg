@@ -9,8 +9,14 @@ function detect() {
             bDetected = true;
             sVersion = "GuardIT ~2013";
         } else {
-            var ep = skipJumpsAndNops(PE.getEntryPointOffset()),
-                rva = PE.compare("48 83 EC 28 E8", ep) ? PE.OffsetToRVA(ep) + PE.readSDword(ep + 5) + 9 : PE.OffsetToRVA(ep);
+            var ep = PE.getEntryPointOffset();
+            // For DLLs without an entry point, try the first exported function
+            if (ep <= 0 && PE.isDll()) {
+                ep = getExportFunctionOffsetByIndex(0);
+            }
+
+            ep = skipJumpsAndNops(ep);
+            const rva = PE.compare("48 83 EC 28 E8", ep) ? PE.OffsetToRVA(ep) + PE.readSDword(ep + 5) + 9 : PE.OffsetToRVA(ep);
 
             if (rva != -1) {
                 var addr = PE.OffsetToVA(PE.RVAToOffset(rva));
@@ -66,4 +72,21 @@ function skipJumpsAndNops(offset) {
     }
 
     return PE.RVAToOffset(rva);
+}
+
+function getExportFunctionOffsetByIndex(index) {
+    const optionalHeaderOffset = PE.read_int32(0x3C) + 4 + 20;
+    // IMAGE_DIRECTORY_ENTRY_EXPORT is the first entry; no index needed
+    const exportDirRva = PE.read_uint32(optionalHeaderOffset + (PE.is64() ? 0x70 : 0x60));
+    const exportDirOffset = exportDirRva !== 0 ? PE.RVAToOffset(exportDirRva) : -1;
+    if (exportDirOffset !== -1) {
+        const numberOfFunctions = PE.read_uint32(exportDirOffset + 20);
+        if (index >= 0 && index < numberOfFunctions) {
+            const addressOfFunctions = PE.read_uint32(exportDirOffset + 28);
+            const functionRva = PE.read_uint32(PE.RVAToOffset(addressOfFunctions + index * 4));
+            return PE.RVAToOffset(functionRva);
+        }
+    }
+
+    return -1;
 }
