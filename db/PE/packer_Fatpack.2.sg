@@ -7,29 +7,38 @@
 
 // https://github.com/Fatmike-GH/Fatpack
 meta("packer", "Fatpack");
-
 function detect() {
     if (!PE.isNet() && PE.is64() && PE.isTLSPresent()) {
         if (PE.getNumberOfImports() === 1 && PE.isImportPositionHashPresent(0, 0x74244911)) {
-            bDetected = true;
-
-            if (PE.getNumberOfSections() === 6 && PE.getNumberOfResources() > 0) {
-                sOptions = "resources payload";
-
-                if (!PE.isResourceNamePresent("FPACK")) {
-                    sOptions = sOptions.append("modified");
+            for (var i = 0; i < PE.getNumberOfSections(); ++i) {
+                if (PE.section[i].FileSize === 0) {
+                    bDetected = true;
+                    break;
                 }
-            } else if (PE.getNumberOfSections() === 5) {
-                sOptions = "section payload";
+            }
 
+            if (PE.getNumberOfResources() > 0) {
+                for (var i = 0; i < PE.getNumberOfResources(); ++i) {
+                    if (PE.compare("5D00001000", PE.getResourceOffsetByNumber(i))) {
+                        sOptions = "resources payload";
+                        if (PE.getResourceNameByNumber(i) !== "FPACK") {
+                            sOptions = sOptions.append("modified");
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (!sOptions) {
+                sOptions = "section payload";
                 if (PE.section[PE.nLastSection].Name !== ".fpack  ") {
                     sOptions = sOptions.append("modified");
+                } 
+                else {
+                    sVersion = "custom";
                 }
-            } else {
-                sVersion = "custom";
             }
         }
     }
-
     return result();
 }
