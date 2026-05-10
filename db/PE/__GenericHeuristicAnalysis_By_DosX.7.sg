@@ -4055,17 +4055,26 @@ function isTokenObfuscated(token) {
 
     // Single consonant repeated excessively (e.g., "jnfasjknjnjnjn")
     // Same consonant appears 5+ times in strings shorter than 15 chars
-    var consonantCounts = {};
-    for (var i = 0; i < token.length; i++) {
-        var ch = token[i].toLowerCase();
-        if ('bcdfghjklmnpqrstvwxz'.indexOf(ch) !== -1) {
-            consonantCounts[ch] = (consonantCounts[ch] || 0) + 1;
-            if (consonantCounts[ch] >= 5 && token.length < 15) return true;
+    if (token.length < 15) {
+        var consonantCounts = {};
+        for (var i = 0; i < token.length; i++) {
+            var ch = token[i].toLowerCase();
+            if (/[bcdfghjklmnpqrstvwxz]/.test(ch)) {
+                if ((consonantCounts[ch] = (consonantCounts[ch] || 0) + 1) >= 5) return true;
+            }
         }
     }
 
-    // Keyboard walk patterns (e.g., "qwerty", "asdfgh", "zxcvbn")
-    if (token.match(/qwerty|asdfgh|zxcvbn|yuiop|hjkl|cvbnm|poiuy|lkjh/i)) return true;
+    // Keyboard walk patterns — horizontal rows, 5+ chars (forward and backward).
+    // No legitimate abbreviation or identifier contains these sequences.
+    if (token.match(/qwert|werty|ertyu|rtyui|tyuio|yuiop|asdfg|sdfgh|dfghj|fghjk|ghjkl|zxcvb|xcvbn|cvbnm|poiuy|oiuyt|iuyte|uyter|ytrew|trewq|lkjhg|kjhgf|jhgfd|hgfds|gfdsa|mnbvc|nbvcx|bvcxz/i)) return true;
+
+    // Keyboard walk patterns — vertical columns, 6+ chars (e.g., "qazwsx", "wsxedc").
+    // Single 3-char columns (qaz, wsx) may appear in code; 6+ chars are unambiguous.
+    if (token.match(/qazwsx|wsxedc|edcrfv|rfvtgb|tgbyhn|yhnujm|zaqxsw|xswcde|cdevfr|vfrbgt|bgtnhy|nhymju/i)) return true;
+
+    // Number row sequences — 5+ consecutive digits in ascending or descending order.
+    if (token.match(/01234|12345|23456|34567|45678|56789|98765|87654|76543|65432|54321|43210/)) return true;
 
     // Excessive digit-letter boundaries (e.g., "a1b2c3d4e5f6")
     // Count transitions specifically between letters and digits (8+ transitions)
