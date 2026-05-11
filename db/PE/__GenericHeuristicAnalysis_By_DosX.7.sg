@@ -7102,6 +7102,33 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
+    // Some malware tries to masquerade as critical system files by using the same "OriginalFilename"
+    // or "InternalName" as legitimate system processes, but they often forget to properly sign the file
+    // or include a Rich Signature, which can be a strong indicator of malicious intent.
+
+    const systemSignedFileNames = [
+        "csrss.exe", "wininit.exe", "lsass.exe", "svchost.exe",
+        "taskhostw.exe", "ntkrnlmp.exe" /* (ntoskrnl.exe) */
+    ];
+
+    for (var j = 0; j < systemSignedFileNames.length; j++) {
+        if (PE.getVersionStringInfo("OriginalFilename").toLowerCase() === systemSignedFileNames[j] ||
+            PE.getVersionStringInfo("InternalName").toLowerCase() === systemSignedFileNames[j]) {
+            if (PE_Cached.isDotNet || !PE_Cached.isRichSignaturePresent || !PE.isSigned()) {
+                verdicts.push({
+                    type: "Fake " + (!PE_Cached.isDotNet ? "or infected " : String()) + "system file",
+                    version: String(),
+                    details: mayBeInfected
+                });
+
+                break;
+            }
+        }
+    }
+
+
+
+
     // Check for obfuscated names and anomalous signs in .NET and native assemblies
 
     if (PE_Cached.isDotNet && (
