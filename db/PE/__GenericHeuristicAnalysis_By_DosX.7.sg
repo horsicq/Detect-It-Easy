@@ -3996,13 +3996,21 @@ function isTokenObfuscated(token) {
         // Hardware chip/model numbers: AX88179_178A, Acx01000, urscx01000, CUDART64_132_51
         // Letter prefix (1-6) + digit block (4+) + optional underscore segments (end-anchored)
         /^[A-Za-z]{1,6}\d{4,}(?:[_-][A-Za-z0-9]{1,12})*$/,
-        // Windows driver/service name suffixes: kbldfltr, mshwnclx, WSDScDrv, NrptDnsForm, hnswfpdriver
-        /(?:driver|drv|fltr|clx|form)(?:\.\w{1,4})?$/i,
+        // Windows driver/service name suffixes: kbldfltr, mshwnclx, WSDScDrv, NrptDnsForm, hnswfpdriver, mskssrv
+        /(?:driver|drv|fltr|clx|form|srv|svc|port|bus|hub|hid)(?:\.\w{1,4})?$/i,
         // Charset and codepage names: c_is2022, cp1251, iso8859, utf32le
         /^(?:c_|cp|iso|utf|ucs|gb|koi|win|mac|ascii|latin|ansi)\w*\d/i,
         // Windows resource and constant identifiers (SCREAMING_SNAKE_CASE): IDR_MSCORLIB_4030319, MY_CONST_VALUE
         // Requires underscore — pure all-caps hex strings (DEADBEEF, CAFEBABE) are NOT whitelisted
         /^[A-Z][A-Z0-9]*_[A-Z0-9_]+$/,
+        // PascalCase compound identifiers (2+ word segments, purely alphabetic): GetWindowText, BthMtpContextHandler
+        // Each segment: uppercase letter + 2+ lowercase. Random strings almost never follow this structure.
+        /^(?:[A-Z][a-z]{2,}){2,}$/,
+        // camelCase identifiers (lowercase start + 1+ PascalCase segments): createFile, readBuffer, sendMessage
+        // Initial lowercase part limited to 8 chars to avoid whitelisting long random prefixes.
+        /^[a-z]{1,8}(?:[A-Z][a-z]{2,})+$/,
+        // Known Windows kernel/networking component substrings: ndis, acpi, storport, usbhub, etc.
+        /(?:ndis|acpi|storport|classpnp|fltmgr|hidclass|usbhub|usbstor|kbdclass|mouclass|ksuser|nsiproxy|tcpip|netbt|wfplwf|pacer)/i,
     ];
 
     for (var w = 0; w < whitelist.length; w++) {
