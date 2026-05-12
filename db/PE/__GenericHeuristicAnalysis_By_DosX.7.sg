@@ -3976,6 +3976,12 @@ function isTokenObfuscated(token) {
     // UUIDs: 550e8400-e29b-41d4-a716-446655440000
     if (token.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) return false;
 
+    // Partial GUIDs / GUID fragments: 69fe178f-26e7-43a9-a, c4d66f00-b6f0-4439-a
+    if (token.match(/^[0-9a-f]{4,8}(?:-[0-9a-f]{1,8}){2,}$/i)) return false;
+
+    // Build/version hashes with optional word suffix: 2b7-0fc9cc7187f5_Hyp, 620-2cfb01a9318d_Hyp
+    if (token.match(/^[0-9a-f]{2,8}-[0-9a-f]{8,}(?:[_-][a-zA-Z]+)?$/i)) return false;
+
     // Common hex prefixes: 0x1234ABCD, 0X1A2B3C4D
     if (token.match(/^0x[0-9a-f]+$/i)) return false;
 
@@ -3997,7 +4003,13 @@ function isTokenObfuscated(token) {
 
     // Build/CI server patterns: buildbot, jenkins, gitlab-runner, etc.
     // Contains common CI/build keywords with hyphens/underscores
-    if (token.match(/(?:krnl|mgr|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86)/i)) return false;
+    if (token.match(/(?:krnl|sql|mgr|tmp|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86)/i)) return false;
+
+    // Charset and codepage names: c_is2022, cp1251, iso8859, utf32le
+    if (token.match(/^(?:c_|cp|iso|utf|ucs|gb|koi|win|mac|ascii|latin|ansi)\w*\d/i)) return false;
+
+    // Windows resource and constant identifiers (SCREAMING_SNAKE_CASE, no lowercase): IDR_MSCORLIB_4030319
+    if (token.match(/^[A-Z][A-Z0-9_]{4,}$/) && stats.lower === 0) return false;
 
 
     // === OBFUSCATION DETECTION ===
@@ -4055,9 +4067,9 @@ function isTokenObfuscated(token) {
     if (token.match(/(?:[a-z]\d{3,}){2,}/i)) return true;
 
     // Random consonant clusters without vowels (e.g., "jnfsjknjn", "bcdfgh")
-    // 6+ consonants in a row (excluding common patterns and abbreviation-style names with doubled consonants like "spprgrss.dll")
+    // 8+ consonants in a row (excluding common patterns and abbreviation-style names with doubled consonants like "spprgrss.dll")
     // Doubled consonants (pp, ss, rr, etc.) indicate vowel-stripped abbreviations, not obfuscation
-    if (token.match(/[bcdfghjklmnpqrstvwxz]{6,}/i) &&
+    if (token.match(/[bcdfghjklmnpqrstvwxz]{8,}/i) &&
         !token.match(/str|chr|thr|sch|scr|spr/i) &&
         !token.match(/([bcdfghjklmnpqrstvwxz])\1/i)) return true;
 
