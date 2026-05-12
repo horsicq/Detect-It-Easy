@@ -3962,69 +3962,52 @@ function isTokenObfuscated(token) {
 
     // === WHITELIST: Common legitimate patterns ===
 
-    // Copyright patterns: (C) 2020, © 1999-2024, etc.
-    if (token.match(/^(?:(?:\(C\)|©)\s?)?[0-9]{4}(?:[-–][0-9]{4})?/i)) return false;
+    var whitelist = [
+        // Copyright patterns: (C) 2020, © 1999-2024, etc.
+        /^(?:(?:\(C\)|©)\s?)?[0-9]{4}(?:[-–][0-9]{4})?/i,
+        // Date patterns: YYYY-YYYY, DD.MM.YYYY, YYYY-MM-DD
+        /^\d{4}[-\/\.]\d{4}$|^\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4}$|^\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}$/,
+        // Version numbers: v1.2.3, v.1.2.3, 1.0.0.0, 10.15.7
+        /^(?:v(?:\.)?)?\d+(\.\d+){1,4}$/i,
+        // UUIDs: 550e8400-e29b-41d4-a716-446655440000
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        // Partial GUIDs / GUID fragments: 69fe178f-26e7-43a9-a, c4d66f00-b6f0-4439-a
+        /^[0-9a-f]{4,8}(?:-[0-9a-f]{1,8}){2,}$/i,
+        // Build/version hashes with optional word suffix: 2b7-0fc9cc7187f5_Hyp, 620-2cfb01a9318d_Hyp
+        /^[0-9a-f]{2,8}-[0-9a-f]{8,}(?:[_-][a-zA-Z]+)?$/i,
+        // Common hex prefixes: 0x1234ABCD, 0X1A2B3C4D
+        /^0x[0-9a-f]+$/i,
+        // File sizes with units: 123KB, 45.6MB, 1.5GB
+        /^\d+(\.\d+)?(bytes?|[kmgt]b)$/i,
+        // IP addresses: 192.168.1.1
+        /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+        // Common abbreviations/acronyms (all caps with digits): DX11, OpenGL3, Win32
+        /^[A-Z]{2,}[0-9]{1,3}$/,
+        // Changelist/build numbers (pure digits 6-12 chars): CL 35398403, Build 123456
+        /^\d{6,12}$/,
+        // Version control tags: v1.0, v21.9
+        /^[Vv]\d{1,2}\.\d{1,4}/,
+        // Build/CI keywords: krnl, sql, cuda, scsi, sstp, etc.
+        /(?:krnl|sql|mgr|tmp|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86|cuda|iscsi|scsi|sstp|uart)/i,
+        // DirectX / Direct3D module names: D3D10_1, D3D11On12, D3D9on12, D3D11_1SDKLayers
+        /^d3d/i,
+        // Kernel debugger transport names: kd_02_1137, kd_07_1415, kdnet_uart16550
+        /^kd[_n]/i,
+        // Hardware chip/model numbers: AX88179_178A, Acx01000, urscx01000, CUDART64_132_51
+        // Letter prefix (1-6) + digit block (4+) + optional underscore segments (end-anchored)
+        /^[A-Za-z]{1,6}\d{4,}(?:[_-][A-Za-z0-9]{1,12})*$/,
+        // Windows driver/service name suffixes: kbldfltr, mshwnclx, WSDScDrv, NrptDnsForm, hnswfpdriver
+        /(?:driver|drv|fltr|clx|form)(?:\.\w{1,4})?$/i,
+        // Charset and codepage names: c_is2022, cp1251, iso8859, utf32le
+        /^(?:c_|cp|iso|utf|ucs|gb|koi|win|mac|ascii|latin|ansi)\w*\d/i,
+        // Windows resource and constant identifiers (SCREAMING_SNAKE_CASE): IDR_MSCORLIB_4030319, MY_CONST_VALUE
+        // Requires underscore — pure all-caps hex strings (DEADBEEF, CAFEBABE) are NOT whitelisted
+        /^[A-Z][A-Z0-9]*_[A-Z0-9_]+$/,
+    ];
 
-    // Date patterns: YYYY-YYYY, DD.MM.YYYY, YYYY-MM-DD
-    if (token.match(/^\d{4}[-\/\.]\d{4}$/) ||
-        token.match(/^\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4}$/) ||
-        token.match(/^\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}$/)) return false;
-
-    // Version numbers: v1.2.3, v.1.2.3, 1.0.0.0, 10.15.7
-    if (token.match(/^(?:v(?:\.)?)?\d+(\.\d+){1,4}$/i)) return false;
-
-    // UUIDs: 550e8400-e29b-41d4-a716-446655440000
-    if (token.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) return false;
-
-    // Partial GUIDs / GUID fragments: 69fe178f-26e7-43a9-a, c4d66f00-b6f0-4439-a
-    if (token.match(/^[0-9a-f]{4,8}(?:-[0-9a-f]{1,8}){2,}$/i)) return false;
-
-    // Build/version hashes with optional word suffix: 2b7-0fc9cc7187f5_Hyp, 620-2cfb01a9318d_Hyp
-    if (token.match(/^[0-9a-f]{2,8}-[0-9a-f]{8,}(?:[_-][a-zA-Z]+)?$/i)) return false;
-
-    // Common hex prefixes: 0x1234ABCD, 0X1A2B3C4D
-    if (token.match(/^0x[0-9a-f]+$/i)) return false;
-
-    // File sizes with units: 123KB, 45.6MB, 1.5GB
-    if (token.match(/^\d+(\.\d+)?(bytes?|[kmgt]b)$/i)) return false;
-
-    // IP addresses: 192.168.1.1
-    if (token.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) return false;
-
-    // Common abbreviations/acronyms (all caps with digits): DX11, OpenGL3, Win32
-    if (token.match(/^[A-Z]{2,}[0-9]{1,3}$/)) return false;
-
-    // Changelist/build numbers (pure digits 6-12 chars): CL 35398403, Build 123456
-    // Todo: upgrade
-    if (token.match(/^\d{6,12}$/)) return false;
-
-    // Version control tags: v1.0, v21.9
-    if (token.match(/^[Vv]\d{1,2}\.\d{1,4}/)) return false;
-
-    // Build/CI server patterns: buildbot, jenkins, gitlab-runner, etc.
-    // Contains common CI/build keywords with hyphens/underscores
-    if (token.match(/(?:krnl|sql|mgr|tmp|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86|cuda|iscsi|scsi|sstp|uart)/i)) return false;
-
-    // DirectX / Direct3D module names: D3D10_1, D3D11On12, D3D9on12, D3D11_1SDKLayers
-    if (token.match(/^d3d/i)) return false;
-
-    // Kernel debugger transport names: kd_02_1137, kd_07_1415, kdnet_uart16550
-    if (token.match(/^kd[_n]/i)) return false;
-
-    // Hardware chip/model numbers: AX88179_178A, Acx01000, urscx01000, CUDART64_132_51
-    // Requires clean structure: letter prefix (1-6) + digit block (4+) + optional underscore+suffix
-    // End-anchored to prevent whitelisting random strings that happen to start with letters+digits
-    if (token.match(/^[A-Za-z]{1,6}\d{4,}(?:[_-][A-Za-z0-9]{1,12})*$/)) return false;
-
-    // Windows driver/service name suffixes: kbldfltr, mshwnclx, WSDScDrv, NrptDnsForm, hnswfpdriver
-    if (token.match(/(?:driver|drv|fltr|clx|form)(?:\.\w{1,4})?$/i)) return false;
-
-    // Charset and codepage names: c_is2022, cp1251, iso8859, utf32le
-    if (token.match(/^(?:c_|cp|iso|utf|ucs|gb|koi|win|mac|ascii|latin|ansi)\w*\d/i)) return false;
-
-    // Windows resource and constant identifiers (SCREAMING_SNAKE_CASE): IDR_MSCORLIB_4030319, MY_CONST_VALUE
-    // Requires at least one underscore — pure all-caps hex strings (DEADBEEF, CAFEBABE) are NOT whitelisted
-    if (token.match(/^[A-Z][A-Z0-9_]{4,}$/) && token.indexOf('_') !== -1) return false;
+    for (var w = 0; w < whitelist.length; w++) {
+        if (token.match(whitelist[w])) return false;
+    }
 
 
     // === OBFUSCATION DETECTION ===
