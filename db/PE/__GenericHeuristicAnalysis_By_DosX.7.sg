@@ -3934,6 +3934,7 @@ function isNameObfuscated(name) {
         const chunk = name.substring(start, start + CHUNK_SIZE);
         if (isTokenObfuscated(chunk)) {
             log(logType.nothing, "Obfuscated string chunk: \"" + chunk + "\" in \"" + name + "\"");
+            _setResult("~virus", "DEBUG ONLY", chunk, "");
             return true;
         }
     }
@@ -4003,13 +4004,26 @@ function isTokenObfuscated(token) {
 
     // Build/CI server patterns: buildbot, jenkins, gitlab-runner, etc.
     // Contains common CI/build keywords with hyphens/underscores
-    if (token.match(/(?:krnl|sql|mgr|tmp|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86)/i)) return false;
+    if (token.match(/(?:krnl|sql|mgr|tmp|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86|cuda|iscsi|scsi|sstp|uart)/i)) return false;
+
+    // DirectX / Direct3D module names: D3D10_1, D3D11On12, D3D9on12, D3D11_1SDKLayers
+    if (token.match(/^d3d/i)) return false;
+
+    // Kernel debugger transport names: kd_02_1137, kd_07_1415, kdnet_uart16550
+    if (token.match(/^kd[_n]/i)) return false;
+
+    // Hardware chip/model numbers: AX88179_178A, A2400, Acx01000, urscx01000
+    // Short letter prefix (1-6 chars) followed by 4+ consecutive digits
+    if (token.match(/^[A-Za-z]{1,6}\d{4}/)) return false;
+
+    // Windows driver/service name suffixes: kbldfltr, mshwnclx, WSDScDrv, NrptDnsForm, hnswfpdriver
+    if (token.match(/(?:driver|drv|fltr|clx|form)(?:\.\w{1,4})?$/i)) return false;
 
     // Charset and codepage names: c_is2022, cp1251, iso8859, utf32le
     if (token.match(/^(?:c_|cp|iso|utf|ucs|gb|koi|win|mac|ascii|latin|ansi)\w*\d/i)) return false;
 
     // Windows resource and constant identifiers (SCREAMING_SNAKE_CASE, no lowercase): IDR_MSCORLIB_4030319
-    if (token.match(/^[A-Z][A-Z0-9_]{4,}$/) && stats.lower === 0) return false;
+    if (token.match(/^[A-Z][A-Z0-9_]{4,}$/)) return false;
 
 
     // === OBFUSCATION DETECTION ===
@@ -4074,13 +4088,14 @@ function isTokenObfuscated(token) {
         !token.match(/([bcdfghjklmnpqrstvwxz])\1/i)) return true;
 
     // Single consonant repeated excessively (e.g., "jnfasjknjnjnjn")
-    // Same consonant appears 5+ times in strings shorter than 15 chars
+    // Same consonant appears 7+ times in strings shorter than 15 chars
+    // (threshold 7 avoids FPs from "luainstall.dll" l=6, "rassstp.sys" s=5, "msiscsi.sys" s=5)
     if (token.length < 15) {
         var consonantCounts = {};
         for (var i = 0; i < token.length; i++) {
             var ch = token[i].toLowerCase();
             if (/[bcdfghjklmnpqrstvwxz]/.test(ch)) {
-                if ((consonantCounts[ch] = (consonantCounts[ch] || 0) + 1) >= 5) return true;
+                if ((consonantCounts[ch] = (consonantCounts[ch] || 0) + 1) >= 7) return true;
             }
         }
     }
