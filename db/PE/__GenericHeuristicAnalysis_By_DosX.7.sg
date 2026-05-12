@@ -4855,20 +4855,6 @@ function scanForObfuscations_Native() {
 
 
 
-    // Control flow guard (0x4000) without DEP (0x0100) is a broken security combination — no legitimate toolchain produces this
-
-    var isGuardCfWithoutDep = false;
-
-    if ((dllCharacteristics & IMAGE_DLLCHARACTERISTICS_GUARD_CF) &&
-        !(dllCharacteristics & IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
-        isGuardCfWithoutDep = true;
-    }
-
-    if (isGuardCfWithoutDep) options = addOption(options, "CFG without DEP");
-
-
-
-
     // No-SEH flag (0x0400) is invalid on 64-bit images — x64 does not use table-based SEH at all
 
     var isNoSehOn64bit = false;
@@ -7078,7 +7064,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if (legalCopyrightInfo && !/(?:\(C\)|©|\bcopyright\b)/i.test(legalCopyrightInfo)) {
 
-        const companyNames = [
+        const companyNamesDict = [
             // Big Tech — most commonly faked
             "microsoft", "google", "apple", "amazon",
             // Software & games
@@ -7094,8 +7080,8 @@ function scanForMaliciousCode_NET_and_Native() {
             "nvidia", "intel"
         ];
 
-        for (var i = 0; i < companyNames.length; i++) {
-            if (new RegExp("\\b" + companyNames[i] + "\\b").test(legalCopyrightInfo.toLowerCase())) {
+        for (var i = 0; i < companyNamesDict.length; i++) {
+            if (new RegExp("\\b" + companyNamesDict[i] + "\\b").test(legalCopyrightInfo.toLowerCase())) {
                 verdicts.push({
                     type: "Fake build info",
                     version: String(),
@@ -7110,28 +7096,61 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
-    // Some malware tries to masquerade as critical system files by using the same "OriginalFilename"
-    // or "InternalName" as legitimate system processes, but they often forget to properly sign the file
-    // or include a Rich Signature, which can be a strong indicator of malicious intent.
+    // Some malwares masquerade as critical system files to avoid detection, but they often forget
+    // to change the internal and original file names, which can be easily checked.
+    // Also check if such files are signed and have a rich signature, as legitimate
+    // system files should have these features.
 
-    const systemSignedFileNames = [
+    const systemSignedFileNamesDict = [
         "csrss.exe", "wininit.exe", "lsass.exe", "svchost.exe",
-        "taskhostw.exe", "ntkrnlmp.exe" /* (ntoskrnl.exe) */
+        "taskhostw.exe", "ntkrnlmp.exe" /* -> (ntoskrnl.exe) */,
+        "RuntimeBroker.exe", "smss.exe"
     ];
 
-    for (var j = 0; j < systemSignedFileNames.length; j++) {
-        if (PE.getVersionStringInfo("OriginalFilename").toLowerCase() === systemSignedFileNames[j] ||
-            PE.getVersionStringInfo("InternalName").toLowerCase() === systemSignedFileNames[j]) {
-            if (PE_Cached.isDotNet || !PE_Cached.isRichSignaturePresent || !PE.isSigned()) {
-                verdicts.push({
-                    type: "Fake " + (!PE_Cached.isDotNet ? "or infected " : String()) + "system file",
-                    version: String(),
-                    details: mayBeInfected
-                });
+    const systemFileNamesDict = systemSignedFileNamesDict.concat([
+        "dwm.exe", "winlogon.exe", "services.exe", "spoolsv.exe",
+        "fontdrvhost.exe", "sihost.exe", "winresume.exe",
+        "SystemSettings.exe", "OneDrive.exe",
+        "ShellExperienceHost.exe", "StartMenuExperienceHost.exe"
+    ]);
 
-                break;
+    var isFakeOrInfected = false;
+
+    function compareOriginalAndInternalNames(inputName) {
+        if (!inputName) return false;
+
+        inputName = inputName.toLowerCase();
+
+        return (
+            PE.getVersionStringInfo("OriginalFilename").toLowerCase() === inputName ||
+            PE.getVersionStringInfo("InternalName").toLowerCase() === inputName
+        );
+    }
+
+    for (var j = 0; j < systemSignedFileNamesDict.length && !isFakeOrInfected; j++) {
+        if (compareOriginalAndInternalNames(systemSignedFileNamesDict[j])) {
+            if (PE_Cached.isDotNet || !PE_Cached.isRichSignaturePresent || !PE.isSigned()) {
+                isFakeOrInfected = true;
             }
         }
+    }
+
+    for (var k = 0; k < systemFileNamesDict.length && !isFakeOrInfected; k++) {
+        if (compareOriginalAndInternalNames(systemFileNamesDict[k])) {
+            if (PE_Cached.isDotNet || !PE_Cached.isRichSignaturePresent) {
+                if (_getNumberOfResults("packer") > 0 || _getNumberOfResults("protector") > 0) {
+                    isFakeOrInfected = true;
+                }
+            }
+        }
+    }
+
+    if (isFakeOrInfected) {
+        verdicts.push({
+            type: "Fake " + (!PE_Cached.isDotNet ? "or infected " : String()) + "system file",
+            version: String(),
+            details: mayBeInfected
+        });
     }
 
 
