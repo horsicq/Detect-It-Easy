@@ -4011,9 +4011,10 @@ function isTokenObfuscated(token) {
     // Kernel debugger transport names: kd_02_1137, kd_07_1415, kdnet_uart16550
     if (token.match(/^kd[_n]/i)) return false;
 
-    // Hardware chip/model numbers: AX88179_178A, A2400, Acx01000, urscx01000
-    // Short letter prefix (1-6 chars) followed by 4+ consecutive digits
-    if (token.match(/^[A-Za-z]{1,6}\d{4}/)) return false;
+    // Hardware chip/model numbers: AX88179_178A, Acx01000, urscx01000, CUDART64_132_51
+    // Requires clean structure: letter prefix (1-6) + digit block (4+) + optional underscore+suffix
+    // End-anchored to prevent whitelisting random strings that happen to start with letters+digits
+    if (token.match(/^[A-Za-z]{1,6}\d{4,}(?:[_-][A-Za-z0-9]{1,12})*$/)) return false;
 
     // Windows driver/service name suffixes: kbldfltr, mshwnclx, WSDScDrv, NrptDnsForm, hnswfpdriver
     if (token.match(/(?:driver|drv|fltr|clx|form)(?:\.\w{1,4})?$/i)) return false;
@@ -4021,8 +4022,9 @@ function isTokenObfuscated(token) {
     // Charset and codepage names: c_is2022, cp1251, iso8859, utf32le
     if (token.match(/^(?:c_|cp|iso|utf|ucs|gb|koi|win|mac|ascii|latin|ansi)\w*\d/i)) return false;
 
-    // Windows resource and constant identifiers (SCREAMING_SNAKE_CASE, no lowercase): IDR_MSCORLIB_4030319
-    if (token.match(/^[A-Z][A-Z0-9_]{4,}$/)) return false;
+    // Windows resource and constant identifiers (SCREAMING_SNAKE_CASE): IDR_MSCORLIB_4030319, MY_CONST_VALUE
+    // Requires at least one underscore — pure all-caps hex strings (DEADBEEF, CAFEBABE) are NOT whitelisted
+    if (token.match(/^[A-Z][A-Z0-9_]{4,}$/) && token.indexOf('_') !== -1) return false;
 
 
     // === OBFUSCATION DETECTION ===
