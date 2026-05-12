@@ -760,7 +760,8 @@ function scanForObfuscations_NET() {
 
 
 
-    const afterCtorOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'<Module>'00**") + 8;
+    const ctorSignatureOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'<Module>'00**");
+    const afterCtorOffset = ctorSignatureOffset !== -1 ? ctorSignatureOffset + 8 : -1;
 
 
 
@@ -770,32 +771,34 @@ function scanForObfuscations_NET() {
 
     var isShortNamesPresent = false;
 
-    if (PE.compare("00**00**00", afterCtorOffset) ||
-        PE.compare("00****00****00****00", afterCtorOffset) ||
-        PE.compare("00******00******00******00", afterCtorOffset) ||
-        PE.compare("00********00********00********00", afterCtorOffset) ||
-        PE.compare("00****00****00", afterCtorOffset) ||
-        PE.compare("00****00**00", afterCtorOffset) ||
-        PE.compare("00**00****00", afterCtorOffset)) {
-        log(logType.net, "Short names detected! (mask)");
+    if (afterCtorOffset !== -1) {
+        if (PE.compare("00**00**00", afterCtorOffset) ||
+            PE.compare("00****00****00****00", afterCtorOffset) ||
+            PE.compare("00******00******00******00", afterCtorOffset) ||
+            PE.compare("00********00********00********00", afterCtorOffset) ||
+            PE.compare("00****00****00", afterCtorOffset) ||
+            PE.compare("00****00**00", afterCtorOffset) ||
+            PE.compare("00**00****00", afterCtorOffset)) {
+            log(logType.net, "Short names detected! (mask)");
 
-        isShortNamesPresent = true;
-    }
+            isShortNamesPresent = true;
+        }
 
-    if (!isShortNamesPresent && PE.compare("00**00", afterCtorOffset)) { // the second way :D
-        var shortNamesFound = 0;
+        if (!isShortNamesPresent && PE.compare("00**00", afterCtorOffset)) { // the second way :D
+            var shortNamesFound = 0;
 
-        const chars = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm";
+            const chars = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm";
 
-        for (var i = 1; i < chars.length && !isShortNamesPresent; i++) {
-            if (PE.isNetObjectPresent(chars[i])) {
-                log(logType.net, "Short name found: \"" + chars[i] + "\" (" + shortNamesFound + "/20)");
+            for (var i = 1; i < chars.length && !isShortNamesPresent; i++) {
+                if (PE.isNetObjectPresent(chars[i])) {
+                    log(logType.net, "Short name found: \"" + chars[i] + "\" (" + shortNamesFound + "/20)");
 
-                shortNamesFound++;
-            }
+                    shortNamesFound++;
+                }
 
-            if (shortNamesFound === 20) {
-                isShortNamesPresent = true;
+                if (shortNamesFound === 20) {
+                    isShortNamesPresent = true;
+                }
             }
         }
     }
@@ -812,7 +815,7 @@ function scanForObfuscations_NET() {
     var buffer = String();
 
     // get next 0x12c bytes after <Module> .ctor
-    for (var i = 0; i < 0x12c; i++) {
+    for (var i = 0; afterCtorOffset !== -1 && i < 0x12c; i++) {
         var currentByte = PE.readByte(afterCtorOffset + i).toString(16);
 
         if (currentByte === '0') currentByte += '0';
@@ -1056,7 +1059,7 @@ function scanForObfuscations_NET() {
 
     var runtimeFound = String();
 
-    const protectionsRuntime = [ // Need more
+    var protectionsRuntime = [ // Need more
         { lib: "haspdnert.dll", name: "SafeNet Sentinel LDK" },
         { lib: "AgileDotNet.VMRuntime.dll", name: "Agile" },
         { lib: "Xerin.Runtime.dll", name: "XerinFuscator" },
