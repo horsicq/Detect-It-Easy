@@ -1,0 +1,222 @@
+// Detect It Easy: detection rule file
+// Author: t.me/foo0c
+
+meta("protector", "PyArmor");
+
+includeScript("python");
+
+function detect() {
+    if (PE.isNet()) return;
+
+    var exportMatch = PE.isExportFunctionPresentExp(/PyInit_pyarmor_runtime/);
+    if (exportMatch) {
+        bDetected = true;
+        sOptions = "runtime module";
+        sLang = "Python";
+
+        var dataSection = PE.section[".data"];
+        if (dataSection) {
+            var nVaxOff = PE.findString(dataSection.FileOffset, dataSection.FileSize, "pyarmor-vax-");
+            if (nVaxOff !== -1 && nVaxOff + 18 <= PE.getSize()) {
+                var version = "";
+                var bValid = true;
+                for (var k = 0; k < 6; k++) {
+                    var byteVal = PE.read_uint8(nVaxOff + 12 + k);
+                    if (byteVal < 0x30 || byteVal > 0x39) { bValid = false; break; }
+                    version += String.fromCharCode(byteVal);
+                }
+                if (bValid && version.length === 6) sVersion = version;
+                else sVersion = "8.x-9.x";
+            } else {
+                sVersion = "8.x-9.x";
+            }
+        } else {
+            sVersion = "8.x-9.x";
+        }
+
+        return result();
+    }
+
+    var hasFptable = PE.isSectionNamePresent(".fptable");
+
+    var hasAntiDebug = false;
+    for (var i = 0; i < PE.getNumberOfImports() && !hasAntiDebug; i++) {
+        if (PE.getImportLibraryName(i) === "ntdll.dll") {
+            for (var j = 0; j < PE.getNumberOfImportFunctions(i); j++) {
+                if (PE.getImportFunctionName(i, j) === "NtSetInformationThread") {
+                    hasAntiDebug = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    var rdataSection = PE.section[".rdata"];
+    var rdataHasPyArmor = false;
+    var rdataHasRuntimeModule = false;
+    var rdataHasLang = false;
+    var rdataHasRkey = false;
+
+    if (rdataSection) {
+        var rOff = rdataSection.FileOffset;
+        var rSz = rdataSection.FileSize;
+        rdataHasPyArmor = (PE.findString(rOff, rSz, "__pyarmor__") !== -1);
+        rdataHasRuntimeModule = (PE.findString(rOff, rSz, "PyArmor v8+") !== -1);
+        rdataHasLang = (PE.findString(rOff, rSz, "PYARMOR_LANG") !== -1);
+        rdataHasRkey = (PE.findString(rOff, rSz, "pyarmor.rkey") !== -1);
+    }
+
+    var dataSection = PE.section[".data"];
+    var dataHasVax = false;
+    var dataHasRkey = false;
+    var dataVaxOffset = -1;
+
+    if (dataSection) {
+        var dOff = dataSection.FileOffset;
+        var dSz = dataSection.FileSize;
+        dataVaxOffset = PE.findString(dOff, dSz, "pyarmor-vax-");
+        dataHasVax = (dataVaxOffset !== -1);
+        dataHasRkey = (PE.findString(dOff, dSz, "pyarmor.rkey") !== -1);
+    }
+
+    if (dataHasVax) {
+        bDetected = true;
+        sOptions = "runtime module";
+        sLang = "Python";
+
+        if (dataVaxOffset !== -1 && dataVaxOffset + 18 <= PE.getSize()) {
+            var version = "";
+            var bValid = true;
+            for (var k = 0; k < 6; k++) {
+                var byteVal = PE.read_uint8(dataVaxOffset + 12 + k);
+                if (byteVal < 0x30 || byteVal > 0x39) { bValid = false; break; }
+                version += String.fromCharCode(byteVal);
+            }
+            if (bValid && version.length === 6) sVersion = version;
+            else sVersion = "8.x-9.x";
+        } else {
+            sVersion = "8.x-9.x";
+        }
+
+        return result();
+    }
+
+    if (rdataHasPyArmor && rdataHasRkey) {
+        bDetected = true;
+        sVersion = "8.x-9.x";
+        sOptions = "runtime module";
+        sLang = "Python";
+        return result();
+    }
+
+    if (rdataHasRuntimeModule) {
+        bDetected = true;
+        sVersion = "8.x-9.x";
+        sOptions = "runtime module";
+        sLang = "Python";
+        return result();
+    }
+
+    if (rdataHasLang && rdataHasPyArmor) {
+        bDetected = true;
+        sVersion = "8.x-9.x";
+        sOptions = "localized runtime";
+        sLang = "Python";
+        return result();
+    }
+
+    // anti-debug import + __pyarmor__
+    if (hasAntiDebug && rdataHasPyArmor) {
+        bDetected = true;
+        sVersion = "8.x-9.x";
+        sOptions = "anti-debug";
+        sLang = "Python";
+        return result();
+    }
+
+    if (PE.isOverlayPresent() && PE.getOverlaySize() > 64) {
+        var oOff = PE.getOverlayOffset();
+        var oSz = PE.getOverlaySize();
+
+        var pyarmorInOverlay = (PE.findString(oOff, oSz, "__pyarmor__") !== -1);
+        var rkeyInOverlay = (PE.findString(oOff, oSz, "pyarmor.rkey") !== -1);
+        var runtimeInOverlay = (PE.findString(oOff, oSz, "pyarmor_runtime") !== -1);
+
+        // __pyarmor__ + pyarmor.rkey
+        if (pyarmorInOverlay && rkeyInOverlay) {
+            bDetected = true;
+            sVersion = "8.x-9.x";
+            sOptions = "PyInstaller, embedded runtime";
+            sLang = "Python";
+            return result();
+        }
+
+        // __pyarmor__ + pyarmor_runtime
+        if (pyarmorInOverlay && runtimeInOverlay) {
+            bDetected = true;
+            sVersion = "8.x-9.x";
+            sOptions = "PyInstaller, embedded";
+            sLang = "Python";
+            return result();
+        }
+
+        // .fptable + __pyarmor__
+        if (hasFptable && pyarmorInOverlay) {
+            bDetected = true;
+            sVersion = "8.x-9.x";
+            sOptions = "PyInstaller, protected";
+            sLang = "Python";
+            return result();
+        }
+
+        if (pyarmorInOverlay) {
+            var nPyarmorOff = PE.findString(oOff, oSz, "__pyarmor__");
+            if (nPyarmorOff !== -1) {
+                var winOff = nPyarmorOff + 11;
+                var winSz = Math.min(64, PE.getSize() - winOff);
+                var nPY0 = PE.findString(winOff, winSz, "PY0");
+
+                if (nPY0 !== -1 && nPY0 + 9 <= PE.getSize()) {
+                    var version = "";
+                    var bValid = true;
+                    for (var k = 0; k < 6; k++) {
+                        var byteVal = PE.read_uint8(nPY0 + 2 + k);
+                        if (byteVal < 0x30 || byteVal > 0x39) { bValid = false; break; }
+                        version += String.fromCharCode(byteVal);
+                    }
+                    if (bValid && version.length === 6) {
+                        bDetected = true;
+                        sVersion = version;
+                        sOptions = "PyInstaller, obfuscated bytecode";
+                        sLang = "Python";
+                        return result();
+                    }
+                }
+            }
+			
+            bDetected = true;
+            sVersion = "8.x-9.x";
+            sOptions = "PyInstaller, embedded script";
+            sLang = "Python";
+            return result();
+        }
+
+        if (rkeyInOverlay) {
+            bDetected = true;
+            sVersion = "8.x-9.x";
+            sOptions = "PyInstaller, runtime data";
+            sLang = "Python";
+            return result();
+        }
+    }
+
+    if (dataHasRkey) {
+        bDetected = true;
+        sVersion = "8.x-9.x";
+        sOptions = "runtime data";
+        sLang = "Python";
+        return result();
+    }
+
+    return result();
+}

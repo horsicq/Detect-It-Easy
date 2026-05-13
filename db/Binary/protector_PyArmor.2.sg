@@ -1,0 +1,40 @@
+// Detect It Easy: detection rule file
+// Author: t.me/foo0c
+
+meta("protector", "PyArmor");
+
+function detect() {
+    var fileSize = Binary.getSize();
+    if (fileSize < 64) return result();
+
+    var scanSize = Math.min(fileSize, 16 * 1024);
+    var nPyarmorOff = Binary.findString(0, scanSize, "__pyarmor__");
+    if (nPyarmorOff === -1) return result();
+
+    var winOff = nPyarmorOff + 11;
+    var winSz = Math.min(64, fileSize - winOff);
+    var nPY0 = Binary.findString(winOff, winSz, "PY0");
+
+    if (nPY0 !== -1 && nPY0 + 9 <= fileSize) {
+        var version = "";
+        var bValid = true;
+        for (var k = 0; k < 6; k++) {
+            var byteVal = Binary.read_uint8(nPY0 + 2 + k);
+            if (byteVal < 0x30 || byteVal > 0x39) { bValid = false; break; }
+            version += String.fromCharCode(byteVal);
+        }
+        if (bValid && version.length === 6) {
+            bDetected = true;
+            sVersion = version;
+            sOptions = "obfuscated bytecode";
+            sLang = "Python";
+            return result();
+        }
+    }
+
+    bDetected = true;
+    sVersion = "8.x-9.x";
+    sOptions = "obfuscated (legacy?)";
+    sLang = "Python";
+    return result();
+}
