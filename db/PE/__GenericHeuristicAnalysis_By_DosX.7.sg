@@ -3128,7 +3128,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isPeInResourcesPresent; i++) {
         const resourceOffset = PE.getResourceOffsetByNumber(i);
 
-        if (PE.compare("'MZ'", resourceOffset)) {
+        if (resourceOffset !== -1 && PE.compare("'MZ'", resourceOffset)) {
             log(logType.any, "PE signature in resources detected");
 
             isPeInResourcesPresent = true;
@@ -4602,7 +4602,7 @@ function scanForObfuscations_Native() {
                     var currentOffset = PE.VAToOffset(disasmAddress);
 
                     // Check if machine code matches E8 00 00 00 00 pattern
-                    if (PE.compare("E8 00 00 00 00", currentOffset)) {
+                    if (currentOffset !== -1 && PE.compare("E8 00 00 00 00", currentOffset)) {
                         log(logType.any, "Stack-push address near EP found at offset: 0x" + currentOffset.toString(16));
 
                         isAddrToStackTrickPresent = true;
@@ -5121,6 +5121,8 @@ function emulateAndGetAsmInstructionByIndex(index) {
         // Cache the instruction if it hasn't been cached yet
         if (epAsmInstructions[i] === undefined) {
             epAsmInstructions[i] = PE.getDisasmString(disasmAddress);
+
+            if (!epAsmInstructions[i]) break; // Safety check
         }
 
         // If the current iteration matches the specified index, retrieve the instruction
@@ -7287,8 +7289,10 @@ function scanForInterestingMarkers_NET_and_Native() {
 
     for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isGdfSchemaPresent; i++) {
         if (PE.getResourceNameByNumber(i) === "__GDF_XML") {
-            if (PE.isSignaturePresent(
-                PE.getResourceOffsetByNumber(i),
+            const gdfResourceOffset = PE.getResourceOffsetByNumber(i);
+
+            if (gdfResourceOffset !== -1 && PE.isSignaturePresent(
+                gdfResourceOffset,
                 PE.getResourceSizeByNumber(i), generateUnicodeSignatureMask("GameDefinitionFile"))) {
                 isGdfSchemaPresent = true;
             }
