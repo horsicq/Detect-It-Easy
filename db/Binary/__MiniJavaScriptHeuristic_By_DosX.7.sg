@@ -57,10 +57,32 @@ function main() {
                                         i++;
                                         var innerChar = scriptContent[i];
                                         if (innerChar === '\\') {
-                                            // capture escaped char and the next one
-                                            currentSegment += innerChar;
-                                            if (i + 1 < scriptContent.length) {
-                                                i++; currentSegment += scriptContent[i];
+                                            i++; // skip escaped char
+                                            continue;
+                                        }
+                                        // Skip string literals inside the expression to avoid false positives
+                                        if (innerChar === '"' || innerChar === "'") {
+                                            var innerDelim = innerChar;
+                                            while (i + 1 < scriptContent.length) {
+                                                i++;
+                                                if (scriptContent[i] === '\\') { i++; continue; }
+                                                if (scriptContent[i] === innerDelim) break;
+                                            }
+                                            continue;
+                                        }
+                                        // Nested template literal — skip until matching backtick, tracking inner ${}
+                                        if (innerChar === '`') {
+                                            var templateBraceDepth = 0;
+                                            while (i + 1 < scriptContent.length) {
+                                                i++;
+                                                var tc = scriptContent[i];
+                                                if (tc === '\\') { i++; continue; }
+                                                if (tc === '$' && templateBraceDepth === 0 && i + 1 < scriptContent.length && scriptContent[i + 1] === '{') {
+                                                    i++; templateBraceDepth++; continue;
+                                                }
+                                                if (tc === '{' && templateBraceDepth > 0) { templateBraceDepth++; continue; }
+                                                if (tc === '}' && templateBraceDepth > 0) { templateBraceDepth--; continue; }
+                                                if (tc === '`' && templateBraceDepth === 0) break;
                                             }
                                             continue;
                                         }
@@ -93,8 +115,8 @@ function main() {
 
                         for (var segIndex = 0; segIndex < segments.length; segIndex++) {
                             var tokenToProcess = segments[segIndex];
-                            if (!/(  |\t)/.test(tokenToProcess) && (
-                                /(((var|let|const)[\t ]|\())\b[a-zA-Z](?:,[a-zA-Z]){3,}\b/.test(tokenToProcess) ||
+                            if (!/(?:  |\t)/.test(tokenToProcess) && (
+                                /(?:(?:(?:var|let|const)[\t ]|\())\b[a-zA-Z](?:,[a-zA-Z]){3,}\b/.test(tokenToProcess) ||
                                 /[a-zA-Z][!=]?=?=![01][;,})]/.test(tokenToProcess)
                             )) {
                                 options = "minified/compiled";
