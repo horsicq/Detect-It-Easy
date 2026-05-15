@@ -7,6 +7,41 @@
 
 function detect() { main(); }
 
+// Skips a template literal from position i (the char after the opening backtick).
+// Handles nested ${} and inner strings/templates of any depth recursively.
+// Returns the index of the closing backtick.
+function skipNestedTemplate(s, i) {
+    while (i < s.length) {
+        var c = s[i];
+        if (c === '\\') { i += 2; continue; }  // escaped char — skip both
+        if (c === '`') return i;                  // closing backtick found
+        if (c === '$' && i + 1 < s.length && s[i + 1] === '{') {
+            i += 2; // skip '${'
+            // Scan the expression body until matching '}'
+            while (i < s.length) {
+                var d = s[i];
+                if (d === '\\') { i += 2; continue; }
+                if (d === '"' || d === "'") {
+                    // Skip string literal, respecting escape sequences
+                    var q = d; i++;
+                    while (i < s.length) {
+                        if (s[i] === '\\') { i += 2; continue; }
+                        if (s[i] === q) { i++; break; }
+                        i++;
+                    }
+                    continue;
+                }
+                if (d === '`') { i = skipNestedTemplate(s, i + 1) + 1; continue; } // recurse
+                if (d === '}') { i++; break; } // end of ${}
+                i++;
+            }
+            continue;
+        }
+        i++;
+    }
+    return i;
+}
+
 function main() {
     if (Binary.isHeuristicScan()) {
         switch (Binary.getFileSuffix().toLowerCase()) {
@@ -70,20 +105,9 @@ function main() {
                                             }
                                             continue;
                                         }
-                                        // Nested template literal — skip until matching backtick, tracking inner ${}
+                                        // Nested template literal — skip until matching backtick (any depth)
                                         if (innerChar === '`') {
-                                            var templateBraceDepth = 0;
-                                            while (i + 1 < scriptContent.length) {
-                                                i++;
-                                                var tc = scriptContent[i];
-                                                if (tc === '\\') { i++; continue; }
-                                                if (tc === '$' && templateBraceDepth === 0 && i + 1 < scriptContent.length && scriptContent[i + 1] === '{') {
-                                                    i++; templateBraceDepth++; continue;
-                                                }
-                                                if (tc === '{' && templateBraceDepth > 0) { templateBraceDepth++; continue; }
-                                                if (tc === '}' && templateBraceDepth > 0) { templateBraceDepth--; continue; }
-                                                if (tc === '`' && templateBraceDepth === 0) break;
-                                            }
+                                            i = skipNestedTemplate(scriptContent, i + 1);
                                             continue;
                                         }
                                         if (innerChar === '{') { braceDepth++; currentSegment += innerChar; continue; }
