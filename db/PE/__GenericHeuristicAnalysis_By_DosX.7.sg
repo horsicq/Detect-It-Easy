@@ -6645,6 +6645,46 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
+    // http://www.microsoft.com/security/portal/threat/encyclopedia/entry.aspx?Name=Virus%3AWin32%2FPolip.A
+
+    if (verdicts.length === 0 && PE_Cached.isArchX86 && !PE_Cached.is64bit &&
+        PE_Cached.numberOfSections >= 2 && (
+            getAsmOpCode(PE_Cached.firstEpAsmInstruction) === "PUSH" ||
+            getAsmOpCode(PE_Cached.firstEpAsmInstruction) === "CALL"
+        )) {
+        for (var x = 1; x < PE_Cached.numberOfSections; x++) {
+            if (PE.getSectionName(x) === String()) {
+                var currentSection = PE.section[x];
+
+                if ((currentSection.Characteristics & SECTION_FLAGS_RWX_MASK) &&
+                    PE.getEntryPointSection() !== x &&
+                    PE.getResourceSection() !== x &&
+                    PE.getImportSection() !== x &&
+                    PE.getExportSection() !== x &&
+                    PE.getRelocsSection() !== x &&
+                    PE.getTLSSection() !== x &&
+                    PE.calculateEntropy(currentSection.FileOffset, currentSection.FileSize) > 7.3 &&
+                    PE.isSignatureInSectionPresent(x,
+                        "55" +        // push ebp
+                        "8B EC" +     // mov ebp, esp
+                        "83 EC .." +  // sub esp, ...
+                        "60"          // pushal
+                    )) {
+                    verdicts.push({
+                        type: "Polip",
+                        version: String(),
+                        details: "infected"
+                    });
+
+                    break;
+                }
+            }
+        }
+    }
+
+
+
+
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.wannacryptor
 
     if (verdicts.length === 0 && PE_Cached.isArchX86 && PE.compareEP(
