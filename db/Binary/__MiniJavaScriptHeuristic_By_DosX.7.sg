@@ -5,7 +5,124 @@
 // GitHub: https://github.com/DosX-dev
 // Telegram: @DosX_dev
 
-function detect() { main(); }
+function detect() {
+    if (Binary.isHeuristicScan()) {
+        main();
+    }
+}
+
+function main() {
+    switch (Binary.getFileSuffix().toLowerCase()) {
+        case "js": // JavaScript
+        case "jse": // JScript Encoded
+        case "jsc": // JavaScript Compiled
+        case "jsx": // JavaScript XML
+        case "mjs": // JavaScript Module
+        case "cjs": // JavaScript CommonJS Module
+        case "sg": // Detect It Easy module
+            var options = String();
+
+            if (!Binary.isPlainText()) {
+                options = "bytecode";
+            } else {
+                if (Binary.getSize() > 0x400) {
+                    var scriptContent = Binary.getString(0x00, Binary.getSize());
+
+                    // Split the code into segments that are outside of string literals.
+                    // Handle escaping (\", \\', \`) — escaped quotes are not treated as string delimiters.
+                    // Also include expressions inside template literals `${...}` as code (they will be scanned).
+                    var segments = [],
+                        currentSegment = String(),
+                        insideString = false,
+                        stringDelimiter = String(),
+                        isEscaped = false;
+
+                    for (var i = 0; i < scriptContent.length; i++) {
+                        var currChar = scriptContent[i];
+
+                        if (insideString) {
+                            if (isEscaped) {
+                                isEscaped = false;
+                                continue;
+                            }
+                            if (currChar === '\\') {
+                                isEscaped = true;
+                                continue;
+                            }
+
+                            // For template literals: when encountering `${` include nested expression into current segment
+                            if (stringDelimiter === '`' && currChar === '$' && i + 1 < scriptContent.length && scriptContent[i + 1] === '{') {
+                                // skip '{' and start accumulating the expression content
+                                i++; // now scriptContent[i] === '{'
+                                var braceDepth = 1;
+                                // Inside the expression, handle escaping as well
+                                while (i + 1 < scriptContent.length && braceDepth > 0) {
+                                    i++;
+                                    var innerChar = scriptContent[i];
+                                    if (innerChar === '\\') {
+                                        i++; // skip escaped char
+                                        continue;
+                                    }
+                                    // Skip string literals inside the expression to avoid false positives
+                                    if (innerChar === '"' || innerChar === "'") {
+                                        var innerDelim = innerChar;
+                                        while (i + 1 < scriptContent.length) {
+                                            i++;
+                                            if (scriptContent[i] === '\\') { i++; continue; }
+                                            if (scriptContent[i] === innerDelim) break;
+                                        }
+                                        continue;
+                                    }
+                                    // Nested template literal — skip until matching backtick (any depth)
+                                    if (innerChar === '`') {
+                                        i = skipNestedTemplate(scriptContent, i + 1);
+                                        continue;
+                                    }
+                                    if (innerChar === '{') { braceDepth++; currentSegment += innerChar; continue; }
+                                    if (innerChar === '}') { braceDepth--; if (braceDepth === 0) break; currentSegment += innerChar; continue; }
+                                    currentSegment += innerChar;
+                                }
+                                continue;
+                            }
+
+                            if (currChar === stringDelimiter) {
+                                insideString = false;
+                                stringDelimiter = String();
+                            }
+                            // do not copy characters that are inside strings
+                        } else {
+                            // not inside a string
+                            if (currChar === '"' || currChar === "'" || currChar === '`') {
+                                // start of string — finish current segment
+                                if (currentSegment.length > 0) { segments.push(currentSegment); currentSegment = String(); }
+                                insideString = true;
+                                stringDelimiter = currChar;
+                            } else {
+                                currentSegment += currChar;
+                            }
+                        }
+                    }
+
+                    if (currentSegment.length > 0) segments.push(currentSegment);
+
+                    for (var segIndex = 0; segIndex < segments.length; segIndex++) {
+                        var tokenToProcess = segments[segIndex];
+                        if (!/(?:  |\t)/.test(tokenToProcess) && (
+                            /(?:(?:(?:var|let|const)[\t ]|\())\b[a-zA-Z](?:,[a-zA-Z]){3,}\b/.test(tokenToProcess) ||
+                            /[a-zA-Z][!=]?=?=![01][;,\}\)]/.test(tokenToProcess)
+                        )) {
+                            options = "minified/compiled";
+                            break;
+                        }
+                    }
+                }
+            }
+
+            _setResult("~language", "JavaScript", String(), Binary.isVerbose() ? options : String());
+
+            break;
+    }
+}
 
 // Skips a template literal from position i (the char after the opening backtick).
 // Handles nested ${} and inner strings/templates of any depth recursively.
@@ -40,119 +157,4 @@ function skipNestedTemplate(s, i) {
         i++;
     }
     return i;
-}
-
-function main() {
-    if (Binary.isHeuristicScan()) {
-        switch (Binary.getFileSuffix().toLowerCase()) {
-            case "js": // JavaScript
-            case "jse": // JScript Encoded
-            case "jsc": // JavaScript Compiled
-            case "jsx": // JavaScript XML
-            case "mjs": // JavaScript Module
-            case "cjs": // JavaScript CommonJS Module
-            case "sg": // Detect It Easy module
-                var options = String();
-
-                if (!Binary.isPlainText()) {
-                    options = "bytecode";
-                } else {
-                    if (Binary.getSize() > 0x400) {
-                        var scriptContent = Binary.getString(0x00, Binary.getSize());
-
-                        // Split the code into segments that are outside of string literals.
-                        // Handle escaping (\", \\', \`) — escaped quotes are not treated as string delimiters.
-                        // Also include expressions inside template literals `${...}` as code (they will be scanned).
-                        var segments = [],
-                            currentSegment = String(),
-                            insideString = false,
-                            stringDelimiter = String(),
-                            isEscaped = false;
-
-                        for (var i = 0; i < scriptContent.length; i++) {
-                            var currChar = scriptContent[i];
-
-                            if (insideString) {
-                                if (isEscaped) {
-                                    isEscaped = false;
-                                    continue;
-                                }
-                                if (currChar === '\\') {
-                                    isEscaped = true;
-                                    continue;
-                                }
-
-                                // For template literals: when encountering `${` include nested expression into current segment
-                                if (stringDelimiter === '`' && currChar === '$' && i + 1 < scriptContent.length && scriptContent[i + 1] === '{') {
-                                    // skip '{' and start accumulating the expression content
-                                    i++; // now scriptContent[i] === '{'
-                                    var braceDepth = 1;
-                                    // Inside the expression, handle escaping as well
-                                    while (i + 1 < scriptContent.length && braceDepth > 0) {
-                                        i++;
-                                        var innerChar = scriptContent[i];
-                                        if (innerChar === '\\') {
-                                            i++; // skip escaped char
-                                            continue;
-                                        }
-                                        // Skip string literals inside the expression to avoid false positives
-                                        if (innerChar === '"' || innerChar === "'") {
-                                            var innerDelim = innerChar;
-                                            while (i + 1 < scriptContent.length) {
-                                                i++;
-                                                if (scriptContent[i] === '\\') { i++; continue; }
-                                                if (scriptContent[i] === innerDelim) break;
-                                            }
-                                            continue;
-                                        }
-                                        // Nested template literal — skip until matching backtick (any depth)
-                                        if (innerChar === '`') {
-                                            i = skipNestedTemplate(scriptContent, i + 1);
-                                            continue;
-                                        }
-                                        if (innerChar === '{') { braceDepth++; currentSegment += innerChar; continue; }
-                                        if (innerChar === '}') { braceDepth--; if (braceDepth === 0) break; currentSegment += innerChar; continue; }
-                                        currentSegment += innerChar;
-                                    }
-                                    continue;
-                                }
-
-                                if (currChar === stringDelimiter) {
-                                    insideString = false;
-                                    stringDelimiter = String();
-                                }
-                                // do not copy characters that are inside strings
-                            } else {
-                                // not inside a string
-                                if (currChar === '"' || currChar === "'" || currChar === '`') {
-                                    // start of string — finish current segment
-                                    if (currentSegment.length > 0) { segments.push(currentSegment); currentSegment = String(); }
-                                    insideString = true;
-                                    stringDelimiter = currChar;
-                                } else {
-                                    currentSegment += currChar;
-                                }
-                            }
-                        }
-
-                        if (currentSegment.length > 0) segments.push(currentSegment);
-
-                        for (var segIndex = 0; segIndex < segments.length; segIndex++) {
-                            var tokenToProcess = segments[segIndex];
-                            if (!/(?:  |\t)/.test(tokenToProcess) && (
-                                /(?:(?:(?:var|let|const)[\t ]|\())\b[a-zA-Z](?:,[a-zA-Z]){3,}\b/.test(tokenToProcess) ||
-                                /[a-zA-Z][!=]?=?=![01][;,\}\)]/.test(tokenToProcess)
-                            )) {
-                                options = "minified/compiled";
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                _setResult("~language", "JavaScript", String(), Binary.isVerbose() ? options : String());
-
-                break;
-        }
-    }
 }
