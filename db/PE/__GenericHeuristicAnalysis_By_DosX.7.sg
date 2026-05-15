@@ -3149,7 +3149,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Checks for high entropy (ignore overlay)
     if (!(PE_Cached.isDynamicLinkLibrary && (PE.section[".rdata"] || PE.isSectionNamePresent(".rsrc"))) && // .dll with resources
-        PE.calculateEntropy(0x00, PE.getSize() - PE.getOverlaySize()) > 7.3) {
+        PE.calculateEntropy(PE_Cached.dosStubSize, PE_Cached.fileBodySize) > 7.3) {
         isHighEntropy = true;
     }
 
@@ -3342,8 +3342,8 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
     for (var i = 0; i < licesingStrings.length; i++) {
         const currentPatternToFind = licesingStrings[i];
 
-        if (PE.isSignaturePresent(0x00, PE.getSize(), "'" + currentPatternToFind + "'") ||
-            PE.isSignaturePresent(0x00, PE.getSize(), "'" + generateUnicodeSignatureMask(currentPatternToFind) + "'")) {
+        if (PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "'" + currentPatternToFind + "'") ||
+            PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "'" + generateUnicodeSignatureMask(currentPatternToFind) + "'")) {
             isInterestingStringsFound = true;
             break;
         }
@@ -5752,14 +5752,14 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
             langName = extdb[i][0],
             langExtName = extdb[i][1];
 
-        if (PE.isSignaturePresent(0x00, PE.getSize(), "%% %% %% %% %% %% %% %% '." + langExtName + "' 00")) {
+        if (PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "%% %% %% %% %% %% %% %% '." + langExtName + "' 00")) {
             log(logType.any, "Lines of ." + langExtName + " files (" + langName + ") detected");
             _setLangByHeur(langName);
         }
     }
 
 
-    if (!_isLangDetected("C++") && PE.isSignaturePresent(0x00, PE.getSize(), "%% %% %% %% %% %% %% %% %% %% '.c' 00")) {
+    if (!_isLangDetected("C++") && PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "%% %% %% %% %% %% %% %% %% %% '.c' 00")) {
         log(logType.any, "Lines of .c files (C) detected (not a C++)");
         _setLangByHeur("C");
     }
@@ -5975,7 +5975,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
         }
     }
 
-    if (isPpLibraryPresent || (c_cpp && PE.isSignaturePresent(0x00, PE.getSize() - PE.getOverlaySize(), "' C++ '"))) {
+    if (isPpLibraryPresent || (c_cpp && PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.fileBodySize, "' C++ '"))) {
         _setLangByHeur("C++");
     } else if (!_isLangPresent("C++") && isCLibraryPresent && (PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
         _setLangByHeur("C");
