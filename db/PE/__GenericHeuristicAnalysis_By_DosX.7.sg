@@ -251,14 +251,18 @@ function initializeCache() {
        /* Boolean */ isVbNetStandardLibraryPresent: isVbNetStandardLibraryPresent,
        /* Boolean */ isJscriptNetStandardLibraryPresent: isJscriptNetStandardLibraryPresent,
        /* String  */ firstEpAsmInstruction: getFirstEpAsmInstruction,
+       /* Computed values */
+       /* Number  */ fileBodySize: function () { return PE.getSize() - PE.getOverlaySize() - PE.getDosStubSize(); },
        /* Native functions */
        /* Boolean */ is64bit: PE["is64"],
        /* Boolean */ isDotNet: PE["isNet"],
        /* Boolean */ isDynamicLinkLibrary: PE["isDll"],
        /* Boolean */ isNetGlobalCctorPresent: PE["isNetGlobalCctorPresent"],
        /* Boolean */ isRichSignaturePresent: PE["isRichSignaturePresent"],
+       /* Number  */ addressOfUnmanagedEntryPoint: PE["getAddressOfEntryPoint"],
        /* Number  */ numberOfSections: PE["getNumberOfSections"],
        /* Number  */ numberOfRichIDs: PE["getNumberOfRichIDs"],
+       /* Number  */ dosStubSize: PE["getDosStubSize"],
        /* Number  */ numberOfUnmanagedResources: PE["getNumberOfResources"],
        /* Number  */ numberOfUnmanagedImports: PE["getNumberOfImports"],
        /* Number  */ numberOfUnmanagedExports: PE["getNumberOfExports"],
@@ -404,7 +408,7 @@ function scanForObfuscations_NET() {
             const firstOpCode = getFirstEpAsmOpCode();
 
             if (firstOpCode !== "JMP") {
-                if (PE.VAToOffset(PE.getAddressOfEntryPoint()) !== -1) {
+                if (PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint) !== -1) {
                     log(logType.net, "Very strange EP pattern: " + emulateAndGetEpAsmPattern(true, 4).split("|").join(" .. "));
                 } else {
                     log(logType.net, "No native entry point");
@@ -413,7 +417,7 @@ function scanForObfuscations_NET() {
                 isNativeEntryPointModified = true;
             }
         } else { // AMD64
-            if (PE.VAToOffset(PE.getAddressOfEntryPoint()) !== 0x00) {
+            if (PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint) !== 0x00) {
                 isNativeEntryPointModified = true;
             }
         }
@@ -428,7 +432,7 @@ function scanForObfuscations_NET() {
 
     var isDosMessageModified = false;
 
-    if (PE.findSignature(PE.getDosStubOffset(), PE.getDosStubSize(), "'This program cannot be run in DOS mode.'") === -1) {
+    if (PE.findSignature(PE.getDosStubOffset(), PE_Cached.dosStubSize, "'This program cannot be run in DOS mode.'") === -1) {
         log(logType.net, "DOS-stub modified!");
 
         isDosMessageModified = true;
@@ -760,7 +764,7 @@ function scanForObfuscations_NET() {
 
 
 
-    const ctorSignatureOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "'<Module>'00**");
+    const ctorSignatureOffset = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.fileBodySize, "'<Module>'00**");
     const afterCtorOffset = ctorSignatureOffset !== -1 ? ctorSignatureOffset + 8 : -1;
 
 
@@ -820,8 +824,7 @@ function scanForObfuscations_NET() {
 
         if (currentByte.length === 1) currentByte = '0' + currentByte;
 
-        buffer += currentByte;
-        buffer += ' ';
+        buffer += currentByte + ' ';
     }
 
     var bufferString = String();
@@ -900,10 +903,10 @@ function scanForObfuscations_NET() {
 
     var isModuleCtorMultiple = false;
 
-    var currentCtorOffset = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), "00'<Module>'00");
+    var currentCtorOffset = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.fileBodySize, "00'<Module>'00");
 
     if (currentCtorOffset !== -1) {
-        var secondCtorNameOffset = PE.findSignature(currentCtorOffset + 10, PE.getSize() - PE.getOverlaySize(), "'<Module>'");
+        var secondCtorNameOffset = PE.findSignature(currentCtorOffset + 10, PE_Cached.fileBodySize, "'<Module>'");
 
         if (secondCtorNameOffset !== -1 && PE.readByte(secondCtorNameOffset + 8) !== 0x00) {
             log(logType.net, "Fake <Module> detected! Offset: 0x" + Number(secondCtorNameOffset).toString(16));
@@ -2496,7 +2499,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             // Get addresses of the last section and entry point
 
             var lastSectionAddress = -1,
-                entryPointAddress = PE.getAddressOfEntryPoint();
+                entryPointAddress = PE_Cached.addressOfUnmanagedEntryPoint;
 
             // Get last section with non -1 address
             for (var i = 1; lastSectionAddress === -1 && i <= PE_Cached.numberOfSections; i++) {
@@ -3015,11 +3018,11 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             const currentSection = PE.section[sectionWithWrongOffsetOrSizeIndex];
 
             // Todo: add more checks
-            if (currentSection.FileOffset === 0x00 || currentSection.FileOffset > (PE.getSize() - PE.getOverlaySize())) {
+            if (currentSection.FileOffset === 0x00 || currentSection.FileOffset > PE_Cached.fileBodySize) {
                 wrongOffset = true;
             }
 
-            if (currentSection.FileSize === 0x00 || currentSection.FileSize > (PE.getSize() - PE.getOverlaySize())) {
+            if (currentSection.FileSize === 0x00 || currentSection.FileSize > PE_Cached.fileBodySize) {
                 wrongSize = true;
             }
 
@@ -3108,7 +3111,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         if (
             PE.getOverlaySize() > 150 && overlayEntropy > 7 ||
-            PE.getOverlaySize() > (PE.getSize() - PE.getOverlaySize())
+            PE.getOverlaySize() > PE_Cached.fileBodySize
         ) {
             log(logType.any, "Overlay size: " + PE.getOverlaySize() + " bytes; Entropy: " + overlayEntropy);
 
@@ -3584,8 +3587,8 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
     var isPdbFullPathPresent = false;
 
     var pdbExtensionPatternOffset = PE.findSignature(
-        PE.getDosStubOffset() + PE.getDosStubSize(),
-        PE.getSize() - PE.getOverlaySize(),
+        PE_Cached.dosStubSize,
+        PE_Cached.fileBodySize,
         "%% %% %% '.pdb' 00"
     );
 
@@ -3594,7 +3597,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     if (pdbExtensionPatternOffset !== -1) {
 
-        for (var i = pdbExtensionPatternOffset; i > PE.getDosStubOffset() + PE.getDosStubSize(); i--) {
+        for (var i = pdbExtensionPatternOffset; i > PE_Cached.dosStubSize; i--) {
             if (PE.readByte(i) === 0x00) {
                 pdbPathBeginOffset = i + 1;
                 break;
@@ -3722,7 +3725,7 @@ function isFrameworkComponent() {
  */
 function validateSignature(pattern) {
     const
-        offsetFound = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), pattern),
+        offsetFound = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.fileBodySize, pattern),
         resultBool = offsetFound !== -1;
 
     if (resultBool) {
@@ -3800,7 +3803,7 @@ function validateNetUnicodeString(ustring) {
  * @returns {boolean} - Returns true if the Unicode string is found, otherwise false.
  */
 function validateGlobalUnicodeString(ustring) {
-    const result = PE.findSignature(PE.getDosStubOffset() + PE.getDosStubSize(), PE.getSize() - PE.getOverlaySize(), generateUnicodeSignatureMask(ustring)) !== -1;
+    const result = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.fileBodySize, generateUnicodeSignatureMask(ustring)) !== -1;
     if (result) log(logType.nothing, "Unicode string found: \"" + ustring + "\"");
     return result;
 }
@@ -4246,7 +4249,7 @@ function scanForObfuscations_Native() {
         isCustomDosPresent = false;
 
     // If DOS stub size is 0, set flag for missing DOS
-    if (PE.getDosStubSize() === 0) {
+    if (PE_Cached.dosStubSize === 0) {
         isDosMissing = true;
     } else {
         // Define messages to check for custom DOS
@@ -4265,7 +4268,7 @@ function scanForObfuscations_Native() {
 
         // Iterate through messages to check for custom DOS
         for (var d = 0; d < messages.length && isCustomDosPresent; d++) {
-            if (PE.isSignaturePresent(PE.getDosStubOffset(), PE.getDosStubSize(), "'" + messages[d] + "'")) {
+            if (PE.isSignaturePresent(PE.getDosStubOffset(), PE_Cached.dosStubSize, "'" + messages[d] + "'")) {
                 isCustomDosPresent = false;
             }
         }
@@ -4383,7 +4386,7 @@ function scanForObfuscations_Native() {
 
     var isDllIatAndEatMissing = false;
 
-    if (PE_Cached.isDynamicLinkLibrary && PE.getAddressOfEntryPoint() && (PE_Cached.indexOfImportsSection === -1 && PE_Cached.indexOfExportsSection === -1)) { // DLLs without imports/exports and with EP (not a resource-only DLL)
+    if (PE_Cached.isDynamicLinkLibrary && PE_Cached.addressOfUnmanagedEntryPoint && (PE_Cached.indexOfImportsSection === -1 && PE_Cached.indexOfExportsSection === -1)) { // DLLs without imports/exports and with EP (not a resource-only DLL)
         isDllIatAndEatMissing = true;
     }
 
@@ -4398,7 +4401,7 @@ function scanForObfuscations_Native() {
         isDllEmptyEatPresent = false;
 
     if (!isDllIatAndEatMissing && PE_Cached.isDynamicLinkLibrary) {
-        if (PE_Cached.indexOfExportsSection === -1 && PE.getAddressOfEntryPoint()) { // DLL without exports and with EP (not a resource-only DLL)
+        if (PE_Cached.indexOfExportsSection === -1 && PE_Cached.addressOfUnmanagedEntryPoint) { // DLL without exports and with EP (not a resource-only DLL)
             isDllEatMissing = true;
         } else if (PE_Cached.indexOfExportsSection !== -1 && PE_Cached.numberOfUnmanagedExports === 0) { // DLL with empty exports
             isDllEmptyEatPresent = true;
@@ -4593,7 +4596,7 @@ function scanForObfuscations_Native() {
                 // Check if instruction is CALL
                 if (getAsmOpCode(currentInstruction) === "CALL") {
                     // Get address and offset for this instruction
-                    var disasmAddress = PE.getAddressOfEntryPoint();
+                    var disasmAddress = PE_Cached.addressOfUnmanagedEntryPoint;
 
                     for (var j = 0; j < i; j++) {
                         disasmAddress = PE.getDisasmNextAddress(disasmAddress);
@@ -4743,7 +4746,7 @@ function scanForObfuscations_Native() {
     var epSectionWithZeroPaddingIndex = -1;
 
     // Find the section that contains the entry point
-    const entryPointRva = PE.getAddressOfEntryPoint() - PE.getImageBase();
+    const entryPointRva = PE_Cached.addressOfUnmanagedEntryPoint - PE.getImageBase();
 
     for (var i = 0; i < PE_Cached.numberOfSections && !isEpSectionZeroPaddingPresent; i++) {
         const
@@ -5064,7 +5067,7 @@ function emulateAndGetEpAsmPattern(onlyOpCodes, numberOf) {
     var result = _patternSplitter;
 
     // Get the address of the entry point
-    var disasmAddress = PE.getAddressOfEntryPoint();
+    var disasmAddress = PE_Cached.addressOfUnmanagedEntryPoint;
 
     // Iterate through instructions up to the specified number
     for (var i = 0; i < numberOf; i++) {
@@ -5108,7 +5111,7 @@ function emulateAndGetAsmInstructionByIndex(index) {
     }
 
     // Get the address of the entry point
-    var disasmAddress = PE.getAddressOfEntryPoint();
+    var disasmAddress = PE_Cached.addressOfUnmanagedEntryPoint;
 
     // Iterate through instructions until the specified index is reached
     for (var i = 0; i <= index; i++) {
@@ -6572,7 +6575,7 @@ function scanForMaliciousCode_NET_and_Native() {
             "50"               // push eax
         ];
 
-        var offsetSearchFrom = PE.VAToOffset(PE.getAddressOfEntryPoint());
+        var offsetSearchFrom = PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint);
 
         for (var i = 0; i < instructionsOfWin9xCih.length; i++) {
             var foundInstructionPatternAt = PE.findSignature(offsetSearchFrom, 0x20, instructionsOfWin9xCih[i]);
@@ -6599,7 +6602,7 @@ function scanForMaliciousCode_NET_and_Native() {
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.parite
 
     if (verdicts.length === 0 && PE_Cached.isArchX86) {
-        var pariteAddr = PE.getAddressOfEntryPoint(),
+        var pariteAddr = PE_Cached.addressOfUnmanagedEntryPoint,
             pariteLoopCount = 0,
             pariteSubFound = false;
 
