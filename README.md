@@ -7,7 +7,7 @@
 
 **Detect It Easy (DiE)** is a powerful tool for file type identification, popular among **malware analysts**, **cybersecurity experts**, and **reverse engineers** worldwide. Supporting both **signature-based** and **heuristic analysis**, DiE enables efficient file inspections across a broad range of platforms, including **Windows, Linux, and MacOS**. Its adaptable, script-driven detection architecture makes it one of the most versatile tools in the field, with a comprehensive list of supported OS images.
 
-## 🚀 Getting Started
+## 🚀 Getting started
 
 -   **[💎 Download release/beta](https://github.com/horsicq/DIE-engine/releases)**
 -   **[🧪 DiE API Library (for Developers)](https://github.com/horsicq/die_library)**
@@ -16,19 +16,19 @@
 
 ![Screenshot](docs/1.png)
 
-## 💡 Why Use Detect It Easy?
+## 💡 Why use Detect It Easy?
 
 Detect It Easy’s **flexible signature system** and **scripting capabilities** make it an essential tool for **malware analysis** and **digital forensics**. With traditional static analyzers often limited in scope and prone to false positives, DiE’s customizable design enables precise integration of new detection logic, ensuring reliable results across diverse file types.
 
 ![Screenshot](docs/2.png)
 
-### Key Advantages:
+### Key advantages:
 
--   **Flexible Signature Management**: Easily create, modify, and optimize signatures.
+-   **Flexible Signature Management**: Easily create, modify, and optimize detection scripts (rules).
 -   **Cross-Platform Support**: Runs on Windows, Linux, and MacOS.
 -   **Minimal False Positives**: Combined signature and heuristic analysis ensures high detection accuracy.
 
-## 📄 Supported File Types
+## 📄 Supported file types
 
 Detect It Easy supports a wide range of executable and archive types, including:
 
@@ -52,16 +52,16 @@ And that's not all... The list is expanding as the tool is updated
 
 Unknown formats undergo heuristic analysis, providing identification for both known and unrecognized files.
 
-## 🔑 Key Features
+## 🔑 Key features
 
--   **Flexible Signature Management**: Define or modify detection signatures.
--   **Scripted Detection**: Use a JavaScript-like scripting language (DiE-JS runtime) for custom detection algorithms.
+-   **Flexible Signature Management**: Define or modify detection rules.
+-   **Scripted Detection**: Use a JavaScript-like scripting language (DiE-JS ES5 runtime) for custom detection algorithms.
 -   **Cross-Platform Compatibility**: Available for Windows, Linux, and MacOS.
 -   **Reduced False Positives**: Combines signature and heuristic scanning for accuracy.
 
 ## 📥 Installation
 
-### 📦 Install via Package Managers
+### 📦 Install via package managers
 
 -   **Windows**:
 
@@ -80,11 +80,11 @@ Unknown formats undergo heuristic analysis, providing identification for both kn
 > [!NOTE]
 > Use **Detect It Easy** bot via **Telegram** to quickly check files: [**@detectiteasy_bot**](https://t.me/detectiteasy_bot)
 
-### ⚙️ Build from Source
+### ⚙️ Build from source
 
 See the [BUILD.md](docs/BUILD.md) for detailed instructions.
 
-### 🐳 Docker Installation
+### 🐳 Docker installation
 
 Run DiE in a Docker container:
 
@@ -96,7 +96,7 @@ docker build . -t horsicq:diec
 
 ## 🖥️ Usage
 
-Detect It Easy offers three versions:
+**Detect It Easy** offers three versions:
 
 -   **die** - Graphical interface.
 -   **diec** - Command-line version for batch processing.
@@ -104,13 +104,13 @@ Detect It Easy offers three versions:
 
 For detailed usage, refer to the [RUN.md](docs/RUN.md).
 
-### 🔎 Example Use Cases
+### 🔎 Example use cases
 
--   🦠 **Malware Analysis**: Identify file types, packers, or protections.
--   🛡 **Security Audits**: Determine executable file types and potential security risks.
+-   🦠 **Malware Analysis**: Identify file types, packers, or protections. Heuristic engine detects multiple malware and file virus families.
+-   🛡 **Security Audits**: Determine executable potential security risks.
 -   🔎 **Software Forensics**: Inspect software components and validate compliance.
 
-## 💬 Community
+## 💬 Our community
 
 👋 **Hello! / Привет!** Welcome to the Detect It Easy community!
 
