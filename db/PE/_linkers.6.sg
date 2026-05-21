@@ -1,0 +1,96 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+meta("linker");
+
+includeScript("FASM");
+includeScript("RosASM");
+includeScript("SpASM");
+includeScript("FPC");
+
+function detect() {
+    sVersion = PE.getCompilerVersion();
+
+    if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'0000000000000'PE'0000")) {
+        var nMajor = PE.getMajorLinkerVersion(),
+            nMinor = PE.getMinorLinkerVersion();
+
+        if (nMajor == 2) {
+            if (nMinor == 55) {
+                sName = "LCC Linker";
+                sVersion += "*";
+                sLang = "C";
+                bDetected = true;
+            } else if (nMinor <= 40 || nMinor == 56) {
+                sName = "GNU Linker ld (GNU Binutils)";
+                if (nMinor == 56) {
+                    sVersion += "*";
+                }
+                bDetected = true;
+            } else if (nMinor == 50) {
+                sName = "Polink";
+                sVersion += "*";
+                bDetected = true;
+            }
+        } else if (nMajor == 1) {
+            if (nMinor == 3) {
+                sName = "LCC Linker";
+                bDetected = true;
+            }
+        }
+    } else if (PE.compare("'This program must be run under Win'....0D0A24..00", 0x50)) {
+        sName = "Turbo Linker";
+        if (sVersion == "2.25") {
+            if (PE.isSectionNamePresent(".tls")) {
+                sLang = "Object Pascal (Delphi)";
+            }
+        }
+        bDetected = true;
+    } else if (PE.compare("FB..'jr'", 0x1e)) {
+        sName = "Turbo Linker";
+        sVersion = (PE.readByte(0x1f) / 16).toFixed(1);
+        if (PE.compare("'32STUB'", 0x200)) {
+            sOptions = sOptions.append("RTM32");
+        }
+        bDetected = true;
+    } else if (PE.compare( /*[Tt]*/ "'his is a Windows '" /*(?:95|NT)*/, 0x4f)) {
+        sName = "Watcom Linker";
+        sVersion += "*";
+        bDetected = true;
+    } else if (PE.compare("'MZ'6c000100000002000000ffff000000000000110000004000000000000000'Win'....' Program!\r\n\b409ba0001cd21b44ccd2160000000'GoLink, GoAsm www.GoDevTool.com'00")) {
+        sName = "GoLink";
+        bDetected = true;
+    }
+
+    var nMajor = PE.getMajorLinkerVersion(),
+        nMinor = PE.getMinorLinkerVersion();
+
+    if (nMajor == 2 && nMinor == 18) {
+        sName = "Watcom Linker";
+        bDetected = true;
+    } else if (nMajor == 2 && nMinor == 52) {
+        sName = "PowerBASIC Linker";
+        sLang = "Basic";
+        bDetected = true;
+    } else if (nMajor == 255 && nMinor == 255) {
+        sName = "IBM VisualAge";
+        bDetected = true;
+    } else if (nMajor == 7 && nMinor == 32) {
+        sName = "Symantec C/C++";
+        sVersion = "7.2";
+        bDetected = true;
+    }
+    // Correct version
+    if (sName == "Borland Linker") {
+        if (PE.getMajorLinkerVersion() > 15) {
+            sVersion += "*";
+        }
+    }
+
+    // Doesn't have a linker.
+    if (bFASM || bRosASM || bSpASM || bFPC) {
+        bDetected = false;
+    }
+
+    return result();
+}
