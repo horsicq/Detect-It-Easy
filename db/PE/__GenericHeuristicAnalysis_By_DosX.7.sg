@@ -6079,6 +6079,28 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if (PE_Cached.isDotNet) {
 
+        var isNjRatDetected = false,
+            njRatVersion = String();
+
+        var njRatDataSeparator = "|'|'|",
+            njRatDataSeparatorPattern = generateUnicodeSignatureMask(njRatDataSeparator) + "00";
+
+        njRatDataSeparatorPattern = "??" + njRatDataSeparatorPattern.substring(2);
+
+        // NjRAT Generic: Detect NjRAT via requests-separator or assembly name
+        if (verdicts.length === 0) {
+            if (PE.isNetUStringPresent("im523")) {
+                njRatVersion = "0.7D Green Edition";
+                isNjRatDetected = true;
+            } else if (PE_Cached.nameOfNetAssemblyName === "w" || PE_Cached.nameOfNetModuleName === "w.exe" ||
+                PE_Cached.nameOfNetAssemblyName === "k" || PE_Cached.nameOfNetModuleName === "k.exe" ||
+                PE.isNetObjectPresent("njLogger") || PE.isNetUStringPresent("|PWD| ") || PE.isNetUStringPresent(njRatDataSeparator) ||
+                PE.isSignatureInSectionPresent(0, njRatDataSeparatorPattern)) {
+                isNjRatDetected = true;
+            }
+        }
+
+
         var requiredDotNetImports = [
             "System.Diagnostics",
             "System.IO.Compression",
@@ -6094,7 +6116,7 @@ function scanForMaliciousCode_NET_and_Native() {
             }
         }
 
-        if (PE.isSignatureInSectionPresent(0, "00'System.Net.Sockets'00") && foundImportsCount >= 2) {
+        if (verdicts.length === 0 && PE.isSignatureInSectionPresent(0, "00'System.Net.Sockets'00") && foundImportsCount >= 2) {
             var maliciousImportPatterns = [
                 {
                     type: "NjRAT",
@@ -6263,17 +6285,10 @@ function scanForMaliciousCode_NET_and_Native() {
             }
         }
 
-        var separatorToSearch = generateUnicodeSignatureMask("|'|'|") + "00";
-        separatorToSearch = "??" + separatorToSearch.substring(2, separatorToSearch.length);
-
-        // NjRAT Generic: Detect NjRAT via requests-separator or assembly name
-        if (verdicts.length === 0 && (
-            PE_Cached.nameOfNetAssemblyName === "w" || PE_Cached.nameOfNetModuleName === "w.exe" ||
-            PE_Cached.nameOfNetAssemblyName === "k" || PE_Cached.nameOfNetModuleName === "k.exe" ||
-            PE.isNetObjectPresent("njLogger") || PE.isNetUStringPresent("|PWD| ") || PE.isSignatureInSectionPresent(0, separatorToSearch))) {
+        if (verdicts.length === 0 && isNjRatDetected) {
             verdicts.push({
                 type: "NjRAT",
-                version: String(),
+                version: njRatVersion,
                 details: String()
             });
         }
@@ -6297,7 +6312,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
         if (verdicts.length === 0 && (
             PE_Cached.nameOfNetAssemblyName === "AsyncClient" || PE_Cached.nameOfNetModuleName === "AsyncClient.exe" ||
-            PE.isNetObjectPresent("Pastebin")
+            (PE.isNetObjectPresent("Pastebin") && PE.isNetObjectPresent("Packet")) || (PE.isNetObjectPresent("Antivirus") && PE.isNetObjectPresent("Pong"))
         )) {
             verdicts.push({
                 type: "AsyncRAT",
@@ -6472,6 +6487,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
     if (verdicts.length === 0 && (
+        PE.isNetObjectPresent("Stealer") ||
         PE.isNetObjectPresent("potentiallyVulnerablePasswords") ||
         PE.isNetObjectPresent("ScanGeckoBrowsersPaths") ||
         PE.isNetObjectPresent("ScannedWallets") ||
