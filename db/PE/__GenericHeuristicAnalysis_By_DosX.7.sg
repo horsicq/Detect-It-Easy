@@ -4001,7 +4001,7 @@ function isTokenObfuscated(token) {
         // Version control tags: v1.0, v21.9
         /^[Vv]\d{1,2}\.\d{1,4}/,
         // Build/CI keywords: krnl, sql, cuda, scsi, sstp, etc.
-        /(?:krnl|sql|mgr|tmp|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86|cuda|iscsi|scsi|sstp|uart)/i,
+        /(?:krnl|sql|mgr|tmp|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86|cuda|iscsi|scsi|sstp|uart|nightly|canary|stable|preview|insider|hotfix|snapshot|release|update|patch|master|develop)/i,
         // DirectX / Direct3D module names: D3D10_1, D3D11On12, D3D9on12, D3D11_1SDKLayers
         /^d3d\d{1,2}/i,
         // Kernel debugger transport names: kd_02_1137, kd_07_1415, kdnet_uart16550
@@ -4035,6 +4035,27 @@ function isTokenObfuscated(token) {
         // snake_case identifiers containing real words (lower_case_with_underscores): create_file, get_process_id
         // Requires every segment between underscores to be 2+ letters only (no digit-only segments)
         /^[a-z]{2,}(?:_[a-z]{2,})+$/,
+        // ECC named curve identifiers: secp256k1, secp384r1, secp521r1, sect163k1, prime256v1
+        // These have the pattern: letters(2-9) + 2-3 digits + 1 letter + 1-2 digits [+ optional vN]
+        /^(?:secp|sect|prime|brainpoolp|c2[tp]nb)\d{2,4}[a-z]\d{1,2}(?:v\d)?$/i,
+        // Semantic versioning with pre-release or build metadata: 1.0.0-rc1, 2.0.0-alpha.1, 1.0.0-20240101, 3.5.0+build.1
+        /^\d+\.\d+(?:\.\d+)*[-+][a-zA-Z0-9][a-zA-Z0-9._-]{0,29}$/,
+        // Library version with underscore or dot separation: lz4_1_9_4, zlib_1_2_13, openssl_3_0_9
+        // Allows an optional leading digit in the library name (e.g. lz4 = letters + one digit)
+        /^[a-z]{2,8}\d{0,2}(?:[_.]\d{1,5}){2,}$/i,
+        // Long word (7+ letters) prefix + year-based date suffix: release20240101, AppBuild20231205
+        // Shorter prefixes (1-6 letters) are already covered by the hardware chip/model pattern above
+        /^[a-zA-Z]{7,}(?:19|20)\d{2,6}$/,
+        // All-uppercase acronym/abbreviation + 4-digit year: MSVC2022, LLVM2024 are already covered
+        // by the hardware chip pattern, but that requires 4+ consecutive digits (e.g. BCB2010 ✓).
+        // This entry extends coverage to acronym + exactly 3-digit revision: BCB401, GCC142
+        /^[A-Z]{2,}\d{3,4}$/,
+        // Module/assembly names with embedded version via dot: MyLib.2.5, Component.1.0
+        // Complements the version-number pattern which requires the string to start with a digit
+        /^[a-zA-Z][a-zA-Z0-9]{1,30}\.\d+\.\d+$/,
+        // Common English word suffixes that appear in product/file names but can trip digit checks
+        // when combined with build numbers — e.g. "Installer64bit", "Launcher32bit"
+        /(?:installer|launcher|setup|updater|patcher|bootstrapper|uninstaller|configuration|settings|preferences|options|properties)(?:\d{1,4})?$/i,
     ];
 
     for (var w = 0; w < whitelist.length; w++) {
