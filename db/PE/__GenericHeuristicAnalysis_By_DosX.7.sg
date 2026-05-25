@@ -5927,24 +5927,30 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
     // Detect IL2CPP by sections (thanks to AyukiDev)
 
     if (!isCompilerDetected()) {
-        const il2cppSections = [
-            ".text$mn",
-            ".rdata$zzzdbg",
-            ".rtc$IAA",
-            ".rtc$IZZ",
-            ".rtc$TAA",
-            ".rtc$TZZ",
-            "il2cpp"
-        ];
+        var isIl2cpp = false;
 
-        for (var i = 0; i < il2cppSections.length; i++) {
-            if (PE.isSectionNamePresent(il2cppSections[i])) {
-                _setResult("~compiler", "IL2CPP Technology", String(), String());
-                _setLangByHeur("Native MSIL/C#");
-                break;
+        if (PE.isSectionNamePresentExp(/^\.rtc\$[IT](?:AA|ZZ)$/)) {
+            isIl2cpp = true;
+        } else {
+            const il2cppSections = [
+                "il2cpp",
+                ".text$mn",
+                ".rdata$zzzdbg"
+            ];
+
+            for (var i = 0; i < il2cppSections.length && !isIl2cpp; i++) {
+                if (PE.isSectionNamePresent(il2cppSections[i])) {
+                    isIl2cpp = true;
+                }
             }
         }
+
+        if (isIl2cpp) {
+            _setResult("~compiler", "IL2CPP Technology", String(), String());
+            _setLangByHeur("Native MSIL/C#");
+        }
     }
+
 
 
 
