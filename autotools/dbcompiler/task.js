@@ -127,13 +127,17 @@ function processFile(srcFile, dstFile) {
     return new Promise((resolve) => {
         const worker = new Worker(path.join(__dirname, 'worker.js'), {
             workerData: { srcFile, dstFile },
+            execArgv: [],
             resourceLimits: {
                 maxOldGenerationSizeMb: 2048,
                 maxYoungGenerationSizeMb: 512
             }
         });
 
-        worker.on('message', (result) => {
+        let settled = false;
+        const once = (fn) => (...args) => { if (!settled) { settled = true; fn(...args); } };
+
+        worker.on('message', once((result) => {
             stats.total++;
 
             if (result.type === 'minified') {
@@ -166,21 +170,23 @@ function processFile(srcFile, dstFile) {
             }
 
             resolve();
-        });
+        }));
 
-        worker.on('error', (err) => {
+        worker.on('error', once((err) => {
             stats.failed++;
             failedFiles.push({ file: srcFile, reason: err.message });
             console.warn("[ERROR] " + srcFile + " — " + err.message);
             resolve();
-        });
+        }));
 
         worker.on('exit', (code) => {
             if (code !== 0) {
-                stats.failed++;
-                failedFiles.push({ file: srcFile, reason: `Worker stopped with exit code ${code}` });
-                console.warn("[ERROR] " + srcFile + " — Worker stopped with exit code " + code);
-                resolve();
+                once(() => {
+                    stats.failed++;
+                    failedFiles.push({ file: srcFile, reason: `Worker stopped with exit code ${code}` });
+                    console.warn("[ERROR] " + srcFile + " — Worker stopped with exit code " + code);
+                    resolve();
+                })();
             }
         });
     });
