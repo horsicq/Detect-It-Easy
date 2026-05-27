@@ -3996,8 +3996,8 @@ function isTokenObfuscated(token) {
         /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
         // Common abbreviations/acronyms (all caps with digits): DX11, OpenGL3, Win32
         /^[A-Z]{2,}[0-9]{1,3}$/,
-        // Changelist/build numbers (pure digits 6-12 chars): CL [35398403], Build [123456]
-        /^\d{6,12}$/,
+        // Build/changelist numbers, datetime and Unix-ms timestamps: 35398403, 20240101120000, 1720000000000
+        /^\d{6,16}$/,
         // Version control tags: v1.0, v21.9
         /^[Vv]\d{1,2}\.\d{1,4}/,
         // Build/CI keywords: krnl, sql, cuda, scsi, sstp, etc.
@@ -4007,57 +4007,46 @@ function isTokenObfuscated(token) {
         // Kernel debugger transport names: kd_02_1137, kd_07_1415, kdnet_uart16550
         /^kd(?:_|net_)/i,
         // Hardware chip/model numbers: AX88179_178A, Acx01000, urscx01000, CUDART64_132_51
-        // Letter prefix (1-6) + digit block (4+) + optional underscore segments (end-anchored)
         /^[A-Za-z]{1,6}\d{4,}(?:[_-][A-Za-z0-9]{1,12})*$/,
         // Windows driver/service name suffixes: kbldfltr, mshwnclx, WSDScDrv, NrptDnsForm, hnswfpdriver, mskssrv
         /(?:driver|drv|fltr|clx|form|srv|svc|port|bus|hub|hid)(?:\.\w{1,4})?$/i,
         // Charset and codepage names: c_is2022, cp1251, iso8859, utf32le
         /^(?:c_|cp|iso|utf|ucs|gb|koi|win|mac|ascii|latin|ansi)\w*\d/i,
         // Windows resource and constant identifiers (SCREAMING_SNAKE_CASE): IDR_MSCORLIB_4030319, MY_CONST_VALUE
-        // Requires underscore — pure all-caps hex strings (DEADBEEF, CAFEBABE) are NOT whitelisted
         /^[A-Z][A-Z0-9]*_[A-Z0-9_]+$/,
-        // PascalCase compound identifiers (2+ word segments, purely alphabetic): GetWindowText, BthMtpContextHandler
-        // Each segment: uppercase letter + 2+ lowercase. Random strings almost never follow this structure.
+        // PascalCase compound identifiers: GetWindowText, BthMtpContextHandler
         /^(?:[A-Z][a-z]{2,}){2,}$/,
-        // camelCase identifiers (lowercase start + 1+ PascalCase segments): createFile, readBuffer, sendMessage
-        // Initial lowercase part limited to 8 chars to avoid whitelisting long random prefixes.
+        // camelCase identifiers: createFile, readBuffer, sendMessage
         /^[a-z]{1,8}(?:[A-Z][a-z]{2,})+$/,
         // Known Windows kernel/networking component substrings: ndis, acpi, storport, usbhub, etc.
         /(?:ndis|acpi|storport|classpnp|fltmgr|hidclass|usbhub|usbstor|kbdclass|mouclass|ksuser|nsiproxy|tcpip|netbt|wfplwf|pacer)/i,
-        // Common OOP/API noun suffixes — obfuscated strings never end in real English words.
-        // Covers: GetWindowHandler, CreateContextManager, OnEventCallback, etc.
+        // Common OOP/API noun suffixes: GetWindowHandler, CreateContextManager, OnEventCallback
         /(?:handler|manager|factory|provider|helper|callback|context|interface|service|listener|controller|observer|processor|validator|converter|iterator|descriptor|dispatcher|allocator|builder|writer|reader|parser|encoder|decoder)$/i,
-        // Hungarian notation (Windows API naming): lpszFileName, dwProcessId, hWndParent, pbBuffer
-        // Type prefix (lp/dw/hw/sz/cb/pb/ul/ui) followed by a PascalCase noun
+        // Hungarian notation: lpszFileName, dwProcessId, hWndParent, pbBuffer
         /^(?:lp(?:sz)?|dw|hw|sz|cb|pb|ul|ui|hg)[A-Z][a-z]{3,}/,
         // PascalCase or camelCase with trailing version digit: Direct3D9, OpenGL4, CreateFile2
         /^(?:[A-Z][a-z]{2,}){2,}\d{1,2}$|^[a-z]{1,8}(?:[A-Z][a-z]{2,})+\d{1,2}$/,
-        // snake_case identifiers containing real words (lower_case_with_underscores): create_file, get_process_id
-        // Requires every segment between underscores to be 2+ letters only (no digit-only segments)
+        // snake_case identifiers: create_file, get_process_id
         /^[a-z]{2,}(?:_[a-z]{2,})+$/,
-        // ECC named curve identifiers: secp256k1, secp384r1, secp521r1, sect163k1, prime256v1
-        // These have the pattern: letters(2-9) + 2-3 digits + 1 letter + 1-2 digits [+ optional vN]
+        // Runtime/tool name + version (no delimiter): node20.11.1, python3.12.10, chromium121.0.6167, dotnet9.0.202
+        /^[a-z]{2,}\d{1,3}\.\d+(?:\.\d+)*$/i,
+        // .NET Target Framework Monikers: net8.0, netstandard2.1, netcoreapp3.1, net8.0-windows10.0.19041
+        /^net(?:coreapp|standard)?\d+\.\d+(?:[-][a-z0-9.]+)*$/i,
+        // ECC named curve identifiers: secp256k1, secp384r1, secp521r1, prime256v1
         /^(?:secp|sect|prime|brainpoolp|c2[tp]nb)\d{2,4}[a-z]\d{1,2}(?:v\d)?$/i,
-        // Semantic versioning with pre-release or build metadata: 1.0.0-rc1, 2.0.0-alpha.1, 1.0.0-20240101, 3.5.0+build.1
+        // SemVer with pre-release/build metadata: 1.0.0-rc1, 2.0.0-alpha.1, 1.0.0-20240101, 3.5.0+build.1
         /^\d+\.\d+(?:\.\d+)*[-+][a-zA-Z0-9][a-zA-Z0-9._-]{0,29}$/,
-        // Library version with underscore or dot separation: lz4_1_9_4, zlib_1_2_13, openssl_3_0_9
-        // Allows an optional leading digit in the library name (e.g. lz4 = letters + one digit)
+        // Library version with underscore/dot separation: lz4_1_9_4, zlib_1_2_13, openssl_3_0_9
         /^[a-z]{2,8}\d{0,2}(?:[_.]\d{1,5}){2,}$/i,
-        // Long word (7+ letters) prefix + year-based date suffix: release20240101, AppBuild20231205
-        // Shorter prefixes (1-6 letters) are already covered by the hardware chip/model pattern above
+        // Word (7+ letters) + year-based date suffix: release20240101, AppBuild20231205
         /^[a-zA-Z]{7,}(?:19|20)\d{2,6}$/,
-        // All-uppercase acronym/abbreviation + 4-digit year: MSVC2022, LLVM2024 are already covered
-        // by the hardware chip pattern, but that requires 4+ consecutive digits (e.g. BCB2010 ✓).
-        // This entry extends coverage to acronym + exactly 3-digit revision: BCB401, GCC142
+        // Uppercase acronym + 3–4 digit revision: BCB401, GCC142, MSVC2022
         /^[A-Z]{2,}\d{3,4}$/,
-        // Module/assembly names with embedded version via dot: MyLib.2.5, Component.1.0
-        // Complements the version-number pattern which requires the string to start with a digit
+        // Assembly/module names with embedded version: MyLib.2.5, Component.1.0
         /^[a-zA-Z][a-zA-Z0-9]{1,30}\.\d+\.\d+$/,
         // Delimiter-separated word identifiers: dotnet-sdk-9.0.202-w, libssl-3.0.9-dev, api-2.1, bin-debug
-        // Covers product names, filenames, package IDs with short abbreviations like sdk, api, bin, dev, lib, etc.
         /^[a-z]{3,}(?:[-._](?:[a-z]+|\d+))*$/i,
-        // Common English word suffixes that appear in product/file names but can trip digit checks
-        // when combined with build numbers — e.g. "Installer64bit", "Launcher32bit"
+        // Product installer/config noun suffixes: ProductInstaller, AppSetup2024, MyConfiguration
         /(?:installer|launcher|setup|updater|patcher|bootstrapper|uninstaller|configuration|settings|preferences|options|properties)(?:\d{1,4})?$/i,
     ];
 
