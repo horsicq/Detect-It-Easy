@@ -3975,87 +3975,92 @@ function isTokenObfuscated(token) {
     // === WHITELIST: Common legitimate patterns ===
 
     var whitelist = [
-        // Copyright patterns: (C) 2020, © 1999-2024, etc.
+
+        // ── NUMBERS · DATES · TIMESTAMPS ─────────────────────────────────────
+        // Copyright: (C) 2020, © 1999-2024
         /^(?:(?:\(C\)|©)\s?)?[0-9]{4}(?:[-–][0-9]{4})?$/i,
-        // Year / date patterns (with optional trailing comma/punctuation):
-        //   1999,  2020-2024,  31.12.2020,  2020-12-31,  2010-2013,
+        // Year / date: 1999, 2020-2024, 31.12.2020, 2020-12-31
         /^(?:\d{4}(?:[-–\/\.]\d{1,4}(?:[-\/\.]\d{1,4})?)?|\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4})[,.]?$/,
-        // Version numbers: v1.2.3, v.1.2.3, 1.0.0.0, 10.15.7
-        /^(?:v(?:\.)?)?\d+(\.\d+){1,4}$/i,
-        // UUIDs: 550e8400-e29b-41d4-a716-446655440000
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-        // Partial GUIDs / GUID fragments: 69fe178f-26e7-43a9-a, c4d66f00-b6f0-4439-a
-        /^[0-9a-f]{4,8}(?:-[0-9a-f]{1,8}){2,}$/i,
-        // Build/version hashes with optional word suffix: 2b7-0fc9cc7187f5_Hyp, 620-2cfb01a9318d_Hyp
-        /^[0-9a-f]{2,8}-[0-9a-f]{8,}(?:[_-][a-zA-Z]+)?$/i,
-        // Common hex prefixes: 0x1234ABCD, 0X1A2B3C4D
-        /^0x[0-9a-f]+$/i,
-        // File sizes with units: 123KB, 45.6MB, 1.5GB
-        /^\d+(\.\d+)?(bytes?|[kmgt]b)$/i,
-        // IP addresses: 192.168.1.1
-        /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
-        // Common abbreviations/acronyms (all caps with digits): DX11, OpenGL3, Win32
-        /^[A-Z]{2,}[0-9]{1,3}$/,
-        // Build/changelist numbers, datetime and Unix-ms timestamps: 35398403, 20240101120000, 1720000000000
-        /^\d{6,16}$/,
-        // Version control tags: v1.0, v21.9
-        /^[Vv]\d{1,2}\.\d{1,4}/,
-        // Build/CI keywords: krnl, sql, cuda, scsi, sstp, etc.
-        /(?:krnl|sql|mgr|tmp|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86|cuda|iscsi|scsi|sstp|uart|nightly|canary|stable|preview|insider|hotfix|snapshot|release|update|patch|master|develop)/i,
-        // DirectX / Direct3D module names: D3D10_1, D3D11On12, D3D9on12, D3D11_1SDKLayers
-        /^d3d\d{1,2}/i,
-        // Kernel debugger transport names: kd_02_1137, kd_07_1415, kdnet_uart16550
-        /^kd(?:_|net_)/i,
-        // Hardware chip/model numbers: AX88179_178A, Acx01000, urscx01000, CUDART64_132_51
-        /^[A-Za-z]{1,6}\d{4,}(?:[_-][A-Za-z0-9]{1,12})*$/,
-        // Windows driver/service name suffixes: kbldfltr, mshwnclx, WSDScDrv, NrptDnsForm, hnswfpdriver, mskssrv
-        /(?:driver|drv|fltr|clx|form|srv|svc|port|bus|hub|hid)(?:\.\w{1,4})?$/i,
-        // Charset and codepage names: c_is2022, cp1251, iso8859, utf32le
-        /^(?:c_|cp|iso|utf|ucs|gb|koi|win|mac|ascii|latin|ansi)\w*\d/i,
-        // Windows resource and constant identifiers (SCREAMING_SNAKE_CASE): IDR_MSCORLIB_4030319, MY_CONST_VALUE
-        /^[A-Z][A-Z0-9]*_[A-Z0-9_]+$/,
-        // PascalCase compound identifiers: GetWindowText, BthMtpContextHandler
-        /^(?:[A-Z][a-z]{2,}){2,}$/,
-        // camelCase identifiers: createFile, readBuffer, sendMessage
-        /^[a-z]{1,8}(?:[A-Z][a-z]{2,})+$/,
-        // Known Windows kernel/networking component substrings: ndis, acpi, storport, usbhub, etc.
-        /(?:ndis|acpi|storport|classpnp|fltmgr|hidclass|usbhub|usbstor|kbdclass|mouclass|ksuser|nsiproxy|tcpip|netbt|wfplwf|pacer)/i,
-        // Common OOP/API noun suffixes: GetWindowHandler, CreateContextManager, OnEventCallback
-        /(?:handler|manager|factory|provider|helper|callback|context|interface|service|listener|controller|observer|processor|validator|converter|iterator|descriptor|dispatcher|allocator|builder|writer|reader|parser|encoder|decoder)$/i,
-        // Hungarian notation: lpszFileName, dwProcessId, hWndParent, pbBuffer
-        /^(?:lp(?:sz)?|dw|hw|sz|cb|pb|ul|ui|hg)[A-Z][a-z]{3,}/,
-        // PascalCase or camelCase with trailing version digit: Direct3D9, OpenGL4, CreateFile2
-        /^(?:[A-Z][a-z]{2,}){2,}\d{1,2}$|^[a-z]{1,8}(?:[A-Z][a-z]{2,})+\d{1,2}$/,
-        // snake_case identifiers: create_file, get_process_id
-        /^[a-z]{2,}(?:_[a-z]{2,})+$/,
-        // Runtime/tool name + version (no delimiter): node20.11.1, python3.12.10, chromium121.0.6167, dotnet9.0.202
-        /^[a-z]{2,}\d{1,3}\.\d+(?:\.\d+)*$/i,
-        // .NET Target Framework Monikers: net8.0, netstandard2.1, netcoreapp3.1, net8.0-windows10.0.19041
-        /^net(?:coreapp|standard)?\d+\.\d+(?:[-][a-z0-9.]+)*$/i,
-        // ECC named curve identifiers: secp256k1, secp384r1, secp521r1, prime256v1
-        /^(?:secp|sect|prime|brainpoolp|c2[tp]nb)\d{2,4}[a-z]\d{1,2}(?:v\d)?$/i,
-        // SemVer with pre-release/build metadata: 1.0.0-rc1, 2.0.0-alpha.1, 1.0.0-20240101, 3.5.0+build.1
-        /^\d+\.\d+(?:\.\d+)*[-+][a-zA-Z0-9][a-zA-Z0-9._-]{0,29}$/,
-        // Library version with underscore/dot separation: lz4_1_9_4, zlib_1_2_13, openssl_3_0_9
-        /^[a-z]{2,8}\d{0,2}(?:[_.]\d{1,5}){2,}$/i,
-        // Word (7+ letters) + year-based date suffix: release20240101, AppBuild20231205
-        /^[a-zA-Z]{7,}(?:19|20)\d{2,6}$/,
-        // Uppercase acronym + 3–4 digit revision: BCB401, GCC142, MSVC2022
-        /^[A-Z]{2,}\d{3,4}$/,
-        // Assembly/module names with embedded version: MyLib.2.5, Component.1.0
-        /^[a-zA-Z][a-zA-Z0-9]{1,30}\.\d+\.\d+$/,
-        // Delimiter-separated word identifiers: dotnet-sdk-9.0.202-w, libssl-3.0.9-dev, api-2.1, bin-debug
-        /^[a-z]{3,}(?:[-._](?:[a-z]+|\d+))*$/i,
-        // Product installer/config noun suffixes: ProductInstaller, AppSetup2024, MyConfiguration
-        /(?:installer|launcher|setup|updater|patcher|bootstrapper|uninstaller|configuration|settings|preferences|options|properties)(?:\d{1,4})?$/i,
-        // GUIDs with braces: {550e8400-e29b-41d4-a716-446655440000}
-        /^\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}$/i,
-        // ISO 8601 compact datetime stamps: 20250527T143022, 20250527T143022Z
+        // ISO 8601 compact datetime: 20250527T143022, 20250527T143022Z
         /^\d{8}T\d{6}Z?$/,
-        // .NET assembly PublicKeyToken field: PublicKeyToken=b77a5c561934e089
-        /^PublicKeyToken=[0-9a-f]{16}$/i,
-        // OID strings (5+ dot-separated components): 1.2.840.113549.1.1.11, 2.16.840.1.101.3.4.2.1
+        // Pure digit stamps (build, changelist, Unix-ms): 35398403, 20240101120000, 1720000000000
+        /^\d{6,16}$/,
+        // IP address: 192.168.1.1
+        /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+        // File size: 123KB, 45.6MB, 1.5GB
+        /^\d+(\.\d+)?(bytes?|[kmgt]b)$/i,
+        // Hex literal: 0x1234ABCD
+        /^0x[0-9a-f]+$/i,
+
+        // ── VERSION STRINGS ───────────────────────────────────────────────────
+        // Version number: v1.2.3, v.1.2.3, 1.0.0.0, 10.15.7
+        /^(?:v(?:\.)?)?\d+(\.\d+){1,4}$/i,
+        // Version tag prefix (no end anchor): v1.0-release, v21.9.1-beta
+        /^[Vv]\d{1,2}\.\d{1,4}/,
+        // SemVer with pre-release/metadata: 1.0.0-rc1, 2.0.0-alpha.1, 3.5.0+build.1
+        /^\d+\.\d+(?:\.\d+)*[-+][a-zA-Z0-9][a-zA-Z0-9._-]{0,29}$/,
+        // OID (5+ components): 1.2.840.113549.1.1.11, 2.16.840.1.101.3.4.2.1
         /^\d+(?:\.\d+){4,}$/,
+        // Library version (underscore/dot): lz4_1_9_4, zlib_1_2_13, openssl_3_0_9
+        /^[a-z]{2,8}\d{0,2}(?:[_.]\d{1,5}){2,}$/i,
+        // Runtime/tool + version (no delimiter): node20.11.1, python3.12.10, dotnet9.0.202
+        /^[a-z]{2,}\d{1,3}\.\d+(?:\.\d+)*$/i,
+        // .NET TFM: net8.0, netstandard2.1, net8.0-windows10.0.19041
+        /^net(?:coreapp|standard)?\d+\.\d+(?:[-][a-z0-9.]+)*$/i,
+        // Assembly/module with embedded version: MyLib.2.5, Component.1.0
+        /^[a-zA-Z][a-zA-Z0-9]{1,30}\.\d+\.\d+$/,
+
+        // ── GUIDS · HASHES · CRYPTO ───────────────────────────────────────────
+        // UUID: 550e8400-e29b-41d4-a716-446655440000
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        // UUID with braces: {550e8400-e29b-41d4-a716-446655440000}
+        /^\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}$/i,
+        // Partial GUID fragments: 69fe178f-26e7-43a9-a, c4d66f00-b6f0-4439-a
+        /^[0-9a-f]{4,8}(?:-[0-9a-f]{1,8}){2,}$/i,
+        // Build/version hash: 2b7-0fc9cc7187f5_Hyp, 620-2cfb01a9318d_Hyp
+        /^[0-9a-f]{2,8}-[0-9a-f]{8,}(?:[_-][a-zA-Z]+)?$/i,
+        // ECC named curves: secp256k1, secp384r1, prime256v1
+        /^(?:secp|sect|prime|brainpoolp|c2[tp]nb)\d{2,4}[a-z]\d{1,2}(?:v\d)?$/i,
+        // .NET PublicKeyToken: PublicKeyToken=b77a5c561934e089
+        /^PublicKeyToken=[0-9a-f]{16}$/i,
+
+        // ── IDENTIFIER NAMING CONVENTIONS ─────────────────────────────────────
+        // SCREAMING_SNAKE_CASE: IDR_MSCORLIB_4030319, MY_CONST_VALUE
+        /^[A-Z][A-Z0-9]*_[A-Z0-9_]+$/,
+        // PascalCase (optional 1-2 digit suffix): GetWindowText, BthMtpContextHandler, CreateFile2
+        /^(?:[A-Z][a-z]{2,}){2,}\d{0,2}$/,
+        // camelCase (optional 1-2 digit suffix): createFile, readBuffer, sendMessage2
+        /^[a-z]{1,8}(?:[A-Z][a-z]{2,})+\d{0,2}$/,
+        // snake_case: create_file, get_process_id
+        /^[a-z]{2,}(?:_[a-z]{2,})+$/,
+        // Hungarian notation: lpszFileName, dwProcessId, pbBuffer
+        /^(?:lp(?:sz)?|dw|hw|sz|cb|pb|ul|ui|hg)[A-Z][a-z]{3,}/,
+
+        // ── PLATFORM & WINDOWS SPECIFICS ──────────────────────────────────────
+        // Hardware chip/model: AX88179_178A, Acx01000, CUDART64_132_51
+        /^[A-Za-z]{1,6}\d{4,}(?:[_-][A-Za-z0-9]{1,12})*$/,
+        // DirectX module names: D3D10_1, D3D11On12, D3D9on12
+        /^d3d\d{1,2}/i,
+        // Kernel debugger transport: kd_02_1137, kdnet_uart16550
+        /^kd(?:_|net_)/i,
+        // All-caps abbreviation + 1-4 digits: DX11, Win32, BCB401, MSVC2022
+        /^[A-Z]{2,}[0-9]{1,4}$/,
+        // Windows driver/service suffixes: kbldfltr, WSDScDrv, hnswfpdriver
+        /(?:driver|drv|fltr|clx|form|srv|svc|port|bus|hub|hid)(?:\.\w{1,4})?$/i,
+        // Charset/codepage names: c_is2022, cp1251, utf32le
+        /^(?:c_|cp|iso|utf|ucs|gb|koi|win|mac|ascii|latin|ansi)\w*\d/i,
+        // Windows kernel/networking + build/CI keywords
+        /(?:ndis|acpi|storport|classpnp|fltmgr|hidclass|usbhub|usbstor|kbdclass|mouclass|ksuser|nsiproxy|tcpip|netbt|wfplwf|pacer|krnl|sql|mgr|tmp|vds|word|runtime|buildbot|builder|jenkins|gitlab|runner|beta|alpha|client|relclient|steam|win(?:32|64|2)|x64|x86|cuda|iscsi|scsi|sstp|uart|nightly|canary|stable|preview|insider|hotfix|snapshot|release|update|patch|master|develop)/i,
+
+        // ── PRODUCT, PACKAGE & API IDENTIFIERS ────────────────────────────────
+        // OOP/API noun suffixes: GetWindowHandler, CreateContextManager, OnEventCallback
+        /(?:handler|manager|factory|provider|helper|callback|context|interface|service|listener|controller|observer|processor|validator|converter|iterator|descriptor|dispatcher|allocator|builder|writer|reader|parser|encoder|decoder)$/i,
+        // Product installer/config suffixes: ProductInstaller, AppSetup2024
+        /(?:installer|launcher|setup|updater|patcher|bootstrapper|uninstaller|configuration|settings|preferences|options|properties)(?:\d{1,4})?$/i,
+        // Delimiter-separated identifiers: dotnet-sdk-9.0.202-w, libssl-3.0.9-dev, api-2.1
+        /^[a-z]{3,}(?:[-._](?:[a-z]+|\d+))*$/i,
+        // Word (7+ letters) + year suffix: release20240101, AppBuild20231205
+        /^[a-zA-Z]{7,}(?:19|20)\d{2,6}$/,
     ];
 
     for (var w = 0; w < whitelist.length; w++) {
