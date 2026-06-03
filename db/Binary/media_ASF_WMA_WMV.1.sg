@@ -1,112 +1,112 @@
 // Detect It Easy: detection rule file
 // Author: Kaens (TG@kaens)
 
-meta("media","Microsoft Advanced Systems Format container");
+meta("media", "Microsoft Advanced Systems Format container");
 
 function detect() {
     const
-      // top-level ASF object GUIDs:
-      ASF_Header_Object = "3026B275 8E66 CF11 A6D9 00AA0062CE6C",
-      ASF_Data_Object = "3626B275 8E66 CF11 A6D9 00AA0062CE6C",
-      ASF_Simple_Index_Object ="90080033 B1E5 CF11 89F4 00A0C90349CB",
-      ASF_Index_Object = "D329E2D6 DA35 D111 9034 00A0C90349BE",
-      ASF_Media_Object_Index_Object = "F803B1FE AD12 644C 840F 2A1D2F7AD48C",
-      ASF_Timecode_Index_Object = "D03FB73C 4A0C 0348 953D EDF7B6227F0C",
+        // top-level ASF object GUIDs:
+        ASF_Header_Object = "3026B275 8E66 CF11 A6D9 00AA0062CE6C",
+        ASF_Data_Object = "3626B275 8E66 CF11 A6D9 00AA0062CE6C",
+        ASF_Simple_Index_Object = "90080033 B1E5 CF11 89F4 00A0C90349CB",
+        ASF_Index_Object = "D329E2D6 DA35 D111 9034 00A0C90349BE",
+        ASF_Media_Object_Index_Object = "F803B1FE AD12 644C 840F 2A1D2F7AD48C",
+        ASF_Timecode_Index_Object = "D03FB73C 4A0C 0348 953D EDF7B6227F0C",
 
-      // header object GUIDs (some):
-      ASF_File_Properties_Object = "A1DCAB8C 47A9 CF11 8EE4 00C00C205365",
-      ASF_Stream_Properties_Object = "9107DCB7 B7A9 CF11 8EE6 00C00C205365",
-      ASF_Header_Extension_Object = "B503BF5F 2EA9 CF11 8EE3 00C00C205365",
-      ASF_Codec_List_Object = "4052D186 1D31 D011 A3A4 00A0C90348F6",
-      ASF_Padding_Object = "74D40618 DFCA 0945 A4BA 9AABCB96AAE8",
-      ASF_Extended_Content_Description_Object = "40A4D0D2 07E3 D211 97F0 00A0C95EA850",
+        // header object GUIDs (some):
+        ASF_File_Properties_Object = "A1DCAB8C 47A9 CF11 8EE4 00C00C205365",
+        ASF_Stream_Properties_Object = "9107DCB7 B7A9 CF11 8EE6 00C00C205365",
+        ASF_Header_Extension_Object = "B503BF5F 2EA9 CF11 8EE3 00C00C205365",
+        ASF_Codec_List_Object = "4052D186 1D31 D011 A3A4 00A0C90348F6",
+        ASF_Padding_Object = "74D40618 DFCA 0945 A4BA 9AABCB96AAE8",
+        ASF_Extended_Content_Description_Object = "40A4D0D2 07E3 D211 97F0 00A0C95EA850",
 
-      // stream properties object GUIDs:
-      ASF_Audio_Media = "409E69F8 4D5B CF11 A8FD 00805F5C442B",
-      ASF_Video_Media = "C0EF19BC 4D5B CF11 A8FD 00805F5C442B",
-      ASF_JFIF_Media = "00E11BB6 5B4E CF11 A8FD 00805F5C442B",
-      ASF_Degradable_JPEG_Media = "E07D9035 15E4 CF11 A917 00805F5C442B",
-      ASF_Command_Media = "C0CFDA59 E659 D011 A3AC 00A0C90348F6",
-      ASF_File_Transfer_Media = "2C22BD91 1CF2 7A49 8B6D 5AA86BFC0185",
-      ASF_Binary_Media = "E265FB3A EF47 F240 AC2C 70A90D71D343";
+        // stream properties object GUIDs:
+        ASF_Audio_Media = "409E69F8 4D5B CF11 A8FD 00805F5C442B",
+        ASF_Video_Media = "C0EF19BC 4D5B CF11 A8FD 00805F5C442B",
+        ASF_JFIF_Media = "00E11BB6 5B4E CF11 A8FD 00805F5C442B",
+        ASF_Degradable_JPEG_Media = "E07D9035 15E4 CF11 A917 00805F5C442B",
+        ASF_Command_Media = "C0CFDA59 E659 D011 A3AC 00A0C90348F6",
+        ASF_File_Transfer_Media = "2C22BD91 1CF2 7A49 8B6D 5AA86BFC0185",
+        ASF_Binary_Media = "E265FB3A EF47 F240 AC2C 70A90D71D343";
 
-    if (X.Sz() < 0x1E || !X.c(ASF_Header_Object) || X.U8(0x1D) != 2 || (hdsz=X.U64(0x10)) < 0x1E || !(hdobj=X.U32(0x18))) return;
+    if (X.Sz() < 0x1E || !X.c(ASF_Header_Object) || X.U8(0x1D) != 2 || (hdsz = X.U64(0x10)) < 0x1E || !(hdobj = X.U32(0x18))) return;
     var p = t = 0x1E, objsz = fdone = fl = maxbr = 0, bad = '', codecs = [], ext = '.ASF', streams = [],
         asffpo = asfspo = asfhxo = false;
-    while(p < X.Sz() && hdobj--) {
-        if(X.c(ASF_File_Properties_Object, p)) {
-//_l2r('asf',p,'File Properties found')
-            objsz = X.U64(p+16);
-            if(asffpo) bad = bad.addIfNone('!dupeFileProperties'); else { asffpo = true; fdone |= 0x01 }
-            t = p+16+8+16; sz = X.U64(t); t += 8+8+8; dur = X.U64(t); /*_l2r('asf',t,'duration here'); */ t +=8+8+8; fl = X.U32(t);
-            t += 4+4+4; maxbr = X.U32(t);
-            if(fl & 1) { sz = -1; dur = -1 } //Broadcast
-            if(fl & 2) sOption('seekable');
+    while (p < X.Sz() && hdobj--) {
+        if (X.c(ASF_File_Properties_Object, p)) {
+            //_l2r('asf',p,'File Properties found')
+            objsz = X.U64(p + 16);
+            if (asffpo) bad = bad.addIfNone('!dupeFileProperties'); else { asffpo = true; fdone |= 0x01 }
+            t = p + 16 + 8 + 16; sz = X.U64(t); t += 8 + 8 + 8; dur = X.U64(t); /*_l2r('asf',t,'duration here'); */ t += 8 + 8 + 8; fl = X.U32(t);
+            t += 4 + 4 + 4; maxbr = X.U32(t);
+            if (fl & 1) { sz = -1; dur = -1 } //Broadcast
+            if (fl & 2) sOption('seekable');
             p += objsz;
         }
-        else if(X.c(ASF_Header_Extension_Object, p)) {
-//_l2r('asf',p,'Header Extension found');
-            objsz = X.U64(p+16);
-            if(asfhxo) bad = bad.addIfNone('!dupeHeaderExtension'); else { asfhxo = true; fdone |= 0x02 }
+        else if (X.c(ASF_Header_Extension_Object, p)) {
+            //_l2r('asf',p,'Header Extension found');
+            objsz = X.U64(p + 16);
+            if (asfhxo) bad = bad.addIfNone('!dupeHeaderExtension'); else { asfhxo = true; fdone |= 0x02 }
             p += objsz;
         }
-        else if(X.c(ASF_Stream_Properties_Object, p)) {
-//_l2r('asf',p,'Stream Properties found');
-            objsz = X.U64(p+16);
+        else if (X.c(ASF_Stream_Properties_Object, p)) {
+            //_l2r('asf',p,'Stream Properties found');
+            objsz = X.U64(p + 16);
             asfspo = true; fdone |= 0x04;
-            if(X.c(ASF_Video_Media, p+16+8)) streams.push('video');
-            else if(X.c(ASF_Audio_Media, p+16+8)) streams.push('audio');
-            else if(X.c(ASF_Command_Media, p+16+8)) streams.push('commands');
-            else if(X.c(ASF_JFIF_Media, p+16+8)) streams.push('JFIF');
-            else if(X.c(ASF_Degradable_JPEG_Media, p+16+8)) streams.push('degradable JPEG');
-            else if(X.c(ASF_File_Transfer_Media, p+16+8)) streams.push('file transfer');
-            else if(X.c(ASF_File_Transfer_Media, p+16+8)) streams.push('binary');
+            if (X.c(ASF_Video_Media, p + 16 + 8)) streams.push('video');
+            else if (X.c(ASF_Audio_Media, p + 16 + 8)) streams.push('audio');
+            else if (X.c(ASF_Command_Media, p + 16 + 8)) streams.push('commands');
+            else if (X.c(ASF_JFIF_Media, p + 16 + 8)) streams.push('JFIF');
+            else if (X.c(ASF_Degradable_JPEG_Media, p + 16 + 8)) streams.push('degradable JPEG');
+            else if (X.c(ASF_File_Transfer_Media, p + 16 + 8)) streams.push('file transfer');
+            else if (X.c(ASF_File_Transfer_Media, p + 16 + 8)) streams.push('binary');
             else bad = bad.addIfNone('!badstreamtype')
             p += objsz;
         }
-        else if(X.c(ASF_Extended_Content_Description_Object, p)) {
-//_l2r('asf',p,'Ext. Content Desc. found');
-            objsz = X.U64(p+16);
+        else if (X.c(ASF_Extended_Content_Description_Object, p)) {
+            //_l2r('asf',p,'Ext. Content Desc. found');
+            objsz = X.U64(p + 16);
             // we don't really care about these "bibliographical" WM settings and whatnot
             p += objsz;
         }
-        else if(X.c(ASF_Codec_List_Object, p)) {
-//_l2r('asf',p,'Codec List found');
-            objsz = X.U64(p+16);
-            t = p+16+8+16; codecentriescount = X.U32(t); t += 4;
+        else if (X.c(ASF_Codec_List_Object, p)) {
+            //_l2r('asf',p,'Codec List found');
+            objsz = X.U64(p + 16);
+            t = p + 16 + 8 + 16; codecentriescount = X.U32(t); t += 4;
             var tp, namelen, codecname;
-            while(t < p+objsz && t < X.Sz() && codecentriescount--) {
-                tp = X.U16(t); len = X.U16(t+2); codecname = X.SC(t+4, len*2, "UTF-16");
-                codecs.push((tp==1?'video': tp==2?'audio': tp==0xFFFF?'unk.': 'broken')+': '+codecname)
-                if(tp == 1) ext = ".WMV";
-                else if(tp == 2 && ext !== ".WMV") ext = ".WMA";
-                t += 4+len*2;
-                len = X.U16(t); t += 2+len*2; //codec desc
-                len = X.U16(t); t += 2+len; //codec info
+            while (t < p + objsz && t < X.Sz() && codecentriescount--) {
+                tp = X.U16(t); len = X.U16(t + 2); codecname = X.SC(t + 4, len * 2, "UTF-16");
+                codecs.push((tp == 1 ? 'video' : tp == 2 ? 'audio' : tp == 0xFFFF ? 'unk.' : 'broken') + ': ' + codecname)
+                if (tp == 1) ext = ".WMV";
+                else if (tp == 2 && ext !== ".WMV") ext = ".WMA";
+                t += 4 + len * 2;
+                len = X.U16(t); t += 2 + len * 2; //codec desc
+                len = X.U16(t); t += 2 + len; //codec info
             }
             p += objsz;
         }
         else {
-//_l2r('asf',p,'Skipping object')
-            p += X.U64(p+16);
+            //_l2r('asf',p,'Skipping object')
+            p += X.U64(p + 16);
         }
     }
-    if(p >= X.Sz()) bad = bad.addIfNone('!short');
+    if (p >= X.Sz()) bad = bad.addIfNone('!short');
     else {
-        if(!X.c(ASF_Data_Object, p)) bad = bad.addIfNone('!nodata');
-        objsz = X.U64(p+16);
+        if (!X.c(ASF_Data_Object, p)) bad = bad.addIfNone('!nodata');
+        objsz = X.U64(p + 16);
         p += objsz;
         // Might be some other objects here
-        if(p >= X.Sz()) bad = bad.addIfNone('!short');
+        if (p >= X.Sz()) bad = bad.addIfNone('!short');
     }
-    if(ext == ".WMA") sName += '/Windows Media Audio';
-    else if(ext == ".WMV") sName += '/Windows Media';
-    sName += ' ('+ext+')';
-    if(X.isVerbose()) {
-        sOptionT(outArray(streams),'streams: '); sOptionT(outArray(codecs),'codecs: ')
-        sOption('max. '+(maxbr >> 10)+'kbps');
+    if (ext == ".WMA") sName += '/Windows Media Audio';
+    else if (ext == ".WMV") sName += '/Windows Media';
+    sName += ' (' + ext + ')';
+    if (X.isVerbose()) {
+        sOptionT(outArray(streams), 'streams: '); sOptionT(outArray(codecs), 'codecs: ')
+        sOption('max. ' + (maxbr >> 10) + 'kbps');
         //if(dur > 0) sOption(secondsToTimeStr(dur/10000000),'play duration: '); //something's off
-        sOption('sz:'+outSz(sz))
+        sOption('sz:' + outSz(sz))
     }
     bDetected = true;
 

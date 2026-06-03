@@ -6684,7 +6684,7 @@ function scanForMaliciousCode_NET_and_Native() {
     if (verdicts.length === 0 && PE_Cached.isArchX86) {
         var pariteAddr = PE_Cached.addressOfUnmanagedEntryPoint,
             pariteLoopCount = 0,
-            pariteSubFound = false;
+            pariteState = 0; // 0=init, 1=push/xor found, 2=sub found
 
         for (var i = 0; i < 364; i++) {
             var currentInstruction = PE.getDisasmString(pariteAddr),
@@ -6692,22 +6692,20 @@ function scanForMaliciousCode_NET_and_Native() {
 
             if (!currentInstruction) break; // Safety check
 
-            if (currentOpCode === "SUB" && currentInstruction.match(/^SUB E[A-Z]{2}, [2-4]$/)) {
-                pariteSubFound = true;
-            } else if (currentOpCode === "JNE") {
+            if (pariteState === 0 && /^(?:PUSH|XOR) DWORD PTR \[E[A-Z]{2} \+ E[A-Z]{2}\]/.test(currentInstruction)) {
+                pariteState = 1;
+            } else if (pariteState === 1 && currentOpCode === "SUB" && currentInstruction.match(/^SUB E[A-Z]{2}, [2-4]$/)) {
+                pariteState = 2;
+            } else if (pariteState === 2 && currentOpCode === "JNE") {
                 var jneTargetMatch = currentInstruction.match(/^JNE 0X([0-9A-F]+)$/);
 
-                if (jneTargetMatch) {
-                    var pariteTarget = parseInt(jneTargetMatch[1], 16);
-
-                    if (pariteTarget < pariteAddr && pariteSubFound) {
-                        if (/^(?:PUSH|XOR) DWORD PTR \[E[A-Z]{2} \+ E[A-Z]{2}\]/.test(PE.getDisasmString(pariteTarget))) {
-                            pariteLoopCount++;
-                        }
-                    }
-
-                    pariteSubFound = false;
+                if (jneTargetMatch && parseInt(jneTargetMatch[1], 16) < pariteAddr) {
+                    pariteLoopCount++;
                 }
+
+                pariteState = 0;
+            } else if (currentOpCode === "JNE" || currentOpCode === "JMP") {
+                pariteState = 0;
             }
 
             pariteAddr = PE.getDisasmNextAddress(pariteAddr);
