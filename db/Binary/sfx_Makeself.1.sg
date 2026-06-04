@@ -1,0 +1,36 @@
+// Detect It Easy: detection rule file
+// Authors: 6eh01der <ras_atari@mail.ru>, (TG@Ibeh01derI)
+
+init("sfx", "Makeself SFX archive");
+
+function detect() {
+    var nSize = Math.min(16384, Binary.getSize());
+    if (nSize < 64) return result();
+
+    if (!Binary.isSignaturePresent(0, 2, "2321")) {
+        return result();
+    }
+
+    var sFileContent = Binary.getString(0, nSize);
+    var sLowerContent = sFileContent.toLowerCase();
+
+    if (sLowerContent.indexOf("makeself version") !== -1 || 
+        sLowerContent.indexOf("ms_version=") !== -1 || 
+        sLowerContent.indexOf("makeself") !== -1) {
+        
+        bDetected = true;
+        
+        var sVersionMatch = sFileContent.match(/MS_VERSION\s*=\s*"([^"]+)"/i) || 
+                           sFileContent.match(/Makeself version\s+([0-9.]+)/i);
+        
+        if (sVersionMatch) {
+            if (sVersionMatch.length > 1 && sVersionMatch[1]) {
+                sVersion = sVersionMatch[1];
+            } else if (sVersionMatch[0]) {
+                sVersion = sVersionMatch[0].replace(/[^0-9.]/g, '');
+            }
+        }
+    }
+
+    return result();
+}
