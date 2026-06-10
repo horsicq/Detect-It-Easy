@@ -155,6 +155,12 @@ sudo make install
 sudo apt-get install --quiet --assume-yes build-essential qt6-base-dev qt6-base-dev-tools qt6-tools-dev-tools qt6-5compat-dev libqt6svg6-dev qt6-declarative-dev
 ```
 
+#### (Fedora) Install Qt Framework:
+
+```bash
+sudo dnf install qt6-qtbase-devel qt6-qtscript-devel qt6-qttools-devel qt6-qt5compat-devel qt6-qtdeclarative-devel git make gcc-c++
+```
+
 #### Clone this repo recursively:
 
 ```bash
