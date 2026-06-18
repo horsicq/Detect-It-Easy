@@ -7820,7 +7820,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
         // Sanity check for the e_lfanew pointer
         if (lfaNewOffset > 0x40 && lfaNewOffset < maxValidLfaNew) {
-            var peHeaderOffset = peStartOffset + lfaNewOffset;
+            var peHeaderOffset = lfaNewOffset;
 
             // 1. Verify PE Signature (PE\0\0)
             if (getDecrypted(peHeaderOffset + 0) === 0x50 &&
@@ -7895,12 +7895,15 @@ function scanForMaliciousCode_NET_and_Native() {
         if (resourceOffset > 0 && resourceSize > 0x1000 && !PE.compare("28 00 00 00 ?? ?? 00 00 ?? ?? 00 00 01 00 ?? 00", resourceOffset)) {
 
             var maxScanSize = Math.min(resourceSize, 0x1000),
-                hexSignature = PE.getSignature(resourceOffset, maxScanSize),
+                hexSignature = PE.getSignature(resourceOffset, maxScanSize).replace(/\s/g, ''),
                 dataBuffer = new Array(maxScanSize);
 
             for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
                 var char1 = hexSignature.charCodeAt(p),
                     char2 = hexSignature.charCodeAt(p + 1);
+
+                if (char1 >= 97) char1 -= 32;
+                if (char2 >= 97) char2 -= 32;
 
                 dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
             }
@@ -7915,12 +7918,16 @@ function scanForMaliciousCode_NET_and_Native() {
             overlaySize = PE.getOverlaySize();
 
         if (overlayOffset > 0 && overlaySize > 0x1000 && !PE.isSigned()) {
-            var maxScanSize = Math.min(overlaySize, 0x1000),
-                hexSignature = PE.getSignature(overlayOffset, maxScanSize),
+            var maxScanSize = Math.min(overlaySize, 0x14000),
+                hexSignature = PE.getSignature(overlayOffset, maxScanSize).replace(/\s/g, ''),
                 dataBuffer = new Array(maxScanSize);
 
             for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
                 var char1 = hexSignature.charCodeAt(p), char2 = hexSignature.charCodeAt(p + 1);
+
+                if (char1 >= 97) char1 -= 32;
+                if (char2 >= 97) char2 -= 32;
+
                 dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
             }
 
@@ -7944,11 +7951,15 @@ function scanForMaliciousCode_NET_and_Native() {
 
             if (sectionOffset > 0 && sectionSize > 0x2500) {
                 var maxScanSize = Math.min(sectionSize, PE.section[i].Name.match(/^\.(?:r)?data$/i) ? 0x6000 : 0x2500),
-                    hexSignature = PE.getSignature(sectionOffset, maxScanSize),
+                    hexSignature = PE.getSignature(sectionOffset, maxScanSize).replace(/\s/g, ''),
                     dataBuffer = new Array(maxScanSize);
 
                 for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
                     var char1 = hexSignature.charCodeAt(p), char2 = hexSignature.charCodeAt(p + 1);
+
+                    if (char1 >= 97) char1 -= 32;
+                    if (char2 >= 97) char2 -= 32;
+
                     dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
                 }
 
