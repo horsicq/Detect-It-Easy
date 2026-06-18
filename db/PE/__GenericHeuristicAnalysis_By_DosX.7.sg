@@ -7780,7 +7780,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
     // Detect encrypted PE files in the resource section AND overlay via KPA (Known Plaintext Attack)
-    // Supports MULTIPLE algorithms (XOR, XNOR, ADD, SUB) and key lengths up to 20 bytes
+    // Supports MULTIPLE algorithms (XOR, XNOR, ADD, SUB, SUB-REV) and key lengths up to 20 bytes
 
     var isEncPePresent = false;
 
@@ -7800,6 +7800,7 @@ function scanForMaliciousCode_NET_and_Native() {
     // Strict PE header verification function.
     // mode 0: Bitwise algorithms (XOR, XNOR)
     // mode 1: Arithmetic algorithms (ADD, SUB)
+    // mode 2: Arithmetic Reverse algorithms (SUB-REV)
     function verifyPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength, mode) {
 
         // Universal decryptor: Maps any PE offset to its corresponding encrypted zero in e_res2
@@ -7808,7 +7809,9 @@ function scanForMaliciousCode_NET_and_Native() {
             var encryptedZero = dataBuffer[peStartOffset + eRes2Offset];
             var cipherByte = dataBuffer[peStartOffset + offset];
 
-            return mode === 0 ? (cipherByte ^ encryptedZero) : ((cipherByte - encryptedZero) & 0xFF);
+            return mode === 0 ? (cipherByte ^ encryptedZero) :
+                mode === 1 ? ((cipherByte - encryptedZero) & 0xFF) :
+                    ((encryptedZero - cipherByte) & 0xFF);
         };
 
         // Get e_lfanew
@@ -7820,7 +7823,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
         // Sanity check for the e_lfanew pointer
         if (lfaNewOffset > 0x40 && lfaNewOffset < maxValidLfaNew) {
-            var peHeaderOffset = lfaNewOffset;
+            var peHeaderOffset = lfaNewOffset; // ИСПРАВЛЕНО: Без двойного прибавления peStartOffset
 
             // 1. Verify PE Signature (PE\0\0)
             if (getDecrypted(peHeaderOffset + 0) === 0x50 &&
@@ -7863,6 +7866,10 @@ function scanForMaliciousCode_NET_and_Native() {
 
             var e0_math = (b0 - 0x4D) & 0xFF,
                 e1_math = (b1 - 0x5A) & 0xFF,
+
+                e0_rev = (b0 + 0x4D) & 0xFF,
+                e1_rev = (b1 + 0x5A) & 0xFF,
+
                 d3 = dataBuffer[j + 3];
 
             for (var L = 1; L <= 20; L++) {
@@ -7871,11 +7878,15 @@ function scanForMaliciousCode_NET_and_Native() {
 
                     if (c0 === e0_bit && dataBuffer[j + k1_off[L]] === e1_bit) {
                         if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 0)) {
-                            detectedAlgo = "XOR/XNOR"; return true;
+                            detectedAlgo = "XOR-XNOR"; return true;
                         }
                     } else if (c0 === e0_math && dataBuffer[j + k1_off[L]] === e1_math) {
                         if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 1)) {
-                            detectedAlgo = "ADD/SUB"; return true;
+                            detectedAlgo = "ADD-SUB"; return true;
+                        }
+                    } else if (c0 === e0_rev && dataBuffer[j + k1_off[L]] === e1_rev) {
+                        if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 2)) {
+                            detectedAlgo = "SUB-REV"; return true;
                         }
                     }
                 }
@@ -7956,7 +7967,7 @@ function scanForMaliciousCode_NET_and_Native() {
     if (isEncPePresent) {
         verdicts.push({
             type: "Encrypted payload",
-            version: detectedAlgo,
+            version: "Algo: " + detectedAlgo,
             details: mayBeInfected
         });
     }
