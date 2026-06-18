@@ -7791,10 +7791,9 @@ function scanForMaliciousCode_NET_and_Native() {
     // ==============================================================================
     var k0_off = new Array(17),
         k1_off = new Array(17),
-        k3_off = new Array(17),
-        len = 1;
+        k3_off = new Array(17);
 
-    for (; len <= 16; len++) {
+    for (var len = 1; len <= 16; len++) {
         k0_off[len] = 40 + ((len - (40 % len)) % len);
         k1_off[len] = 40 + ((1 + len - (40 % len)) % len);
         k3_off[len] = 40 + ((3 + len - (40 % len)) % len); // Maps to +3 (e_cblp upper byte)
@@ -7802,7 +7801,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // Strict PE header verification function. 
     // Dynamically supports ANY key length by mapping relative offsets back to the e_res2 zero-block.
-    var verifyPeSignature = function (dataBuffer, peStartOffset, maxValidLfaNew, keyLength) {
+    function verifyPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength) {
 
         // Universal decryptor: Maps any PE offset to its corresponding key byte stored in e_res2
         var getK = function (offset) {
@@ -7847,9 +7846,7 @@ function scanForMaliciousCode_NET_and_Native() {
         return false;
     };
 
-    var i = 0;
-
-    for (; i < PE_Cached.numberOfUnmanagedResources && !isXorPePresent; i++) {
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isXorPePresent; i++) {
         var resourceOffset = PE.getResourceOffsetByNumber(i),
             resourceSize = PE.getResourceSizeByNumber(i);
 
@@ -7859,22 +7856,19 @@ function scanForMaliciousCode_NET_and_Native() {
             // Limit scanning to the first 4KB to avoid performance bottlenecks
             var maxScanSize = Math.min(resourceSize, 0x1000),
                 hexSignature = PE.getSignature(resourceOffset, maxScanSize),
-                dataBuffer = new Array(maxScanSize),
-                k = 0,
-                p = 0;
+                dataBuffer = new Array(maxScanSize);
 
             // Fast hex-string to integer array parsing
-            for (; k < maxScanSize; k++, p += 2) {
+            for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
                 var char1 = hexSignature.charCodeAt(p),
                     char2 = hexSignature.charCodeAt(p + 1);
 
                 dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
             }
 
-            var maxSearchIndex = maxScanSize - 0x100,
-                j = 0;
+            var maxSearchIndex = maxScanSize - 0x100;
 
-            for (; j < maxSearchIndex; j++) {
+            for (var j = 0; j < maxSearchIndex; j++) {
                 var byte0 = dataBuffer[j],
                     byte1 = dataBuffer[j + 1],
 
@@ -7888,8 +7882,7 @@ function scanForMaliciousCode_NET_and_Native() {
                 }
 
                 // DYNAMIC FAST-FAIL: Test all lengths from 1 to 16 bytes instantly
-                var L = 1;
-                for (; L <= 16; L++) {
+                for (var L = 1; L <= 16; L++) {
 
                     // We check if the key0, key1, and key3 (e_cblp zero) perfectly mirror into the e_res2 zero-block.
                     // Because k0_off, k1_off, and k3_off are precalculated arrays, this check takes ~1 CPU cycle.
