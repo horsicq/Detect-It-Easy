@@ -223,7 +223,7 @@ function stdout(stringToOut) {
         if (typeof _error === "function") {
             _error(stringToOut);
         } else {
-            throw stringToOut;
+            throw new Error(stringToOut);
         }
     }
 }
@@ -7779,28 +7779,24 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
-    // Detect encrypted PE files (XORed with a key of 1 to 16 bytes) in the resource section via KPA (Known Plaintext Attack)
-
     var isXorPePresent = false;
 
     // ==============================================================================
-    // PRE-CALCULATION BLOCK: O(1) Offset mapping for all key lengths (1 to 16 bytes)
-    // We leverage the e_res2 block (+40 to +59), which contains 20 consecutive zeroes.
-    // By precalculating where key[0], key[1], and key[3] (e_cblp zero) fall within 
-    // this zero-block, we eliminate costly modulo math from the hot loop.
+    // PRE-CALCULATION BLOCK: O(1) Offset mapping for key lengths up to 20 bytes
+    // We leverage the e_res2 block (+40 to +59), which contains exactly 20 consecutive zeroes.
+    // 20 bytes is the MATHEMATICAL MAXIMUM key length this specific O(1) KPA attack can support.
     // ==============================================================================
-    var k0_off = new Array(17),
-        k1_off = new Array(17),
-        k3_off = new Array(17);
+    var k0_off = new Array(21),
+        k1_off = new Array(21),
+        k3_off = new Array(21);
 
-    for (var len = 1; len <= 16; len++) {
+    for (var len = 1; len <= 20; len++) {
         k0_off[len] = 40 + ((len - (40 % len)) % len);
         k1_off[len] = 40 + ((1 + len - (40 % len)) % len);
         k3_off[len] = 40 + ((3 + len - (40 % len)) % len); // Maps to +3 (e_cblp upper byte)
     }
 
     // Strict PE header verification function. 
-    // Dynamically supports ANY key length by mapping relative offsets back to the e_res2 zero-block.
     function verifyPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength) {
 
         // Universal decryptor: Maps any PE offset to its corresponding key byte stored in e_res2
@@ -7823,27 +7819,10 @@ function scanForMaliciousCode_NET_and_Native() {
                 peSigByte2 = dataBuffer[peHeaderOffset + 2] ^ getK(lfaNewOffset + 2),
                 peSigByte3 = dataBuffer[peHeaderOffset + 3] ^ getK(lfaNewOffset + 3);
 
-            // Validating against 0x50 ('P'), 0x45 ('E'), 0x00, 0x00
             if (peSigByte0 === 0x50 && peSigByte1 === 0x45 && peSigByte2 === 0x00 && peSigByte3 === 0x00) {
-
-                /* var keyHexArr = [], k = 0;
-                 for (; k < keyLength; k++) {
-                     keyHexArr.push(("0" + getK(k).toString(16).toUpperCase()).slice(-2));
-                 }
-                 var decM = String.fromCharCode(dataBuffer[peStartOffset] ^ getK(0)),
-                     decZ = String.fromCharCode(dataBuffer[peStartOffset + 1] ^ getK(1));
- 
-                 _debug("[+] 100% VALID XOR PE FOUND!");
-                 _debug("    -> Resource Offset: 0x" + peStartOffset.toString(16).toUpperCase());
-                 _debug("    -> e_lfanew pointer: 0x" + lfaNewOffset.toString(16).toUpperCase());
-                 _debug("    -> Key Length: " + keyLength + " bytes");
-                 _debug("    -> Key dump: [ " + keyHexArr.join(" ") + " ]");
-                 _debug("    -> Decrypted signature: " + decM + decZ); */
-
                 return true;
             }
         }
-
         return false;
     };
 
@@ -7851,15 +7830,12 @@ function scanForMaliciousCode_NET_and_Native() {
         var resourceOffset = PE.getResourceOffsetByNumber(i),
             resourceSize = PE.getResourceSizeByNumber(i);
 
-        // Ignore invalid (0) offsets and ensure the resource is large enough for a PE header
-        if (resourceOffset > 0 && resourceSize > 0x100) {
+        if (resourceOffset > 0 && resourceSize > 0x800) { // More than 2 KB
 
-            // Limit scanning to the first 4KB to avoid performance bottlenecks
             var maxScanSize = Math.min(resourceSize, 0x1000),
                 hexSignature = PE.getSignature(resourceOffset, maxScanSize),
                 dataBuffer = new Array(maxScanSize);
 
-            // Fast hex-string to integer array parsing
             for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
                 var char1 = hexSignature.charCodeAt(p),
                     char2 = hexSignature.charCodeAt(p + 1);
@@ -7867,38 +7843,28 @@ function scanForMaliciousCode_NET_and_Native() {
                 dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
             }
 
-            var maxSearchIndex = maxScanSize - 0x100; // 256 bytes
+            var maxSearchIndex = maxScanSize - 0x100;
 
             for (var j = 0; j < maxSearchIndex; j++) {
                 var byte0 = dataBuffer[j],
                     byte1 = dataBuffer[j + 1],
-
-                    // KPA: Assume the current bytes are the encrypted 'M' (0x4D) and 'Z' (0x5A)
                     key0 = byte0 ^ 0x4D,
                     key1 = byte1 ^ 0x5A;
 
-                // FAST-FAIL 1: Ignore UNENCRYPTED PE files (XOR key evaluates to 0x00 0x00)
-                if (key0 === 0x00 && key1 === 0x00) {
-                    continue;
-                }
+                if (key0 === 0x00 && key1 === 0x00) continue;
 
-                // DYNAMIC FAST-FAIL: Test all lengths from 1 to 16 bytes instantly
-                for (var L = 1; L <= 16; L++) {
-
-                    // We check if the key0, key1, and key3 (e_cblp zero) perfectly mirror into the e_res2 zero-block.
-                    // Because k0_off, k1_off, and k3_off are precalculated arrays, this check takes ~1 CPU cycle.
+                // Test all lengths up to 20 bytes (The physical limit of the e_res2 zero-block)
+                for (var L = 1; L <= 20; L++) {
                     if (dataBuffer[j + k0_off[L]] === key0 &&
                         dataBuffer[j + k1_off[L]] === key1 &&
                         dataBuffer[j + 3] === dataBuffer[j + k3_off[L]]) {
 
-                        // If the heuristics match, perform the strict PE signature validation
                         if (verifyPeSignature(dataBuffer, j, maxScanSize - j - 4, L)) {
                             isXorPePresent = true;
                             break;
                         }
                     }
                 }
-
                 if (isXorPePresent) break;
             }
         }
