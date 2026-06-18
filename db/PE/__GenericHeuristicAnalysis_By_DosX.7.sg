@@ -7880,6 +7880,7 @@ function scanForMaliciousCode_NET_and_Native() {
                 }
             }
         }
+
         return false;
     }
 
@@ -7891,7 +7892,7 @@ function scanForMaliciousCode_NET_and_Native() {
         // Target actual payloads (> 4 KB) and skip bitmaps
         if (resourceOffset > 0 && resourceSize > 0x1000 && !PE.compare("28 00 00 00 ?? ?? 00 00 ?? ?? 00 00 01 00 ?? 00", resourceOffset)) {
 
-            var maxScanSize = Math.min(resourceSize, 0x2000),
+            var maxScanSize = Math.min(resourceSize, 0x1000),
                 hexSignature = PE.getSignature(resourceOffset, maxScanSize),
                 dataBuffer = new Array(maxScanSize);
 
@@ -7912,7 +7913,7 @@ function scanForMaliciousCode_NET_and_Native() {
             overlaySize = PE.getOverlaySize();
 
         if (overlayOffset > 0 && overlaySize > 0x1000 && !PE.isSigned()) {
-            var maxScanSize = Math.min(overlaySize, 0x2000),
+            var maxScanSize = Math.min(overlaySize, 0x1000),
                 hexSignature = PE.getSignature(overlayOffset, maxScanSize),
                 dataBuffer = new Array(maxScanSize);
 
@@ -7922,6 +7923,35 @@ function scanForMaliciousCode_NET_and_Native() {
             }
 
             if (scanBuffer(dataBuffer, maxScanSize, overlayOffset)) isEncPePresent = true;
+        }
+    }
+
+    // 3. Scan sections
+    if (!isEncPePresent) {
+        for (var i = 0; i < PE_Cached.numberOfSections && !isEncPePresent; i++) {
+            var sectionOffset = PE.getSectionFileOffset(i),
+                sectionSize = PE.getSectionFileSize(i);
+
+            if (PE_Cached.numberOfSections > 1) {
+                if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && i === 0 && PE.section[0].Name === ".text") {
+                    continue;
+                } else if (i === PE.getResourceSection() && PE.section[i].Name === ".rsrc") {
+                    continue;
+                }
+            }
+
+            if (sectionOffset > 0 && sectionSize > 0x2500) {
+                var maxScanSize = Math.min(sectionSize, PE.section[i].Name.match(/^\.(?:r)?data$/i) ? 0x6000 : 0x2500),
+                    hexSignature = PE.getSignature(sectionOffset, maxScanSize),
+                    dataBuffer = new Array(maxScanSize);
+
+                for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
+                    var char1 = hexSignature.charCodeAt(p), char2 = hexSignature.charCodeAt(p + 1);
+                    dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
+                }
+
+                if (scanBuffer(dataBuffer, maxScanSize, sectionOffset)) isEncPePresent = true;
+            }
         }
     }
 
