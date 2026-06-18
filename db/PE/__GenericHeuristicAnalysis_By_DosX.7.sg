@@ -7779,7 +7779,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
-    // Detect encrypted PE files in the resource section via KPA (Known Plaintext Attack)
+    // Detect encrypted PE files in the resource section AND overlay via KPA (Known Plaintext Attack)
     // Supports MULTIPLE algorithms (XOR, XNOR, ADD, SUB) and key lengths up to 20 bytes
 
     var isEncPePresent = false;
@@ -7849,6 +7849,41 @@ function scanForMaliciousCode_NET_and_Native() {
         return false;
     }
 
+    // Scan function to avoid code duplication
+    function scanBuffer(dataBuffer, bufferSize, offsetBase) {
+        var maxSearchIndex = bufferSize - 0x100;
+        for (var j = 0; j < maxSearchIndex; j++) {
+            var b0 = dataBuffer[j],
+                b1 = dataBuffer[j + 1],
+                e0_bit = b0 ^ 0x4D,
+                e1_bit = b1 ^ 0x5A;
+
+            if (e0_bit === 0x00 && e1_bit === 0x00) continue;
+
+            var e0_math = (b0 - 0x4D) & 0xFF,
+                e1_math = (b1 - 0x5A) & 0xFF,
+                d3 = dataBuffer[j + 3];
+
+            for (var L = 1; L <= 20; L++) {
+                if (d3 === dataBuffer[j + k3_off[L]]) {
+                    var c0 = dataBuffer[j + k0_off[L]];
+
+                    if (c0 === e0_bit && dataBuffer[j + k1_off[L]] === e1_bit) {
+                        if (verifyPeSignature(dataBuffer, j, bufferSize - j - 4, L, 0)) {
+                            detectedAlgo = "XOR/XNOR"; return true;
+                        }
+                    } else if (c0 === e0_math && dataBuffer[j + k1_off[L]] === e1_math) {
+                        if (verifyPeSignature(dataBuffer, j, bufferSize - j - 4, L, 1)) {
+                            detectedAlgo = "ADD/SUB"; return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    // 1. Scan Resources
     for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isEncPePresent; i++) {
         var resourceOffset = PE.getResourceOffsetByNumber(i),
             resourceSize = PE.getResourceSizeByNumber(i);
@@ -7867,39 +7902,26 @@ function scanForMaliciousCode_NET_and_Native() {
                 dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
             }
 
-            var maxSearchIndex = maxScanSize - 0x100;
+            if (scanBuffer(dataBuffer, maxScanSize, resourceOffset)) isEncPePresent = true;
+        }
+    }
 
-            for (var j = 0; j < maxSearchIndex; j++) {
-                var b0 = dataBuffer[j],
-                    b1 = dataBuffer[j + 1],
-                    e0_bit = b0 ^ 0x4D,
-                    e1_bit = b1 ^ 0x5A;
+    // 2. Scan Overlay
+    if (!isEncPePresent) {
+        var overlayOffset = PE.getOverlayOffset(),
+            overlaySize = PE.getOverlaySize();
 
-                if (e0_bit === 0x00 && e1_bit === 0x00) continue;
+        if (overlayOffset > 0 && overlaySize > 0x1000 && !PE.isSigned()) {
+            var maxScanSize = Math.min(overlaySize, 0x2000),
+                hexSignature = PE.getSignature(overlayOffset, maxScanSize),
+                dataBuffer = new Array(maxScanSize);
 
-                var e0_math = (b0 - 0x4D) & 0xFF,
-                    e1_math = (b1 - 0x5A) & 0xFF,
-                    d3 = dataBuffer[j + 3];
-
-                for (var L = 1; L <= 20; L++) {
-
-                    if (d3 === dataBuffer[j + k3_off[L]]) {
-                        var c0 = dataBuffer[j + k0_off[L]];
-
-                        if (c0 === e0_bit && dataBuffer[j + k1_off[L]] === e1_bit) {
-                            if (verifyPeSignature(dataBuffer, j, maxScanSize - j - 4, L, 0)) {
-                                detectedAlgo = "XOR/XNOR"; isEncPePresent = true; break;
-                            }
-                        } else if (c0 === e0_math && dataBuffer[j + k1_off[L]] === e1_math) {
-                            if (verifyPeSignature(dataBuffer, j, maxScanSize - j - 4, L, 1)) {
-                                detectedAlgo = "ADD/SUB"; isEncPePresent = true; break;
-                            }
-                        }
-                    }
-                }
-
-                if (isEncPePresent) break;
+            for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
+                var char1 = hexSignature.charCodeAt(p), char2 = hexSignature.charCodeAt(p + 1);
+                dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
             }
+
+            if (scanBuffer(dataBuffer, maxScanSize, overlayOffset)) isEncPePresent = true;
         }
     }
 
