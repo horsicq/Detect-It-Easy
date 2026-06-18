@@ -7858,7 +7858,6 @@ function scanForMaliciousCode_NET_and_Native() {
                 e0_bit = b0 ^ 0x4D,
                 e1_bit = b1 ^ 0x5A;
 
-
             // Skip if both e0_bit and e1_bit are zero, as it indicates no encryption
             if (e0_bit === 0x00 && e1_bit === 0x00) continue;
 
@@ -7886,6 +7885,24 @@ function scanForMaliciousCode_NET_and_Native() {
         return false;
     }
 
+    // Helper function to decode hex signature into a byte array
+    function getDecodedBuffer(offset, size) {
+        var hexSignature = PE.getSignature(offset, size).replace(/\s/g, ''),
+            buffer = new Array(size);
+
+        for (var k = 0, p = 0; k < size; k++, p += 2) {
+            var char1 = hexSignature.charCodeAt(p),
+                char2 = hexSignature.charCodeAt(p + 1);
+
+            if (char1 >= 97) char1 -= 32;
+            if (char2 >= 97) char2 -= 32;
+
+            buffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
+        }
+
+        return buffer;
+    }
+
     // 1. Scan Resources
     for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isEncPePresent; i++) {
         var resourceOffset = PE.getResourceOffsetByNumber(i),
@@ -7893,20 +7910,8 @@ function scanForMaliciousCode_NET_and_Native() {
 
         // Target actual payloads (> 4 KB) and skip bitmaps
         if (resourceOffset > 0 && resourceSize > 0x1000 && !PE.compare("28 00 00 00 ?? ?? 00 00 ?? ?? 00 00 01 00 ?? 00", resourceOffset)) {
-
             var maxScanSize = Math.min(resourceSize, 0x1000),
-                hexSignature = PE.getSignature(resourceOffset, maxScanSize).replace(/\s/g, ''),
-                dataBuffer = new Array(maxScanSize);
-
-            for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
-                var char1 = hexSignature.charCodeAt(p),
-                    char2 = hexSignature.charCodeAt(p + 1);
-
-                if (char1 >= 97) char1 -= 32;
-                if (char2 >= 97) char2 -= 32;
-
-                dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
-            }
+                dataBuffer = getDecodedBuffer(resourceOffset, maxScanSize);
 
             if (scanBuffer(dataBuffer, maxScanSize, resourceOffset)) isEncPePresent = true;
         }
@@ -7919,17 +7924,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
         if (overlayOffset > 0 && overlaySize > 0x1000 && !PE.isSigned()) {
             var maxScanSize = Math.min(overlaySize, 0x14000),
-                hexSignature = PE.getSignature(overlayOffset, maxScanSize).replace(/\s/g, ''),
-                dataBuffer = new Array(maxScanSize);
-
-            for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
-                var char1 = hexSignature.charCodeAt(p), char2 = hexSignature.charCodeAt(p + 1);
-
-                if (char1 >= 97) char1 -= 32;
-                if (char2 >= 97) char2 -= 32;
-
-                dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
-            }
+                dataBuffer = getDecodedBuffer(overlayOffset, maxScanSize);
 
             if (scanBuffer(dataBuffer, maxScanSize, overlayOffset)) isEncPePresent = true;
         }
@@ -7951,17 +7946,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
             if (sectionOffset > 0 && sectionSize > 0x2500) {
                 var maxScanSize = Math.min(sectionSize, PE.section[i].Name.match(/^\.(?:r)?data$/i) ? 0x6000 : 0x2500),
-                    hexSignature = PE.getSignature(sectionOffset, maxScanSize).replace(/\s/g, ''),
-                    dataBuffer = new Array(maxScanSize);
-
-                for (var k = 0, p = 0; k < maxScanSize; k++, p += 2) {
-                    var char1 = hexSignature.charCodeAt(p), char2 = hexSignature.charCodeAt(p + 1);
-
-                    if (char1 >= 97) char1 -= 32;
-                    if (char2 >= 97) char2 -= 32;
-
-                    dataBuffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
-                }
+                    dataBuffer = getDecodedBuffer(sectionOffset, maxScanSize);
 
                 if (scanBuffer(dataBuffer, maxScanSize, sectionOffset)) isEncPePresent = true;
             }
