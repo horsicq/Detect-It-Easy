@@ -7779,13 +7779,14 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 
-    var isXorPePresent = false;
+    // Detect encrypted PE files in the resource section via KPA (Known Plaintext Attack)
+    // Supports MULTIPLE algorithms (XOR, XNOR, ADD, SUB) and key lengths up to 20 bytes
 
-    // ==============================================================================
+    var isEncPePresent = false;
+
+    var detectedAlgo = String();
+
     // PRE-CALCULATION BLOCK: O(1) Offset mapping for key lengths up to 20 bytes
-    // We leverage the e_res2 block (+40 to +59), which contains exactly 20 consecutive zeroes.
-    // 20 bytes is the MATHEMATICAL MAXIMUM key length this specific O(1) KPA attack can support.
-    // ==============================================================================
     var k0_off = new Array(21),
         k1_off = new Array(21),
         k3_off = new Array(21);
@@ -7793,46 +7794,69 @@ function scanForMaliciousCode_NET_and_Native() {
     for (var len = 1; len <= 20; len++) {
         k0_off[len] = 40 + ((len - (40 % len)) % len);
         k1_off[len] = 40 + ((1 + len - (40 % len)) % len);
-        k3_off[len] = 40 + ((3 + len - (40 % len)) % len); // Maps to +3 (e_cblp upper byte)
+        k3_off[len] = 40 + ((3 + len - (40 % len)) % len);
     }
 
-    // Strict PE header verification function. 
-    function verifyPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength) {
+    // Strict PE header verification function.
+    // mode 0: Bitwise algorithms (XOR, XNOR)
+    // mode 1: Arithmetic algorithms (ADD, SUB)
+    function verifyPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength, mode) {
 
-        // Universal decryptor: Maps any PE offset to its corresponding key byte stored in e_res2
-        var getK = function (offset) {
+        // Universal decryptor: Maps any PE offset to its corresponding encrypted zero in e_res2
+        var getDecrypted = function (offset) {
             var eRes2Offset = 40 + ((offset % keyLength + keyLength - (40 % keyLength)) % keyLength);
-            return dataBuffer[peStartOffset + eRes2Offset];
+            var encryptedZero = dataBuffer[peStartOffset + eRes2Offset];
+            var cipherByte = dataBuffer[peStartOffset + offset];
+
+            return mode === 0 ? (cipherByte ^ encryptedZero) : ((cipherByte - encryptedZero) & 0xFF);
         };
 
-        var lfaNewByte0 = dataBuffer[peStartOffset + 0x3C] ^ getK(0x3C),
-            lfaNewByte1 = dataBuffer[peStartOffset + 0x3D] ^ getK(0x3D),
-            lfaNewByte2 = dataBuffer[peStartOffset + 0x3E] ^ getK(0x3E),
-            lfaNewByte3 = dataBuffer[peStartOffset + 0x3F] ^ getK(0x3F),
+        // Get e_lfanew
+        var lfaNewByte0 = getDecrypted(0x3C),
+            lfaNewByte1 = getDecrypted(0x3D),
+            lfaNewByte2 = getDecrypted(0x3E),
+            lfaNewByte3 = getDecrypted(0x3F),
             lfaNewOffset = lfaNewByte0 | (lfaNewByte1 << 8) | (lfaNewByte2 << 16) | (lfaNewByte3 * 16777216);
 
         // Sanity check for the e_lfanew pointer
         if (lfaNewOffset > 0x40 && lfaNewOffset < maxValidLfaNew) {
-            var peHeaderOffset = peStartOffset + lfaNewOffset,
-                peSigByte0 = dataBuffer[peHeaderOffset + 0] ^ getK(lfaNewOffset + 0),
-                peSigByte1 = dataBuffer[peHeaderOffset + 1] ^ getK(lfaNewOffset + 1),
-                peSigByte2 = dataBuffer[peHeaderOffset + 2] ^ getK(lfaNewOffset + 2),
-                peSigByte3 = dataBuffer[peHeaderOffset + 3] ^ getK(lfaNewOffset + 3);
+            var peHeaderOffset = peStartOffset + lfaNewOffset;
 
-            if (peSigByte0 === 0x50 && peSigByte1 === 0x45 && peSigByte2 === 0x00 && peSigByte3 === 0x00) {
+            // 1. Verify PE Signature (PE\0\0)
+            if (getDecrypted(peHeaderOffset + 0) === 0x50 &&
+                getDecrypted(peHeaderOffset + 1) === 0x45 &&
+                getDecrypted(peHeaderOffset + 2) === 0x00 &&
+                getDecrypted(peHeaderOffset + 3) === 0x00) {
+
+                // 2. Verify Optional Header Magic (PE32=0x10B, PE64=0x20B)
+                var magic = getDecrypted(peHeaderOffset + 0x18) | (getDecrypted(peHeaderOffset + 0x19) << 8);
+                if (magic !== 0x010B && magic !== 0x020B) return false;
+
+                // 3. Verify NumberOfSections (IMAGE_FILE_HEADER)
+                // Offset 0x06 from PE signature
+                var numSections = getDecrypted(peHeaderOffset + 0x06) | (getDecrypted(peHeaderOffset + 0x07) << 8);
+                if (numSections === 0 || numSections > 96) return false;
+
+                // 4. Verify Characteristics (IMAGE_FILE_HEADER)
+                // Offset 0x16 from PE signature. 0x0002 is IMAGE_FILE_EXECUTABLE_IMAGE
+                var characteristics = getDecrypted(peHeaderOffset + 0x16) | (getDecrypted(peHeaderOffset + 0x17) << 8);
+                if (!(characteristics & 0x0002)) return false;
+
                 return true;
             }
         }
-        return false;
-    };
 
-    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isXorPePresent; i++) {
+        return false;
+    }
+
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isEncPePresent; i++) {
         var resourceOffset = PE.getResourceOffsetByNumber(i),
             resourceSize = PE.getResourceSizeByNumber(i);
 
-        if (resourceOffset > 0 && resourceSize > 0x800) { // More than 2 KB
+        // Target actual payloads (> 768 bytes) and skip bitmaps
+        if (resourceOffset > 0 && resourceSize > 0x300 && !PE.compare("28 00 00 00 ?? ?? 00 00 ?? ?? 00 00 01 00 ?? 00", resourceOffset)) {
 
-            var maxScanSize = Math.min(resourceSize, 0x1000),
+            var maxScanSize = Math.min(resourceSize, 0x2000),
                 hexSignature = PE.getSignature(resourceOffset, maxScanSize),
                 dataBuffer = new Array(maxScanSize);
 
@@ -7846,34 +7870,43 @@ function scanForMaliciousCode_NET_and_Native() {
             var maxSearchIndex = maxScanSize - 0x100;
 
             for (var j = 0; j < maxSearchIndex; j++) {
-                var byte0 = dataBuffer[j],
-                    byte1 = dataBuffer[j + 1],
-                    key0 = byte0 ^ 0x4D,
-                    key1 = byte1 ^ 0x5A;
+                var b0 = dataBuffer[j],
+                    b1 = dataBuffer[j + 1],
+                    e0_bit = b0 ^ 0x4D,
+                    e1_bit = b1 ^ 0x5A;
 
-                if (key0 === 0x00 && key1 === 0x00) continue;
+                if (e0_bit === 0x00 && e1_bit === 0x00) continue;
 
-                // Test all lengths up to 20 bytes (The physical limit of the e_res2 zero-block)
+                var e0_math = (b0 - 0x4D) & 0xFF,
+                    e1_math = (b1 - 0x5A) & 0xFF,
+                    d3 = dataBuffer[j + 3];
+
                 for (var L = 1; L <= 20; L++) {
-                    if (dataBuffer[j + k0_off[L]] === key0 &&
-                        dataBuffer[j + k1_off[L]] === key1 &&
-                        dataBuffer[j + 3] === dataBuffer[j + k3_off[L]]) {
 
-                        if (verifyPeSignature(dataBuffer, j, maxScanSize - j - 4, L)) {
-                            isXorPePresent = true;
-                            break;
+                    if (d3 === dataBuffer[j + k3_off[L]]) {
+                        var c0 = dataBuffer[j + k0_off[L]];
+
+                        if (c0 === e0_bit && dataBuffer[j + k1_off[L]] === e1_bit) {
+                            if (verifyPeSignature(dataBuffer, j, maxScanSize - j - 4, L, 0)) {
+                                detectedAlgo = "XOR/XNOR"; isEncPePresent = true; break;
+                            }
+                        } else if (c0 === e0_math && dataBuffer[j + k1_off[L]] === e1_math) {
+                            if (verifyPeSignature(dataBuffer, j, maxScanSize - j - 4, L, 1)) {
+                                detectedAlgo = "ADD/SUB"; isEncPePresent = true; break;
+                            }
                         }
                     }
                 }
-                if (isXorPePresent) break;
+
+                if (isEncPePresent) break;
             }
         }
     }
 
-    if (isXorPePresent) {
+    if (isEncPePresent) {
         verdicts.push({
-            type: "XOR-encrypted payload",
-            version: String(),
+            type: "Encrypted payload",
+            version: detectedAlgo,
             details: mayBeInfected
         });
     }
