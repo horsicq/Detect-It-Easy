@@ -7767,7 +7767,7 @@ function scanForMaliciousCode_NET_and_Native() {
             validateSignature("'" + trigger + "'")
         ) {
             verdicts.push({
-                type: "Base64 payload",
+                type: "Base64 executable payload",
                 version: String(),
                 details: mayBeInfected
             });
@@ -7963,10 +7963,15 @@ function scanForMaliciousCode_NET_and_Native() {
             var sectionOffset = PE.getSectionFileOffset(i),
                 sectionSize = PE.getSectionFileSize(i);
 
+            // Optimizations: Skip known sections that are unlikely to contain encrypted payloads
             if (PE_Cached.numberOfSections > 1) {
-                if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && i === 0 && PE.section[0].Name === ".text") {
+                if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && PE.section[0].Name === ".text" && i === 0) {
                     continue;
                 } else if (i === PE.getResourceSection() && PE.section[i].Name === ".rsrc") {
+                    continue;
+                } else if (i === PE.getImportSection() && PE.section[i].Name === ".idata" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
+                    continue;
+                } else if (i === PE.getRelocsSection() && PE.section[i].Name === ".reloc" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getImportSection()) {
                     continue;
                 }
             }
@@ -7982,7 +7987,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if (isEncPePresent) {
         verdicts.push({
-            type: "Encrypted payload",
+            type: "Encrypted executable payload",
             version: "Algo: " + detectedAlgo,
             details: mayBeInfected
         });
