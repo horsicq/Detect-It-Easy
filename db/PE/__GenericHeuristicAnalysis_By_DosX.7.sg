@@ -7786,6 +7786,8 @@ function scanForMaliciousCode_NET_and_Native() {
 
     var detectedAlgo = String();
 
+    var Uint8Arr = typeof Uint8Array !== "undefined" ? Uint8Array : Array;
+
     // PRE-CALCULATION BLOCK: O(1) Offset mapping for key lengths up to 20 bytes
     var k0_off = new Array(21),
         k1_off = new Array(21),
@@ -7796,6 +7798,13 @@ function scanForMaliciousCode_NET_and_Native() {
         k1_off[len] = 40 + ((1 + len - (40 % len)) % len);
         k3_off[len] = 40 + ((3 + len - (40 % len)) % len);
     }
+
+    // LUT (Lookup Table) for ULTRA-FAST Hex to Byte decoding
+    var hexLUT = new Uint8Arr(256);
+    for (var i = 0; i < 256; i++) hexLUT[i] = 0;
+    for (var i = 48; i <= 57; i++) hexLUT[i] = i - 48; // 0-9
+    for (var i = 65; i <= 70; i++) hexLUT[i] = i - 55; // A-F
+    for (var i = 97; i <= 102; i++) hexLUT[i] = i - 87; // a-f
 
     // Strict PE header verification function.
     // mode 0: Bitwise algorithms (XOR, XNOR)
@@ -7824,7 +7833,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
         // Sanity check for the e_lfanew pointer
         if (lfaNewOffset > 0x40 && lfaNewOffset < maxValidLfaNew) {
-            var peHeaderOffset = lfaNewOffset; // ИСПРАВЛЕНО: Без двойного прибавления peStartOffset
+            var peHeaderOffset = lfaNewOffset;
 
             // 1. Verify PE Signature (PE\0\0)
             if (getDecrypted(peHeaderOffset + 0) === 0x50 &&
@@ -7855,39 +7864,50 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // Scan function to avoid code duplication
     function scanBuffer(dataBuffer, bufferSize, offsetBase) {
-        var maxSearchIndex = bufferSize - 0x100;
-        for (var j = 0; j < maxSearchIndex; j++) {
-            var b0 = dataBuffer[j],
-                b1 = dataBuffer[j + 1],
-                e0_bit = b0 ^ 0x4D,
-                e1_bit = b1 ^ 0x5A;
+        var maxSearchIndex = bufferSize - 0x100,
+            j = 0, L = 1, b0, b1, e0_bit, e1_bit, d3, c0,
+            e0_math, e1_math, e0_rev, e1_rev;
+
+        for (; j < maxSearchIndex; j++) {
+            b0 = dataBuffer[j];
+            b1 = dataBuffer[j + 1];
+            e0_bit = b0 ^ 0x4D;
+            e1_bit = b1 ^ 0x5A;
 
             // Skip if both e0_bit and e1_bit are zero, as it indicates no encryption
             if (e0_bit === 0x00 && e1_bit === 0x00) continue;
 
-            var e0_math = (b0 - 0x4D) & 0xFF,
-                e1_math = (b1 - 0x5A) & 0xFF,
+            d3 = dataBuffer[j + 3];
 
-                e0_rev = (b0 + 0x4D) & 0xFF,
-                e1_rev = (b1 + 0x5A) & 0xFF,
-
-                d3 = dataBuffer[j + 3];
-
-            for (var L = 1; L <= 20; L++) {
+            for (L = 1; L <= 20; L++) {
                 if (d3 === dataBuffer[j + k3_off[L]]) {
-                    var c0 = dataBuffer[j + k0_off[L]];
+                    c0 = dataBuffer[j + k0_off[L]];
 
                     if (c0 === e0_bit && dataBuffer[j + k1_off[L]] === e1_bit) {
                         if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 0)) {
                             detectedAlgo = "XOR-XNOR"; return true;
                         }
-                    } else if (c0 === e0_math && dataBuffer[j + k1_off[L]] === e1_math) {
-                        if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 1)) {
-                            detectedAlgo = "ADD-SUB"; return true;
-                        }
-                    } else if (c0 === e0_rev && dataBuffer[j + k1_off[L]] === e1_rev) {
-                        if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 2)) {
-                            detectedAlgo = "SUB-REV"; return true;
+                    } else {
+                        // LAZY EVALUATION: Execute this only if the previous checks failed
+                        e0_math = (b0 - 0x4D) & 0xFF;
+                        if (c0 === e0_math) {
+                            e1_math = (b1 - 0x5A) & 0xFF;
+                            if (dataBuffer[j + k1_off[L]] === e1_math) {
+                                if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 1)) {
+                                    detectedAlgo = "ADD-SUB"; return true;
+                                }
+                            }
+                        } else {
+                            // LAZY EVALUATION: Execute this only if the previous checks failed
+                            e0_rev = (b0 + 0x4D) & 0xFF;
+                            if (c0 === e0_rev) {
+                                e1_rev = (b1 + 0x5A) & 0xFF;
+                                if (dataBuffer[j + k1_off[L]] === e1_rev) {
+                                    if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 2)) {
+                                        detectedAlgo = "SUB-REV"; return true;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -7900,16 +7920,11 @@ function scanForMaliciousCode_NET_and_Native() {
     // Helper function to decode hex signature into a byte array
     function getDecodedBuffer(offset, size) {
         var hexSignature = PE.getSignature(offset, size),
-            buffer = new Array(size);
+            buffer = new Uint8Arr(size),
+            k = 0, p = 0; // Hoisting
 
-        for (var k = 0, p = 0; k < size; k++, p += 2) {
-            var char1 = hexSignature.charCodeAt(p),
-                char2 = hexSignature.charCodeAt(p + 1);
-
-            if (char1 >= 97) char1 -= 32;
-            if (char2 >= 97) char2 -= 32;
-
-            buffer[k] = (((char1 > 57) ? (char1 - 55) : (char1 - 48)) << 4) | ((char2 > 57) ? (char2 - 55) : (char2 - 48));
+        for (; k < size; k++, p += 2) {
+            buffer[k] = (hexLUT[hexSignature.charCodeAt(p)] << 4) | hexLUT[hexSignature.charCodeAt(p + 1)];
         }
 
         return buffer;
