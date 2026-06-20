@@ -7761,32 +7761,74 @@ function scanForMaliciousCode_NET_and_Native() {
         "p4AA"  // ~[78 00 01]
     ];
 
-    for (var i = 0; i < rawBase64PostfixSigns.length && !isBase64Payload; i++) {
-        if (PE.findString(PE_Cached.dosStubSize, PE.getSize(), "TV" + rawBase64PostfixSigns[i]) !== -1) {
-            base64Version = "ASCII";
-            isBase64Payload = true;
+    function scanArea(areaOffset, areaSize) {
+        if (areaSize <= 0 || areaOffset <= 0 || isBase64Payload) return;
+
+        for (var i = 0; i < rawBase64PostfixSigns.length && !isBase64Payload; i++) {
+            if (PE.findString(areaOffset, areaSize, "TV" + rawBase64PostfixSigns[i]) !== -1) {
+                base64Version = "ASCII";
+                isBase64Payload = true;
+                return;
+            }
         }
-    }
 
-    if (!isBase64Payload) {
-        var uniOffset = 0,
-            uniSize = PE.getSize();
+        var currentOffset = areaOffset,
+            remainingSize = areaSize;
 
-        while (uniSize > 0 && !isBase64Payload) {
-            var base64AnchorOffset = PE.findSignature(uniOffset, uniSize, "54 00 56 00");
-            if (base64AnchorOffset === -1) break;
+        while (remainingSize > 0 && !isBase64Payload) {
+            var anchorOffset = PE.findSignature(currentOffset, remainingSize, "54 00 56 00");
+            if (anchorOffset === -1) break;
 
-            var advanced = (base64AnchorOffset - uniOffset) + 4;
-            uniOffset += advanced;
-            uniSize -= advanced;
+            var advanced = (anchorOffset - currentOffset) + 4;
+            currentOffset += advanced;
+            remainingSize -= advanced;
 
             for (var k = 0; k < rawBase64PostfixSigns.length && !isBase64Payload; k++) {
-                if (PE.compare(generateUnicodeSignatureMask(rawBase64PostfixSigns[k]), base64AnchorOffset + 4)) {
+                if (PE.compare(generateUnicodeSignatureMask(rawBase64PostfixSigns[k]), anchorOffset + 4)) {
                     base64Version = "UTF-16LE";
                     isBase64Payload = true;
                 }
             }
         }
+    }
+
+    if (_getNumberOfResults("packer") === 0 || _getNumberOfResults("packer") > 1 || _getNumberOfResults("protector") > 0) {
+        for (var i = 0; i < PE_Cached.numberOfSections && !isBase64Payload; i++) {
+            // Optimizations: Skip known sections that are unlikely to contain encoded payloads
+            if (PE_Cached.numberOfSections > 1) {
+                if (PE.section[i].FileSize < 0x2000) {
+                } else if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && PE.section[0].Name === ".text" && i === 0) {
+                    continue;
+                } else if (i === PE.getResourceSection() && PE.section[i].Name === ".rsrc") {
+                    continue;
+                } else if (i === PE.getImportSection() && PE.section[i].Name === ".idata" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
+                    continue;
+                } else if (i === PE.getRelocsSection() && PE.section[i].Name === ".reloc" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getImportSection()) {
+                    continue;
+                }
+            }
+
+            var secOffset = PE.section[i].FileOffset,
+                secSize = PE.section[i].FileSize;
+
+            scanArea(secOffset, secSize);
+        }
+    }
+
+    if (!isBase64Payload && PE_Cached.numberOfUnmanagedResources > 0) {
+        for (var r = 0; r < PE_Cached.numberOfUnmanagedResources && !isBase64Payload; r++) {
+            var resourceOffset = PE.getResourceOffsetByNumber(r),
+                resourceSize = PE.getResourceSizeByNumber(r);
+
+            // Target actual payloads (> 4 KB) and skip bitmaps
+            if (resourceOffset > 0 && resourceSize >= 0x1000 && !PE.compare("28 00 00 00 ?? ?? 00 00 ?? ?? 00 00 01 00 ?? 00", resourceOffset)) {
+                scanArea(resourceOffset, resourceSize);
+            }
+        }
+    }
+
+    if (!isBase64Payload) {
+        scanArea(PE.getOverlayOffset(), PE.getOverlaySize());
     }
 
     if (isBase64Payload) {
@@ -7986,7 +8028,9 @@ function scanForMaliciousCode_NET_and_Native() {
 
             // Optimizations: Skip known sections that are unlikely to contain encrypted payloads
             if (PE_Cached.numberOfSections > 1) {
-                if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && PE.section[0].Name === ".text" && i === 0) {
+                if (sectionOffset > 0 && PE.section[i].FileSize < 0x2500) {
+                    continue;
+                } if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && PE.section[0].Name === ".text" && i === 0) {
                     continue;
                 } else if (i === PE.getResourceSection() && PE.section[i].Name === ".rsrc") {
                     continue;
@@ -7997,12 +8041,10 @@ function scanForMaliciousCode_NET_and_Native() {
                 }
             }
 
-            if (sectionOffset > 0 && sectionSize > 0x2500) {
-                var maxScanSize = Math.min(sectionSize, PE.section[i].Name.match(/^\.[rex]?data$/i) ? 0x6000 : 0x3000),
-                    dataBuffer = getDecodedBuffer(sectionOffset, maxScanSize);
+            var maxScanSize = Math.min(sectionSize, PE.section[i].Name.match(/^\.[rex]?data$/i) ? 0x6000 : 0x3000),
+                dataBuffer = getDecodedBuffer(sectionOffset, maxScanSize);
 
-                if (scanBuffer(dataBuffer, maxScanSize, sectionOffset)) isEncPePresent = true;
-            }
+            if (scanBuffer(dataBuffer, maxScanSize, sectionOffset)) isEncPePresent = true;
         }
     }
 
