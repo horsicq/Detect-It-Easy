@@ -7750,30 +7750,51 @@ function scanForMaliciousCode_NET_and_Native() {
     // or hide malicious code, but do not realize that this
     // is very easily detected by heuristic analysis.
 
-    const signaturesVariants = [
-        "TVoAAAAAA", // MZ ~[00 00 00 00 00]
-        "TVqQAA", // MZ ~[90 00 03]
-        "TVpQAA", // MZ ~[50 00 02]
-        "TVp4AA" // MZ ~[78 00 01]
+    var isBase64Payload = false;
+
+    var base64Version = String();
+
+    var rawBase64PostfixSigns = [
+        "oAAA", // ~[00 00 00 00 00]
+        "qQAA", // ~[90 00 03]
+        "pQAA", // ~[50 00 02]
+        "p4AA"  // ~[78 00 01]
     ];
 
-    // Iterate through signature variants
-    for (var s = 0; s < signaturesVariants.length; s++) {
-        const trigger = signaturesVariants[s];
-
-        // Check if the signature is valid using Unicode signature mask or the original signature
-        if (
-            validateGlobalUnicodeString(trigger) ||
-            validateSignature("'" + trigger + "'")
-        ) {
-            verdicts.push({
-                type: "Base64 executable payload",
-                version: String(),
-                details: mayBeInfected
-            });
-
-            break;
+    for (var i = 0; i < rawBase64PostfixSigns.length && !isBase64Payload; i++) {
+        if (PE.findString(PE_Cached.dosStubSize, PE.getSize(), "TV" + rawBase64PostfixSigns[i]) !== -1) {
+            base64Version = "ASCII";
+            isBase64Payload = true;
         }
+    }
+
+    if (!isBase64Payload) {
+        var uniOffset = 0,
+            uniSize = PE.getSize();
+
+        while (uniSize > 0 && !isBase64Payload) {
+            var base64AnchorOffset = PE.findSignature(uniOffset, uniSize, "54 00 56 00");
+            if (base64AnchorOffset === -1) break;
+
+            var advanced = (base64AnchorOffset - uniOffset) + 4;
+            uniOffset += advanced;
+            uniSize -= advanced;
+
+            for (var k = 0; k < rawBase64PostfixSigns.length && !isBase64Payload; k++) {
+                if (PE.compare(generateUnicodeSignatureMask(rawBase64PostfixSigns[k]), base64AnchorOffset + 4)) {
+                    base64Version = "UTF-16LE";
+                    isBase64Payload = true;
+                }
+            }
+        }
+    }
+
+    if (isBase64Payload) {
+        verdicts.push({
+            type: "Encoded executable payload",
+            version: "Base64, " + base64Version,
+            details: mayBeInfected
+        });
     }
 
 
