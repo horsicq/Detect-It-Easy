@@ -7803,16 +7803,20 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if (_getNumberOfResults("packer") === 0 || _getNumberOfResults("packer") > 1 || _getNumberOfResults("protector") > 0) {
         for (var i = 0; i < PE_Cached.numberOfSections && !isBase64Payload; i++) {
+            var sectionOffset = PE.getSectionFileOffset(i),
+                sectionSize = PE.getSectionFileSize(i),
+                sectionName = PE.getSectionName(i);
+
             // Optimizations: Skip known sections that are unlikely to contain encoded payloads
             if (PE_Cached.numberOfSections > 1) {
-                if (sectionOffset > 0 && PE.section[i].FileSize < 0x2000) {
-                } else if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && PE.section[0].Name === ".text" && i === 0) {
+                if (sectionOffset > 0 && sectionSize < 0x2000) {
+                } else if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && sectionName === ".text" && i === 0) {
                     continue;
-                } else if (i === PE.getResourceSection() && PE.section[i].Name === ".rsrc") {
+                } else if (i === PE.getResourceSection() && sectionName === ".rsrc") {
                     continue;
-                } else if (i === PE.getImportSection() && PE.section[i].Name === ".idata" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
+                } else if (i === PE.getImportSection() && sectionName === ".idata" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
                     continue;
-                } else if (i === PE.getRelocsSection() && PE.section[i].Name === ".reloc" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getImportSection()) {
+                } else if (i === PE.getRelocsSection() && sectionName === ".reloc" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getImportSection()) {
                     continue;
                 }
             }
@@ -8033,24 +8037,28 @@ function scanForMaliciousCode_NET_and_Native() {
     if (!isEncPePresent) {
         for (var i = 0; i < PE_Cached.numberOfSections && !isEncPePresent; i++) {
             var sectionOffset = PE.getSectionFileOffset(i),
-                sectionSize = PE.getSectionFileSize(i);
+                sectionSize = PE.getSectionFileSize(i),
+                sectionName = PE.getSectionName(i);
 
             // Optimizations: Skip known sections that are unlikely to contain encrypted payloads
             if (PE_Cached.numberOfSections > 1) {
-                if (sectionOffset > 0 && PE.section[i].FileSize < 0x2500) {
+                if (sectionOffset > 0 && sectionSize < 0x2500) {
                     continue;
-                } if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && PE.section[0].Name === ".text" && i === 0) {
+                } if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && sectionName === ".text" && i === 0) {
                     continue;
-                } else if (i === PE.getResourceSection() && PE.section[i].Name === ".rsrc") {
+                } else if (i === PE.getResourceSection() && sectionName === ".rsrc") {
                     continue;
-                } else if (i === PE.getImportSection() && PE.section[i].Name === ".idata" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
+                } else if (i === PE.getImportSection() && sectionName === ".idata" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
                     continue;
-                } else if (i === PE.getRelocsSection() && PE.section[i].Name === ".reloc" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getImportSection()) {
+                } else if (i === PE.getRelocsSection() && sectionName === ".reloc" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getImportSection()) {
                     continue;
                 }
             }
 
-            var maxScanSize = Math.min(sectionSize, PE.section[i].Name.match(/^\.[rex]?data$/i) ? 0x6000 : 0x3000),
+            var maxScanSize = (PE_Cached.isDotNet && i === 0) ?
+                Math.min(sectionSize, 0x64000) : // Scan larger areas for .text section in .NET assemblies, smaller for others
+                Math.min(sectionSize, sectionName.match(/^\.[rex]?data$/i) ? 0x12000 : 0x6000), // Scan larger areas for .data, .rdata, .edata sections, smaller for others
+
                 dataBuffer = getDecodedBuffer(sectionOffset, maxScanSize);
 
             if (scanBuffer(dataBuffer, maxScanSize, sectionOffset)) isEncPePresent = true;
