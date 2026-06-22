@@ -7866,12 +7866,22 @@ function scanForMaliciousCode_NET_and_Native() {
     // PRE-CALCULATION BLOCK: O(1) Offset mapping for key lengths up to 20 bytes
     var k0_off = new Uint8Arr(21),
         k1_off = new Uint8Arr(21),
-        k3_off = new Uint8Arr(21);
+        k3_off = new Uint8Arr(21),
+        lfa0_off = new Uint8Arr(21), // Pre-calculated offsets for e_lfanew
+        lfa1_off = new Uint8Arr(21),
+        lfa2_off = new Uint8Arr(21),
+        lfa3_off = new Uint8Arr(21);
 
     for (var len = 1; len <= 20; len++) {
         k0_off[len] = 40 + ((len - (40 % len)) % len);
         k1_off[len] = 40 + ((1 + len - (40 % len)) % len);
         k3_off[len] = 40 + ((3 + len - (40 % len)) % len);
+
+        // 0x3C is 60. Offset from e_res2 is 60 - 40 = 20
+        lfa0_off[len] = 40 + (20 % len);
+        lfa1_off[len] = 40 + (21 % len);
+        lfa2_off[len] = 40 + (22 % len);
+        lfa3_off[len] = 40 + (23 % len);
     }
 
     // LUT (Lookup Table) for ULTRA-FAST Hex to Byte decoding
@@ -7881,67 +7891,91 @@ function scanForMaliciousCode_NET_and_Native() {
     for (var i = 65; i <= 70; i++) hexLUT[i] = i - 55; // A-F
     for (var i = 97; i <= 102; i++) hexLUT[i] = i - 87; // a-f
 
-    // Universal decryptor: Extracted from verifyPeSignature to avoid closure allocation overhead in loops
-    function getDecryptedByte(dataBuffer, peStartOffset, offset, keyLength, mode) {
-        // Optimized math: offset is always >= 60 (0x3C), safely simplifying the modulo operations
-        var eRes2Offset = 40 + ((offset - 40) % keyLength),
-            encryptedZero = dataBuffer[peStartOffset + eRes2Offset],
-            cipherByte = dataBuffer[peStartOffset + offset];
-
-        return mode === 0 ? (cipherByte ^ encryptedZero) :
-            mode === 1 ?
-                ((cipherByte - encryptedZero) & 0xFF) :
-                ((encryptedZero - cipherByte) & 0xFF);
-    }
-
     // Strict PE header verification function.
     // mode 0: Bitwise algorithms (XOR, XNOR)
     // mode 1: Arithmetic algorithms (ADD, SUB)
     // mode 2: Arithmetic Reverse algorithms (SUB-REV)
     function verifyPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength, mode) {
+        var z, c, b3, b2, b1, b0;
 
-        // Fast fail: For files under ~16MB, the most significant byte of e_lfanew is ALWAYS 0.
-        var lfaNewByte3 = getDecryptedByte(dataBuffer, peStartOffset, 0x3F, keyLength, mode);
-        if (lfaNewByte3 !== 0) return false;
+        // Fast fail 1: For files under ~16MB, the most significant byte of e_lfanew is ALWAYS 0.
+        // Inlined decryption eliminates function call overhead and modulo arithmetic.
+        z = dataBuffer[peStartOffset + lfa3_off[keyLength]];
+        c = dataBuffer[peStartOffset + 0x3F];
+        b3 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
+        if (b3 !== 0) return false;
 
-        // Get e_lfanew
-        var lfaNewByte0 = getDecryptedByte(dataBuffer, peStartOffset, 0x3C, keyLength, mode),
-            lfaNewByte1 = getDecryptedByte(dataBuffer, peStartOffset, 0x3D, keyLength, mode),
-            lfaNewByte2 = getDecryptedByte(dataBuffer, peStartOffset, 0x3E, keyLength, mode),
-            lfaNewOffset = (lfaNewByte0 | (lfaNewByte1 << 8) | (lfaNewByte2 << 16)) >>> 0;
+        // Fast fail 2: Check if upper 16-bits already exceed max search bounds
+        z = dataBuffer[peStartOffset + lfa2_off[keyLength]];
+        c = dataBuffer[peStartOffset + 0x3E];
+        b2 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
+        if ((b2 << 16) >= maxValidLfaNew) return false;
+
+        // Decode remaining e_lfanew bytes
+        z = dataBuffer[peStartOffset + lfa1_off[keyLength]];
+        c = dataBuffer[peStartOffset + 0x3D];
+        b1 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
+
+        z = dataBuffer[peStartOffset + lfa0_off[keyLength]];
+        c = dataBuffer[peStartOffset + 0x3C];
+        b0 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
+
+        var lfaNewOffset = (b0 | (b1 << 8) | (b2 << 16)) >>> 0;
 
         // Sanity check for the e_lfanew pointer
         if (lfaNewOffset > 0x40 && lfaNewOffset < maxValidLfaNew) {
-            var peHeaderOffset = lfaNewOffset;
+            var peHeaderOffset = lfaNewOffset,
+                baseZ = peStartOffset + 40,
+                pe = peStartOffset + peHeaderOffset,
+                // Calculate base remainder ONCE to avoid repeated expensive modulo operations
+                r = (lfaNewOffset - 40) % keyLength;
 
             // 1. Verify PE Signature (PE\0\0)
-            if (getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0, keyLength, mode) === 0x50 &&
-                getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 1, keyLength, mode) === 0x45 &&
-                getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 2, keyLength, mode) === 0x00 &&
-                getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 3, keyLength, mode) === 0x00) {
+            z = dataBuffer[baseZ + ((r + 0) % keyLength)]; c = dataBuffer[pe + 0];
+            if ((mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF)) !== 0x50) return false;
 
-                // 2. Verify Optional Header Magic (PE32=0x10B, PE64=0x20B)
-                var magic = getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x18, keyLength, mode) |
-                    (getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x19, keyLength, mode) << 8);
+            z = dataBuffer[baseZ + ((r + 1) % keyLength)]; c = dataBuffer[pe + 1];
+            if ((mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF)) !== 0x45) return false;
 
-                if (magic !== 0x010B && magic !== 0x020B) return false;
+            z = dataBuffer[baseZ + ((r + 2) % keyLength)]; c = dataBuffer[pe + 2];
+            if ((mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF)) !== 0x00) return false;
 
-                // 3. Verify NumberOfSections (IMAGE_FILE_HEADER)
-                // Offset 0x06 from PE signature
-                var numSections = getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x06, keyLength, mode) |
-                    (getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x07, keyLength, mode) << 8);
+            z = dataBuffer[baseZ + ((r + 3) % keyLength)]; c = dataBuffer[pe + 3];
+            if ((mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF)) !== 0x00) return false;
 
-                if (numSections === 0 || numSections > 48) return false;
+            // 2. Verify Optional Header Magic (PE32=0x10B, PE64=0x20B)
+            var m1, m2;
+            z = dataBuffer[baseZ + ((r + 0x18) % keyLength)]; c = dataBuffer[pe + 0x18];
+            m1 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
 
-                // 4. Verify Characteristics (IMAGE_FILE_HEADER)
-                // Offset 0x16 from PE signature. 0x0002 is IMAGE_FILE_EXECUTABLE_IMAGE
-                var characteristics = getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x16, keyLength, mode) |
-                    (getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x17, keyLength, mode) << 8);
+            z = dataBuffer[baseZ + ((r + 0x19) % keyLength)]; c = dataBuffer[pe + 0x19];
+            m2 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
 
-                if (!(characteristics & 0x0002)) return false;
+            var magic = m1 | (m2 << 8);
+            if (magic !== 0x010B && magic !== 0x020B) return false;
 
-                return true;
-            }
+            // 3. Verify NumberOfSections (IMAGE_FILE_HEADER)
+            var ns1, ns2;
+            z = dataBuffer[baseZ + ((r + 0x06) % keyLength)]; c = dataBuffer[pe + 0x06];
+            ns1 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+
+            z = dataBuffer[baseZ + ((r + 0x07) % keyLength)]; c = dataBuffer[pe + 0x07];
+            ns2 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+
+            var numSections = ns1 | (ns2 << 8);
+            if (numSections === 0 || numSections > 48) return false;
+
+            // 4. Verify Characteristics (IMAGE_FILE_HEADER)
+            var ch1, ch2;
+            z = dataBuffer[baseZ + ((r + 0x16) % keyLength)]; c = dataBuffer[pe + 0x16];
+            ch1 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+
+            z = dataBuffer[baseZ + ((r + 0x17) % keyLength)]; c = dataBuffer[pe + 0x17];
+            ch2 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+
+            if (!((ch1 | (ch2 << 8)) & 0x0002)) return false;
+
+            return true;
         }
 
         return false;
@@ -7951,7 +7985,8 @@ function scanForMaliciousCode_NET_and_Native() {
     function scanBuffer(dataBuffer, bufferSize, offsetBase) {
         var maxSearchIndex = bufferSize - 0x100,
             j = 0, L = 1, b0, b1, e0_bit, e1_bit, d3, c0,
-            e0_math, e1_math, e0_rev, e1_rev;
+            e0_math, e1_math, e0_rev, e1_rev, maxLfa,
+            _k0 = k0_off, _k1 = k1_off, _k3 = k3_off; // Local variable cache for faster lookup
 
         for (; j < maxSearchIndex; j++) {
             b0 = dataBuffer[j];
@@ -7963,14 +7998,15 @@ function scanForMaliciousCode_NET_and_Native() {
             if (e0_bit === 0x00 && e1_bit === 0x00) continue;
 
             d3 = dataBuffer[j + 3];
+            maxLfa = bufferSize - j - 0x20;
 
             for (L = 1; L <= 20; L++) {
-                if (d3 !== dataBuffer[j + k3_off[L]]) continue;
+                if (d3 !== dataBuffer[j + _k3[L]]) continue;
 
-                c0 = dataBuffer[j + k0_off[L]];
+                c0 = dataBuffer[j + _k0[L]];
 
-                if (c0 === e0_bit && dataBuffer[j + k1_off[L]] === e1_bit) {
-                    if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 0)) {
+                if (c0 === e0_bit && dataBuffer[j + _k1[L]] === e1_bit) {
+                    if (verifyPeSignature(dataBuffer, j, maxLfa, L, 0)) {
                         detectedAlgo = "XOR-XNOR"; return true;
                     }
                 } else {
@@ -7978,8 +8014,8 @@ function scanForMaliciousCode_NET_and_Native() {
                     e0_math = (b0 - 0x4D) & 0xFF;
                     if (c0 === e0_math) {
                         e1_math = (b1 - 0x5A) & 0xFF;
-                        if (dataBuffer[j + k1_off[L]] === e1_math) {
-                            if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 1)) {
+                        if (dataBuffer[j + _k1[L]] === e1_math) {
+                            if (verifyPeSignature(dataBuffer, j, maxLfa, L, 1)) {
                                 detectedAlgo = "ADD-SUB"; return true;
                             }
                         }
@@ -7988,8 +8024,8 @@ function scanForMaliciousCode_NET_and_Native() {
                         e0_rev = (b0 + 0x4D) & 0xFF;
                         if (c0 === e0_rev) {
                             e1_rev = (b1 + 0x5A) & 0xFF;
-                            if (dataBuffer[j + k1_off[L]] === e1_rev) {
-                                if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 2)) {
+                            if (dataBuffer[j + _k1[L]] === e1_rev) {
+                                if (verifyPeSignature(dataBuffer, j, maxLfa, L, 2)) {
                                     detectedAlgo = "SUB-REV"; return true;
                                 }
                             }
@@ -8006,10 +8042,11 @@ function scanForMaliciousCode_NET_and_Native() {
     function getDecodedBuffer(offset, size) {
         var hexSignature = PE.getSignature(offset, size),
             buffer = new Uint8Arr(size),
-            k = 0, p = 0; // Hoisting
+            k = 0, p = 0,
+            lut = hexLUT; // Cache global LUT locally
 
         for (; k < size; k++, p += 2) {
-            buffer[k] = (hexLUT[hexSignature.charCodeAt(p)] << 4) | hexLUT[hexSignature.charCodeAt(p + 1)];
+            buffer[k] = (lut[hexSignature.charCodeAt(p)] << 4) | lut[hexSignature.charCodeAt(p + 1)];
         }
 
         return buffer;
@@ -8025,7 +8062,7 @@ function scanForMaliciousCode_NET_and_Native() {
             var maxScanSize = Math.min(resourceSize, 0x1000),
                 dataBuffer = getDecodedBuffer(resourceOffset, maxScanSize);
 
-            if (scanBuffer(dataBuffer, maxScanSize, resourceOffset)) isEncPePresent = true;
+            if (scanBuffer(dataBuffer, maxScanSize, resourceOffset)) { isEncPePresent = true; break; }
         }
     }
 
@@ -8070,7 +8107,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
                 dataBuffer = getDecodedBuffer(sectionOffset, maxScanSize);
 
-            if (scanBuffer(dataBuffer, maxScanSize, sectionOffset)) isEncPePresent = true;
+            if (scanBuffer(dataBuffer, maxScanSize, sectionOffset)) { isEncPePresent = true; break; }
         }
     }
 
