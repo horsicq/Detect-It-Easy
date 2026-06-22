@@ -3609,10 +3609,9 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     if (pdbExtensionPatternOffset !== -1) {
 
-        for (var i = pdbExtensionPatternOffset; i > PE_Cached.dosStubSize; i--) {
+        for (var i = pdbExtensionPatternOffset; i > PE_Cached.dosStubSize && pdbPathBeginOffset === 0; i--) {
             if (PE.readByte(i) === 0x00) {
                 pdbPathBeginOffset = i + 1;
-                break;
             }
         }
 
@@ -7865,9 +7864,9 @@ function scanForMaliciousCode_NET_and_Native() {
     var Uint8Arr = typeof Uint8Array !== "undefined" ? Uint8Array : Array;
 
     // PRE-CALCULATION BLOCK: O(1) Offset mapping for key lengths up to 20 bytes
-    var k0_off = new Array(21),
-        k1_off = new Array(21),
-        k3_off = new Array(21);
+    var k0_off = new Uint8Arr(21),
+        k1_off = new Uint8Arr(21),
+        k3_off = new Uint8Arr(21);
 
     for (var len = 1; len <= 20; len++) {
         k0_off[len] = 40 + ((len - (40 % len)) % len);
@@ -7882,53 +7881,63 @@ function scanForMaliciousCode_NET_and_Native() {
     for (var i = 65; i <= 70; i++) hexLUT[i] = i - 55; // A-F
     for (var i = 97; i <= 102; i++) hexLUT[i] = i - 87; // a-f
 
+    // Universal decryptor: Extracted from verifyPeSignature to avoid closure allocation overhead in loops
+    function getDecryptedByte(dataBuffer, peStartOffset, offset, keyLength, mode) {
+        // Optimized math: offset is always >= 60 (0x3C), safely simplifying the modulo operations
+        var eRes2Offset = 40 + ((offset - 40) % keyLength),
+            encryptedZero = dataBuffer[peStartOffset + eRes2Offset],
+            cipherByte = dataBuffer[peStartOffset + offset];
+
+        return mode === 0 ? (cipherByte ^ encryptedZero) :
+            mode === 1 ?
+                ((cipherByte - encryptedZero) & 0xFF) :
+                ((encryptedZero - cipherByte) & 0xFF);
+    }
+
     // Strict PE header verification function.
     // mode 0: Bitwise algorithms (XOR, XNOR)
     // mode 1: Arithmetic algorithms (ADD, SUB)
     // mode 2: Arithmetic Reverse algorithms (SUB-REV)
     function verifyPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength, mode) {
 
-        // Universal decryptor: Maps any PE offset to its corresponding encrypted zero in e_res2
-        function getDecrypted(offset) {
-            var eRes2Offset = 40 + ((offset % keyLength + keyLength - (40 % keyLength)) % keyLength),
-                encryptedZero = dataBuffer[peStartOffset + eRes2Offset],
-                cipherByte = dataBuffer[peStartOffset + offset];
-
-            return mode === 0 ? (cipherByte ^ encryptedZero) :
-                mode === 1 ?
-                    ((cipherByte - encryptedZero) & 0xFF) :
-                    ((encryptedZero - cipherByte) & 0xFF);
-        };
+        // Fast fail: For files under ~16MB, the most significant byte of e_lfanew is ALWAYS 0.
+        var lfaNewByte3 = getDecryptedByte(dataBuffer, peStartOffset, 0x3F, keyLength, mode);
+        if (lfaNewByte3 !== 0) return false;
 
         // Get e_lfanew
-        var lfaNewByte0 = getDecrypted(0x3C),
-            lfaNewByte1 = getDecrypted(0x3D),
-            lfaNewByte2 = getDecrypted(0x3E),
-            lfaNewByte3 = getDecrypted(0x3F),
-            lfaNewOffset = (lfaNewByte0 | (lfaNewByte1 << 8) | (lfaNewByte2 << 16) | (lfaNewByte3 << 24)) >>> 0;
+        var lfaNewByte0 = getDecryptedByte(dataBuffer, peStartOffset, 0x3C, keyLength, mode),
+            lfaNewByte1 = getDecryptedByte(dataBuffer, peStartOffset, 0x3D, keyLength, mode),
+            lfaNewByte2 = getDecryptedByte(dataBuffer, peStartOffset, 0x3E, keyLength, mode),
+            lfaNewOffset = (lfaNewByte0 | (lfaNewByte1 << 8) | (lfaNewByte2 << 16)) >>> 0;
 
         // Sanity check for the e_lfanew pointer
         if (lfaNewOffset > 0x40 && lfaNewOffset < maxValidLfaNew) {
             var peHeaderOffset = lfaNewOffset;
 
             // 1. Verify PE Signature (PE\0\0)
-            if (getDecrypted(peHeaderOffset + 0) === 0x50 &&
-                getDecrypted(peHeaderOffset + 1) === 0x45 &&
-                getDecrypted(peHeaderOffset + 2) === 0x00 &&
-                getDecrypted(peHeaderOffset + 3) === 0x00) {
+            if (getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0, keyLength, mode) === 0x50 &&
+                getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 1, keyLength, mode) === 0x45 &&
+                getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 2, keyLength, mode) === 0x00 &&
+                getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 3, keyLength, mode) === 0x00) {
 
                 // 2. Verify Optional Header Magic (PE32=0x10B, PE64=0x20B)
-                var magic = getDecrypted(peHeaderOffset + 0x18) | (getDecrypted(peHeaderOffset + 0x19) << 8);
+                var magic = getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x18, keyLength, mode) |
+                    (getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x19, keyLength, mode) << 8);
+
                 if (magic !== 0x010B && magic !== 0x020B) return false;
 
                 // 3. Verify NumberOfSections (IMAGE_FILE_HEADER)
                 // Offset 0x06 from PE signature
-                var numSections = getDecrypted(peHeaderOffset + 0x06) | (getDecrypted(peHeaderOffset + 0x07) << 8);
+                var numSections = getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x06, keyLength, mode) |
+                    (getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x07, keyLength, mode) << 8);
+
                 if (numSections === 0 || numSections > 48) return false;
 
                 // 4. Verify Characteristics (IMAGE_FILE_HEADER)
                 // Offset 0x16 from PE signature. 0x0002 is IMAGE_FILE_EXECUTABLE_IMAGE
-                var characteristics = getDecrypted(peHeaderOffset + 0x16) | (getDecrypted(peHeaderOffset + 0x17) << 8);
+                var characteristics = getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x16, keyLength, mode) |
+                    (getDecryptedByte(dataBuffer, peStartOffset, peHeaderOffset + 0x17, keyLength, mode) << 8);
+
                 if (!(characteristics & 0x0002)) return false;
 
                 return true;
@@ -7956,32 +7965,32 @@ function scanForMaliciousCode_NET_and_Native() {
             d3 = dataBuffer[j + 3];
 
             for (L = 1; L <= 20; L++) {
-                if (d3 === dataBuffer[j + k3_off[L]]) {
-                    c0 = dataBuffer[j + k0_off[L]];
+                if (d3 !== dataBuffer[j + k3_off[L]]) continue;
 
-                    if (c0 === e0_bit && dataBuffer[j + k1_off[L]] === e1_bit) {
-                        if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 0)) {
-                            detectedAlgo = "XOR-XNOR"; return true;
+                c0 = dataBuffer[j + k0_off[L]];
+
+                if (c0 === e0_bit && dataBuffer[j + k1_off[L]] === e1_bit) {
+                    if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 0)) {
+                        detectedAlgo = "XOR-XNOR"; return true;
+                    }
+                } else {
+                    // LAZY EVALUATION: Execute this only if the previous checks failed
+                    e0_math = (b0 - 0x4D) & 0xFF;
+                    if (c0 === e0_math) {
+                        e1_math = (b1 - 0x5A) & 0xFF;
+                        if (dataBuffer[j + k1_off[L]] === e1_math) {
+                            if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 1)) {
+                                detectedAlgo = "ADD-SUB"; return true;
+                            }
                         }
                     } else {
                         // LAZY EVALUATION: Execute this only if the previous checks failed
-                        e0_math = (b0 - 0x4D) & 0xFF;
-                        if (c0 === e0_math) {
-                            e1_math = (b1 - 0x5A) & 0xFF;
-                            if (dataBuffer[j + k1_off[L]] === e1_math) {
-                                if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 1)) {
-                                    detectedAlgo = "ADD-SUB"; return true;
-                                }
-                            }
-                        } else {
-                            // LAZY EVALUATION: Execute this only if the previous checks failed
-                            e0_rev = (b0 + 0x4D) & 0xFF;
-                            if (c0 === e0_rev) {
-                                e1_rev = (b1 + 0x5A) & 0xFF;
-                                if (dataBuffer[j + k1_off[L]] === e1_rev) {
-                                    if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 2)) {
-                                        detectedAlgo = "SUB-REV"; return true;
-                                    }
+                        e0_rev = (b0 + 0x4D) & 0xFF;
+                        if (c0 === e0_rev) {
+                            e1_rev = (b1 + 0x5A) & 0xFF;
+                            if (dataBuffer[j + k1_off[L]] === e1_rev) {
+                                if (verifyPeSignature(dataBuffer, j, bufferSize - j - 0x20, L, 2)) {
+                                    detectedAlgo = "SUB-REV"; return true;
                                 }
                             }
                         }
