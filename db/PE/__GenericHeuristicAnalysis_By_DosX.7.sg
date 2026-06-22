@@ -3355,7 +3355,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
         const currentPatternToFind = licesingStrings[i];
 
         if (PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "'" + currentPatternToFind + "'") ||
-            PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "'" + generateUnicodeSignatureMask(currentPatternToFind) + "'")) {
+            PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "'" + convertStringToUnicodeSignature(currentPatternToFind) + "'")) {
             isInterestingStringsFound = true;
         }
     }
@@ -3813,7 +3813,7 @@ function validateNetUnicodeString(ustring) {
  * @returns {boolean} - Returns true if the Unicode string is found, otherwise false.
  */
 function validateGlobalUnicodeString(ustring) {
-    const result = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.fileBodySize, generateUnicodeSignatureMask(ustring)) !== -1;
+    const result = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.fileBodySize, convertStringToUnicodeSignature(ustring)) !== -1;
     if (result) log(logType.nothing, "Unicode string found: \"" + ustring + "\"");
     return result;
 }
@@ -3825,13 +3825,13 @@ function validateGlobalUnicodeString(ustring) {
  * Translates characters into their true byte representation (Little-Endian)
  * instead of naively injecting null bytes. Safely handles non-ASCII characters.
  *
- * Example (ASCII): "test" -> "74 00 65 00 73 00 74 00"
- * Example (Cyrillic): "Тест" -> "22 04 35 04 41 04 42 04"
+ * Example (ASCII): "test" -> "7400650073007400"
+ * Example (Cyrillic): "Тест" -> "2204350441044204"
  *
  * @param {string} ustring - The input string to translate into a signature.
  * @returns {string} The formatted UTF-16LE hex signature mask.
  */
-function generateUnicodeSignatureMask(ustring) {
+function convertStringToUnicodeSignature(ustring) {
     var hexMask = [];
 
     for (var i = 0; i < ustring.length; i++) {
@@ -3841,14 +3841,13 @@ function generateUnicodeSignatureMask(ustring) {
         var low = (code & 0xFF).toString(16).toUpperCase(),
             high = ((code >> 8) & 0xFF).toString(16).toUpperCase();
 
-        // Pad with leading zeros (ES3/ES5 compatible for older JS engines)
         low = low.length === 1 ? "0" + low : low;
         high = high.length === 1 ? "0" + high : high;
 
-        hexMask.push(low + " " + high);
+        hexMask.push(low + high);
     }
 
-    return hexMask.join(" ");
+    return hexMask.join(String());
 }
 
 
@@ -6033,7 +6032,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
             PE.isSignaturePresent(
                 rdataSection.FileOffset,
                 rdataSection.FileSize,
-                generateUnicodeSignatureMask("Visual C++"))) {
+                convertStringToUnicodeSignature("Visual C++"))) {
 
             log(logType.any, "Embedded Visual C++ Runtime detected.");
 
@@ -6148,9 +6147,9 @@ function scanForMaliciousCode_NET_and_Native() {
             njRatVersion = String();
 
         var njRatDataSeparator = "|'|'|",
-            njRatDataSeparatorPattern = generateUnicodeSignatureMask(njRatDataSeparator) + "00";
+            njRatDataSeparatorPattern = convertStringToUnicodeSignature(njRatDataSeparator) + "00";
 
-        njRatDataSeparatorPattern = njRatDataSeparatorPattern.substring(2);
+        njRatDataSeparatorPattern = njRatDataSeparatorPattern;
 
         // NjRAT Generic: Detect NjRAT via requests-separator or assembly name
         if (verdicts.length === 0) {
@@ -6556,7 +6555,7 @@ function scanForMaliciousCode_NET_and_Native() {
         }
 
 
-        if (PE.isSignatureInSectionPresent(0, "00" + generateUnicodeSignatureMask(" RAT") + "00") && (
+        if (PE.isSignatureInSectionPresent(0, "00" + convertStringToUnicodeSignature(" RAT") + "00") && (
             PE.isNetObjectPresent("System.Net.Sockets") ||
             PE.isNetObjectPresent("GetWindowText") ||
             PE.isNetObjectPresent("avicap32.dll")
@@ -6567,7 +6566,7 @@ function scanForMaliciousCode_NET_and_Native() {
                 // System.Net.Sockets + GetForegroundWindow + GetWindowsText
                 PE.isNetObjectPresent("System.Net.Sockets") && PE.isNetObjectPresent("GetForegroundWindow") && PE.isNetObjectPresent("GetWindowText") && (
                     // Search for 'AntivirusProduct' or 'DisableTaskMgr'
-                    PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("AntivirusProduct")) || PE.isSignatureInSectionPresent(0, generateUnicodeSignatureMask("DisableTaskMgr"))
+                    PE.isSignatureInSectionPresent(0, convertStringToUnicodeSignature("AntivirusProduct")) || PE.isSignatureInSectionPresent(0, convertStringToUnicodeSignature("DisableTaskMgr"))
                 )
             ) || (
                 // GetForegroundWindow + GetWindowText + NtSetInformationProcess
@@ -7303,7 +7302,7 @@ function scanForMaliciousCode_NET_and_Native() {
                 var rsrcSection = PE.section[".rsrc"],
                     dataSection = PE.section[".data"];
 
-                const cmdSignature = generateUnicodeSignatureMask("%s\\ProgramData") + "00 00 00 00 00 'cmd.exe /c ' 22 '%s' 22";
+                const cmdSignature = convertStringToUnicodeSignature("%s\\ProgramData") + "00 00 00 00 00 'cmd.exe /c ' 22 '%s' 22";
 
                 if ((rsrcSection && PE.isSignaturePresent(rsrcSection.FileOffset, rsrcSection.FileSize, cmdSignature)) ||
                     (dataSection && PE.isSignaturePresent(dataSection.FileOffset, dataSection.FileSize, cmdSignature))) {
@@ -7798,7 +7797,7 @@ function scanForMaliciousCode_NET_and_Native() {
             remainingSize -= advanced;
 
             for (var k = 0; k < rawBase64PostfixSigns.length && !isBase64Payload; k++) {
-                if (PE.compare(generateUnicodeSignatureMask(rawBase64PostfixSigns[k]), anchorOffset + 4)) {
+                if (PE.compare(convertStringToUnicodeSignature(rawBase64PostfixSigns[k]), anchorOffset + 4)) {
                     base64Version = "UTF-16LE";
                     isBase64Payload = true;
                 }
@@ -8278,7 +8277,7 @@ function scanForInterestingMarkers_NET_and_Native() {
 
             if (gdfResourceOffset !== -1 && PE.isSignaturePresent(
                 gdfResourceOffset,
-                PE.getResourceSizeByNumber(i), generateUnicodeSignatureMask("GameDefinitionFile"))) {
+                PE.getResourceSizeByNumber(i), convertStringToUnicodeSignature("GameDefinitionFile"))) {
                 isGdfSchemaPresent = true;
             }
         }
