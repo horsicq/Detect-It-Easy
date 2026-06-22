@@ -7870,91 +7870,91 @@ function scanForMaliciousCode_NET_and_Native() {
     var Uint8Arr = typeof Uint8Array !== "undefined" ? Uint8Array : Array;
 
     // PRE-CALCULATION BLOCK: O(1) Offset mapping for key lengths up to 20 bytes
-    var k0_off = new Uint8Arr(21),
-        k1_off = new Uint8Arr(21),
-        k3_off = new Uint8Arr(21),
-        lfa0_off = new Uint8Arr(21),
-        lfa1_off = new Uint8Arr(21),
-        lfa2_off = new Uint8Arr(21),
-        lfa3_off = new Uint8Arr(21);
+    var offsetKey0 = new Uint8Arr(21),
+        offsetKey1 = new Uint8Arr(21),
+        offsetKey3 = new Uint8Arr(21),
+        offsetLfa0 = new Uint8Arr(21),
+        offsetLfa1 = new Uint8Arr(21),
+        offsetLfa2 = new Uint8Arr(21),
+        offsetLfa3 = new Uint8Arr(21);
 
-    for (var len = 1; len <= 20; len++) {
-        k0_off[len] = 40 + ((len - (40 % len)) % len);
-        k1_off[len] = 40 + ((1 + len - (40 % len)) % len);
-        k3_off[len] = 40 + ((3 + len - (40 % len)) % len);
+    for (var keyLen = 1; keyLen <= 20; keyLen++) {
+        offsetKey0[keyLen] = 40 + ((keyLen - (40 % keyLen)) % keyLen);
+        offsetKey1[keyLen] = 40 + ((1 + keyLen - (40 % keyLen)) % keyLen);
+        offsetKey3[keyLen] = 40 + ((3 + keyLen - (40 % keyLen)) % keyLen);
 
-        lfa0_off[len] = 40 + (20 % len);
-        lfa1_off[len] = 40 + (21 % len);
-        lfa2_off[len] = 40 + (22 % len);
-        lfa3_off[len] = 40 + (23 % len);
+        offsetLfa0[keyLen] = 40 + (20 % keyLen);
+        offsetLfa1[keyLen] = 40 + (21 % keyLen);
+        offsetLfa2[keyLen] = 40 + (22 % keyLen);
+        offsetLfa3[keyLen] = 40 + (23 % keyLen);
     }
 
     // Strict PE header verification function
     function verifyPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength, mode) {
-        var z, c, b2, b1, b0;
+        var encZero, cipherByte, valLfa2, valLfa1, valLfa0;
 
-        z = dataBuffer[peStartOffset + lfa2_off[keyLength]];
-        c = dataBuffer[peStartOffset + 0x3E];
-        b2 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
+        encZero = dataBuffer[peStartOffset + offsetLfa2[keyLength]];
+        cipherByte = dataBuffer[peStartOffset + 0x3E];
+        valLfa2 = mode === 0 ? (cipherByte ^ encZero) : (mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF));
 
-        if ((b2 << 16) >= maxValidLfaNew) return false;
+        if ((valLfa2 << 16) >= maxValidLfaNew) return false;
 
-        z = dataBuffer[peStartOffset + lfa1_off[keyLength]];
-        c = dataBuffer[peStartOffset + 0x3D];
-        b1 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
+        encZero = dataBuffer[peStartOffset + offsetLfa1[keyLength]];
+        cipherByte = dataBuffer[peStartOffset + 0x3D];
+        valLfa1 = mode === 0 ? (cipherByte ^ encZero) : (mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF));
 
-        z = dataBuffer[peStartOffset + lfa0_off[keyLength]];
-        c = dataBuffer[peStartOffset + 0x3C];
-        b0 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
+        encZero = dataBuffer[peStartOffset + offsetLfa0[keyLength]];
+        cipherByte = dataBuffer[peStartOffset + 0x3C];
+        valLfa0 = mode === 0 ? (cipherByte ^ encZero) : (mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF));
 
-        var lfaNewOffset = (b0 | (b1 << 8) | (b2 << 16)) >>> 0;
+        var lfaNewOffset = (valLfa0 | (valLfa1 << 8) | (valLfa2 << 16)) >>> 0;
 
         if (lfaNewOffset > 0x40 && lfaNewOffset < maxValidLfaNew) {
             var peHeaderOffset = lfaNewOffset,
-                baseZ = peStartOffset + 40,
-                pe = peStartOffset + peHeaderOffset,
-                r = (lfaNewOffset - 40) % keyLength;
+                baseZeroOffset = peStartOffset + 40,
+                peSignatureOffset = peStartOffset + peHeaderOffset,
+                baseRemainder = (lfaNewOffset - 40) % keyLength;
 
-            z = dataBuffer[baseZ + ((r + 0) % keyLength)]; c = dataBuffer[pe + 0];
-            if ((mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF)) !== 0x50) return false;
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 0) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 0];
+            if ((mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF)) !== 0x50) return false;
 
-            z = dataBuffer[baseZ + ((r + 1) % keyLength)]; c = dataBuffer[pe + 1];
-            if ((mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF)) !== 0x45) return false;
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 1) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 1];
+            if ((mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF)) !== 0x45) return false;
 
-            z = dataBuffer[baseZ + ((r + 2) % keyLength)]; c = dataBuffer[pe + 2];
-            if ((mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF)) !== 0x00) return false;
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 2) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 2];
+            if ((mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF)) !== 0x00) return false;
 
-            z = dataBuffer[baseZ + ((r + 3) % keyLength)]; c = dataBuffer[pe + 3];
-            if ((mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF)) !== 0x00) return false;
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 3) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 3];
+            if ((mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF)) !== 0x00) return false;
 
-            var m1, m2;
-            z = dataBuffer[baseZ + ((r + 0x18) % keyLength)]; c = dataBuffer[pe + 0x18];
-            m1 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+            var magicByte1, magicByte2;
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 0x18) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 0x18];
+            magicByte1 = mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF);
 
-            z = dataBuffer[baseZ + ((r + 0x19) % keyLength)]; c = dataBuffer[pe + 0x19];
-            m2 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 0x19) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 0x19];
+            magicByte2 = mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF);
 
-            var magic = m1 | (m2 << 8);
-            if (magic !== 0x010B && magic !== 0x020B) return false;
+            var headerMagic = magicByte1 | (magicByte2 << 8);
+            if (headerMagic !== 0x010B && headerMagic !== 0x020B) return false;
 
-            var ns1, ns2;
-            z = dataBuffer[baseZ + ((r + 0x06) % keyLength)]; c = dataBuffer[pe + 0x06];
-            ns1 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+            var numSections1, numSections2;
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 0x06) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 0x06];
+            numSections1 = mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF);
 
-            z = dataBuffer[baseZ + ((r + 0x07) % keyLength)]; c = dataBuffer[pe + 0x07];
-            ns2 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 0x07) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 0x07];
+            numSections2 = mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF);
 
-            var numSections = ns1 | (ns2 << 8);
-            if (numSections === 0 || numSections > 48) return false;
+            var totalSections = numSections1 | (numSections2 << 8);
+            if (totalSections === 0 || totalSections > 48) return false;
 
-            var ch1, ch2;
-            z = dataBuffer[baseZ + ((r + 0x16) % keyLength)]; c = dataBuffer[pe + 0x16];
-            ch1 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+            var charByte1, charByte2;
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 0x16) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 0x16];
+            charByte1 = mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF);
 
-            z = dataBuffer[baseZ + ((r + 0x17) % keyLength)]; c = dataBuffer[pe + 0x17];
-            ch2 = mode === 0 ? (c ^ z) : mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF);
+            encZero = dataBuffer[baseZeroOffset + ((baseRemainder + 0x17) % keyLength)]; cipherByte = dataBuffer[peSignatureOffset + 0x17];
+            charByte2 = mode === 0 ? (cipherByte ^ encZero) : mode === 1 ? ((cipherByte - encZero) & 0xFF) : ((encZero - cipherByte) & 0xFF);
 
-            if (!((ch1 | (ch2 << 8)) & 0x0002)) return false;
+            if (!((charByte1 | (charByte2 << 8)) & 0x0002)) return false;
 
             return true;
         }
@@ -7965,49 +7965,49 @@ function scanForMaliciousCode_NET_and_Native() {
     // Core scanner
     function scanBuffer(dataBuffer, bufferSize) {
         var maxSearchIndex = bufferSize - 0x100,
-            j = 0, L = 1, b0, b1, e0_bit, e1_bit, d3, d3F, c0,
-            e0_math, e1_math, e0_rev, e1_rev, maxLfa,
-            _k0 = k0_off, _k1 = k1_off, _k3 = k3_off, _lfa3 = lfa3_off;
+            offset = 0, keyLength = 1, cipherM, cipherZ, keyXorM, keyXorZ, cipherByte3, cipherLfaMsb, cipherByteKey0,
+            keyAddM, keyAddZ, keyRevM, keyRevZ, maxLfaValid,
+            cacheKey0 = offsetKey0, cacheKey1 = offsetKey1, cacheKey3 = offsetKey3, cacheLfa3 = offsetLfa3;
 
-        for (; j < maxSearchIndex; j++) {
-            b0 = dataBuffer[j];
-            b1 = dataBuffer[j + 1];
-            e0_bit = b0 ^ 0x4D;
-            e1_bit = b1 ^ 0x5A;
+        for (; offset < maxSearchIndex; offset++) {
+            cipherM = dataBuffer[offset];
+            cipherZ = dataBuffer[offset + 1];
+            keyXorM = cipherM ^ 0x4D;
+            keyXorZ = cipherZ ^ 0x5A;
 
-            if (e0_bit === 0x00 && e1_bit === 0x00) continue;
+            if (keyXorM === 0x00 && keyXorZ === 0x00) continue;
 
-            d3 = dataBuffer[j + 3];
-            d3F = dataBuffer[j + 0x3F];
-            maxLfa = bufferSize - j - 0x20;
+            cipherByte3 = dataBuffer[offset + 3];
+            cipherLfaMsb = dataBuffer[offset + 0x3F];
+            maxLfaValid = bufferSize - offset - 0x20;
 
-            for (L = 1; L <= 20; L++) {
-                if (d3 !== dataBuffer[j + _k3[L]]) continue;
-                if (d3F !== dataBuffer[j + _lfa3[L]]) continue;
+            for (keyLength = 1; keyLength <= 20; keyLength++) {
+                if (cipherByte3 !== dataBuffer[offset + cacheKey3[keyLength]]) continue;
+                if (cipherLfaMsb !== dataBuffer[offset + cacheLfa3[keyLength]]) continue;
 
-                c0 = dataBuffer[j + _k0[L]];
+                cipherByteKey0 = dataBuffer[offset + cacheKey0[keyLength]];
 
-                if (c0 === e0_bit && dataBuffer[j + _k1[L]] === e1_bit) {
-                    if (verifyPeSignature(dataBuffer, j, maxLfa, L, 0)) {
+                if (cipherByteKey0 === keyXorM && dataBuffer[offset + cacheKey1[keyLength]] === keyXorZ) {
+                    if (verifyPeSignature(dataBuffer, offset, maxLfaValid, keyLength, 0)) {
                         detectedAlgo = "XOR-XNOR";
                         return true;
                     }
                 } else {
-                    e0_math = (b0 - 0x4D) & 0xFF;
-                    if (c0 === e0_math) {
-                        e1_math = (b1 - 0x5A) & 0xFF;
-                        if (dataBuffer[j + _k1[L]] === e1_math) {
-                            if (verifyPeSignature(dataBuffer, j, maxLfa, L, 1)) {
+                    keyAddM = (cipherM - 0x4D) & 0xFF;
+                    if (cipherByteKey0 === keyAddM) {
+                        keyAddZ = (cipherZ - 0x5A) & 0xFF;
+                        if (dataBuffer[offset + cacheKey1[keyLength]] === keyAddZ) {
+                            if (verifyPeSignature(dataBuffer, offset, maxLfaValid, keyLength, 1)) {
                                 detectedAlgo = "ADD-SUB";
                                 return true;
                             }
                         }
                     } else {
-                        e0_rev = (b0 + 0x4D) & 0xFF;
-                        if (c0 === e0_rev) {
-                            e1_rev = (b1 + 0x5A) & 0xFF;
-                            if (dataBuffer[j + _k1[L]] === e1_rev) {
-                                if (verifyPeSignature(dataBuffer, j, maxLfa, L, 2)) {
+                        keyRevM = (cipherM + 0x4D) & 0xFF;
+                        if (cipherByteKey0 === keyRevM) {
+                            keyRevZ = (cipherZ + 0x5A) & 0xFF;
+                            if (dataBuffer[offset + cacheKey1[keyLength]] === keyRevZ) {
+                                if (verifyPeSignature(dataBuffer, offset, maxLfaValid, keyLength, 2)) {
                                     detectedAlgo = "SUB-REV";
                                     return true;
                                 }
