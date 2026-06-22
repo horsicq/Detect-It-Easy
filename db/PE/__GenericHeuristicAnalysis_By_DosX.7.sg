@@ -3821,28 +3821,34 @@ function validateGlobalUnicodeString(ustring) {
 
 
 /**
- * Generates a Unicode signature mask for the given input string.
+ * Generates a precise UTF-16LE hex signature mask for a given string.
+ * Translates characters into their true byte representation (Little-Endian)
+ * instead of naively injecting null bytes. Safely handles non-ASCII characters.
  *
- * This function iterates through each character in the input string and appends
- * its Unicode representation to the output string. The first character is appended
- * without a prefix, while subsequent characters are prefixed with "00".
- * 
- * "test" -> "'t'00'e'00's'00't'"
+ * Example (ASCII): "test" -> "74 00 65 00 73 00 74 00"
+ * Example (Cyrillic): "Тест" -> "22 04 35 04 41 04 42 04"
  *
- * @param {string} ustring - The input string for which to generate the Unicode signature mask.
- * @returns {string} The generated Unicode signature mask.
+ * @param {string} ustring - The input string to translate into a signature.
+ * @returns {string} The formatted UTF-16LE hex signature mask.
  */
 function generateUnicodeSignatureMask(ustring) {
-    var output = String();
+    var hexMask = [];
 
-    // Iterate through each character in the input string
-    for (var c = 0; c < ustring.length; c++) {
-        // Append the Unicode representation of the character to the output
-        output += (c !== 0 ? "00" : String()) + "'" + ustring[c] + "'";
+    for (var i = 0; i < ustring.length; i++) {
+        var code = ustring.charCodeAt(i);
+
+        // Extract Little-Endian bytes (low byte first, then high byte)
+        var low = (code & 0xFF).toString(16).toUpperCase(),
+            high = ((code >> 8) & 0xFF).toString(16).toUpperCase();
+
+        // Pad with leading zeros (ES3/ES5 compatible for older JS engines)
+        low = low.length === 1 ? "0" + low : low;
+        high = high.length === 1 ? "0" + high : high;
+
+        hexMask.push(low + " " + high);
     }
 
-    // Return the generated Unicode signature mask
-    return output;
+    return hexMask.join(" ");
 }
 
 
