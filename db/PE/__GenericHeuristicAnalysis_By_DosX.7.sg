@@ -7896,22 +7896,16 @@ function scanForMaliciousCode_NET_and_Native() {
     // mode 1: Arithmetic algorithms (ADD, SUB)
     // mode 2: Arithmetic Reverse algorithms (SUB-REV)
     function verifyPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength, mode) {
-        var z, c, b3, b2, b1, b0;
+        var z, c, b2, b1, b0;
 
-        // Fast fail 1: For files under ~16MB, the most significant byte of e_lfanew is ALWAYS 0.
-        // Inlined decryption eliminates function call overhead and modulo arithmetic.
-        z = dataBuffer[peStartOffset + lfa3_off[keyLength]];
-        c = dataBuffer[peStartOffset + 0x3F];
-        b3 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
-        if (b3 !== 0) return false;
-
-        // Fast fail 2: Check if upper 16-bits already exceed max search bounds
+        // Fast fail: Check if upper 16-bits already exceed max search bounds
         z = dataBuffer[peStartOffset + lfa2_off[keyLength]];
         c = dataBuffer[peStartOffset + 0x3E];
         b2 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
+
         if ((b2 << 16) >= maxValidLfaNew) return false;
 
-        // Decode remaining e_lfanew bytes
+        // Decode remaining e_lfanew bytes (byte 3 is implicitly 0x00 at this stage)
         z = dataBuffer[peStartOffset + lfa1_off[keyLength]];
         c = dataBuffer[peStartOffset + 0x3D];
         b1 = mode === 0 ? (c ^ z) : (mode === 1 ? ((c - z) & 0xFF) : ((z - c) & 0xFF));
@@ -7984,9 +7978,9 @@ function scanForMaliciousCode_NET_and_Native() {
     // Scan function to avoid code duplication
     function scanBuffer(dataBuffer, bufferSize, offsetBase) {
         var maxSearchIndex = bufferSize - 0x100,
-            j = 0, L = 1, b0, b1, e0_bit, e1_bit, d3, c0,
+            j = 0, L = 1, b0, b1, e0_bit, e1_bit, d3, d3F, c0,
             e0_math, e1_math, e0_rev, e1_rev, maxLfa,
-            _k0 = k0_off, _k1 = k1_off, _k3 = k3_off; // Local variable cache for faster lookup
+            _k0 = k0_off, _k1 = k1_off, _k3 = k3_off, _lfa3 = lfa3_off; // Local variable cache
 
         for (; j < maxSearchIndex; j++) {
             b0 = dataBuffer[j];
@@ -7998,10 +7992,15 @@ function scanForMaliciousCode_NET_and_Native() {
             if (e0_bit === 0x00 && e1_bit === 0x00) continue;
 
             d3 = dataBuffer[j + 3];
+            d3F = dataBuffer[j + 0x3F]; // Read MSB of e_lfanew ONCE per iteration
             maxLfa = bufferSize - j - 0x20;
 
             for (L = 1; L <= 20; L++) {
                 if (d3 !== dataBuffer[j + _k3[L]]) continue;
+
+                // Universal Lock: If MSB of e_lfanew is 0x00 (which it always is), 
+                // its ciphertext MUST equal its exact key byte in ALL supported algorithms.
+                if (d3F !== dataBuffer[j + _lfa3[L]]) continue;
 
                 c0 = dataBuffer[j + _k0[L]];
 
