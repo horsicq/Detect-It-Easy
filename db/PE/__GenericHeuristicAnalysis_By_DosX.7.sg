@@ -322,6 +322,7 @@ function scanForObfuscations_NET() {
         "MyApplication"
     ], defaultEntries = [ // like MSIL, C#, C++ NET etc
         "Main",
+        "_Main", // Small Basic
         "main", // F# entry
         "main@", // F# entry
         "<Main>$", // For programs with top-level operators (C#)
@@ -7096,7 +7097,7 @@ function scanForMaliciousCode_NET_and_Native() {
             "E8 00 00 00 00" +     // call $+5
             "5D" +                 // pop ebp
             "8B C5" +              // mov eax, ebp
-            "81 ED .. ..  01 20" +  // sub ebp, ...
+            "81 ED .. .. 01 20" +  // sub ebp, ...
             "2B 85 .. .. .. .." +  // sub eax, dword ptr [ebp + ...]
             "89 85 .. .. .. .." +  // mov dword ptr [ebp + ...], eax
             "B0 00"                // mov al, 0
@@ -8197,8 +8198,7 @@ function scanForMaliciousCode_NET_and_Native() {
         PE_Cached.nameOfNetAssemblyName.toLowerCase().indexOf("payload") !== -1 ||
         PE_Cached.nameOfNetModuleName.toLowerCase().indexOf("payload") !== -1 ||
         isNameObfuscated(PE_Cached.nameOfNetAssemblyName) ||
-        isNameObfuscated(PE_Cached.nameOfNetModuleName) ||
-        /(?:^tmp|\.tmp$)/.test(PE_Cached.nameOfNetModuleName)
+        isNameObfuscated(PE_Cached.nameOfNetModuleName)
     ) ||
         PE.getVersionStringInfo("OriginalFilename").toLowerCase().indexOf("stub.") === 0 ||
         PE.getVersionStringInfo("InternalName").toLowerCase().indexOf("stub.") === 0 ||
@@ -8225,6 +8225,12 @@ function scanForMaliciousCode_NET_and_Native() {
     ) {
         verdicts.push({
             type: "Anomalous build info",
+            version: String(),
+            details: mayBeInfected
+        });
+    } else if (/(?:^tmp|\.tmp$)/.test(PE_Cached.nameOfNetModuleName)) {
+        verdicts.push({
+            type: "Generated temporary assembly",
             version: String(),
             details: mayBeInfected
         });
