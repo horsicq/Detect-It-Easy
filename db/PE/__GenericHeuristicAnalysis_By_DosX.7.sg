@@ -3123,10 +3123,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (!isPeAtOverlayDetected && !isSfx && !PE.isSigned() && PE.isOverlayPresent()) {
         var overlayEntropy = PE.calculateEntropy(PE.getOverlayOffset(), PE.getOverlaySize());
 
-        if (
-            PE.getOverlaySize() > 150 && overlayEntropy > 7 ||
-            PE.getOverlaySize() > PE_Cached.fileBodySize
-        ) {
+        if (PE.getOverlaySize() > 150 && overlayEntropy > 7 ||
+            PE.getOverlaySize() > PE_Cached.fileBodySize) {
             log(logType.any, "Overlay size: " + PE.getOverlaySize() + " bytes; Entropy: " + overlayEntropy);
 
             hasStrangeOverlay = true;
@@ -3358,8 +3356,8 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
     for (var i = 0; i < licesingStrings.length && !isInterestingStringsFound; i++) {
         const currentPatternToFind = licesingStrings[i];
 
-        if (PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "'" + currentPatternToFind + "'") ||
-            PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "'" + convertStringToUnicodeSignature(currentPatternToFind) + "'")) {
+        if ((!PE_Cached.isDotNet && PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.fileBodySize, "'" + currentPatternToFind + "'")) ||
+            PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.fileBodySize, convertStringToUnicodeSignature(currentPatternToFind))) {
             isInterestingStringsFound = true;
         }
     }
@@ -5814,7 +5812,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
             langName = extdb[i][0],
             langExtName = extdb[i][1];
 
-        if (PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "%% %% %% %% %% %% %% %% '." + langExtName + "' 00")) {
+        if (PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.fileBodySize, "%% %% %% %% %% %% %% %% '." + langExtName + "' 00")) {
             log(logType.any, "Lines of ." + langExtName + " files (" + langName + ") detected");
 
             _setLangByHeur(langName);
@@ -5822,7 +5820,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
     }
 
 
-    if (!_isLangDetected("C++") && PE.isSignaturePresent(PE_Cached.dosStubSize, PE.getSize(), "%% %% %% %% %% %% %% %% %% %% '.c' 00")) {
+    if (!_isLangDetected("C++") && PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.fileBodySize, "%% %% %% %% %% %% %% %% %% %% '.c' 00")) {
         log(logType.any, "Lines of .c files (C) detected (not a C++)");
 
         _setLangByHeur("C");
