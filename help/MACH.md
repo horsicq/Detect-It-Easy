@@ -1,4 +1,4 @@
-###This is a description of the MACH class.
+# MACH Class Reference
 
 * You could use all functions from Binary class but with MACH prefix (Binary.compareEP -> MACH.compareEP)
 
