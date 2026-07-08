@@ -1,4 +1,4 @@
-###This is a description of the DEX class.
+# This is a description of the DEX class.
 
 * You could use all functions from Binary class but with DEX prefix (Binary.compare -> DEX.compare)
 
