@@ -1,4 +1,4 @@
-###This is a description of the APK class.
+# APK Class Reference
 
 * You could use all functions from Binary class but with APK prefix (Binary.compare -> APK.compare)
 
