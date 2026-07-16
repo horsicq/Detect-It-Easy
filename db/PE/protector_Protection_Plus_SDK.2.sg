@@ -1,0 +1,97 @@
+// Detect It Easy: detection rule file
+// Author: Xylitol <xylitol@temari.fr>
+
+// Distinctive paths documented in the official SDK license schema.
+// https://www.softwarekey.com/help/plus5/Content/License_File_Schema.html
+meta("protector", "Protection PLUS SDK");
+
+var markers = [
+    "/SoftwareKey/PrivateData/License/ProductID",
+    "/SoftwareKey/PrivateData/License/LicenseID",
+    "/SoftwareKey/PrivateData/License/InstallationID",
+    "/SoftwareKey/PrivateData/License/ActivationData",
+    "/SoftwareKey/PrivateData/License/ActivationPassword",
+    "/SoftwareKey/PrivateData/License/LicenseCounter",
+    "/SoftwareKey/PrivateData/License/TriggerCode",
+    "/SoftwareKey/PrivateData/License/TriggerCodeFixedValue",
+    "/SoftwareKey/PrivateData/License/SignatureDate",
+    "/SoftwareKey/PrivateData/License/FormatVersion",
+    "/SoftwareKey/PrivateData/License/Author/AuthorID",
+    "/SoftwareKey/PrivateData/License/LicenseGroup/LicenseGroupID",
+    "/SoftwareKey/PrivateData/License/LicenseValidationOptions/LicenseValidationOptionsID",
+    "/SoftwareKey/PrivateData/License/LicenseValidationOptions/RefreshLicenseAlwaysRequired"
+];
+
+// Converts an ASCII string into a UTF-16LE
+function toUtf16LE(text)
+{
+    var signature = "";
+    var i;
+    var hex;
+
+    for (i = 0; i < text.length; i++)
+    {
+        hex = text.charCodeAt(i).toString(16);
+
+        if (hex.length === 1)
+        {
+            hex = "0" + hex;
+        }
+
+        signature += hex + "00";
+    }
+
+    return signature;
+}
+
+// Searches for a marker in ASCII, then in UTF-16LE.
+function findMarker(marker, fileSize)
+{
+    var offset = PE.findString(0, fileSize, marker);
+
+    if (offset !== -1)
+    {
+        return offset;
+    }
+
+    return PE.findSignature(0, fileSize, toUtf16LE(marker));
+}
+
+function detect()
+{
+    var fileSize = PE.getSize();
+    var foundMarkers = [];
+    var displayedMarkers;
+    var offset;
+    var i;
+
+    for (i = 0; i < markers.length; i++)
+    {
+        offset = findMarker(markers[i], fileSize);
+
+        if (offset !== -1)
+        {
+            foundMarkers.push(markers[i]);
+        }
+    }
+
+    if (foundMarkers.length > 0)
+    {
+        displayedMarkers = foundMarkers.slice(0, 3).join(", ");
+
+        if (foundMarkers.length > 3)
+        {
+            displayedMarkers += ", ...";
+        }
+
+        sVersion = "5.x";
+        sOptions =
+            foundMarkers.length +
+            " markers found: " +
+            displayedMarkers;
+
+        bDetected = true;
+    }
+
+    return result();
+}
