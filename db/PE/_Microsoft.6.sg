@@ -48,7 +48,14 @@ function detect() {
     //
 
     function findNetCoreConfigOffset() {
-        return PE.findString(PE.section[0].FileOffset, PE.getSize(), ".NETCoreApp,Version=v");
+        var rdataSection = PE.section[".rdata"];
+
+        // .NET 10 support
+        if (rdataSection.Number === 1) {
+            return PE.findSignature(rdataSection.FileOffset, rdataSection.FileSize, "00 00 00 %% %% 2E %% 2E") + 3; // \0 \0 \0 N1 N2 . N3 -> "\0\0\010.0.8" 
+        } else {
+            return PE.findString(PE.section[0].FileOffset, PE.getSize(), ".NETCoreApp,Version=v");
+        }
     }
 
     function findNetFrameworkConfigOffset() {
@@ -56,12 +63,17 @@ function detect() {
     }
 
     function getNetConfigStringByOffset(configOffset) {
-        var result = PE.getString(configOffset).split("=")[1];
+        var result = PE.getString(configOffset);
 
-        if (result && result[0] !== 'v' && result.length > 7)
+        if (result.indexOf("=") !== -1) {
+            result = result.split("=")[1];
+            if (result && result[0] !== 'v' && result.length > 7)
+                result = String();
+
+            result = result.substr(1);
+        } else if (!result.match(/^\d{2}\.\d+/)) {
             result = String();
-
-        result = result.substr(1);
+        }
 
         return File.cleanString(result);
     }
@@ -70,7 +82,7 @@ function detect() {
 
         const netFrameworkConfigPattern = findNetFrameworkConfigOffset();
 
-        if (netFrameworkConfigPattern != -1) {
+        if (netFrameworkConfigPattern !== -1) {
 
             dotNetLibraryName = ".NET Framework"; // .NET Framework better than .NET Core
             dotNetLibraryVersion = String(getNetConfigStringByOffset(netFrameworkConfigPattern));
@@ -90,7 +102,7 @@ function detect() {
         } else if (PE.isRichSignaturePresent() && PE.isTLSPresent()) {
             const netCoreConfigPattern = findNetCoreConfigOffset();
 
-            if (netCoreConfigPattern != -1 && PE.compare("18", netCoreConfigPattern - 1) && PE.getNETVersion().substr(0, 4) === "v4.0") { // Is .NET Core DLL
+            if (netCoreConfigPattern !== -1 && PE.compare("18", netCoreConfigPattern - 1) && PE.getNETVersion().substr(0, 4) === "v4.0") { // Is .NET Core DLL
                 dotNetLibraryName = ".NET Core";
                 dotNetLibraryVersion = getNetConfigStringByOffset(netCoreConfigPattern); // antifake
                 if (dotNetLibraryVersion.length >= 2 && isNaN(Number(dotNetLibraryVersion[1]))) {
@@ -152,8 +164,11 @@ function detect() {
         );
 
         // General PE format check
-        if (PE.compareEP("48") &&
-            PE.compare("90", PE.getEntryPointOffset() - 1) && // NOP before OEP
+        if (PE.compareEP("4883EC28") && // sub rsp, 0x28
+            ( // NOP or INT3 (.NET 10+) before OEP
+                PE.compare("90", PE.getEntryPointOffset() - 1) ||
+                PE.compare("CC", PE.getEntryPointOffset() - 1)
+            ) &&
             PE.isRichSignaturePresent() &&
             PE.getExportSection() !== -1 && // EAT always present
             PE.getNumberOfSections() >= 6) { // PE.isLibraryPresentExp(/^api-ms-win-crt-.*\.dll$/)
@@ -180,10 +195,9 @@ function detect() {
                 }
             }
 
-            // TODO: Improve & add .NET 10 support (!!!!!!)
             const netCoreConfigPattern = findNetCoreConfigOffset();
 
-            if (netCoreConfigPattern != -1) dotNetLibraryVersion = getNetConfigStringByOffset(netCoreConfigPattern);
+            if (netCoreConfigPattern !== -1) dotNetLibraryVersion = getNetConfigStringByOffset(netCoreConfigPattern);
         }
 
         if (dotNetLibraryVersion !== String() || dotNetLibraryOptions !== String()) dotNetLibraryName = ".NET " + (isNetNative ? "Native" : "Core");
