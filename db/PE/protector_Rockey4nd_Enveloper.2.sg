@@ -1,0 +1,114 @@
+// Detect It Easy: detection rule file
+// Author: Xylitol <xylitol@temari.fr>
+//
+// Supported variants:
+//
+// - ROCKEY4ND Win98/2000/XP/2003/Vista Enveloper v2.30
+// - Feitian Shell Protect Center v1.0.12.917
+
+meta("protector", "FEITIAN Rockey4nd Software Protection");
+
+function detect()
+{
+    var fileSize = PE.getSize();
+
+    /*
+     * ROCKEY4ND Enveloper v2.30
+     *
+     * entry-point stub observed in nd4_notepad.exe:
+     *
+     * 01047800 | E8 D0020000   | call nd4_notepad.1047AD5
+     * 01047805 | C3            | ret
+     * 01047806 | 2280 BA303885 | and al, byte ptr ds:[eax-7AC7CF46]
+     * 0104780C | 7F 8A         | jg nd4_notepad.1047798
+     * 0104780E | 43            | inc ebx
+     * 0104780F | 9B            | fwait
+     * 01047810 | 192A          | sbb dword ptr ds:[edx], ebp
+     * 01047812 | FD            | std
+     * 01047813 | FB            | sti
+     * 01047814 | E1 8B         | loope nd4_notepad.10477A1
+     * 01047816 | CA 237B       | ret far 7B23
+     * 01047819 | 58            | pop eax
+     * 0104781A | 847A AA       | test byte ptr ds:[edx-56], bh
+     * 0104781D | F8            | clc
+     * 0104781E | 4E            | dec esi
+     * 0104781F | BB AC795EE5   | mov ebx, E55E79AC
+     * 01047824 | 56            | push esi
+     * 01047825 | 17            | pop ss
+     * 01047826 | 88FF          | mov bh, bh
+     * 01047828 | 15 50C3AC28   | adc eax, 28ACC350
+     *
+     * The four-byte relative CALL destination is masked.
+     */
+    var rockey4ndSignature =
+        "e8........c3" +
+        "2280ba3038857f8a439b" +
+        "192afdfbe18bca237b58847aaaf84ebb" +
+        "ac795ee5561788ff1550c3";
+
+    /*
+     * Feitian Shell Protect Center entry-point stub:
+     *
+     * 00D5B7F0 | EB 02         | jmp enc_notepad.D5B7F4  
+     * 00D5B7F2 | 90            | nop                     
+     * 00D5B7F3 | 90            | nop                     
+     * 00D5B7F4 | 90            | nop                     
+     * 00D5B7F5 | E9 06E80300   | jmp enc_notepad.D9A000  
+     * 00D5B7FA | C3            | ret                     
+     * 00D5B7FB | 0000          | add byte ptr ds:[eax],al
+     * 00D5B7FD | 0000          | add byte ptr ds:[eax],al
+     * 00D5B7FF | 0000          | add byte ptr ds:[eax],al
+     *
+     * The four-byte relative JMP destination is masked.
+     */
+    var shellProtectSignature =
+        "eb02909090e9........c3";
+
+    /*
+     * Internal loader marker observed in samples generated with
+     * Feitian Shell Protect Center v1.0.10.105 and v1.0.12.917.
+     *
+     * The final bytes contain the ASCII string "KERNEL32".
+     */
+	 
+    var shellProtect1010105 =
+        "89770100000000000000000000000000" +
+        "b911000000004000440000005f000000" +
+        "a300000040000000e300000002000000" +
+        "e5000000000000004b45524e454c3332" +
+        "2e646c6c";
+	
+    var shellProtect1012917 =
+        "19790100000000000000000000000000" +
+        "b911000000004000440000005f000000" +
+        "a300000040000000e300000002000000" +
+        "e5000000000000004b45524e454c3332" +
+        "2e646c6c";
+
+    // ROCKEY4ND Enveloper v2.30
+    if (PE.section["RY4SHL"] && PE.compareEP(rockey4ndSignature))
+    {
+        sName = "Rockey4nd Enveloper";
+        sVersion = "2.30";
+        bDetected = true;
+    }
+
+    // Feitian Shell Protect Center
+    else if (PE.section[".ftsafe"] && PE.compareEP(shellProtectSignature))
+    {
+        sName = "Rockey4nd Feitian Shell Protect Center";
+    
+        if (PE.findSignature(0, fileSize, shellProtect1012917) !== -1)
+        {
+            sVersion = "1.0.12.917";
+        }
+        else if (PE.findSignature(0, fileSize, shellProtect1010105) !== -1)
+        {
+            sVersion = "1.0.10.105";
+        }
+    
+        bDetected = true;
+    }
+
+    return result();
+}
