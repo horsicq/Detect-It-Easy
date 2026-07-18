@@ -3770,10 +3770,21 @@ function validateSignature(pattern) {
  * @returns {boolean} True if the byte code is found in any section, otherwise false.
  */
 function validateNetByteCode(byteCode) {
-    for (var s = 0; s < PE_Cached.numberOfSections; s++) {
+    for (var i = 0; i < PE_Cached.numberOfSections; i++) {
         const
-            sectionOffset = PE.getSectionFileOffset(s),
-            sectionSize = PE.getSectionFileSize(s);
+            sectionName = PE.getSectionName(i),
+            sectionOffset = PE.getSectionFileOffset(i),
+            sectionSize = PE.getSectionFileSize(i);
+
+        if (PE_Cached.numberOfSections > 1) {
+            if (sectionOffset === 0 || sectionSize === 0) {
+                continue;
+            } else if (i === PE.getResourceSection() && sectionName === ".rsrc" && i !== PE.getRelocsSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getImportSection()) {
+                continue;
+            } else if (i === PE.getRelocsSection() && sectionName === ".reloc" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getImportSection()) {
+                continue;
+            }
+        }
 
         var offsetFound = PE.findSignature(sectionOffset, sectionSize, byteCode);
         if (offsetFound !== -1) {
@@ -7828,10 +7839,11 @@ function scanForMaliciousCode_NET_and_Native() {
 
             // Optimizations: Skip known sections that are unlikely to contain encoded payloads
             if (PE_Cached.numberOfSections > 1) {
-                if (sectionOffset > 0 && sectionSize < 0x2000) {
+                if (sectionOffset === 0 || sectionSize < 0x2000) {
+                    continue;
                 } else if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && sectionName === ".text" && i === 0) {
                     continue;
-                } else if (i === PE.getResourceSection() && sectionName === ".rsrc") {
+                } else if (i === PE.getResourceSection() && sectionName === ".rsrc" && i !== PE.getImportSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
                     continue;
                 } else if (i === PE.getImportSection() && sectionName === ".idata" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
                     continue;
@@ -8069,11 +8081,11 @@ function scanForMaliciousCode_NET_and_Native() {
                 sectionName = PE.getSectionName(i);
 
             if (PE_Cached.numberOfSections > 1) {
-                if (sectionOffset > 0 && sectionSize < 0x2500) {
+                if (sectionOffset === 0 || sectionSize < 0x2500) {
                     continue;
                 } if (!PE_Cached.isDotNet && i === PE.getEntryPointSection() && sectionName === ".text" && i === 0) {
                     continue;
-                } else if (i === PE.getResourceSection() && sectionName === ".rsrc") {
+                } else if (i === PE.getResourceSection() && sectionName === ".rsrc" && i !== PE.getImportSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
                     continue;
                 } else if (i === PE.getImportSection() && sectionName === ".idata" && i !== PE.getResourceSection() && i !== PE.getEntryPointSection() && i !== PE.getTLSSection() && i !== PE.getRelocsSection()) {
                     continue;
