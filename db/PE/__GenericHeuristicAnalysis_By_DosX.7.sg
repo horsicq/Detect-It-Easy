@@ -8434,16 +8434,20 @@ function scanNameForAnomalies_FileSystem_NET_and_Native() {
 
 
 
-    var IsNotVanillaExecutableFileSystemExtension = false;
+    // If the file extension is present in the database and differs from vanilla (generic) .exe/.dll
 
-    if (executableFileSystemExtensionType && executableFileSystemExtensionType !== null) {
-        IsNotVanillaExecutableFileSystemExtension = true;
+    var isSpecializedExecutableFileSystemExtension = false;
+
+    if (hasExecutableFileSystemExtensionType && executableFileSystemExtensionType !== null) {
+        isSpecializedExecutableFileSystemExtension = true;
     }
 
-    if (IsNotVanillaExecutableFileSystemExtension) options = "Extension of " + executableFileSystemExtensionType;
+    if (isSpecializedExecutableFileSystemExtension) options = "Extension of " + executableFileSystemExtensionType;
 
 
 
+
+    // Check for missing file extension
 
     var isExecutableFileSystemExtensionEmpty = false;
 
@@ -8456,13 +8460,33 @@ function scanNameForAnomalies_FileSystem_NET_and_Native() {
 
 
 
+    // Check for a non-standard (custom) file extension
+
     var isCustomExecutableFileSystemExtension = false;
 
     if (executableFileSystemExtension.length <= 0xC && !isExecutableFileSystemExtensionEmpty && !executableFileSystemExtensionType && executableFileSystemExtensionType !== null) {
         isCustomExecutableFileSystemExtension = true;
     }
 
-    if (isCustomExecutableFileSystemExtension) options = addOption(options, "Extension (\"." + executableFileSystemExtension + "\")");
+    if (isCustomExecutableFileSystemExtension) options = addOption(options, "Extension (\"." + executableFileSystemExtension.toUpperCase() + "\")");
+
+
+
+
+    // Checking for DLL extension in executable PE files
+    // Occurs in non-standard protections and SDK-style .NET application assemblies. For example:
+    // *  app.deps.json          -> Dependency manifest
+    // *  app.runtimeconfig.json -> Runtime configuration
+    // *  app.exe                -> Native apphost executable
+    // * [app.dll]               -> Managed application assembly without IMAGE_FILE_DLL
+
+    var hasDllExtensionWithoutDllCharacteristic = false;
+
+    if (executableFileSystemExtension === "dll" && !PE_Cached.isDynamicLinkLibrary) {
+        hasDllExtensionWithoutDllCharacteristic = true;
+    }
+
+    if (hasDllExtensionWithoutDllCharacteristic) options = addOption(options, "Application Image with \".DLL\" extension");
 
 
 
