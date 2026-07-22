@@ -223,11 +223,21 @@ git clone --recursive https://github.com/horsicq/DIE-engine.git
 cd DIE-engine
 ```
 
-#### Build
+#### Build (Release)
 
 ```bash
 mkdir -p build
 cmake . -B build
+cd build
+make -j4
+# To use it as a command, uncomment the following line:
+# sudo make install -j4
+```
+#### Build (Debug)
+
+```bash
+mkdir -p build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cd build
 make -j4
 # To use it as a command, uncomment the following line:
