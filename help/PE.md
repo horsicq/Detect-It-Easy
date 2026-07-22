@@ -22,6 +22,8 @@ The PE class provides specialized analysis capabilities for Windows Portable Exe
 ## File Format Detection
 
 ### Basic PE Detection
+**`bool isPE32()`** - Check if the file is PE32 (32-bit) format.
+
 **`bool isPEPlus()`** - Check if the file is PE32+ (64-bit) format.
 
 **`bool isDll()`** - Check if the file is a Dynamic Link Library (DLL).
