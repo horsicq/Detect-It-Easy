@@ -177,8 +177,8 @@ function main() {
 
 
 function stubForLegacyEngines() {
-    if (typeof PE.getNetAssemblyName === "undefined") {
-        stdout(">>> Update DIE Engine to 3.20 and higher for using Heuristic-analyzer by DosX <<<");
+    if (typeof PE.getNetAssemblyName !== "function" || typeof PE.section[0].Offset !== "number") {
+        stdout(">>> Update DIE Engine to 4.0 and higher for using Heuristic-analyzer by DosX <<<");
         debugger;
         return true;
     }
@@ -278,8 +278,11 @@ function initializeCache() {
     for (var key in cacheMap) {
         const functionBody = cacheMap[key];
 
-        if (functionBody) {
+        if (functionBody && typeof functionBody === "function") {
             PE_Cached[key] = functionBody();
+        } else if (functionBody) {
+            stdout(">>> PE API function '" + key + "' is not a function! <<<");
+            debugger;
         } else {
             stdout(">>> PE API function '" + key + "' is undefined! <<<");
             debugger;
@@ -7895,7 +7898,7 @@ function scanForMaliciousCode_NET_and_Native() {
     if (isBase64Payload) {
         verdicts.push({
             type: "Encoded executable payload",
-            version: "Base64, " + base64Version,
+            version: "Base64".append(base64Version),
             details: mayBeInfected
         });
     }
