@@ -14,7 +14,7 @@ The PE class provides specialized analysis capabilities for Windows Portable Exe
 -   [Import Table Operations](#import-table-operations)
 -   [Export Table Operations](#export-table-operations)
 -   [Resource Management](#resource-management)
--   [.NET Framework Support](#net-framework-support)
+-   [.NET Support](#net-support)
 -   [Version Information](#version-information)
 -   [Linker Information](#linker-information)
 -   [File Properties](#file-properties)
@@ -37,23 +37,18 @@ The PE class provides specialized analysis capabilities for Windows Portable Exe
 
 ### .NET Detection
 
-**`bool isNET()`** - Check if the file contains .NET metadata.
+**`bool isNET()`** - Check if the file is a .NET (CLI) assembly.
 
-**`QString getNETVersion()`** - Get the .NET Framework version.
+**`bool isNet()`** - Alias of `isNET()`.
+
+> Deep .NET/CLI metadata inspection (types, methods, fields, strings, blob, version) has moved to the dedicated [DOTNET](DOTNET.md) class.
 
 **Examples:**
 
 ```javascript
 if (PE.isNet()) {
-    var netVersion = PE.getNETVersion();
-    sInfo = ".NET " + netVersion;
-
-    // Check for specific .NET features
-    if (PE.isNetTypePresent("System.Windows.Forms", "Form")) {
-        sFramework = "Windows Forms";
-    } else if (PE.isNetTypePresent("System.Windows", "Window")) {
-        sFramework = "WPF";
-    }
+    sInfo = ".NET assembly";
+    // Deep metadata checks (types/methods/fields) are available via the DOTNET class.
 }
 
 if (PE.isDll()) {
@@ -317,86 +312,41 @@ if (PE.isResourceNamePresent("MANIFEST")) {
 }
 ```
 
-## .NET Framework Support
+## .NET Support
 
-### .NET String Detection
+.NET / CLI metadata analysis has moved to the dedicated **DOTNET** class — see [DOTNET.md](DOTNET.md). `PE.isNET()` still reports whether a file is a .NET (CLI) assembly.
 
-**`bool isNetObjectPresent(QString sString)`** - Check if a .NET object is present.
+The following PE functions are **obsolete** and kept only for backward compatibility with existing signatures. New signatures should use the `DOTNET` class instead.
 
-**`bool isNetUStringPresent(QString sString)`** - Check if a .NET unicode string is present.
+### .NET String Detection (obsolete)
 
-### .NET Blob Analysis
+**`bool isNetObjectPresent(QString sString)`** - *Obsolete, use `DOTNET.isNetObjectPresent`.* Check if a .NET object is present.
 
-**`qint64 findSignatureInBlob_NET(QString sSignature)`** - Find a signature in .NET blob.
+**`bool isNetUStringPresent(QString sString)`** - *Obsolete, use `DOTNET.isNetUStringPresent`.* Check if a .NET unicode string is present.
 
-**`bool isSignatureInBlobPresent_NET(QString sSignature)`** - Check if a signature exists in .NET blob.
+### .NET Blob Analysis (obsolete)
 
-**`bool compareEP_NET(QString sSignature, qint64 nOffset=0)`** - Compare signature at .NET entry point.
+**`qint64 findSignatureInBlob_NET(QString sSignature)`** - *Obsolete, use `DOTNET.findSignatureInBlob_NET`.* Find a signature in .NET blob.
 
-### .NET Metadata Analysis
+**`bool isSignatureInBlobPresent_NET(QString sSignature)`** - *Obsolete, use `DOTNET.isSignatureInBlobPresent_NET`.* Check if a signature exists in .NET blob.
 
-**`bool isNetGlobalCctorPresent()`** - Check if .NET global constructor is present.
+**`bool compareEP_NET(QString sSignature, qint64 nOffset=0)`** - *Obsolete.* Compare signature at .NET entry point.
 
-**`bool isNetTypePresent(QString sTypeNamespace, QString sTypeName)`** - Check if a .NET type exists.
+### .NET Metadata Analysis (obsolete)
 
-**`bool isNetMethodPresent(QString sTypeNamespace, QString sTypeName, QString sMethodName)`** - Check if a .NET method exists.
+**`QString getNETVersion()`** - *Obsolete, use `DOTNET.getNetVersion`.* Get the CLI metadata version string.
 
-**`bool isNetFieldPresent(QString sTypeNamespace, QString sTypeName, QString sFieldName)`** - Check if a .NET field exists.
+**`QString getNetModuleName()`** - *Obsolete, use `DOTNET.getNetModuleName`.* Get the .NET module name.
 
-**Examples:**
+**`QString getNetAssemblyName()`** - *Obsolete, use `DOTNET.getNetAssemblyName`.* Get the .NET assembly name.
 
-```javascript
-if (PE.isNet()) {
-    // String-based obfuscator detection
-    var obfuscators = [
-        "Confuser",
-        "ConfuserEx",
-        "Babel",
-        "Dotfuscator",
-        "SmartAssembly",
-    ];
-    for (var i = 0; i < obfuscators.length; i++) {
-        if (PE.isNetStringPresent(obfuscators[i])) {
-            sObfuscator = obfuscators[i];
-            break;
-        }
-    }
+**`bool isNetGlobalCctorPresent()`** - *Obsolete, use `DOTNET.isNetGlobalCctorPresent`.* Check if .NET global constructor is present.
 
-    // Framework capability detection
-    if (PE.isNetTypePresent("System", "Console")) {
-        bUsesConsole = true;
-    }
+**`bool isNetTypePresent(QString sTypeNamespace, QString sTypeName)`** - *Obsolete, use `DOTNET.isNetTypePresent`.* Check if a .NET type exists.
 
-    if (PE.isNetTypePresent("System.IO", "File")) {
-        bUsesFileIO = true;
-    }
+**`bool isNetMethodPresent(QString sTypeNamespace, QString sTypeName, QString sMethodName)`** - *Obsolete, use `DOTNET.isNetMethodPresent`.* Check if a .NET method exists.
 
-    if (PE.isNetMethodPresent("System.IO", "File", "ReadAllText")) {
-        bReadsFiles = true;
-    }
-
-    // Cryptography detection
-    if (PE.isNetTypePresent("System.Security.Cryptography", "AES")) {
-        bUsesCrypto = true;
-        sCryptoType = "AES";
-    }
-
-    // Network capabilities
-    if (PE.isNetTypePresent("System.Net", "WebClient")) {
-        bNetworkCapable = true;
-    }
-
-    // Anti-debugging detection
-    if (PE.isNetMethodPresent("System.Diagnostics", "Debugger", "IsAttached")) {
-        bAntiDebug = true;
-    }
-
-    // Reflection usage (potential packer/obfuscator)
-    if (PE.isNetTypePresent("System.Reflection", "Assembly")) {
-        bUsesReflection = true;
-    }
-}
-```
+**`bool isNetFieldPresent(QString sTypeNamespace, QString sTypeName, QString sFieldName)`** - *Obsolete, use `DOTNET.isNetFieldPresent`.* Check if a .NET field exists.
 
 ## Version Information
 
