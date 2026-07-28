@@ -81,6 +81,6 @@ function detect() {
         // anti-debug
     }
 
-    return result(bShowType, bShowVersion, bShowOptions);
+    return result();
 }
 ```
