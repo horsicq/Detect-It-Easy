@@ -55,10 +55,10 @@ The DOTNET signatures live in the `db/PE/dotnet` database folder and are matched
 ## Examples
 
 ```javascript
-// init() runs first; the DOTNET class is available when the file is a CLI assembly.
-init("protector", "");
+// meta() runs first; the DOTNET class is available when the file is a CLI assembly.
+meta("protector", "");
 
-function detect(bShowType, bShowVersion, bShowOptions) {
+function detect() {
     if (DOTNET.isNetGlobalCctorPresent()) {
         // Obfuscator / protector detection by embedded strings
         var obfuscators = ["ConfuserEx", "Confuser", "Babel", "Dotfuscator", "SmartAssembly"];
@@ -66,7 +66,7 @@ function detect(bShowType, bShowVersion, bShowOptions) {
             if (DOTNET.isNetStringPresent(obfuscators[i])) {
                 sName = obfuscators[i];
                 sVersion = DOTNET.getNetVersion();
-                bDetected = 1;
+                bDetected = true;
                 break;
             }
         }
