@@ -1,89 +1,18 @@
 // Detect It Easy: detection rule file
 // Author: Xylitol <xylitol@temari.fr>
 
-// TODO: Optimize & refactor (Temporarily placed in DB_EXTRA)
-
 // Distinctive paths documented in the official SDK license schema.
+// searched once as ASCII and once as UTF-16LE.
 // https://www.softwarekey.com/help/plus5/Content/License_File_Schema.html
 meta("protector", "Protection PLUS SDK");
 
-var markers = [
-    "/SoftwareKey/PrivateData/License/ProductID",
-    "/SoftwareKey/PrivateData/License/LicenseID",
-    "/SoftwareKey/PrivateData/License/InstallationID",
-    "/SoftwareKey/PrivateData/License/ActivationData",
-    "/SoftwareKey/PrivateData/License/ActivationPassword",
-    "/SoftwareKey/PrivateData/License/LicenseCounter",
-    "/SoftwareKey/PrivateData/License/TriggerCode",
-    "/SoftwareKey/PrivateData/License/TriggerCodeFixedValue",
-    "/SoftwareKey/PrivateData/License/SignatureDate",
-    "/SoftwareKey/PrivateData/License/FormatVersion",
-    "/SoftwareKey/PrivateData/License/Author/AuthorID",
-    "/SoftwareKey/PrivateData/License/LicenseGroup/LicenseGroupID",
-    "/SoftwareKey/PrivateData/License/LicenseValidationOptions/LicenseValidationOptionsID",
-    "/SoftwareKey/PrivateData/License/LicenseValidationOptions/RefreshLicenseAlwaysRequired"
-];
-
-// Converts an ASCII string into a UTF-16LE
-function toUtf16LE(text) {
-    var signature = "";
-    var i;
-    var hex;
-
-    for (i = 0; i < text.length; i++) {
-        hex = text.charCodeAt(i).toString(16);
-
-        if (hex.length === 1) {
-            hex = "0" + hex;
-        }
-
-        signature += hex + "00";
-    }
-
-    return signature;
-}
-
-// Searches for a marker in ASCII, then in UTF-16LE.
-function findMarker(marker, fileSize) {
-    var offset = PE.findString(0, fileSize, marker);
-
-    if (offset !== -1) {
-        return offset;
-    }
-
-    return PE.findSignature(0, fileSize, toUtf16LE(marker));
-}
-
 function detect() {
-    var fileSize = PE.getSize();
-    var foundMarkers = [];
-    var displayedMarkers;
-    var offset;
-    var i;
-
-    for (i = 0; i < markers.length; i++) {
-        offset = findMarker(markers[i], fileSize);
-
-        if (offset !== -1) {
-            foundMarkers.push(markers[i]);
-        }
-    }
-
-    if (foundMarkers.length > 0) {
-        displayedMarkers = foundMarkers.slice(0, 3).join(", ");
-
-        if (foundMarkers.length > 3) {
-            displayedMarkers += ", ...";
-        }
-
+    var size = PE.getSize();
+    // "/SoftwareKey/PrivateData/License/" as ASCII, then as UTF-16LE.
+    if (PE.isSignaturePresent(0, size, "2F536F6674776172654B65792F50726976617465446174612F4C6963656E73652F") ||
+        PE.isSignaturePresent(0, size, "2F0053006F006600740077006100720065004B00650079002F00500072006900760061007400650044006100740061002F004C006900630065006E00730065002F00")) {
         sVersion = "5.x";
-        sOptions =
-            foundMarkers.length +
-            " markers found: " +
-            displayedMarkers;
-
         bDetected = true;
     }
-
     return result();
 }
