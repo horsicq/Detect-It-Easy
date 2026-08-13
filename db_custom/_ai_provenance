@@ -1,0 +1,934 @@
+// Detect It Easy: shared helpers for AI provenance carrier research
+// This code recognizes containers only. It does not validate C2PA/COSE signatures.
+
+var AI_C2PA_MANIFEST_UUID = "6332706100110010800000AA00389B71";
+var AI_C2PA_BMFF_UUID = "D8FEC3D61B0E483C92975828877EC481";
+
+function aiHexOffset(nValue) {
+    return "0x" + nValue.toString(16).toUpperCase();
+}
+
+function aiManifestTextEvidence(nOffset, nSize) {
+    var listEvidence = [];
+    var nBoundedSize = Math.min(nSize, 16 * 1024 * 1024);
+
+    // The search literals are assembled from concatenated fragments so this
+    // rule database never contains the contiguous strings and cannot flag
+    // itself when scanned.
+    if (Binary.findString(nOffset, nBoundedSize, "OpenAI Media Serv" + "ice API") !== -1) {
+        listEvidence.push("claim-generator text: OpenAI Media Serv" + "ice API");
+    }
+
+    if (Binary.findString(nOffset, nBoundedSize, "Google C2PA Media Ser" + "vices") !== -1) {
+        listEvidence.push("signer: Google C2PA Media Ser" + "vices");
+    }
+
+    if (Binary.findString(nOffset, nBoundedSize, "Google Media Process" + "ing Services") !== -1) {
+        listEvidence.push("signer: Google Media Process" + "ing Services");
+    }
+
+    if (Binary.findString(nOffset, nBoundedSize, "gpt-im" + "age") !== -1) {
+        listEvidence.push("software-agent text: gpt-im" + "age");
+    }
+
+    if (Binary.findString(nOffset, nBoundedSize, "Synth" + "ID") !== -1) {
+        listEvidence.push("watermark declaration: Synth" + "ID");
+    }
+
+    if (Binary.findString(nOffset, nBoundedSize, "trainedAlgo" + "rithmicMedia") !== -1) {
+        listEvidence.push("AI-source assertion text: trainedAlgo" + "rithmicMedia");
+    }
+
+    if (Binary.findString(nOffset, nBoundedSize, "c2pa.ai-disc" + "losure") !== -1) {
+        listEvidence.push("AI disclosure assertion text");
+    }
+
+    return listEvidence.length ? "; " + listEvidence.join("; ") + " (untrusted text until validation)" : "";
+}
+
+function aiIsManifestStoreJumbf(nOffset, nSize, bAllowTruncated) {
+    if ((nOffset < 0) || (nSize < 38) || ((nOffset + nSize) > Binary.getSize())) {
+        return false;
+    }
+
+    var nSuperboxSize = Binary.read_uint32(nOffset, true);
+    var nDescriptionSize = Binary.read_uint32(nOffset + 8, true);
+
+    if ((nSuperboxSize !== 0) && ((nSuperboxSize < 38) || (!bAllowTruncated && (nSuperboxSize > nSize)))) {
+        return false;
+    }
+
+    if ((nDescriptionSize < 30) || ((8 + nDescriptionSize) > nSize)) {
+        return false;
+    }
+
+    if (!Binary.compare("'jumb'", nOffset + 4) ||
+        !Binary.compare("'jumd'", nOffset + 12) ||
+        !Binary.compare(AI_C2PA_MANIFEST_UUID, nOffset + 16)) {
+        return false;
+    }
+
+    // The JUMBF description label immediately follows the UUID/toggle byte.
+    return Binary.findString(nOffset + 32, Math.min(nDescriptionSize - 24, 64), "c2pa") !== -1;
+}
+
+function aiFindManifestStoreJumbf(nOffset, nSize, bAllowTruncated) {
+    if ((nOffset < 0) || (nSize < 38) || ((nOffset + nSize) > Binary.getSize())) {
+        return -1;
+    }
+
+    // Match a superbox type, its first child size/type, and the C2PA manifest-store UUID.
+    var nTypeOffset = Binary.findSignature(
+        nOffset,
+        nSize,
+        "'jumb'........'jumd'" + AI_C2PA_MANIFEST_UUID
+    );
+
+    if ((nTypeOffset >= (nOffset + 4)) &&
+        aiIsManifestStoreJumbf(nTypeOffset - 4, nOffset + nSize - (nTypeOffset - 4), bAllowTruncated)) {
+        return nTypeOffset - 4;
+    }
+
+    return -1;
+}
+
+function aiDetectPngC2pa() {
+    var nFileSize = Binary.getSize();
+
+    if ((nFileSize < 20) || !Binary.compare("89504E470D0A1A0A", 0)) {
+        return null;
+    }
+
+    var nOffset = 8;
+    var nChunks = 0;
+
+    while ((nOffset + 12 <= nFileSize) && (nChunks < 100000)) {
+        var nChunkSize = Binary.read_uint32(nOffset, true);
+
+        if (nChunkSize > (nFileSize - nOffset - 12)) {
+            return null;
+        }
+
+        if (Binary.compare("'caBX'", nOffset + 4)) {
+            var nDataOffset = nOffset + 8;
+
+            if (aiIsManifestStoreJumbf(nDataOffset, nChunkSize)) {
+                return {
+                    version: "JUMBF",
+                    options: "PNG caBX at " + aiHexOffset(nOffset) + "; carrier present, cryptography unverified" +
+                        aiManifestTextEvidence(nDataOffset, nChunkSize)
+                };
+            }
+        }
+
+        if (Binary.compare("'IEND'", nOffset + 4)) {
+            break;
+        }
+
+        nOffset += nChunkSize + 12;
+        nChunks++;
+    }
+
+    return null;
+}
+
+function aiDetectJpegC2pa() {
+    var nFileSize = Binary.getSize();
+
+    if ((nFileSize < 4) || !Binary.compare("FFD8", 0)) {
+        return null;
+    }
+
+    var nOffset = 2;
+    var nSegments = 0;
+
+    while ((nOffset + 4 <= nFileSize) && (nSegments < 65536)) {
+        if (Binary.read_uint8(nOffset) !== 0xFF) {
+            nOffset++;
+            continue;
+        }
+
+        var nMarker = Binary.read_uint8(nOffset + 1);
+
+        if ((nMarker === 0xD9) || (nMarker === 0xDA)) {
+            break;
+        }
+
+        if ((nMarker === 0x01) || ((nMarker >= 0xD0) && (nMarker <= 0xD7))) {
+            nOffset += 2;
+            continue;
+        }
+
+        var nSegmentSize = Binary.read_uint16(nOffset + 2, true);
+
+        if ((nSegmentSize < 2) || ((nOffset + 2 + nSegmentSize) > nFileSize)) {
+            break;
+        }
+
+        if (nMarker === 0xEB) {
+            var nPayloadOffset = nOffset + 4;
+            var nPayloadSize = nSegmentSize - 2;
+            var nJumbfOffset = aiFindManifestStoreJumbf(nPayloadOffset, nPayloadSize, true);
+
+            if (nJumbfOffset !== -1) {
+                return {
+                    version: "JUMBF",
+                    options: "JPEG APP11/JUMBF at " + aiHexOffset(nOffset) +
+                        "; carrier present, fragmented store and cryptography unverified" +
+                        aiManifestTextEvidence(nPayloadOffset, nPayloadSize)
+                };
+            }
+        }
+
+        nOffset += nSegmentSize + 2;
+        nSegments++;
+    }
+
+    return null;
+}
+
+function aiDetectRiffC2pa() {
+    var nFileSize = Binary.getSize();
+
+    if ((nFileSize < 20) || !Binary.compare("'RIFF'", 0)) {
+        return null;
+    }
+
+    var nOffset = 12;
+    var nChunks = 0;
+
+    while ((nOffset + 8 <= nFileSize) && (nChunks < 100000)) {
+        var nChunkSize = Binary.read_uint32(nOffset + 4, false);
+        var nPayloadOffset = nOffset + 8;
+
+        if (nChunkSize > (nFileSize - nPayloadOffset)) {
+            break;
+        }
+
+        if (Binary.compare("'C2PA'", nOffset) && ((nPayloadOffset + nChunkSize + (nChunkSize & 1)) === nFileSize)) {
+            var nJumbfOffset = aiFindManifestStoreJumbf(nPayloadOffset, nChunkSize);
+
+            if (nJumbfOffset !== -1) {
+                return {
+                    version: "JUMBF",
+                    options: "RIFF C2PA chunk at " + aiHexOffset(nOffset) +
+                        "; carrier present, cryptography unverified" + aiManifestTextEvidence(nJumbfOffset, nChunkSize)
+                };
+            }
+        }
+
+        nOffset = nPayloadOffset + nChunkSize + (nChunkSize & 1);
+        nChunks++;
+    }
+
+    return null;
+}
+
+function aiDetectBmffC2pa() {
+    var nFileSize = Binary.getSize();
+    var nOffset = 0;
+    var nBoxes = 0;
+    var bSeenFtyp = false;
+    var bSeenMedia = false;
+
+    while ((nOffset + 8 <= nFileSize) && (nBoxes < 100000)) {
+        var nBoxSize = Binary.read_uint32(nOffset, true);
+        var nHeaderSize = 8;
+
+        if (nBoxSize === 1) {
+            if (nOffset + 16 > nFileSize) {
+                break;
+            }
+
+            nBoxSize = Binary.read_uint64(nOffset + 8, true);
+            nHeaderSize = 16;
+        } else if (nBoxSize === 0) {
+            nBoxSize = nFileSize - nOffset;
+        }
+
+        if ((nBoxSize < nHeaderSize) || (nBoxSize > (nFileSize - nOffset))) {
+            break;
+        }
+
+        // C2PA uses a UUID FullBox: extended type, version/flags, then a
+        // NUL-terminated purpose string and carrier-specific payload fields.
+        if (Binary.compare("'uuid'", nOffset + 4) &&
+            (nBoxSize >= (nHeaderSize + 32)) &&
+            Binary.compare(AI_C2PA_BMFF_UUID, nOffset + nHeaderSize) &&
+            Binary.compare("00000000", nOffset + nHeaderSize + 16)) {
+            var nPurposeOffset = nOffset + nHeaderSize + 20;
+            var sPurpose = Binary.read_ansiString(nPurposeOffset, 16);
+
+            if ((sPurpose !== "manifest") && (sPurpose !== "original") &&
+                (sPurpose !== "update") && (sPurpose !== "merkle")) {
+                nOffset += nBoxSize;
+                nBoxes++;
+                continue;
+            }
+
+            if (((sPurpose === "manifest") && (!bSeenFtyp || bSeenMedia)) ||
+                ((sPurpose === "update") && ((nOffset + nBoxSize) !== nFileSize))) {
+                nOffset += nBoxSize;
+                nBoxes++;
+                continue;
+            }
+
+            return {
+                version: "BMFF UUID",
+                options: "BMFF C2PA UUID box at " + aiHexOffset(nOffset) +
+                    "; purpose " + sPurpose + "; carrier present, cryptography unverified"
+            };
+        }
+
+        if (Binary.compare("'ftyp'", nOffset + 4)) {
+            bSeenFtyp = true;
+        } else if (Binary.compare("'mdat'", nOffset + 4) || Binary.compare("'moov'", nOffset + 4)) {
+            bSeenMedia = true;
+        }
+
+        nOffset += nBoxSize;
+        nBoxes++;
+    }
+
+    return null;
+}
+
+function aiSkipGifSubBlocks(nOffset, nFileSize) {
+    var nBlocks = 0;
+
+    while ((nOffset < nFileSize) && (nBlocks < 100000)) {
+        var nBlockSize = Binary.read_uint8(nOffset);
+        nOffset++;
+
+        if (nBlockSize === 0) {
+            return nOffset;
+        }
+
+        if (nBlockSize > (nFileSize - nOffset)) {
+            return -1;
+        }
+
+        nOffset += nBlockSize;
+        nBlocks++;
+    }
+
+    return -1;
+}
+
+function aiDetectGifC2pa() {
+    var nFileSize = Binary.getSize();
+
+    if ((nFileSize < 14) || (!Binary.compare("'GIF87a'", 0) && !Binary.compare("'GIF89a'", 0))) {
+        return null;
+    }
+
+    var nPacked = Binary.read_uint8(10);
+    var nOffset = 13;
+
+    if (nPacked & 0x80) {
+        nOffset += 3 * (1 << ((nPacked & 0x07) + 1));
+    }
+
+    var nCarrierOffset = -1;
+    var nCarriers = 0;
+    var nBlocks = 0;
+
+    while ((nOffset < nFileSize) && (nBlocks < 100000)) {
+        var nIntroducer = Binary.read_uint8(nOffset);
+
+        // The C2PA application extension must precede the first image descriptor.
+        if (nIntroducer === 0x2C) {
+            break;
+        }
+
+        if ((nIntroducer === 0x3B) || (nIntroducer !== 0x21) || (nOffset + 3 > nFileSize)) {
+            break;
+        }
+
+        var nLabel = Binary.read_uint8(nOffset + 1);
+        var nBlockSize = Binary.read_uint8(nOffset + 2);
+        var nSubBlocksOffset = nOffset + 3 + nBlockSize;
+
+        if (nSubBlocksOffset > nFileSize) {
+            return null;
+        }
+
+        if ((nLabel === 0xFF) && (nBlockSize === 11) &&
+            Binary.compare("'C2PA_GIF'010000", nOffset + 3)) {
+            nCarrierOffset = nOffset;
+            nCarriers++;
+        }
+
+        nOffset = aiSkipGifSubBlocks(nSubBlocksOffset, nFileSize);
+
+        if (nOffset === -1) {
+            return null;
+        }
+
+        nBlocks++;
+    }
+
+    if (nCarriers === 1) {
+        return {
+            version: "GIF application extension",
+            options: "GIF C2PA application extension at " + aiHexOffset(nCarrierOffset) +
+                "; carrier present, sub-block/JUMBF and cryptography unverified"
+        };
+    }
+
+    return null;
+}
+
+function aiDetectZipC2pa() {
+    var nFileSize = Binary.getSize();
+    var nOffset = 0;
+    var nRecords = 0;
+
+    while ((nOffset + 30 <= nFileSize) && (nRecords < 100000)) {
+        if (!Binary.compare("504B0304", nOffset)) {
+            nOffset = Binary.findSignature(nOffset, nFileSize - nOffset, "504B0304");
+            if (nOffset === -1) return null;
+        }
+
+        var nFlags = Binary.read_uint16(nOffset + 6, false);
+        var nMethod = Binary.read_uint16(nOffset + 8, false);
+        var nCompressedSize = Binary.read_uint32(nOffset + 18, false);
+        var nUncompressedSize = Binary.read_uint32(nOffset + 22, false);
+        var nNameSize = Binary.read_uint16(nOffset + 26, false);
+        var nExtraSize = Binary.read_uint16(nOffset + 28, false);
+        var nDataOffset = nOffset + 30 + nNameSize + nExtraSize;
+
+        if ((nNameSize === 0) || (nDataOffset > nFileSize)) {
+            return null;
+        }
+
+        var sName = Binary.read_ansiString(nOffset + 30, nNameSize);
+
+        if (sName === "META-INF/content_credential.c2pa") {
+            if ((nFlags !== 0) || (nMethod !== 0) || (nCompressedSize !== nUncompressedSize) ||
+                (nCompressedSize < 38) || (nCompressedSize > (nFileSize - nDataOffset)) ||
+                !aiIsManifestStoreJumbf(nDataOffset, nCompressedSize, false)) {
+                return null;
+            }
+
+            return {
+                version: "ZIP member",
+                options: "stored, unencrypted META-INF/content_credential.c2pa at " + aiHexOffset(nOffset) +
+                    "; JUMBF carrier present, cryptography unverified"
+            };
+        }
+
+        if ((nFlags & 0x08) || (nCompressedSize > (nFileSize - nDataOffset))) {
+            nOffset = Binary.findSignature(nDataOffset, nFileSize - nDataOffset, "504B0304");
+            if (nOffset === -1) return null;
+        } else {
+            nOffset = nDataOffset + nCompressedSize;
+        }
+
+        nRecords++;
+    }
+
+    return null;
+}
+
+function aiDetectTiffC2pa() {
+    var nFileSize = Binary.getSize();
+    var bBigEndian;
+
+    if ((nFileSize >= 8) && Binary.compare("'II'2A00", 0)) {
+        bBigEndian = false;
+    } else if ((nFileSize >= 8) && Binary.compare("'MM'002A", 0)) {
+        bBigEndian = true;
+    } else {
+        return null;
+    }
+
+    var nIfdOffset = Binary.read_uint32(4, bBigEndian);
+
+    if ((nIfdOffset < 8) || (nIfdOffset + 2 > nFileSize)) {
+        return null;
+    }
+
+    var nEntries = Binary.read_uint16(nIfdOffset, bBigEndian);
+
+    if ((nEntries > 8192) || (nIfdOffset + 2 + nEntries * 12 > nFileSize)) {
+        return null;
+    }
+
+    var bIsLastIfd = Binary.read_uint32(nIfdOffset + 2 + nEntries * 12, bBigEndian) === 0;
+
+    if (!bIsLastIfd) {
+        return null;
+    }
+
+    for (var i = 0; i < nEntries; i++) {
+        var nEntryOffset = nIfdOffset + 2 + i * 12;
+
+        if ((Binary.read_uint16(nEntryOffset, bBigEndian) === 52545) &&
+            (Binary.read_uint16(nEntryOffset + 2, bBigEndian) === 7) &&
+            (Binary.read_uint32(nEntryOffset + 4, bBigEndian) > 0)) {
+            return {
+                version: "TIFF tag 52545",
+                options: "TIFF C2PA tag at " + aiHexOffset(nEntryOffset) +
+                    "; carrier present, JUMBF and cryptography unverified"
+            };
+        }
+    }
+
+    return null;
+}
+
+function aiDetectOpenTypeC2pa() {
+    var nFileSize = Binary.getSize();
+
+    if ((nFileSize < 12) ||
+        (!Binary.compare("00010000", 0) && !Binary.compare("'OTTO'", 0) && !Binary.compare("'true'", 0))) {
+        return null;
+    }
+
+    var nTables = Binary.read_uint16(4, true);
+
+    if ((nTables > 4096) || (12 + nTables * 16 > nFileSize)) {
+        return null;
+    }
+
+    for (var i = 0; i < nTables; i++) {
+        var nRecordOffset = 12 + i * 16;
+
+        if (Binary.compare("'C2PA'", nRecordOffset)) {
+            return {
+                version: "OpenType table",
+                options: "OpenType C2PA table at " + aiHexOffset(nRecordOffset) +
+                    "; carrier present, cryptography unverified"
+            };
+        }
+    }
+
+    return null;
+}
+
+function aiDetectBinaryC2pa() {
+    var oResult = aiDetectRiffC2pa();
+    if (oResult) return oResult;
+
+    oResult = aiDetectBmffC2pa();
+    if (oResult) return oResult;
+
+    oResult = aiDetectTiffC2pa();
+    if (oResult) return oResult;
+
+    oResult = aiDetectOpenTypeC2pa();
+    if (oResult) return oResult;
+
+    oResult = aiDetectGifC2pa();
+    if (oResult) return oResult;
+
+    var sSuffix = Binary.lowerCase(Binary.getFileSuffix());
+
+    if (sSuffix === "svg") {
+        var nManifestOffset = Binary.findString(0, Binary.getSize(), "<c2pa:manifest");
+        var nNamespaceOffset = Binary.findString(0, Binary.getSize(), "xmlns:c2pa=");
+
+        var nMetadataOffset = Binary.findString(0, Binary.getSize(), "<metadata");
+
+        if ((nManifestOffset !== -1) && (nNamespaceOffset !== -1) &&
+            (nMetadataOffset !== -1) && (nMetadataOffset < nManifestOffset)) {
+            return {
+                version: "SVG metadata",
+                options: "SVG c2pa:manifest element at " + aiHexOffset(nManifestOffset) +
+                    "; carrier present, Base64/JUMBF and cryptography unverified"
+            };
+        }
+    }
+
+    return null;
+}
+
+// ============================================================================
+// Unsigned AI attribution evidence (complements the C2PA carrier detection
+// above; it never replaces it). A match means only that plain, unsigned
+// attribution text was found in a bounded metadata region. Such text is
+// trivially forgeable and trivially removable. It is attribution, not proof.
+//
+// Every literal below is assembled from concatenated fragments so that this
+// rule database itself never contains the contiguous evidence strings and
+// therefore cannot trigger its own detection when scanned.
+
+var AI_ATTR_MARKER_PREFIX = "AI-PROVEN" + "ANCE:";
+var AI_ATTR_SOURCE_TYPE = "trainedAlgo" + "rithmicMedia";
+var AI_ATTR_SOURCE_FIELDS = [
+    "digitalsource" + "type",
+    "digitalSource" + "Type",
+    "DigitalSource" + "Type"
+];
+var AI_ATTR_VENDOR_TEXTS = [
+    "Claude Fa" + "ble 5",
+    "Anthro" + "pic",
+    "claude-fa" + "ble",
+    "OpenAI Co" + "dex",
+    "gpt-im" + "age",
+    "Google Gem" + "ini",
+    "Google " + "AI",
+    "Made with Google " + "AI",
+    "Edited with Google " + "AI",
+    "Google Genera" + "tive AI",
+    "Synth" + "ID"
+];
+
+function aiListContains(listValues, sValue) {
+    for (var i = 0; i < listValues.length; i++) {
+        if (listValues[i] === sValue) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function aiNewAttributionState() {
+    return {
+        bMarkerPrefix: false,
+        bSourceType: false,
+        bSourceField: false,
+        listVendors: [],
+        listRegions: []
+    };
+}
+
+// Scans one bounded region for unsigned-attribution evidence and merges the
+// findings into oState. Returns true if this region contained any evidence.
+function aiScanAttributionRegion(oState, nOffset, nSize, sRegion) {
+    var nFileSize = Binary.getSize();
+    var bFound = false;
+
+    if ((nOffset < 0) || (nSize <= 0) || (nOffset >= nFileSize)) {
+        return false;
+    }
+
+    if (nSize > (nFileSize - nOffset)) {
+        nSize = nFileSize - nOffset;
+    }
+
+    if (Binary.findString(nOffset, nSize, AI_ATTR_MARKER_PREFIX) !== -1) {
+        oState.bMarkerPrefix = true;
+        bFound = true;
+    }
+
+    if (Binary.findString(nOffset, nSize, AI_ATTR_SOURCE_TYPE) !== -1) {
+        oState.bSourceType = true;
+        bFound = true;
+    }
+
+    for (var i = 0; i < AI_ATTR_SOURCE_FIELDS.length; i++) {
+        if (Binary.findString(nOffset, nSize, AI_ATTR_SOURCE_FIELDS[i]) !== -1) {
+            oState.bSourceField = true;
+            bFound = true;
+            break;
+        }
+    }
+
+    for (var j = 0; j < AI_ATTR_VENDOR_TEXTS.length; j++) {
+        if (Binary.findString(nOffset, nSize, AI_ATTR_VENDOR_TEXTS[j]) !== -1) {
+            if (!aiListContains(oState.listVendors, AI_ATTR_VENDOR_TEXTS[j])) {
+                oState.listVendors.push(AI_ATTR_VENDOR_TEXTS[j]);
+            }
+
+            bFound = true;
+        }
+    }
+
+    if (bFound && sRegion && !aiListContains(oState.listRegions, sRegion) && (oState.listRegions.length < 6)) {
+        oState.listRegions.push(sRegion);
+    }
+
+    return bFound;
+}
+
+function aiFormatAttributionEvidence(oState) {
+    var listEvidence = [];
+
+    if (oState.bMarkerPrefix) {
+        listEvidence.push("attribution header \"" + AI_ATTR_MARKER_PREFIX + "\"");
+    }
+
+    if (oState.bSourceType) {
+        listEvidence.push("AI-source text " + AI_ATTR_SOURCE_TYPE);
+    }
+
+    if (oState.bSourceField) {
+        listEvidence.push("IPTC " + AI_ATTR_SOURCE_FIELDS[1] + " field");
+    }
+
+    if (oState.listVendors.length) {
+        listEvidence.push("generator text: " + oState.listVendors.join(", "));
+    }
+
+    if (!listEvidence.length) {
+        return "";
+    }
+
+    var sResult = listEvidence.join("; ");
+
+    if (oState.listRegions.length) {
+        sResult += "; in " + oState.listRegions.join(", ");
+    }
+
+    sResult += "; unsigned plain text, trivially forgeable/removable, not cryptographic proof";
+
+    return sResult;
+}
+
+// PNG: evidence in tEXt/iTXt/zTXt/eXIf chunk payloads only (zTXt and
+// compressed iTXt payloads are deflate-compressed and are effectively
+// out of reach for a plain string scan; that is a stated limitation).
+function aiDetectPngUnsignedAttribution() {
+    var nFileSize = Binary.getSize();
+
+    if ((nFileSize < 20) || !Binary.compare("89504E470D0A1A0A", 0)) {
+        return null;
+    }
+
+    var oState = aiNewAttributionState();
+    var nOffset = 8;
+    var nChunks = 0;
+    var nFirstOffset = -1;
+
+    while ((nOffset + 12 <= nFileSize) && (nChunks < 100000)) {
+        var nChunkSize = Binary.read_uint32(nOffset, true);
+
+        if (nChunkSize > (nFileSize - nOffset - 12)) {
+            break;
+        }
+
+        if (Binary.compare("'tEXt'", nOffset + 4) || Binary.compare("'iTXt'", nOffset + 4) ||
+            Binary.compare("'zTXt'", nOffset + 4) || Binary.compare("'eXIf'", nOffset + 4)) {
+            var sChunkName = Binary.read_ansiString(nOffset + 4, 4);
+
+            if (aiScanAttributionRegion(oState, nOffset + 8, nChunkSize, sChunkName) && (nFirstOffset === -1)) {
+                nFirstOffset = nOffset;
+            }
+        }
+
+        if (Binary.compare("'IEND'", nOffset + 4)) {
+            break;
+        }
+
+        nOffset += nChunkSize + 12;
+        nChunks++;
+    }
+
+    var sEvidence = aiFormatAttributionEvidence(oState);
+
+    if (sEvidence) {
+        return {
+            version: "PNG text chunk",
+            options: "PNG metadata chunks from " + aiHexOffset(nFirstOffset) + "; " + sEvidence
+        };
+    }
+
+    return null;
+}
+
+// JPEG: evidence in APP1 (EXIF or XMP) and COM segment payloads only.
+function aiDetectJpegUnsignedAttribution() {
+    var nFileSize = Binary.getSize();
+
+    if ((nFileSize < 4) || !Binary.compare("FFD8", 0)) {
+        return null;
+    }
+
+    var oState = aiNewAttributionState();
+    var nOffset = 2;
+    var nSegments = 0;
+    var nFirstOffset = -1;
+
+    while ((nOffset + 4 <= nFileSize) && (nSegments < 65536)) {
+        if (Binary.read_uint8(nOffset) !== 0xFF) {
+            nOffset++;
+            continue;
+        }
+
+        var nMarker = Binary.read_uint8(nOffset + 1);
+
+        if ((nMarker === 0xD9) || (nMarker === 0xDA)) {
+            break;
+        }
+
+        if ((nMarker === 0x01) || ((nMarker >= 0xD0) && (nMarker <= 0xD7))) {
+            nOffset += 2;
+            continue;
+        }
+
+        var nSegmentSize = Binary.read_uint16(nOffset + 2, true);
+
+        if ((nSegmentSize < 2) || ((nOffset + 2 + nSegmentSize) > nFileSize)) {
+            break;
+        }
+
+        if ((nMarker === 0xE1) || (nMarker === 0xFE)) {
+            var sRegion = "COM";
+
+            if (nMarker === 0xE1) {
+                sRegion = Binary.compare("'Exif'", nOffset + 4) ? "APP1 Exif" : "APP1 XMP";
+            }
+
+            if (aiScanAttributionRegion(oState, nOffset + 4, nSegmentSize - 2, sRegion) && (nFirstOffset === -1)) {
+                nFirstOffset = nOffset;
+            }
+        }
+
+        nOffset += nSegmentSize + 2;
+        nSegments++;
+    }
+
+    var sEvidence = aiFormatAttributionEvidence(oState);
+
+    if (sEvidence) {
+        return {
+            version: "JPEG APP1/COM",
+            options: "JPEG metadata segments from " + aiHexOffset(nFirstOffset) + "; " + sEvidence
+        };
+    }
+
+    return null;
+}
+
+// PDF: the Info dictionary sits near the trailer and an uncompressed XMP
+// packet is normally reachable as plain text; both are covered by scanning
+// the first and the last megabyte only.
+function aiPdfHasC2paTokens() {
+    var nFileSize = Binary.getSize();
+
+    return (Binary.findString(0, nFileSize, "/Subtype /application#2Fc2pa") !== -1) &&
+        (Binary.findString(0, nFileSize, "/AFRelationship /C2PA_Manifest") !== -1);
+}
+
+function aiDetectPdfUnsignedAttribution() {
+    var nFileSize = Binary.getSize();
+    var nWindow = 1024 * 1024;
+    var oState = aiNewAttributionState();
+
+    if (nFileSize <= (2 * nWindow)) {
+        aiScanAttributionRegion(oState, 0, nFileSize, "");
+    } else {
+        aiScanAttributionRegion(oState, 0, nWindow, "first 1 MB");
+        aiScanAttributionRegion(oState, nFileSize - nWindow, nWindow, "last 1 MB");
+    }
+
+    var sEvidence = aiFormatAttributionEvidence(oState);
+
+    if (sEvidence) {
+        return {
+            version: "PDF text",
+            options: "PDF Info/XMP text region; " + sEvidence
+        };
+    }
+
+    return null;
+}
+
+// ZIP: only STORED (method 0) member payloads are readable by a plain string
+// scan. The Claude office samples store docProps/core.xml, docProps/app.xml,
+// docProps/custom.xml, meta.xml, and content.opf uncompressed, but real-world
+// Office/ODF/EPUB writers normally DEFLATE those members, in which case this
+// rule cannot see the text. The end-of-central-directory archive comment is
+// always stored and is scanned as well.
+function aiZipScanArchiveComment(oState) {
+    var nFileSize = Binary.getSize();
+    var nSearchStart = (nFileSize > 66000) ? (nFileSize - 66000) : 0;
+    var nOffset = Binary.findSignature(nSearchStart, nFileSize - nSearchStart, "504B0506");
+    var nEocdOffset = -1;
+    var nGuard = 0;
+
+    while ((nOffset !== -1) && (nGuard < 1000)) {
+        nEocdOffset = nOffset;
+        nOffset = Binary.findSignature(nOffset + 1, nFileSize - (nOffset + 1), "504B0506");
+        nGuard++;
+    }
+
+    if ((nEocdOffset !== -1) && ((nEocdOffset + 22) <= nFileSize)) {
+        var nCommentSize = Binary.read_uint16(nEocdOffset + 20, false);
+
+        if ((nCommentSize > 0) && ((nEocdOffset + 22 + nCommentSize) <= nFileSize)) {
+            aiScanAttributionRegion(oState, nEocdOffset + 22, nCommentSize, "archive comment");
+        }
+    }
+}
+
+function aiDetectZipUnsignedAttribution() {
+    var nFileSize = Binary.getSize();
+    var oState = aiNewAttributionState();
+    var nOffset = 0;
+    var nRecords = 0;
+    var nScanned = 0;
+
+    while ((nOffset + 30 <= nFileSize) && (nRecords < 100000) && (nScanned < 512)) {
+        if (!Binary.compare("504B0304", nOffset)) {
+            break;
+        }
+
+        var nFlags = Binary.read_uint16(nOffset + 6, false);
+        var nMethod = Binary.read_uint16(nOffset + 8, false);
+        var nCompressedSize = Binary.read_uint32(nOffset + 18, false);
+        var nNameSize = Binary.read_uint16(nOffset + 26, false);
+        var nExtraSize = Binary.read_uint16(nOffset + 28, false);
+        var nDataOffset = nOffset + 30 + nNameSize + nExtraSize;
+
+        if ((nNameSize === 0) || (nDataOffset > nFileSize)) {
+            break;
+        }
+
+        if ((nFlags & 0x08) || (nCompressedSize > (nFileSize - nDataOffset))) {
+            nOffset = Binary.findSignature(nDataOffset, nFileSize - nDataOffset, "504B0304");
+
+            if (nOffset === -1) {
+                break;
+            }
+        } else {
+            if ((nMethod === 0) && (nCompressedSize > 0)) {
+                var sName = Binary.read_ansiString(nOffset + 30, Math.min(nNameSize, 64));
+
+                aiScanAttributionRegion(oState, nDataOffset, Math.min(nCompressedSize, 1024 * 1024), sName);
+                nScanned++;
+            }
+
+            nOffset = nDataOffset + nCompressedSize;
+        }
+
+        nRecords++;
+    }
+
+    aiZipScanArchiveComment(oState);
+
+    var sEvidence = aiFormatAttributionEvidence(oState);
+
+    if (sEvidence) {
+        return {
+            version: "ZIP stored text",
+            options: "ZIP stored members/archive comment; " + sEvidence
+        };
+    }
+
+    return null;
+}
+
+// Generic: bounded leading-region scan for any file type. Used by the
+// Binary rule (16 KB) and the PE rule (4 MB, because attribution strings in
+// .rdata regularly sit beyond the first 16 KB). ASCII text only; UTF-16LE
+// VERSIONINFO strings are not decoded by this scan.
+function aiDetectGenericUnsignedAttribution(nBound, sVersionLabel, sRegionLabel) {
+    var oState = aiNewAttributionState();
+
+    aiScanAttributionRegion(oState, 0, Math.min(Binary.getSize(), nBound), "");
+
+    var sEvidence = aiFormatAttributionEvidence(oState);
+
+    if (sEvidence) {
+        return {
+            version: sVersionLabel,
+            options: sRegionLabel + "; " + sEvidence
+        };
+    }
+
+    return null;
+}
