@@ -168,7 +168,7 @@ cd DIE-engine
 ```bash
 mkdir build
 cd build
-qmake6 ../die_source.pro CONFIG+=release
+cmake ..
 make
 ```
 
@@ -317,7 +317,7 @@ cd DIE-engine
 ```bash
 mkdir build
 cd build
-qmake ../die_source.pro CONFIG+=debug CONFIG-=release
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
@@ -343,7 +343,7 @@ cd DIE-engine
 ```bash
 mkdir build
 cd build
-qmake6 ../die_source.pro CONFIG+=debug CONFIG-=release
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
@@ -409,7 +409,7 @@ cd DIE-engine
 ```bash
 mkdir build
 cd build
-qmake ../die_source.pro CONFIG+=release
+cmake ..
 make
 ```
 
@@ -418,7 +418,7 @@ make
 ```bash
 mkdir build
 cd build
-qmake ../die_source.pro CONFIG+=debug
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
@@ -452,7 +452,7 @@ cd DIE-engine
 ```bash
 mkdir build
 cd build
-qmake ../die_source.pro CONFIG+=release
+cmake ..
 make
 ```
 
@@ -461,7 +461,7 @@ make
 ```bash
 mkdir build
 cd build
-qmake ../die_source.pro CONFIG+=debug
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
@@ -489,7 +489,7 @@ cd DIE-engine
 ```bash
 mkdir build
 cd build
-qmake-qt5 ../die_source.pro CONFIG+=release
+cmake ..
 gmake
 ```
 
@@ -498,6 +498,6 @@ gmake
 ```bash
 mkdir build
 cd build
-qmake-qt5 ../die_source.pro CONFIG+=debug
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 gmake
 ```
