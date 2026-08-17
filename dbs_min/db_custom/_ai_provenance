@@ -1,0 +1,92 @@
+var AI_C2PA_MANIFEST_UUID="6332706100110010800000AA00389B71",AI_C2PA_BMFF_UUID="D8FEC3D61B0E483C92975828877EC481"
+function aiHexOffset(i){return"0x"+i.toString(16).toUpperCase()}function aiManifestTextEvidence(i,r){var e=[],r=Math.min(r,16777216)
+return-1!==Binary.findString(i,r,"OpenAI Media Service API")&&e.push("claim-generator text: OpenAI Media Service API"),-1!==Binary.findString(i,r,"Google C2PA Media Services")&&e.push("signer: Google C2PA Media Services"),-1!==Binary.findString(i,r,"Google Media Processing Services")&&e.push("signer: Google Media Processing Services"),-1!==Binary.findString(i,r,"gpt-image")&&e.push("software-agent text: gpt-image"),-1!==Binary.findString(i,r,"SynthID")&&e.push("watermark declaration: SynthID"),-1!==Binary.findString(i,r,"trainedAlgorithmicMedia")&&e.push("AI-source assertion text: trainedAlgorithmicMedia"),-1!==Binary.findString(i,r,"c2pa.ai-disclosure")&&e.push("AI disclosure assertion text"),e.length?"; "+e.join("; ")+" (untrusted text until validation)":""}function aiIsManifestStoreJumbf(i,r,e){var n,a
+return!(i<0||r<38||i+r>Binary.getSize()||(n=Binary.read_uint32(i,!0),a=Binary.read_uint32(i+8,!0),0!==n&&(n<38||!e&&r<n))||a<30||r<8+a||!(Binary.compare("'jumb'",i+4)&&Binary.compare("'jumd'",i+12)&&Binary.compare(AI_C2PA_MANIFEST_UUID,i+16))||-1===Binary.findString(i+32,Math.min(a-24,64),"c2pa"))}function aiFindManifestStoreJumbf(i,r,e){var n
+return!(i<0||r<38||i+r>Binary.getSize())&&i+4<=(n=Binary.findSignature(i,r,"'jumb'........'jumd'"+AI_C2PA_MANIFEST_UUID))&&aiIsManifestStoreJumbf(n-4,i+r-(n-4),e)?n-4:-1}function aiDetectPngC2pa(){var i=Binary.getSize()
+if(!(i<20)&&Binary.compare("89504E470D0A1A0A",0))for(var r=8,e=0;r+12<=i&&e<1e5;){var n=Binary.read_uint32(r,!0)
+if(i-r-12<n)return null
+if(Binary.compare("'caBX'",r+4)){var a=r+8
+if(aiIsManifestStoreJumbf(a,n))return{version:"JUMBF",options:"PNG caBX at "+aiHexOffset(r)+"; carrier present, cryptography unverified"+aiManifestTextEvidence(a,n)}}if(Binary.compare("'IEND'",r+4))break
+r+=n+12,e++}return null}function aiDetectJpegC2pa(){var i=Binary.getSize()
+if(!(i<4)&&Binary.compare("FFD8",0))for(var r=2,e=0;r+4<=i&&e<65536;)if(255!==Binary.read_uint8(r))r++
+else{var n=Binary.read_uint8(r+1)
+if(217===n||218===n)break
+if(1===n||208<=n&&n<=215)r+=2
+else{var a=Binary.read_uint16(r+2,!0)
+if(a<2||i<r+2+a)break
+if(235===n){var n=r+4,t=a-2
+if(-1!==aiFindManifestStoreJumbf(n,t,!0))return{version:"JUMBF",options:"JPEG APP11/JUMBF at "+aiHexOffset(r)+"; carrier present, fragmented store and cryptography unverified"+aiManifestTextEvidence(n,t)}}r+=a+2,e++}}return null}function aiDetectRiffC2pa(){var i=Binary.getSize()
+if(!(i<20)&&Binary.compare("'RIFF'",0))for(var r=12,e=0;r+8<=i&&e<1e5;){var n=Binary.read_uint32(r+4,!1),a=r+8
+if(i-a<n)break
+if(Binary.compare("'C2PA'",r)&&a+n+(1&n)===i){var t=aiFindManifestStoreJumbf(a,n)
+if(-1!==t)return{version:"JUMBF",options:"RIFF C2PA chunk at "+aiHexOffset(r)+"; carrier present, cryptography unverified"+aiManifestTextEvidence(t,n)}}r=a+n+(1&n),e++}return null}function aiDetectBmffC2pa(){for(var i=Binary.getSize(),r=0,e=0,n=!1,a=!1;r+8<=i&&e<1e5;){var t=Binary.read_uint32(r,!0),o=8
+if(1===t){if(i<r+16)break
+t=Binary.read_uint64(r+8,!0),o=16}else 0===t&&(t=i-r)
+if(t<o||i-r<t)break
+if(Binary.compare("'uuid'",r+4)&&o+32<=t&&Binary.compare(AI_C2PA_BMFF_UUID,r+o)&&Binary.compare("00000000",r+o+16)){o=Binary.read_ansiString(r+o+20,16)
+if("manifest"!==o&&"original"!==o&&"update"!==o&&"merkle"!==o){r+=t,e++
+continue}if("manifest"===o&&(!n||a)||"update"===o&&r+t!==i){r+=t,e++
+continue}return{version:"BMFF UUID",options:"BMFF C2PA UUID box at "+aiHexOffset(r)+"; purpose "+o+"; carrier present, cryptography unverified"}}Binary.compare("'ftyp'",r+4)?n=!0:(Binary.compare("'mdat'",r+4)||Binary.compare("'moov'",r+4))&&(a=!0),r+=t,e++}return null}function aiSkipGifSubBlocks(i,r){for(var e=0;i<r&&e<1e5;){var n=Binary.read_uint8(i)
+if(i++,0===n)return i
+if(r-i<n)return-1
+i+=n,e++}return-1}function aiDetectGifC2pa(){var i=Binary.getSize()
+if(i<14||!Binary.compare("'GIF87a'",0)&&!Binary.compare("'GIF89a'",0))return null
+for(var r=Binary.read_uint8(10),e=13,n=(128&r&&(e+=3*(1<<1+(7&r))),-1),a=0,t=0;e<i&&t<1e5;){var o=Binary.read_uint8(e)
+if(44===o)break
+if(59===o||33!==o||i<e+3)break
+var o=Binary.read_uint8(e+1),u=Binary.read_uint8(e+2),f=e+3+u
+if(i<f)return null
+if(255===o&&11===u&&Binary.compare("'C2PA_GIF'010000",e+3)&&(n=e,a++),-1===(e=aiSkipGifSubBlocks(f,i)))return null
+t++}return 1===a?{version:"GIF application extension",options:"GIF C2PA application extension at "+aiHexOffset(n)+"; carrier present, sub-block/JUMBF and cryptography unverified"}:null}function aiDetectZipC2pa(){for(var i=Binary.getSize(),r=0,e=0;r+30<=i&&e<1e5;){if(!Binary.compare("504B0304",r)&&-1===(r=Binary.findSignature(r,i-r,"504B0304")))return null
+var n=Binary.read_uint16(r+6,!1),a=Binary.read_uint16(r+8,!1),t=Binary.read_uint32(r+18,!1),o=Binary.read_uint32(r+22,!1),u=Binary.read_uint16(r+26,!1),f=r+30+u+Binary.read_uint16(r+28,!1)
+if(0===u||i<f)return null
+if("META-INF/content_credential.c2pa"===Binary.read_ansiString(r+30,u))return 0!==n||0!==a||t!==o||t<38||i-f<t||!aiIsManifestStoreJumbf(f,t,!1)?null:{version:"ZIP member",options:"stored, unencrypted META-INF/content_credential.c2pa at "+aiHexOffset(r)+"; JUMBF carrier present, cryptography unverified"}
+if(8&n||i-f<t){if(-1===(r=Binary.findSignature(f,i-f,"504B0304")))return null}else r=f+t
+e++}return null}function aiDetectTiffC2pa(){var i,r=Binary.getSize()
+if(8<=r&&Binary.compare("'II'2A00",0))i=!1
+else{if(!(8<=r&&Binary.compare("'MM'002A",0)))return null
+i=!0}var e=Binary.read_uint32(4,i)
+if(!(e<8||r<e+2)){var n=Binary.read_uint16(e,i)
+if(!(8192<n||r<e+2+12*n))if(0===Binary.read_uint32(e+2+12*n,i))for(var a=0;a<n;a++){var t=e+2+12*a
+if(52545===Binary.read_uint16(t,i)&&7===Binary.read_uint16(t+2,i)&&0<Binary.read_uint32(t+4,i))return{version:"TIFF tag 52545",options:"TIFF C2PA tag at "+aiHexOffset(t)+"; carrier present, JUMBF and cryptography unverified"}}}return null}function aiDetectOpenTypeC2pa(){var i=Binary.getSize()
+if(!(i<12)&&(Binary.compare("00010000",0)||Binary.compare("'OTTO'",0)||Binary.compare("'true'",0))){var r=Binary.read_uint16(4,!0)
+if(!(4096<r||i<12+16*r))for(var e=0;e<r;e++){var n=12+16*e
+if(Binary.compare("'C2PA'",n))return{version:"OpenType table",options:"OpenType C2PA table at "+aiHexOffset(n)+"; carrier present, cryptography unverified"}}}return null}function aiDetectBinaryC2pa(){var i=aiDetectRiffC2pa()
+if(i)return i
+if(i=aiDetectBmffC2pa())return i
+if(i=aiDetectTiffC2pa())return i
+if(i=aiDetectOpenTypeC2pa())return i
+if(i=aiDetectGifC2pa())return i
+if("svg"===Binary.lowerCase(Binary.getFileSuffix())){var i=Binary.findString(0,Binary.getSize(),"<c2pa:manifest"),r=Binary.findString(0,Binary.getSize(),"xmlns:c2pa="),e=Binary.findString(0,Binary.getSize(),"<metadata")
+if(-1!==i&&-1!==r&&-1!==e&&e<i)return{version:"SVG metadata",options:"SVG c2pa:manifest element at "+aiHexOffset(i)+"; carrier present, Base64/JUMBF and cryptography unverified"}}return null}var AI_ATTR_MARKER_PREFIX="AI-PROVENANCE:",AI_ATTR_SOURCE_TYPE="trainedAlgorithmicMedia",AI_ATTR_SOURCE_FIELDS=["digitalsourcetype","digitalSourceType","DigitalSourceType"],AI_ATTR_VENDOR_TEXTS=["Claude Fable 5","Anthropic","claude-fable","OpenAI Codex","gpt-image","Google Gemini","Google AI","Made with Google AI","Edited with Google AI","Google Generative AI","SynthID"]
+function aiListContains(i,r){for(var e=0;e<i.length;e++)if(i[e]===r)return!0
+return!1}function aiNewAttributionState(){return{bMarkerPrefix:!1,bSourceType:!1,bSourceField:!1,listVendors:[],listRegions:[]}}function aiScanAttributionRegion(i,r,e,n){var a=Binary.getSize(),t=!1
+if(r<0||e<=0||a<=r)return!1
+a-r<e&&(e=a-r),-1!==Binary.findString(r,e,AI_ATTR_MARKER_PREFIX)&&(t=i.bMarkerPrefix=!0),-1!==Binary.findString(r,e,AI_ATTR_SOURCE_TYPE)&&(t=i.bSourceType=!0)
+for(var o=0;o<AI_ATTR_SOURCE_FIELDS.length;o++)if(-1!==Binary.findString(r,e,AI_ATTR_SOURCE_FIELDS[o])){t=i.bSourceField=!0
+break}for(var u=0;u<AI_ATTR_VENDOR_TEXTS.length;u++)-1!==Binary.findString(r,e,AI_ATTR_VENDOR_TEXTS[u])&&(aiListContains(i.listVendors,AI_ATTR_VENDOR_TEXTS[u])||i.listVendors.push(AI_ATTR_VENDOR_TEXTS[u]),t=!0)
+return t&&n&&!aiListContains(i.listRegions,n)&&i.listRegions.length<6&&i.listRegions.push(n),t}function aiFormatAttributionEvidence(i){var r=[]
+return i.bMarkerPrefix&&r.push('attribution header "'+AI_ATTR_MARKER_PREFIX+'"'),i.bSourceType&&r.push("AI-source text "+AI_ATTR_SOURCE_TYPE),i.bSourceField&&r.push("IPTC "+AI_ATTR_SOURCE_FIELDS[1]+" field"),i.listVendors.length&&r.push("generator text: "+i.listVendors.join(", ")),r.length?(r=r.join("; "),i.listRegions.length&&(r+="; in "+i.listRegions.join(", ")),r+"; unsigned plain text, trivially forgeable/removable, not cryptographic proof"):""}function aiDetectPngUnsignedAttribution(){var i=Binary.getSize()
+if(i<20||!Binary.compare("89504E470D0A1A0A",0))return null
+for(var r=aiNewAttributionState(),e=8,n=0,a=-1;e+12<=i&&n<1e5;){var t=Binary.read_uint32(e,!0)
+if(i-e-12<t)break
+if((Binary.compare("'tEXt'",e+4)||Binary.compare("'iTXt'",e+4)||Binary.compare("'zTXt'",e+4)||Binary.compare("'eXIf'",e+4))&&aiScanAttributionRegion(r,e+8,t,Binary.read_ansiString(e+4,4))&&-1===a&&(a=e),Binary.compare("'IEND'",e+4))break
+e+=t+12,n++}var o=aiFormatAttributionEvidence(r)
+return o?{version:"PNG text chunk",options:"PNG metadata chunks from "+aiHexOffset(a)+"; "+o}:null}function aiDetectJpegUnsignedAttribution(){var i=Binary.getSize()
+if(i<4||!Binary.compare("FFD8",0))return null
+for(var r=aiNewAttributionState(),e=2,n=0,a=-1;e+4<=i&&n<65536;)if(255!==Binary.read_uint8(e))e++
+else{var t=Binary.read_uint8(e+1)
+if(217===t||218===t)break
+if(1===t||208<=t&&t<=215)e+=2
+else{var o,u=Binary.read_uint16(e+2,!0)
+if(u<2||i<e+2+u)break
+225!==t&&254!==t||(o="COM",aiScanAttributionRegion(r,e+4,u-2,o=225===t?Binary.compare("'Exif'",e+4)?"APP1 Exif":"APP1 XMP":o)&&-1===a&&(a=e)),e+=u+2,n++}}var f=aiFormatAttributionEvidence(r)
+return f?{version:"JPEG APP1/COM",options:"JPEG metadata segments from "+aiHexOffset(a)+"; "+f}:null}function aiPdfHasC2paTokens(){var i=Binary.getSize()
+return-1!==Binary.findString(0,i,"/Subtype /application#2Fc2pa")&&-1!==Binary.findString(0,i,"/AFRelationship /C2PA_Manifest")}function aiDetectPdfUnsignedAttribution(){var i=Binary.getSize(),r=1048576,e=aiNewAttributionState(),i=(i<=2*r?aiScanAttributionRegion(e,0,i,""):(aiScanAttributionRegion(e,0,r,"first 1 MB"),aiScanAttributionRegion(e,i-r,r,"last 1 MB")),aiFormatAttributionEvidence(e))
+return i?{version:"PDF text",options:"PDF Info/XMP text region; "+i}:null}function aiZipScanArchiveComment(i){for(var r=Binary.getSize(),e=66e3<r?r-66e3:0,n=Binary.findSignature(e,r-e,"504B0506"),a=-1,t=0;-1!==n&&t<1e3;)a=n,n=Binary.findSignature(n+1,r-(n+1),"504B0506"),t++;-1!==a&&a+22<=r&&0<(e=Binary.read_uint16(a+20,!1))&&a+22+e<=r&&aiScanAttributionRegion(i,a+22,e,"archive comment")}function aiDetectZipUnsignedAttribution(){for(var i=Binary.getSize(),r=aiNewAttributionState(),e=0,n=0,a=0;e+30<=i&&n<1e5&&a<512&&Binary.compare("504B0304",e);){var t=Binary.read_uint16(e+6,!1),o=Binary.read_uint16(e+8,!1),u=Binary.read_uint32(e+18,!1),f=Binary.read_uint16(e+26,!1),c=e+30+f+Binary.read_uint16(e+28,!1)
+if(0===f||i<c)break
+if(8&t||i-c<u){if(-1===(e=Binary.findSignature(c,i-c,"504B0304")))break}else 0===o&&0<u&&(t=Binary.read_ansiString(e+30,Math.min(f,64)),aiScanAttributionRegion(r,c,Math.min(u,1048576),t),a++),e=c+u
+n++}aiZipScanArchiveComment(r)
+var s=aiFormatAttributionEvidence(r)
+return s?{version:"ZIP stored text",options:"ZIP stored members/archive comment; "+s}:null}function aiDetectGenericUnsignedAttribution(i,r,e){var n=aiNewAttributionState(),i=(aiScanAttributionRegion(n,0,Math.min(Binary.getSize(),i),""),aiFormatAttributionEvidence(n))
+return i?{version:r,options:e+"; "+i}:null}
