@@ -16,11 +16,14 @@ jobs:
               run: |
                   git clone https://github.com/horsicq/Detect-It-Easy DIE
 
-            - name: Release db
+            - name: Create db.zip (db + db_extra)
               if: ${{ hashFiles('DIE/db/info.ini') != '' }}
               run: |
                   cd DIE
                   zip -r ../db.zip db
+                  if [ -d db_extra ]; then
+                      zip -r ../db.zip db_extra
+                  fi
                   cd ..
 
             - name: Read db/info.ini
@@ -40,35 +43,6 @@ jobs:
                   name: "db"
                   tag_name: db
                   body: ${{ steps.db_info.outputs.DB_INFO }}
-                  draft: false
-                  prerelease: true
-              env:
-                  GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-
-            - name: Create db_extra.zip
-              if: ${{ hashFiles('DIE/db_extra/info.ini') != '' }}
-              run: |
-                  cd DIE
-                  zip -r ../db_extra.zip db_extra
-                  cd ..
-
-            - name: Read db_extra/info.ini
-              if: ${{ hashFiles('DIE/db_extra/info.ini') != '' }}
-              id: db_extra_info
-              run: |
-                  DB_EXTRA_INFO=$(cat DIE/db_extra/info.ini)
-                  echo "DB_EXTRA_INFO<<EOF" >> $GITHUB_OUTPUT
-                  echo "$DB_EXTRA_INFO" >> $GITHUB_OUTPUT
-                  echo "EOF" >> $GITHUB_OUTPUT
-
-            - name: Update db_extra release
-              if: ${{ hashFiles('DIE/db_extra/info.ini') != '' }}
-              uses: softprops/action-gh-release@v3
-              with:
-                  files: db_extra.zip
-                  name: "db_extra"
-                  tag_name: db_extra
-                  body: ${{ steps.db_extra_info.outputs.DB_EXTRA_INFO }}
                   draft: false
                   prerelease: true
               env:

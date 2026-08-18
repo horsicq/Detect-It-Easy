@@ -34,24 +34,23 @@ jobs:
               run: |
                   git clone https://github.com/horsicq/Detect-It-Easy DIE
 
-            # Create zip archives
-            - name: Create zip archives
+            # Create zip archive (db + db_extra in a single db.zip)
+            - name: Create zip archive
               run: |
                   cd DIE
                   zip -r ../db.zip db
-                  zip -r ../db_extra.zip db_extra
+                  if [ -d db_extra ]; then
+                      zip -r ../db.zip db_extra
+                  fi
                   cd ..
-                  ls -la *.zip  # Verify the zip files were created
+                  ls -la *.zip  # Verify the zip file was created
             # Calculate MD5 checksums
             - name: Calculate MD5 checksums
               id: md5
               run: |
                   DB_MD5=$(md5sum db.zip | awk '{print $1}')
-                  DB_EXTRA_MD5=$(md5sum db_extra.zip | awk '{print $1}')
                   echo "DB_MD5=$DB_MD5" >> $GITHUB_OUTPUT
-                  echo "DB_EXTRA_MD5=$DB_EXTRA_MD5" >> $GITHUB_OUTPUT
                   echo "$DB_MD5" >> db.zip.md5
-                  echo "$DB_EXTRA_MD5" >> db_extra.zip.md5
 
             - name: Generate DB Stats
               run: |
@@ -86,22 +85,21 @@ jobs:
                   files: |
                       db.zip
                       db.zip.md5
-                      db_extra.zip
-                      db_extra.zip.md5
                   name: "Current database"
                   tag_name: current-database
                   body: |
                       - db.zip: `${{ steps.md5.outputs.DB_MD5 }}`
-                      - db_extra.zip: `${{ steps.md5.outputs.DB_EXTRA_MD5 }}`
 
                       Last updated: ${{ steps.date.outputs.DATE }}
 
-                      This pre-release contains the latest database files from Detect-It-Easy:
-                      - db.zip: Contains main database files
+                      This pre-release contains the latest database from Detect-It-Easy.
+                      db.zip bundles both the main database (db) and the extra database (db_extra).
+
+                      Main database (db):
 
                       ${{ steps.dbstats.outputs.DB_STATS }}
 
-                      - db_extra.zip: Contains extra database files
+                      Extra database (db_extra):
 
                       ${{ steps.dbstats.outputs.DB_EXTRA_STATS }}
                   draft: false
