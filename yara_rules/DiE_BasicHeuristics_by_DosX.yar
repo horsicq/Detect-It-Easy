@@ -1,8 +1,8 @@
 /*
 	Author: DosX
-	E-Mail: collab@kay-software.ru
 	GitHub: https://github.com/DosX-dev
-	Telegram: @DosX_dev
+    Website: https://dosx.su
+	Telegram: @DosX_dev 
 */
 
 // This module was written specifically for the Detect It Easy project.

@@ -1,7 +1,7 @@
 /*
 	Author: DosX
-	E-Mail: collab@kay-software.ru
 	GitHub: https://github.com/DosX-dev
+    Website: https://dosx.su
 	Telegram: @DosX_dev
 */
 
