@@ -7,8 +7,6 @@
 
 ### Basic PE Detection
 
-**`bool isNE16()`** - Check if the file is NE16 (16-bit) format.
-
 **`bool isDll()`** - Check if the file is a Dynamic Link Library (DLL).
 
 **`bool isDriver()`** - Check if the file is a device driver.
