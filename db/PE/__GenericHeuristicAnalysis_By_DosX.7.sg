@@ -339,10 +339,10 @@ function scanForObfuscations_NET() {
 
     if (!PE_Cached.isDynamicLinkLibrary) {
         if (PE_Cached.isVbNetStandardLibraryPresent) {
-            if (isAllNetReferencesMissing(vbNetEntries)) {
+            if (isAllNetObjectsMissing(vbNetEntries)) {
                 isEntryPointModified = true;
             }
-        } else if (isAllNetReferencesMissing(defaultEntries)) {
+        } else if (isAllNetObjectsMissing(defaultEntries)) {
             isEntryPointModified = true;
         }
 
@@ -573,7 +573,7 @@ function scanForObfuscations_NET() {
     var isVirtualizationPresent = false;
 
     if (
-        isAllNetReferencesPresent(
+        isAllNetObjectsPresent(
             [
                 "System.Reflection", // System.Reflection.dll
                 "GetILGenerator", // MSIL: 'System.Reflection.Emit.DynamicMethod::GetILGenerator()'
@@ -602,7 +602,7 @@ function scanForObfuscations_NET() {
     var callsEncrypt = false;
 
     if (
-        isAllNetReferencesPresent(
+        isAllNetObjectsPresent(
             [
                 "GetTypeFromHandle", // MSIL: 'System.Type::GetTypeFromHandle( ... )'
                 "BinaryReader", // MSIL: 'System.IO.BinaryReader'
@@ -1325,7 +1325,7 @@ function scanForAntiAnalysis_NET() {
     if (
         !isFrameworkComponent() && validateNetObject("VirtualProtect") && ( // from 'kernel32.dll', WinAPI
             // Need to check
-            isAllNetReferencesPresent( // samples by: ConfuserEx, SkiDzEX
+            isAllNetObjectsPresent( // samples by: ConfuserEx, SkiDzEX
                 [
                     "System.Runtime.InteropServices", // System.Runtime.InteropServices.dll
                     "Marshal", // MSIL: '*.Marshal::GetHINSTANCE( ... )'
@@ -1334,7 +1334,7 @@ function scanForAntiAnalysis_NET() {
                     "op_Explicit" // MSIL: 'System.IntPtr::op_Explicit'
                 ]
             ) ||
-            isAllNetReferencesPresent( // samples by: Inx Obfuscator
+            isAllNetObjectsPresent( // samples by: Inx Obfuscator
                 [
                     "System.Diagnostics", // System.Diagnostics
                     "memcpy", // from 'msvcrt.dll', WinAPI
@@ -1343,7 +1343,7 @@ function scanForAntiAnalysis_NET() {
                     "get_BaseAddress" // MSIL: '*.ProcessModule::get_BaseAddress()'
                 ]
             ) ||
-            isAllNetReferencesPresent( // samples by: MindLated
+            isAllNetObjectsPresent( // samples by: MindLated
                 [
                     "System.Runtime.InteropServices", // System.Runtime.InteropServices.dll
                     "Marshal", // MSIL: '*.Marshal::GetHINSTANCE( ... )'
@@ -2168,7 +2168,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         var isAssemblyInvokeFound = false;
 
-        if (!isFrameworkComponent() && PE_Cached.nameOfNetModuleName !== "System.dll" && isAllNetReferencesPresent( // TODO: update [!!!]
+        if (!isFrameworkComponent() && PE_Cached.nameOfNetModuleName !== "System.dll" && isAllNetObjectsPresent( // TODO: update [!!!]
             [
                 "System.Reflection", // System.Reflection.dll
                 "get_EntryPoint", // MSIL: '*.Assembly::get_EntryPoint()'
@@ -2284,6 +2284,44 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         if (isRunPePresent) options = addOption(options, "RunPE");
     }
+
+
+
+
+    // Check for packers and protections by .NET objects
+
+    var isObjectLikePacker = false;
+
+    // [{Name}, {Version}, {ObjectNames}]
+    var dbCollectionOfObjectNamesDict = [
+        [".NETZ", null, ["NetzStarter", "StartApp"]],          // https://github.com/madebits/msnet-netz-compressor
+        ["MPRESS", "2.XX", ["mpress", "lzmat"]],               // https://www.autohotkey.com/mpress/mpress_web.htm
+        ["Costura.Fody", null, ["Costura", "AssemblyLoader"]]  // https://github.com/fody/costura
+    ];
+
+    var objectNamesValidatingResult = null;
+
+    for (var i = 0; i < dbCollectionOfObjectNamesDict.length; i++) {
+        if (isAllNetObjectsPresent(dbCollectionOfObjectNamesDict[i][2])) {
+            objectNamesValidatingResult = dbCollectionOfObjectNamesDict[i];
+            break;
+        }
+    }
+
+    var versionByObjectNameDetected = String();
+
+    if (objectNamesValidatingResult !== null) {
+        versionByObjectNameDetected = objectNamesValidatingResult[1];
+
+        log(logType.net, "Objects like " + objectNamesValidatingResult[0] + (versionByObjectNameDetected ? " (v" + versionByObjectNameDetected + ")" : String()));
+
+        isObjectLikePacker = true;
+    }
+
+    // Clean up: release the dictionary
+    dbCollectionOfObjectNamesDict = undefined;
+
+    if (isObjectLikePacker) options = addOption(options, "Object names like " + objectNamesValidatingResult[0] + (versionByObjectNameDetected ? " (v" + versionByObjectNameDetected + ")" : String()));
 
 
 
@@ -2734,7 +2772,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["CodeVirtualizer", null, ".vlizer"],                                             // https://www.oreans.com/CodeVirtualizer.php
         ["Enigma", null, /^\.enigma[12]$/],                                               // https://enigmaprotector.com/
         ["Eronana", null, ".packer"],                                                     // https://github.com/Eronana/packer
-        ["MPRESS", null, /^\.MPRESS[12]$/],                                               // https://www.autohotkey.com/mpress/mpress_web.htm
+        ["MPRESS", "2.XX", /^\.MPRESS[12]$/],                                               // https://www.autohotkey.com/mpress/mpress_web.htm
         ["NsPack", null, [/^(?:\.)?nsp[01]$/, /^PE[Pp][01]$/, ".Packer!"]],               // https://nspack.apponic.com/
         ["PE Diminisher", null, ".teraphy"],                                              // https://web.archive.org/web/20060111104142/http://www.exetools.com/files/compressors/win/ped.zip
         ["PE-SHiELD", null, ["PESHiELD", "ANAKiN98"]],                                    // https://webscene.ir/tools/show/PE-SHIELD-0.25
@@ -3907,48 +3945,48 @@ function convertStringToUnicodeSignature(ustring) {
 
 
 /**
- * Checks if all .NET references in the provided array are missing.
+ * Checks if all .NET objects in the provided array are missing.
  *
- * @param {Array} references - An array of .NET references to check.
- * @returns {boolean} - Returns true if all .NET references are missing, otherwise false.
+ * @param {Array} objects - An array of .NET object names to check.
+ * @returns {boolean} - Returns true if all .NET objects are missing, otherwise false.
  */
-function isAllNetReferencesMissing(references) {
-    // Iterate through the array of .NET references
-    for (var i = 0; i < references.length; i++) {
-        // Get the current reference
-        const ref = references[i];
+function isAllNetObjectsMissing(objects) {
+    // Iterate through the array of .NET objects
+    for (var i = 0; i < objects.length; i++) {
+        // Get the current object name
+        const objectName = objects[i];
 
-        // If the .NET object corresponding to the reference is present, return false
-        if (PE.isNetObjectPresent(ref)) {
+        // If the current .NET object is present, return false
+        if (PE.isNetObjectPresent(objectName)) {
             return false;
         }
     }
 
-    // If all .NET references are missing, return true
+    // If all .NET objects are missing, return true
     return true;
 }
 
 
 
 /**
- * Checks if all .NET references are present.
+ * Checks if all .NET objects in the provided array are present.
  *
- * @param {Array} references - An array of .NET references to check.
- * @returns {boolean} - Returns true if all .NET references are present, otherwise false.
+ * @param {Array} objects - An array of .NET object names to check.
+ * @returns {boolean} - Returns true if all .NET objects are present, otherwise false.
  */
-function isAllNetReferencesPresent(references) {
-    // Iterate through the array of .NET references
-    for (var i = 0; i < references.length; i++) {
-        // Get the current reference
-        const ref = references[i];
+function isAllNetObjectsPresent(objects) {
+    // Iterate through the array of .NET objects
+    for (var i = 0; i < objects.length; i++) {
+        // Get the current object name
+        const objectName = objects[i];
 
-        // If the .NET object corresponding to the reference is not present, return false
-        if (!PE.isNetObjectPresent(ref)) {
+        // If the current .NET object is not present, return false
+        if (!PE.isNetObjectPresent(objectName)) {
             return false;
         }
     }
 
-    // If all .NET references are present, return true
+    // If all .NET objects are present, return true
     return true;
 }
 
