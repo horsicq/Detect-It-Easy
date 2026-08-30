@@ -38,7 +38,7 @@ With heuristic scanning enabled, DiE makes a series of independent passes over n
 
 One of these passes performs **surface-level emulation of native instructions around the entry point**. It is deliberately lightweight rather than a sandbox or full CPU emulator, but it is enough to expose unusual instruction sequences, proxy jumps, stack tricks, NOP padding, hidden TLS entry points, and other patterns often left by packers or hand-written stubs.
 
-Here is what currently goes into a full PE scan:
+These are the main passes rather than a complete inventory of every check:
 
 |     | Area                         | What is checked                                                                                                                                                                                                                                                                            |
 | --: | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -59,14 +59,14 @@ This is not a black-box malware score. DiE reports the evidence it found so that
 
 DiE is **not an antivirus**, and the PE heuristic engine is not designed to declare a file safe. It provides no real-time protection or disinfection, and a clean report only means that the enabled rules did not find the static evidence they know how to recognize. Reputation services, an antivirus, dynamic analysis, and manual reverse engineering still answer different questions.
 
-What DiE can do is expose a surprisingly broad range of threat-related clues while the file is still on disk:
+What DiE can do is expose a surprisingly broad range of threat-related clues while the file is still on disk. The examples below are only a small part of the actual rule set, not a complete catalogue. The heuristic engine evolves faster than this README and new families, markers, and cross-checks are added regularly.
 
 -   **Remote-access trojans and backdoors**, including generic RAT patterns and families such as NjRAT, AsyncRAT, NanoCore, Orcus, Gh0st RAT, DarkComet, NetWire, Remcos, BitRAT, and many others.
--   **Stealers and spyware**, including generic stealer scoring, Mars Stealer, Echelon Stealer, StormKitty, and MAX Spyware indicators.
--   **Ransomware, lockers, and destructive malware**, with checks for WannaCry, UX-Locker, Liberium WinLocker, Amp WinLocker, and Olympic Destroyer.
--   **File-infecting viruses.** The current analyzer contains dedicated static infection checks for **Ramnit, Neshta, Slugin, Win9X.CIH, Win9X.Dupator, Parite, and Polip**.
--   **Targeted and unusual threats**, including markers associated with Slingshot APT, Equation Group tooling, RAT injectors, maliciously generated assemblies, and fake or infected system files.
--   **Hidden payloads and delivery techniques**, such as encoded or encrypted executable payloads, PE files concealed in resources or overlays, RunPE-like behavior, suspicious temporary assemblies, anomalous resources, and misleading build metadata.
+-   **Stealers and spyware**, including generic stealer scoring, Mars Stealer, Echelon Stealer, StormKitty, MAX Spyware, and other family or behavior indicators.
+-   **Ransomware, lockers, and destructive malware**, with checks for WannaCry, UX-Locker, Liberium WinLocker, Amp WinLocker, Olympic Destroyer, and related threats.
+-   **File-infecting viruses.** Dedicated static infection checks currently cover **Ramnit, Neshta, Slugin, Win9X.CIH, Win9X.Dupator, Parite, and Polip**, with the list continuing to grow.
+-   **Targeted and unusual threats**, including markers associated with Slingshot APT, Equation Group tooling, RAT injectors, maliciously generated assemblies, fake or infected system files, and similar cases.
+-   **Hidden payloads and delivery techniques**, from Base64-encoded executables and RunPE-like behavior to PE files concealed in resources, sections, or overlays. A built-in known-plaintext attack (KPA) pass derives repeating XOR/XNOR, ADD/SUB, or reverse-subtraction keys up to 20 bytes from invariant PE-header fields, then validates the decoded image structurally instead of trusting a plain `MZ` match. Other payload and build anomalies are covered as well.
 
 These are explainable static detections built from entry-point code, import fingerprints, metadata, strings, resources, section structure, and other relationships inside the image. They are valuable leads, but they are not a promise of complete malware-family coverage: modified samples may evade a rule, and an unusual clean program may share part of a suspicious pattern.
 
