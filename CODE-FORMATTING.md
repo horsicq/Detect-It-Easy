@@ -6,7 +6,7 @@ Do not use an extension-specific formatter as the primary formatter for `.sg` fi
 
 This document defines the style for new rules and for code touched by a change. Some old database files predate the standard and contain legacy formatting. Do not copy a legacy exception into new code, and do not reformat an unrelated large file merely to make it match this document.
 
-The [PE heuristic analyzer](db/PE/__GenericHeuristicAnalysis_By_DosX.7.sg) is a reference for spacing only. It is a specialized module maintained exclusively by its author: do not copy its internal data structures, detector blocks, or result-building code into ordinary rules, and do not modify it as part of unrelated formatting work.
+The [PE heuristic engine](db/PE/__GenericHeuristicAnalysis_By_DosX.7.sg) is a reference for spacing only. It is a specialized module maintained exclusively by its author: do not copy its internal data structures, detector blocks, or result-building code into ordinary rules, and do not modify it as part of unrelated formatting work.
 
 ## VS Code setup
 

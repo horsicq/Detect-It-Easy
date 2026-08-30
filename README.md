@@ -32,9 +32,9 @@ Detect It Easy’s **flexible signature system** and **scripting capabilities** 
 
 ### PE analysis that goes beyond a signature match
 
-A signature can tell you what a file resembles. The [Generic Heuristic Analysis engine](db/PE/__GenericHeuristicAnalysis_By_DosX.7.sg) goes further: it tries to explain what is unusual about the file and why it deserves a closer look.
+A signature can tell you what a file resembles. The [Generic Heuristic Analysis engine](db/PE/__GenericHeuristicAnalysis_By_DosX.7.sg) goes further: it tries to explain what is unusual about the file and why it deserves a closer look. The PE heuristic engine is created and maintained by [DosX](https://github.com/DosX-dev).
 
-With heuristic scanning enabled, DiE makes a series of independent passes over native and managed PE images. The file is never launched. Instead, the analyzer works with headers, data directories, sections, imports, exports, resources, .NET metadata, bytecode, overlays, debug records, and code around the entry point. This makes it useful both when an exact signature is known and when a sample has been modified enough to evade ordinary identification.
+With heuristic scanning enabled, DiE makes a series of independent passes over native and managed PE images. The file is never launched. Instead, the engine works with headers, data directories, sections, imports, exports, resources, .NET metadata, bytecode, overlays, debug records, and code around the entry point. This makes it useful both when an exact signature is known and when a sample has been modified enough to evade ordinary identification.
 
 One of these passes performs **surface-level emulation of native instructions around the entry point**. It is deliberately lightweight rather than a sandbox or full CPU emulator, but it is enough to expose unusual instruction sequences, proxy jumps, stack tricks, NOP padding, hidden TLS entry points, and other patterns often left by packers or hand-written stubs.
 
@@ -74,7 +74,7 @@ These are explainable static detections built from entry-point code, import fing
 
 Heuristic findings are never silently mixed into ordinary signature matches. Every result produced by the heuristic layer is kept separate and marked with `(Heur)`, so it is always clear which conclusion came from an exact rule and which one was inferred from a combination of evidence.
 
-The analyzer does more than append extra lines. In a few deliberate cases it can reject a misleading result from the main signature database and replace it with a more precise heuristic conclusion. Programming-language detection is a typical example: a compiler signature may suggest C or C++, while stronger structural and runtime evidence identifies Rust. The replacement still carries `(Heur)` and never passes itself off as an exact signature match. The same reconciliation mechanism is used to suppress known fake packer, protector, and dongle signatures left behind by obfuscators.
+The engine does more than append extra lines. In a few deliberate cases it can reject a misleading result from the main signature database and replace it with a more precise heuristic conclusion. Programming-language detection is a typical example: a compiler signature may suggest C or C++, while stronger structural and runtime evidence identifies Rust. The replacement still carries `(Heur)` and never passes itself off as an exact signature match. The same reconciliation mechanism is used to suppress known fake packer, protector, and dongle signatures left behind by obfuscators.
 
 A protected .NET sample may produce a report like this:
 
