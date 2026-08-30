@@ -2649,7 +2649,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["XComp", "0.97-0.98", -1, 0xea1e66e4, 0],
         ["XPack", null, -1, [0x2ac44dd2, 0x6c170ab3], 0],
         ["kkrunchy", null, 0, 0x29188619, 0],                                                      // https://www.farbrausch.de/~fg/kkrunchy/
-        ["ANDPakk2", "0.18", -1, 0x29188619, 0],
+        ["ANDPakk", "0.18", -1, 0x29188619, 0],
         ["RLPack", "1.1-1.2", 0, 0x5bd1d713, 0],
         ["RLPack", "1.16+", 0, 0x6889715b, 0],
         ["Petite", "2.1", -1, [0x69a2b86d, 0x69a2b86d, 0xaf362d6a], 0],                            // https://www.un4seen.com/petite/
@@ -2759,6 +2759,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var dbCollectionOfSectionNamesDict = [
         ["Ramnit (infected)", null, ".rmnet"],
         ["Parite (infected)", null, /\.[a-z]{3}[\u0006\u0007\u0009]$/],
+        ["Win9X.Dupator (infected)", null, "DUPATOR!"],
         ["Mars Stealer (payload)", null, "LLCPPC"],
         ["DBPE", null, "        "],
         ["Themida", "2.XX", "   "],                                                       // https://www.oreans.com/Themida.php
@@ -2842,6 +2843,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["notcpuid", null, ".ptext"],                                                     // https://github.com/notcpuid/pe-packer
         ["WinZip SFX", null, "_winzip_"],                                                 // https://www.winzip.com/en/product/self-extractor/
         ["RDG Tejon Crypter", "1.3", "RDGMax"],                                           // http://crypter.unblog.fr/rdg-tejon-crypter-v13/
+        ["EsProtect", "1.3-3.9", [/^Esp[01]$/, /^\.Esp[! ]$/]],                           // https://www.greenxf.com/soft/29156.html
         ["vQPU Protection Tech", null, ".vQPU", ".vqmeta"],
         ["Rockey4nd Enveloper", "2.XX", "RY4SHL"],
         ["Rockey4nd Feitian Shell Protect Center", "1.X", ".ftsafe"],
@@ -2859,7 +2861,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["MEW", null, "MEW"],
         ["MaskPE", null, ".MaskPE"],
         ["Morphnah", "1.0.X", ".nah"],
-        ["NakedPacker", null, /^\.naked[12]$/],
+        ["NakedPacker", null, /^\.naked[12]$/, /^\.Kaos(?:2 |12)$/],
         ["NativeCryptor", null, /^(?:NATIVES|CONFIG|(?:F)?CRYPT)~$/],
         ["NeoLite", null, ".neolite"],
         ["PE-PACK", "1.0", "PEPACK!!"],
@@ -2937,7 +2939,10 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["Feoktist Packer", null, "Feokt."],
         ["Snaker", null, ".snaker"],
         ["NEzZ Patcher", null, [".HACK", ".NEzZ"]],
-        ["Zprotect", "1.X", ["PackedBy", ".Shadowz"]]
+        ["Zprotect", "1.X", ["PackedBy", ".Shadowz"]],
+        ["Guy UPX Mod", null, ["Hello", "Guy !"]],
+        ["AiR Cryptor", null, "TEAM AiR"],
+        ["Stone's PE Encrypter", "1.13-2.0", /^\.Stone(?:r)?$/]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDict.concat(
@@ -7310,6 +7315,24 @@ function scanForMaliciousCode_NET_and_Native() {
                 });
             }
         }
+    }
+
+
+
+
+    // https://community.avast.com/t/win95-dupator/591940
+
+    if (verdicts.length === 0 && (PE.compareEP(
+        "60" +                 // pushal
+        "8B E8" +              // mov ebp, eax
+        "81 ED 00 10 40 00" +  // sub ebp, 0x401000
+        "8B 85"                // mov eax, dword ptr [ebp + ...]
+    ) || PE.section[PE.nLastSection].Name === "DUPATOR!")) {
+        verdicts.push({
+            type: "Win9X.Dupator",
+            version: String(),
+            details: "infected"
+        });
     }
 
 
