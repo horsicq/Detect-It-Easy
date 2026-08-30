@@ -75,7 +75,7 @@ Remove fields that the rule does not need. Do not leave empty assignments merely
 A standalone rule is laid out in this order:
 
 1. `// Detect It Easy: detection rule file` on the first line.
-2. One empty line.
+2. One empty line. (optional, but not recommended)
 3. Author or co-author comments, kept together without empty lines between them.
 4. One empty line.
 5. Optional references or short provenance comments.
