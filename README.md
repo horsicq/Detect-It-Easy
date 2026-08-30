@@ -112,6 +112,15 @@ PE is the largest heuristic module, but it is not the only one shipped with DiE:
 -   The [file-extension heuristic](db/Binary/__MiniExtensionsHeuristic_By_DosX.7.sg) provides a broad fallback catalogue of formats and programming languages, cross-checking the extension against whether the file is actually textual or binary.
 -   The [Batch-script heuristic](db/Binary/__MiniBatchHeuristic_By_DosX.7.sg) catches UTF-16LE obfuscation and non-textual content hidden inside BAT and CMD files.
 
+## 🧰 Several engines under one GUI
+
+The desktop version of DiE is not limited to its own scanning engine. It brings several independent analyzers into the same interface, each with a different rule model and a different idea of what constitutes a useful match. On a difficult or unfamiliar file, running them in turn can expose details that one database alone would miss. Their output is complementary rather than a vote: three engines repeating a weak signature do not turn it into proof.
+
+-   **Detect It Easy (DiE)** is the primary, format-aware engine. Its DiE-JS rules can combine executable structures, metadata, imports, sections, entry-point code, antipatterns, and bounded byte searches, while the PE heuristic layer adds broader anomaly and behavioral analysis.
+-   **[Nauz File Detector](https://github.com/horsicq/Nauz-File-Detector) (NFD)** provides an independent view of linkers, compilers, tools, and packers. It has no user-rule workflow comparable to DiE-JS or YARA, its heuristic logic is much simpler, and its database is updated relatively infrequently. That makes it useful as a second opinion, not as a replacement for the main engine.
+-   **[YARA](https://github.com/VirusTotal/yara)** adds direct rule-based matching with textual, binary, and logical conditions. It is a de facto standard for malware researchers and threat hunters, and DiE ships its own [basic](yara_rules/DiE_BasicHeuristics_by_DosX.yar) and [enhanced](yara_rules/DiE_EnhancedHeuristics_by_DosX.yar) YARA-side heuristics. These provide a lighter cross-check of suspicious PE traits rather than duplicating the full DiE heuristic engine.
+-   **PEiD** is included for compatibility with the classic "old-school" detector and its `userdb` ecosystem. The [bundled database](peid_rules/PE) preserves a large amount of historical material imported from the original PEiD rules. It remains useful for reproducing legacy detections, but many signatures are noisy by modern standards and can produce convincing-looking false positives, so its results should be treated as secondary evidence.
+
 ## 🧩 Anatomy of a detection rule
 
 DiE rules are small DiE-JS modules. A typical standalone rule declares the kind of result it produces, inspects the current file through the format API, fills optional result fields, and returns the engine-built result:
