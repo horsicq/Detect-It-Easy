@@ -112,6 +112,59 @@ PE is the largest heuristic module, but it is not the only one shipped with DiE:
 -   The [file-extension heuristic](db/Binary/__MiniExtensionsHeuristic_By_DosX.7.sg) provides a broad fallback catalogue of formats and programming languages, cross-checking the extension against whether the file is actually textual or binary.
 -   The [Batch-script heuristic](db/Binary/__MiniBatchHeuristic_By_DosX.7.sg) catches UTF-16LE obfuscation and non-textual content hidden inside BAT and CMD files.
 
+## 🧩 Anatomy of a detection rule
+
+DiE rules are small DiE-JS modules. A typical standalone rule declares the kind of result it produces, inspects the current file through the format API, fills optional result fields, and returns the engine-built result:
+
+```js
+// Detect It Easy: detection rule file
+// Author: Your Name <you@example.com>
+
+// Optional reference URL
+meta("compiler", "Example Compiler");
+
+function detect() {
+    if (PE.isSectionNamePresent(".lz-algo")) {
+        sVersion = "1.0";
+        sOptions = "LZMA";
+        bDetected = true;
+    }
+
+    sLang = "C/C++";
+
+    return result();
+}
+```
+
+The result variables are supplied by the DiE engine and must not be redeclared:
+
+| Field       | Purpose                                                                                                                                                                                                                |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bDetected` | Marks the rule as matched. This is the field a normal rule must set when its conditions succeed.                                                                                                                       |
+| `sName`     | Overrides the default name from `meta()` when the exact variant is only known at runtime.                                                                                                                              |
+| `sVersion`  | Version, build, generation, or another short version-like value.                                                                                                                                                       |
+| `sOptions`  | Architecture, mode, modification state, or other useful qualifiers.                                                                                                                                                    |
+| `sLang`     | Adds a programming-language result. It is intentionally uncommon, used mostly by compiler rules, and conventionally assigned at the end of `detect()`, immediately before the blank line preceding `return result();`. |
+| `sType`     | Rare runtime override for the result category; reserve it for multi-purpose modules.                                                                                                                                   |
+
+`meta("type", "name")` supplies the normal result category and default name. Optional shared helpers are loaded with `includeScript("module")` between `meta()` and `detect()`. Simple rules finish with `return result();`; keep one empty line immediately before it.
+
+Before submitting a rule or script module, follow the complete [DiE-JS code-formatting standard](CODE-FORMATTING.md).
+
+### Before writing a real rule
+
+The skeleton above is only the wrapper. DiE determines the file class first and then runs the rules from the matching directory, so format-specific logic belongs beside that format: PE rules use `db/PE`, ELF rules use `db/ELF`, and so on. `db/Binary` is intended for unclassified or genuinely format-independent data, not as a shortcut for code that belongs to a more specific parser.
+
+The scripting API is documented in `help`. Start with the [global functions](help/Global.md), the common [Binary API](help/Binary.md), and the [signature-pattern reference](help/Signatures.md), then use the class reference for the format being inspected: [PE](help/PE.md), [.NET metadata](help/DOTNET.md), [ELF](help/ELF.md), [Mach-O](help/MACH.md), or another document from the same directory.
+
+DiE byte signatures are a small pattern language embedded inside JavaScript strings. Hex bytes match literally, `..` and `??` are byte wildcards, text is written inside single quotes, and `$`/`#` forms describe relative or address-dependent values. They are not regular expressions. The complete syntax and examples live in the [signature reference](help/Signatures.md).
+
+Rules can inspect the scan mode with `isHeuristicScan()`, `isDeepScan()`, `isAggressiveScan()`, and `isVerbose()`. These calls reflect options selected by the user; they do not make an unnecessarily expensive rule acceptable. Even optional code must use cheap structural gates and antipatterns before bounded signature searches.
+
+Repository placement also carries a quality meaning. `db` is the reviewed main database. [`db_extra`](db_extra/about.txt) contains rules that were not approved for the main database and is explicitly not recommended as a quality or performance reference. `dbs_min` is generated output and must not be edited by hand.
+
+Finally, a rule that works on one private sample is not yet maintainable coverage. The [contribution requirements](CONTRIBUTING.md#new-detection-rule-pull-requests) require reproducible samples, expected DiE output, independently checkable sources, and relevant false-positive material. The same document explains the [performance requirements](CONTRIBUTING.md#detection-rule-performance-requirements) that are enforced during review.
+
 ## 📄 Supported file types
 
 Detect It Easy supports a wide range of executable and archive types, including:
