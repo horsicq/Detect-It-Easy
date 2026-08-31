@@ -6,19 +6,24 @@
 // Website: https://dosx.su
 // Telegram: @DosX_dev
 
+includeScript("python");
+
 // https://github.com/Nuitka/Nuitka
 meta("packer", "Nuitka");
 
 function detect() {
-    var dataSection = PE.section[".rdata"]
+    var dataSection = PE.section[".rdata"];
 
-    if (dataSection && !PE.isRichSignaturePresent()) {
+    if (dataSection) {
         var dataSectionOffset = dataSection.FileOffset,
             dataSectionSize = dataSection.FileSize;
 
-        if (PE.findString(dataSectionOffset, dataSectionSize, "__nuitka_version__") != -1) {
+        var pythonRuntimeLibraryName = PE.isLibraryPresentExp(/^python/i);
+
+        if (pythonRuntimeLibraryName && PE.findString(dataSectionOffset, dataSectionSize, "__nuitka_version__") !== -1) {
+            sVersion = getPythonVersionByDll(pythonRuntimeLibraryName);
             bDetected = true;
-        } else if (PE.findString(dataSectionOffset, dataSectionSize, "NUITKA_ONEFILE_PARENT") != -1) {
+        } else if (PE.findString(dataSectionOffset, dataSectionSize, "NUITKA_ONEFILE_PARENT") !== -1) {
             sOptions = "OneFile";
             bDetected = true;
         }
