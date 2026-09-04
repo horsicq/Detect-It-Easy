@@ -1,11 +1,34 @@
 // Detect It Easy: detection rule file
-// Author: BJNFNE <bjnfne@web.de>
+
+// Author: DosX
+// GitHub: https://github.com/DosX-dev
+// Website: https://dosx.su
+// Telegram: @DosX_dev
+// -------------
+// Co-author: BJNFNE <bjnfne@web.de>
 
 // https://www.unrealengine.com/
 meta("game engine", "Unreal");
 
 function detect() {
-    if (PE.getVersionStringInfo("ProductName") === "Unreal Engine") {
+    if (PE.getSize() > 0x2000000 && PE.getNumberOfExports() > 32 && !PE.isDll()) {
+        sOptions = "release";
+
+        if (PE.isExportFunctionPresentExp(/^xJSON_/)) {
+            bDetected = true;
+        } else if (PE.getVersionStringInfo("OriginalFilename").match(/Win(?:32|64)-Shipping\.exe$/)) {
+            bDetected = true;
+        } else {
+            var rdataSection = PE.section[".rdata"],
+                archSection = PE.section[".arch"];
+
+            if ((rdataSection && PE.isSignaturePresent(rdataSection.FileOffset, Math.min(rdataSection.FileSize, 0x2000000), "'Unreal'")) ||
+                (archSection && PE.isSignaturePresent(archSection.FileOffset, Math.min(archSection.FileSize, 0x2000000), "'Unreal'"))) {
+                bDetected = true;
+            }
+        }
+    } else if (PE.getVersionStringInfo("ProductName") === "Unreal Engine") {
+        sOptions = "debug";
         bDetected = true;
     }
 
