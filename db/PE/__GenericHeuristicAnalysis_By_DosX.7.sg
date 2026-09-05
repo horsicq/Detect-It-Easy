@@ -5010,6 +5010,7 @@ function scanForObfuscations_Native() {
     var isEpSectionZeroPaddingPresent = false;
 
     var epSectionWithZeroPaddingIndex = -1;
+    var isEpInNonExecutableSection = false;
 
     // Find the section that contains the entry point
     const entryPointRva = PE_Cached.addressOfUnmanagedEntryPoint - PE.getImageBase();
@@ -5023,6 +5024,9 @@ function scanForObfuscations_Native() {
         if (entryPointRva >= sectionVirtualAddress &&
             entryPointRva < sectionVirtualAddress + sectionVirtualSize) {
             epSectionWithZeroPaddingIndex = i;
+            if (!(PE.section[i].Characteristics & SECTION_FLAGS_EXECUTE)) {
+                isEpInNonExecutableSection = true;
+            }
 
             // Check for zero padding at the beginning of the section
             if (PE.compare("00 00 00", PE.getSectionFileOffset(epSectionWithZeroPaddingIndex))) {
@@ -5032,6 +5036,7 @@ function scanForObfuscations_Native() {
     }
 
     if (isEpSectionZeroPaddingPresent) options = addOption(options, "EP-section #" + epSectionWithZeroPaddingIndex + " (\"" + cleanSectionName(PE.getSectionName(epSectionWithZeroPaddingIndex)) + "\") zero padding");
+    if (isEpInNonExecutableSection) options = addOption(options, "EP in non-executable section");
 
 
 
