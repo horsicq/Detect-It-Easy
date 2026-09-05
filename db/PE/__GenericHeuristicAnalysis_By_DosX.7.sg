@@ -4923,15 +4923,17 @@ function scanForObfuscations_Native() {
 
     // Check for a non-standard entry-point transfer through RET. Normal PE startup code
     // does not return to a caller, while protected stubs use RET to conceal a direct jump.
-    // Supported variants: PUSH <VA>; RET, MOV [ESP/RSP], <VA>; RET and MOV ESP, <VA>; RET.
+    // Supported variants: direct VA, a VA propagated through registers, and a x86 stack pivot.
 
     var isSyntheticEpTransferPresent = false;
 
     if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
-        // A target is retained only across NOPs, which preserves stack contents.
+        // Track only statically proven image addresses. Unknown instructions invalidate this
+        // lightweight state, preventing a generic PUSH register; RET sequence from matching.
         var syntheticEpTargetAddress = String(),
             syntheticEpTargetType = String(),
-            syntheticEpNopCount = 0;
+            syntheticEpNeutralInstructionCount = 0,
+            syntheticEpKnownAddresses = {};
 
         // Limit the scan to the entry stub and use the cached linear disassembly.
         for (var i = 0; i < 32 && !isSyntheticEpTransferPresent; i++) {
@@ -4940,11 +4942,21 @@ function scanForObfuscations_Native() {
 
             if (!currentEpOpCode) break; // Safety check
 
-            // These instructions directly place a valid image address at the top of stack.
-            var pushedAddress = currentEpInstruction.match(/^PUSH (0X[0-9A-F]+|\d+)$/i),
+            // Extract only register forms whose value can be followed without emulation.
+            var generalPurposeRegister = "(?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))",
+                registerLiteralAddress = currentEpInstruction.match(new RegExp("^MOV (" + generalPurposeRegister + "), (0X[0-9A-F]+|\\d+)$", "i")),
+                registerCopy = currentEpInstruction.match(new RegExp("^MOV (" + generalPurposeRegister + "), (" + generalPurposeRegister + ")$", "i")),
+                pushedRegister = currentEpInstruction.match(new RegExp("^PUSH (" + generalPurposeRegister + ")$", "i")),
+                storedRegister = currentEpInstruction.match(new RegExp("^MOV (?:DWORD|QWORD) PTR \\[(?:E|R)SP\\], (" + generalPurposeRegister + ")$", "i")),
+                poppedRegister = currentEpInstruction.match(new RegExp("^POP (" + generalPurposeRegister + ")$", "i")),
+                exchangedRegister = currentEpInstruction.match(new RegExp("^XCHG (?:DWORD|QWORD) PTR \\[(?:E|R)SP\\], (" + generalPurposeRegister + ")$", "i")),
+                pushedAddress = currentEpInstruction.match(/^PUSH (0X[0-9A-F]+|\d+)$/i),
                 storedAddress = currentEpInstruction.match(/^MOV (?:DWORD|QWORD) PTR \[(?:E|R)SP\], (0X[0-9A-F]+|\d+)$/i),
                 stackPivotAddress = PE_Cached.isI386 ? currentEpInstruction.match(/^MOV ESP, (0X[0-9A-F]+|\d+)$/i) : null,
-                targetAddress = pushedAddress || storedAddress;
+                targetAddress = pushedAddress || storedAddress,
+                isNeutralInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "CLC" ||
+                    currentEpOpCode === "STC" || currentEpOpCode === "CMC" ||
+                    new RegExp("^(?:MOV|XCHG) (" + generalPurposeRegister + "), \\1$|^LEA (" + generalPurposeRegister + "), \\[\\2\\]$", "i").test(currentEpInstruction);
 
             if (stackPivotAddress) {
                 // A pivot is accepted only when its new stack contains an image VA.
@@ -4957,24 +4969,53 @@ function scanForObfuscations_Native() {
                 if (returnAddress !== -1 && PE.VAToOffset(returnAddress) !== -1) {
                     syntheticEpTargetAddress = returnAddress;
                     syntheticEpTargetType = "stack pivot";
-                    syntheticEpNopCount = 0;
+                    syntheticEpNeutralInstructionCount = 0;
                 }
             } else if (targetAddress && PE.VAToOffset(parseInt(targetAddress[1], 0)) !== -1) {
                 syntheticEpTargetAddress = targetAddress[1];
                 syntheticEpTargetType = pushedAddress ? "push" : "stack write";
-                syntheticEpNopCount = 0;
+                syntheticEpNeutralInstructionCount = 0;
+            } else if (registerLiteralAddress && PE.VAToOffset(parseInt(registerLiteralAddress[2], 0)) !== -1) {
+                // MOV reg, <VA> establishes a proven target for a later PUSH/MOV/XCHG.
+                syntheticEpKnownAddresses[registerLiteralAddress[1].toUpperCase()] = registerLiteralAddress[2];
+                syntheticEpNeutralInstructionCount = 0;
+            } else if (registerCopy && syntheticEpKnownAddresses[registerCopy[2].toUpperCase()]) {
+                // Preserve provenance through a plain register-to-register copy.
+                syntheticEpKnownAddresses[registerCopy[1].toUpperCase()] = syntheticEpKnownAddresses[registerCopy[2].toUpperCase()];
+                syntheticEpNeutralInstructionCount = 0;
+            } else if (poppedRegister && syntheticEpTargetAddress) {
+                // PUSH <VA>; POP reg is a common polymorphic spelling of MOV reg, <VA>.
+                syntheticEpKnownAddresses[poppedRegister[1].toUpperCase()] = syntheticEpTargetAddress;
+                syntheticEpTargetAddress = String();
+                syntheticEpTargetType = String();
+                syntheticEpNeutralInstructionCount = 0;
+            } else if (pushedRegister && syntheticEpKnownAddresses[pushedRegister[1].toUpperCase()]) {
+                syntheticEpTargetAddress = syntheticEpKnownAddresses[pushedRegister[1].toUpperCase()];
+                syntheticEpTargetType = "register push";
+                syntheticEpNeutralInstructionCount = 0;
+            } else if (storedRegister && syntheticEpKnownAddresses[storedRegister[1].toUpperCase()]) {
+                syntheticEpTargetAddress = syntheticEpKnownAddresses[storedRegister[1].toUpperCase()];
+                syntheticEpTargetType = "register stack write";
+                syntheticEpNeutralInstructionCount = 0;
+            } else if (exchangedRegister && syntheticEpKnownAddresses[exchangedRegister[1].toUpperCase()]) {
+                // XCHG [ESP/RSP], reg replaces the return address without a direct MOV.
+                syntheticEpTargetAddress = syntheticEpKnownAddresses[exchangedRegister[1].toUpperCase()];
+                syntheticEpTargetType = "register stack exchange";
+                syntheticEpNeutralInstructionCount = 0;
             } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetAddress) {
                 // RET at a process entry point is meaningful here only as a concealed transfer.
                 log(logType.any, "Synthetic " + syntheticEpTargetType + "/ret transfer near EP to 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
 
                 isSyntheticEpTransferPresent = true;
-            } else if (currentEpOpCode === "NOP" && syntheticEpTargetAddress && syntheticEpNopCount < 2) {
-                // Permit short NOP padding commonly inserted by protectors.
-                syntheticEpNopCount++;
+            } else if (isNeutralInstruction && syntheticEpNeutralInstructionCount < 4) {
+                // Permit limited stack-preserving junk commonly inserted by protectors.
+                syntheticEpNeutralInstructionCount++;
             } else {
-                // Any other instruction can change stack state, so discard the pending target.
+                // Any other instruction can alter stack/register state, so discard provenance.
                 syntheticEpTargetAddress = String();
                 syntheticEpTargetType = String();
+                syntheticEpNeutralInstructionCount = 0;
+                syntheticEpKnownAddresses = {};
             }
         }
     }
