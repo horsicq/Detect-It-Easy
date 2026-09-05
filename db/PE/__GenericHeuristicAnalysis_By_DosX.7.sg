@@ -4160,6 +4160,9 @@ function findAndMark(sign, isFullName) {
 function isNameObfuscated(name) {
     if (!name || name.length === 0) return false;
 
+    if (PE_Cached.obfuscationWhitelist.test(name) ||
+        PE_Cached.obfuscationWhitelistInsensitive.test(name)) return false;
+
     if (name.indexOf(' ') !== -1) {
         const tokens = name.split(/\s+/);
         for (var i = 0; i < tokens.length; i++) {
@@ -4241,12 +4244,14 @@ const obfuscationWhitelistPatterns = [
     // ── NUMBERS · DATES · TIMESTAMPS ─────────────────────────────────────────
     // Copyright: (C) 1995, 2019, 2020, 2021SQUARE (four years, optional whitespace)
     /^(?:(?:\(\s*C\s*\)|©)\s*)?[12]\d{3}(?:\s*,\s*[12]\d{3}){3}(?:\s*[A-Z][A-Z0-9&._-]{1,24})?$/i,
-    // Copyright/build years: © 2019-2026, Copyright (C) 2019, 2020, 2021 Company, All Rights Reserved
-    /^(?:copyright\s*)?(?:(?:\(\s*c\s*\)|©)\s*)?[12]\d{3}(?:\s*(?:,|[-–—])\s*[12]\d{3}){1,5}(?:\s+(?:all\s+rights\s+reserved|[a-z][a-z&.,'()_-]*)){0,8}$/i,
-    // Copyright/build year: ©2026, (C) 2026, Copyright 2026 Company, All Rights Reserved
-    /^(?:(?:copyright\s*)?(?:\(\s*c\s*\)|©)\s*|copyright\s+)[12]\d{3}(?:\s*(?:,|[-–—])\s*[12]\d{3}){0,5}(?:\s+(?:all\s+rights\s+reserved|[a-z][a-z&.,'()_-]*)){0,8}$/i,
+    // Copyright/build years: © 2019-2026, Copyright (C) 2019; 2020; 2021 Company, All Rights Reserved
+    /^(?:copyright\s*)?(?:(?:\(\s*c\s*\)|©)\s*)?[12]\d{3}(?:\s*(?:,|;|[-–—]|to)\s*[12]\d{3}){1,5}(?:\s+(?:all\s+rights\s+reserved[.!]?|[a-z][a-z&.,'®™()_-]*)){0,8}$/i,
+    // Copyright/build year: ©2026, (C) 2026, Copyright 2026 Company™, All Rights Reserved.
+    /^(?:(?:copyright\s*)?(?:\(\s*c\s*\)|©)\s*|copyright\s+)[12]\d{3}(?:\s*(?:,|;|[-–—]|to)\s*[12]\d{3}){0,5}(?:\s+(?:all\s+rights\s+reserved[.!]?|[a-z][a-z&.,'®™()_-]*)){0,8}$/i,
+    // Reversed legal notice: All Rights Reserved © 2026 Company
+    /^all\s+rights\s+reserved[.!]?\s*(?:\(\s*c\s*\)|©)\s*[12]\d{3}(?:\s*(?:,|;|[-–—]|to)\s*[12]\d{3}){0,5}(?:\s+[a-z][a-z&.,'®™()_-]*){0,8}$/i,
     // Version Info output labels: Dev-output: ©2026, Build Output - Copyright 2026 Company
-    /^(?:(?:dev(?:elopment)?|build)[-_ ]?output\s*[:\-]\s*)(?:(?:copyright\s*)?(?:\(\s*c\s*\)|©)\s*|copyright\s+)[12]\d{3}(?:\s*(?:,|[-–—])\s*[12]\d{3}){0,5}(?:\s+(?:all\s+rights\s+reserved|[a-z][a-z&.,'()_-]*)){0,8}$/i,
+    /^(?:(?:dev(?:elopment)?|build)[-_ ]?output\s*(?::|-|–|—)?\s*)(?:(?:copyright\s*)?(?:\(\s*c\s*\)|©)\s*|copyright\s+)[12]\d{3}(?:\s*(?:,|;|[-–—]|to)\s*[12]\d{3}){0,5}(?:\s+(?:all\s+rights\s+reserved[.!]?|[a-z][a-z&.,'®™()_-]*)){0,8}$/i,
     // ISO 8601 compact datetime: 20250527T143022, 20250527T143022Z, 20250527t143022.123z
     /^\d{8}T\d{6}(?:\.\d{1,3})?Z?$/i,
     // File size: 123KB, 45.6 MB, 1.5GB
