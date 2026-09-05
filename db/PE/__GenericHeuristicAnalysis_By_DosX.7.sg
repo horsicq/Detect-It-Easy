@@ -4935,8 +4935,8 @@ function scanForObfuscations_Native() {
             syntheticEpNeutralInstructionCount = 0,
             syntheticEpKnownAddresses = {};
 
-        // Limit the scan to the entry stub and use the cached linear disassembly.
-        for (var i = 0; i < 32 && !isSyntheticEpTransferPresent; i++) {
+        // Inspect the whole usual entry stub while using cached linear disassembly.
+        for (var i = 0; i < 128 && !isSyntheticEpTransferPresent; i++) {
             var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
                 currentEpOpCode = getAsmOpCode(currentEpInstruction);
 
@@ -5026,8 +5026,8 @@ function scanForObfuscations_Native() {
 
 
 
-    // Check for an opaque conditional branch near the entry point. XOR reg, reg always
-    // produces CF=OF=SF=0 and ZF=PF=1, therefore the following Jcc outcome is constant.
+    // Check for an opaque conditional branch near the entry point. XOR/SUB/CMP reg, reg
+    // and AND reg, 0 always produce CF=OF=SF=0 and ZF=PF=1, making the following Jcc constant.
 
     var isOpaqueEpBranchPresent = false;
 
@@ -5050,16 +5050,17 @@ function scanForObfuscations_Native() {
 
             if (!currentEpOpCode) break; // Safety check
 
-            var xorZeroRegister = currentEpInstruction.match(/^XOR ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1$/i),
+            // Each form deterministically sets the tested EFLAGS without requiring register values.
+            var constantFlagsRegister = currentEpInstruction.match(/^(?:(?:XOR|SUB|CMP) ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1|AND ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), (?:0X0+|0+))$/i),
                 conditionalBranch = currentEpInstruction.match(/^(J[A-Z]+) (0X[0-9A-F]+|\d+)$/i),
                 isNeutralInstruction = currentEpOpCode === "NOP" ||
                     /^MOV ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1$/i.test(currentEpInstruction) ||
                     /^XCHG ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1$/i.test(currentEpInstruction) ||
                     /^LEA ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \[\1\]$/i.test(currentEpInstruction);
 
-            if (xorZeroRegister) {
-                // Start a new candidate only when the same general-purpose register is cleared.
-                opaqueEpRegister = xorZeroRegister[1].toUpperCase();
+            if (constantFlagsRegister) {
+                // Start a new candidate only from an instruction with mathematically known flags.
+                opaqueEpRegister = (constantFlagsRegister[1] || constantFlagsRegister[2]).toUpperCase();
                 opaqueEpNeutralInstructionCount = 0;
             } else if (conditionalBranch && opaqueEpRegister &&
                 PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 &&
@@ -5070,7 +5071,7 @@ function scanForObfuscations_Native() {
                 log(logType.any, "Opaque " + opaqueEpBranchType + " branch near EP: XOR " + opaqueEpRegister + ", " + opaqueEpRegister + "; " + currentEpInstruction);
 
                 isOpaqueEpBranchPresent = true;
-            } else if (isNeutralInstruction && opaqueEpRegister && opaqueEpNeutralInstructionCount < 2) {
+            } else if (isNeutralInstruction && opaqueEpRegister && opaqueEpNeutralInstructionCount < 4) {
                 opaqueEpNeutralInstructionCount++;
             } else {
                 // Any other instruction may alter EFLAGS or the intended control-flow sequence.
