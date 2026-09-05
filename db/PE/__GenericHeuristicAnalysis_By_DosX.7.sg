@@ -31,10 +31,10 @@
 //       │     signature-based analysis, native code emulation,        │
 //       │     thorough file content evaluation, and much more! >:)    │
 //       │                                                             │
-//       │     Supported archictures:                                  │
-//       │      1.  I386 (x86_32)            2.  AMD64 (x86_64)        │
-//       │      3.  ARM                      4.  ARM THUMB             │
-//       │      5.  ARMNT (ARMv7)                                      │
+//       │     Supported architectures:                                │
+//       │      1. I386 (x86-32)             2. AMD64 (x86-64)         │
+//       │      3. ARM (A32)                 4. THUMB (T32)            │
+//       │      5. ARMNT (ARMv7 Thumb-2)     6. ARM64 (AArch64)        │
 //       │                                                             │
 //       └─────────────────────────────────────────────────────────────┘
 
@@ -435,7 +435,7 @@ function scanForObfuscations_NET() {
     var isNativeEntryPointModified = false;
 
     if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isCppClrLikeApp) { // not for CLR apps
-        if (!PE_Cached.is64bit && PE_Cached.isArchX86) {
+        if (PE_Cached.isI386) {
             // FF2500????00: jmp dword ptr [ ... ]
             const firstOpCode = getFirstEpAsmOpCode();
 
@@ -448,7 +448,7 @@ function scanForObfuscations_NET() {
 
                 isNativeEntryPointModified = true;
             }
-        } else { // AMD64
+        } else if (PE_Cached.isAMD64 || PE_Cached.isARM64) {
             if (PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint) !== 0x00) {
                 isNativeEntryPointModified = true;
             }
@@ -2558,7 +2558,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
                 isStartsWithStackOperation = true;
         }
-    } else {
+    } else if (PE_Cached.isARM || PE_Cached.isThumb) {
         firstEpAsmOpCode = getFirstEpAsmOpCode();
 
         switch (firstEpAsmOpCode) {
@@ -2570,6 +2570,14 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 log(logType.nothing, "\"" + firstEpAsmOpCode + "\" at EP");
 
                 isStartsWithStackOperation = true;
+        }
+    } else if (PE_Cached.isARM64) {
+        firstEpAsmOpCode = getFirstEpAsmOpCode();
+
+        if (firstEpAsmOpCode === "LDP") {
+            log(logType.nothing, "\"" + firstEpAsmOpCode + "\" at EP");
+
+            isStartsWithStackOperation = true;
         }
     }
 
@@ -2623,8 +2631,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 isStrangeCallOrJmpPresent = true;
             }
         }
-    } else {
-        // ARM: Check for strange branch instructions
+    } else if (PE_Cached.isARM || PE_Cached.isThumb) {
+        // ARM/Thumb: Check for strange branch instructions
         firstOpCode = getAsmOpCode(PE_Cached.firstEpAsmInstruction);
 
         if (!PE_Cached.isDynamicLinkLibrary) {
@@ -5181,7 +5189,7 @@ function scanForObfuscations_Native() {
         isHighEntropyOn32bit = true;
     }
 
-    if (isHighEntropyOn32bit) options = addOption(options, "High entropy VA on x32");
+    if (isHighEntropyOn32bit) options = addOption(options, "High entropy VA on 32-bit image");
 
 
 
@@ -5214,7 +5222,7 @@ function scanForObfuscations_Native() {
 
 
 
-    // No-SEH flag (0x0400) is invalid on 64-bit images — x64 does not use table-based SEH at all
+    // No-SEH flag (0x0400) is invalid on 64-bit images — they do not use table-based SEH
 
     var isNoSehOn64bit = false;
 
@@ -5222,7 +5230,7 @@ function scanForObfuscations_Native() {
         isNoSehOn64bit = true;
     }
 
-    if (isNoSehOn64bit) options = addOption(options, "No-SEH on x64");
+    if (isNoSehOn64bit) options = addOption(options, "No-SEH on 64-bit image");
 
 
 
@@ -5353,9 +5361,7 @@ function scanForObfuscations_Native() {
 /**
  * Determines if the PE file's operating system architecture is x86-based.
  *
- * @returns {boolean|undefined} Returns true if the architecture is x86_32 (I386) or x86_64 (AMD64),
- *                               false if the architecture is ARM-based (ARM, ARMNT, THUMB),
- *                               undefined if the architecture is unknown or not recognized.
+ * @returns {boolean} True for I386 or AMD64; otherwise false.
  */
 function isArchX86() {
     const architecture = getPeArchitecture();
@@ -6348,7 +6354,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
             }
         } else if (PE.isSectionNamePresent(".flat") && !isPpLibraryPresent) {
             _setResult("~compiler", "FASM", String(), String());
-            _setLangByHeur("ASMx" + (PE_Cached.is64bit ? "64" : "86"));
+            _setLangByHeur(getAsmLanguageName());
         }
     }
 
@@ -6380,7 +6386,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
         if (!_getNumberOfResults("protector") &&
             !_getNumberOfResults("cryptor") && !_getNumberOfResults("~cryptor") &&
             !_getNumberOfResults("packer") && !_getNumberOfResults("~packer")) {
-            _setLangByHeur("ASMx" + (PE_Cached.is64bit ? "64" : "86"));
+            _setLangByHeur(getAsmLanguageName());
         }
     }
 }
@@ -7419,7 +7425,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if (verdicts.length === 0 && (
         PE.isSectionNamePresent(".rmnet") ||
-        PE.compareEP(
+        (PE_Cached.isI386 && PE.compareEP(
             "60" +                 // pushal
             "E8 00 00 00 00" +     // call $+5
             "5D" +                 // pop ebp
@@ -7428,7 +7434,7 @@ function scanForMaliciousCode_NET_and_Native() {
             "2B 85 .. .. .. .." +  // sub eax, dword ptr [ebp + ...]
             "89 85 .. .. .. .." +  // mov dword ptr [ebp + ...], eax
             "B0 00"                // mov al, 0
-        ))) {
+        )))) {
         verdicts.push({
             type: "Ramnit",
             version: String(),
@@ -7532,12 +7538,12 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://community.avast.com/t/win95-dupator/591940
 
-    if (verdicts.length === 0 && (PE.compareEP(
+    if (verdicts.length === 0 && ((PE_Cached.isI386 && PE.compareEP(
         "60" +                 // pushal
         "8B E8" +              // mov ebp, eax
         "81 ED 00 10 40 00" +  // sub ebp, 0x401000
         "8B 85"                // mov eax, dword ptr [ebp + ...]
-    ) || PE.section[PE.nLastSection].Name === "DUPATOR!")) {
+    )) || PE.section[PE.nLastSection].Name === "DUPATOR!")) {
         verdicts.push({
             type: "Win9X.Dupator",
             version: String(),
