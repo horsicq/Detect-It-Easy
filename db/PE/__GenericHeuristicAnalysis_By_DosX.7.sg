@@ -4959,6 +4959,28 @@ function scanForObfuscations_Native() {
 
 
 
+
+    // Check for write-execute sections without read permission
+
+    var isWxWithoutReadSectionPresent = false;
+
+    var wxWithoutReadSectionIndex = -1;
+
+    for (var i = 0; i < PE_Cached.numberOfSections && !isWxWithoutReadSectionPresent; i++) {
+        var currentSectionCharacteristics = PE.section[i].Characteristics;
+
+        if ((currentSectionCharacteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE) &&
+            !(currentSectionCharacteristics & SECTION_FLAGS_READ)) {
+            isWxWithoutReadSectionPresent = true;
+            wxWithoutReadSectionIndex = i;
+        }
+    }
+
+    if (isWxWithoutReadSectionPresent) options = addOption(options, "Section #" + wxWithoutReadSectionIndex + " (\"" + cleanSectionName(PE.getSectionName(wxWithoutReadSectionIndex)) + "\") has WX without R");
+
+
+
+
     // Check for zero padding at the beginning of the entry point section
 
     var isEpSectionZeroPaddingPresent = false;
