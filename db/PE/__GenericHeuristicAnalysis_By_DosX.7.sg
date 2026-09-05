@@ -4920,6 +4920,70 @@ function scanForObfuscations_Native() {
 
 
 
+
+    // Check for a non-standard entry-point transfer through RET. Normal PE startup code
+    // does not return to a caller, while protected stubs use RET to conceal a direct jump.
+    // Supported variants: PUSH <VA>; RET, MOV [ESP/RSP], <VA>; RET and MOV ESP, <VA>; RET.
+
+    var isSyntheticEpTransferPresent = false;
+
+    if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
+        // A target is retained only across NOPs, which preserves stack contents.
+        var syntheticEpTargetAddress = String(),
+            syntheticEpTargetType = String(),
+            syntheticEpNopCount = 0;
+
+        // Limit the scan to the entry stub and use the cached linear disassembly.
+        for (var i = 0; i < 32 && !isSyntheticEpTransferPresent; i++) {
+            var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
+                currentEpOpCode = getAsmOpCode(currentEpInstruction);
+
+            if (!currentEpOpCode) break; // Safety check
+
+            // These instructions directly place a valid image address at the top of stack.
+            var pushedAddress = currentEpInstruction.match(/^PUSH (0X[0-9A-F]+|\d+)$/i),
+                storedAddress = currentEpInstruction.match(/^MOV (?:DWORD|QWORD) PTR \[(?:E|R)SP\], (0X[0-9A-F]+|\d+)$/i),
+                stackPivotAddress = PE_Cached.isI386 ? currentEpInstruction.match(/^MOV ESP, (0X[0-9A-F]+|\d+)$/i) : null,
+                targetAddress = pushedAddress || storedAddress;
+
+            if (stackPivotAddress) {
+                // A pivot is accepted only when its new stack contains an image VA.
+                var stackOffset = PE.VAToOffset(parseInt(stackPivotAddress[1], 0)),
+                    returnAddress = stackOffset !== -1 ? PE.read_int32(stackOffset) >>> 0 : -1;
+
+                syntheticEpTargetAddress = String();
+                syntheticEpTargetType = String();
+
+                if (returnAddress !== -1 && PE.VAToOffset(returnAddress) !== -1) {
+                    syntheticEpTargetAddress = returnAddress;
+                    syntheticEpTargetType = "stack pivot";
+                    syntheticEpNopCount = 0;
+                }
+            } else if (targetAddress && PE.VAToOffset(parseInt(targetAddress[1], 0)) !== -1) {
+                syntheticEpTargetAddress = targetAddress[1];
+                syntheticEpTargetType = pushedAddress ? "push" : "stack write";
+                syntheticEpNopCount = 0;
+            } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetAddress) {
+                // RET at a process entry point is meaningful here only as a concealed transfer.
+                log(logType.any, "Synthetic " + syntheticEpTargetType + "/ret transfer near EP to 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
+
+                isSyntheticEpTransferPresent = true;
+            } else if (currentEpOpCode === "NOP" && syntheticEpTargetAddress && syntheticEpNopCount < 2) {
+                // Permit short NOP padding commonly inserted by protectors.
+                syntheticEpNopCount++;
+            } else {
+                // Any other instruction can change stack state, so discard the pending target.
+                syntheticEpTargetAddress = String();
+                syntheticEpTargetType = String();
+            }
+        }
+    }
+
+    if (isSyntheticEpTransferPresent) options = addOption(options, "Synthetic EP transfer");
+
+
+
+
     // Check for strange opcodes at entry point
 
     var isStrangeOpCodeNearEpPresent = false;
