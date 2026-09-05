@@ -241,10 +241,12 @@ function stdout(stringToOut) {
  * interface, then copies each entry into PE_Cached.
  *
  * Additionally compiles the obfuscation whitelist into case-sensitive and
- * case-insensitive regular expressions for repeated token checks.
+ * case-insensitive regular expressions for repeated token checks. These cached
+ * expressions are valid until {@link unloadCache} runs at the end of the scan.
  *
  * Side effects:
  *  - Mutates the global PE_Cached object by adding/updating cached values.
+ *  - Evaluates local and PE API functions stored in the cache map.
  *
  * @function initializeCache
  * @returns {void} No return value; updates PE_Cached as a side effect.
@@ -311,6 +313,7 @@ function initializeCache() {
 
 /**
  * Clears the PE cache by removing all enumerable properties from PE_Cached.
+ * It must be called after analysis so no values from the previous PE are reused.
  * 
  * @function unloadCache
  * @returns {void} No return value; clears PE_Cached properties as a side effect.
@@ -3915,11 +3918,15 @@ function validateSignature(pattern) {
 
 
 /**
- * Searches all sections in the current PE file for the specified byte code.
- * If discovered, logs the offset at which it appears and returns true.
+ * Searches PE sections for the specified byte-code signature.
+ *
+ * For multi-section images, empty sections and standalone `.rsrc`/`.reloc`
+ * sections are skipped. A section is still searched when it also contains the
+ * entry point or an important PE directory.
  * 
  * @param {string} byteCode - The byte code signature to locate.
  * @returns {boolean} True if the byte code is found in any section, otherwise false.
+ * @sideEffects Updates `lastOffsetDetected` and writes a log entry on success.
  */
 function validateNetByteCode(byteCode) {
     for (var i = 0; i < PE_Cached.numberOfSections; i++) {
@@ -3982,12 +3989,13 @@ function validateNetUnicodeString(ustring) {
 /**
  * Validates if a given Unicode string exists within the PE file.
  *
- * This function searches for the specified Unicode string within the PE file's
- * memory range, excluding the DOS stub and overlay sections. If the string is
- * found, it logs a message indicating the presence of the string.
+ * This function converts the input to a UTF-16LE signature and searches the PE
+ * body from the end of the DOS stub to the end of the file body, excluding the
+ * overlay. It is independent of the .NET metadata string heap.
  *
  * @param {string} ustring - The Unicode string to search for within the PE file.
- * @returns {boolean} - Returns true if the Unicode string is found, otherwise false.
+ * @returns {boolean} True if the UTF-16LE sequence is found; otherwise false.
+ * @sideEffects Writes a general log entry when the string is found.
  */
 function validateGlobalUnicodeString(ustring) {
     const result = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.fileBodySize, convertStringToUnicodeSignature(ustring)) !== -1;
@@ -4007,6 +4015,8 @@ function validateGlobalUnicodeString(ustring) {
  *
  * @param {string} ustring - The input string to translate into a signature.
  * @returns {string} The formatted UTF-16LE hex signature mask.
+ * @example
+ * convertStringToUnicodeSignature("Test"); // "5400650073007400"
  */
 function convertStringToUnicodeSignature(ustring) {
     var hexMask = [];
@@ -4106,6 +4116,9 @@ function findAndMark(sign, isFullName) {
  *
  * @param {string} name - The string to analyze for obfuscation.
  * @returns {boolean} True if the name or any of its segments/chunks are obfuscated, false otherwise.
+ * @example
+ * isNameObfuscated("a1b2c3d4e5f6"); // true
+ * isNameObfuscated("GetWindowText"); // false
  */
 function isNameObfuscated(name) {
     if (!name || name.length === 0) return false;
@@ -4256,8 +4269,14 @@ const obfuscationWhitelistPatterns = [
  * - Statistical character analysis with entropy detection
  * - Repetitive pattern detection
  *
+ * Whitelist matches are checked before every heuristic and always return false.
+ * A positive result is a suspicious-name signal, not proof of malware.
+ *
  * @param {string} token - The string token to analyze
  * @returns {boolean} True if token matches obfuscation patterns, false otherwise
+ * @example
+ * isTokenObfuscated("a1b2c3d4e5"); // true
+ * isTokenObfuscated("550e8400-e29b-41d4-a716-446655440000"); // false
  */
 function isTokenObfuscated(token) {
     if (!token || token.length < 7) return false;
@@ -5454,9 +5473,11 @@ function getInstructionsAsmPattern(instruction) {
 
 
 /**
- * Retrieves the first assembly instruction at the entry point of the PE file.
+ * Retrieves the first disassembled instruction at the PE entry point.
  *
- * @returns {string} The disassembled string of the first instruction at the entry point.
+ * @returns {string|undefined} The instruction text, or undefined if it cannot be disassembled.
+ * @example
+ * getFirstEpAsmInstruction(); // "JMP 0x401000"
  */
 function getFirstEpAsmInstruction() {
     return emulateAndGetAsmInstructionByIndex(0);
@@ -5956,13 +5977,15 @@ function validateResourceNames(dbCollection) {
 
 
 /**
- * Calculates and returns the offset of the PE optional header within the file.
+ * Calculates the file offset of the PE optional header.
  * 
  * The function reads the e_lfanew field at offset 0x3C to find the PE header start,
  * then adds 4 bytes for the PE signature and 20 bytes for the COFF header to locate
  * the start of the optional header.
  *
- * @returns {number} The offset (in bytes) to the optional header in the PE file.
+ * @returns {number} The offset in bytes, derived from the DOS `e_lfanew` field.
+ * @example
+ * getOptHeaderOffset(); // e_lfanew + 24
  */
 function getOptHeaderOffset() {
     return PE.read_int32(0x3C) + 4 + 20;
