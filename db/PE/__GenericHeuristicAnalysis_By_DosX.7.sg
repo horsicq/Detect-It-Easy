@@ -2162,7 +2162,8 @@ const
     SECTION_FLAGS_EXECUTE = 0x20000000, // IMAGE_SCN_MEM_EXECUTE
     SECTION_FLAGS_READ = 0x40000000,    // IMAGE_SCN_MEM_READ
     SECTION_FLAGS_WRITE = 0x80000000,   // IMAGE_SCN_MEM_WRITE
-    SECTION_FLAGS_CODE = 0x00000020;    // IMAGE_SCN_CNT_CODE
+    SECTION_FLAGS_CODE = 0x00000020,    // IMAGE_SCN_CNT_CODE
+    IMAGE_FILE_RELOCS_STRIPPED = 0x0001;
 
 const
     SECTION_FLAGS_RWX_MASK = SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ | SECTION_FLAGS_WRITE,
@@ -4915,10 +4916,10 @@ function scanForObfuscations_Native() {
             }
         } else {
             // ARM: Check for breakpoint or return instructions
-            if (/^BKPT/.test(PE_Cached.firstEpAsmInstruction) ||    // BKPT  (breakpoint)
-                /^BRK/.test(PE_Cached.firstEpAsmInstruction) ||     // BRK   (ARM64 breakpoint)
-                /^RET/.test(PE_Cached.firstEpAsmInstruction) ||     // RET   (ARM64 return)
-                /^BX(?: )?LR$/.test(PE_Cached.firstEpAsmInstruction)) {           // BX LR (ARM32 return)) {
+            if (/^BKPT/.test(PE_Cached.firstEpAsmInstruction) ||         // BKPT  (breakpoint)
+                /^BRK/.test(PE_Cached.firstEpAsmInstruction) ||          // BRK   (ARM64 breakpoint)
+                /^RET/.test(PE_Cached.firstEpAsmInstruction) ||          // RET   (ARM64 return)
+                /^BX(?: )?LR$/.test(PE_Cached.firstEpAsmInstruction)) {  // BX LR (ARM32 return)) {
                 isTlsWithBadEpPresent = true;
             }
         }
@@ -5086,6 +5087,23 @@ function scanForObfuscations_Native() {
 
 
     const dllCharacteristics = PE.getImageOptionalHeader("DllCharacteristics");
+
+
+
+
+    // ASLR requires base relocations to rebase the image safely
+
+    var isAslrWithStrippedRelocs = false;
+
+    const coffCharacteristics = PE.readByte(getOptHeaderOffset() - 2) |
+        (PE.readByte(getOptHeaderOffset() - 1) << 8);
+
+    if ((coffCharacteristics & IMAGE_FILE_RELOCS_STRIPPED) &&
+        (dllCharacteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)) {
+        isAslrWithStrippedRelocs = true;
+    }
+
+    if (isAslrWithStrippedRelocs) options = addOption(options, "ASLR with stripped relocs");
 
 
 
