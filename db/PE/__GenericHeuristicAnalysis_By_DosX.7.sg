@@ -5025,6 +5025,66 @@ function scanForObfuscations_Native() {
 
 
 
+
+    // Check for an opaque conditional branch near the entry point. XOR reg, reg always
+    // produces CF=OF=SF=0 and ZF=PF=1, therefore the following Jcc outcome is constant.
+
+    var isOpaqueEpBranchPresent = false;
+
+    if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
+        // Flags-preserving junk is allowed to make the check resilient to light polymorphism.
+        var opaqueEpRegister = String(),
+            opaqueEpNeutralInstructionCount = 0,
+            opaqueEpAlwaysTakenBranches = [
+                "JAE", "JNB", "JNC", "JBE", "JNA", "JE", "JZ", "JGE", "JNL",
+                "JLE", "JNG", "JNO", "JNS", "JP", "JPE"
+            ],
+            opaqueEpNeverTakenBranches = [
+                "JA", "JNBE", "JB", "JNAE", "JC", "JG", "JNLE", "JL", "JNGE",
+                "JNE", "JNZ", "JO", "JNP", "JPO", "JS"
+            ];
+
+        for (var i = 0; i < 256 && !isOpaqueEpBranchPresent; i++) {
+            var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
+                currentEpOpCode = getAsmOpCode(currentEpInstruction);
+
+            if (!currentEpOpCode) break; // Safety check
+
+            var xorZeroRegister = currentEpInstruction.match(/^XOR ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1$/i),
+                conditionalBranch = currentEpInstruction.match(/^(J[A-Z]+) (0X[0-9A-F]+|\d+)$/i),
+                isNeutralInstruction = currentEpOpCode === "NOP" ||
+                    /^MOV ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1$/i.test(currentEpInstruction) ||
+                    /^XCHG ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1$/i.test(currentEpInstruction) ||
+                    /^LEA ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \[\1\]$/i.test(currentEpInstruction);
+
+            if (xorZeroRegister) {
+                // Start a new candidate only when the same general-purpose register is cleared.
+                opaqueEpRegister = xorZeroRegister[1].toUpperCase();
+                opaqueEpNeutralInstructionCount = 0;
+            } else if (conditionalBranch && opaqueEpRegister &&
+                PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 &&
+                (opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ||
+                    opaqueEpNeverTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1)) {
+                var opaqueEpBranchType = opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ? "always taken" : "never taken";
+
+                log(logType.any, "Opaque " + opaqueEpBranchType + " branch near EP: XOR " + opaqueEpRegister + ", " + opaqueEpRegister + "; " + currentEpInstruction);
+
+                isOpaqueEpBranchPresent = true;
+            } else if (isNeutralInstruction && opaqueEpRegister && opaqueEpNeutralInstructionCount < 2) {
+                opaqueEpNeutralInstructionCount++;
+            } else {
+                // Any other instruction may alter EFLAGS or the intended control-flow sequence.
+                opaqueEpRegister = String();
+                opaqueEpNeutralInstructionCount = 0;
+            }
+        }
+    }
+
+    if (isOpaqueEpBranchPresent) options = addOption(options, "Opaque EP branch");
+
+
+
+
     // Check for strange opcodes at entry point
 
     var isStrangeOpCodeNearEpPresent = false;
