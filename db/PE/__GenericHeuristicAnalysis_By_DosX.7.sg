@@ -4933,6 +4933,8 @@ function scanForObfuscations_Native() {
         var syntheticEpTargetAddress = String(),
             syntheticEpTargetType = String(),
             syntheticEpNeutralInstructionCount = 0,
+            // This is a plain object: its dynamically added properties are configurable,
+            // so delete object[key] is valid in strict mode.
             syntheticEpKnownAddresses = {};
 
         // Inspect the whole usual entry stub while using cached linear disassembly.
@@ -4954,6 +4956,7 @@ function scanForObfuscations_Native() {
                 storedAddress = currentEpInstruction.match(/^MOV (?:DWORD|QWORD) PTR \[(?:E|R)SP\], (0X[0-9A-F]+|\d+)$/i),
                 stackPivotAddress = PE_Cached.isI386 ? currentEpInstruction.match(/^MOV ESP, (0X[0-9A-F]+|\d+)$/i) : null,
                 targetAddress = pushedAddress || storedAddress,
+                registerWrite = currentEpInstruction.match(new RegExp("^(?:MOV|LEA|XOR|ADD|SUB|AND|OR|NOT|NEG|INC|DEC|POP) (" + generalPurposeRegister + ")(?:,|$)", "i")),
                 isNeutralInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "CLC" ||
                     currentEpOpCode === "STC" || currentEpOpCode === "CMC" ||
                     new RegExp("^(?:MOV|XCHG) (" + generalPurposeRegister + "), \\1$|^LEA (" + generalPurposeRegister + "), \\[\\2\\]$", "i").test(currentEpInstruction);
@@ -5010,6 +5013,16 @@ function scanForObfuscations_Native() {
             } else if (isNeutralInstruction && syntheticEpNeutralInstructionCount < 4) {
                 // Permit limited stack-preserving junk commonly inserted by protectors.
                 syntheticEpNeutralInstructionCount++;
+            } else if (registerWrite) {
+                // An unrelated register write cannot invalidate other proven addresses.
+                // Remove only the overwritten register instead of discarding all provenance.
+                delete syntheticEpKnownAddresses[registerWrite[1].toUpperCase()];
+            } else if (currentEpOpCode === "CALL" || currentEpOpCode === "JMP" ||
+                currentEpOpCode === "RET" || currentEpOpCode === "RETN" ||
+                currentEpOpCode === "INT" || currentEpOpCode === "UD2" ||
+                currentEpOpCode === "HLT") {
+                // Do not linearly join instructions from a subsequent basic block.
+                break;
             } else {
                 // Any other instruction can alter stack/register state, so discard provenance.
                 syntheticEpTargetAddress = String();
@@ -5034,7 +5047,10 @@ function scanForObfuscations_Native() {
     if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
         // Flags-preserving junk is allowed to make the check resilient to light polymorphism.
         var opaqueEpRegister = String(),
+            opaqueEpOriginInstruction = String(),
             opaqueEpNeutralInstructionCount = 0,
+            // Plain-object entries are configurable, therefore strict-mode delete is safe.
+            opaqueEpKnownZeroRegisters = {},
             opaqueEpAlwaysTakenBranches = [
                 "JAE", "JNB", "JNC", "JBE", "JNA", "JE", "JZ", "JGE", "JNL",
                 "JLE", "JNG", "JNO", "JNS", "JP", "JPE"
@@ -5050,17 +5066,48 @@ function scanForObfuscations_Native() {
 
             if (!currentEpOpCode) break; // Safety check
 
-            // Each form deterministically sets the tested EFLAGS without requiring register values.
-            var constantFlagsRegister = currentEpInstruction.match(/^(?:(?:XOR|SUB|CMP) ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1|AND ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), (?:0X0+|0+))$/i),
+            var generalPurposeRegister = "(?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))",
+                // These forms deterministically set EFLAGS without requiring register values.
+                constantFlagsRegister = currentEpInstruction.match(new RegExp("^(?:(?:XOR|SUB|CMP) (" + generalPurposeRegister + "), \\1|AND (" + generalPurposeRegister + "), (?:0X0+|0+))$", "i")),
+                zeroLiteralRegister = currentEpInstruction.match(new RegExp("^MOV (" + generalPurposeRegister + "), (?:0X0+|0+)$", "i")),
+                zeroTestRegister = currentEpInstruction.match(new RegExp("^(?:TEST|OR) (" + generalPurposeRegister + "), \\1$", "i")),
                 conditionalBranch = currentEpInstruction.match(/^(J[A-Z]+) (0X[0-9A-F]+|\d+)$/i),
+                registerCopy = currentEpInstruction.match(new RegExp("^MOV (" + generalPurposeRegister + "), (" + generalPurposeRegister + ")$", "i")),
+                flagsNeutralRegisterWrite = currentEpInstruction.match(new RegExp("^(?:MOV|MOVZX|MOVSX|LEA) (" + generalPurposeRegister + ")(?:,|$)", "i")),
+                registerWrite = currentEpInstruction.match(new RegExp("^(?:MOV|MOVZX|MOVSX|LEA|XOR|ADD|SUB|ADC|SBB|AND|OR|NOT|NEG|INC|DEC|POP) (" + generalPurposeRegister + ")(?:,|$)", "i")),
                 isNeutralInstruction = currentEpOpCode === "NOP" ||
-                    /^MOV ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1$/i.test(currentEpInstruction) ||
-                    /^XCHG ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \1$/i.test(currentEpInstruction) ||
-                    /^LEA ((?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5]))), \[\1\]$/i.test(currentEpInstruction);
+                    new RegExp("^XCHG (" + generalPurposeRegister + "), \\1$", "i").test(currentEpInstruction);
 
             if (constantFlagsRegister) {
                 // Start a new candidate only from an instruction with mathematically known flags.
                 opaqueEpRegister = (constantFlagsRegister[1] || constantFlagsRegister[2]).toUpperCase();
+                opaqueEpOriginInstruction = currentEpInstruction;
+                opaqueEpNeutralInstructionCount = 0;
+                if (currentEpOpCode !== "CMP") {
+                    opaqueEpKnownZeroRegisters[opaqueEpRegister] = true;
+                }
+            } else if (zeroLiteralRegister) {
+                // MOV reg, 0 preserves prior flags but enables a later TEST/OR reg, reg.
+                opaqueEpKnownZeroRegisters[zeroLiteralRegister[1].toUpperCase()] = true;
+                if (opaqueEpRegister && opaqueEpNeutralInstructionCount < 4) {
+                    opaqueEpNeutralInstructionCount++;
+                }
+            } else if (registerCopy) {
+                // Preserve zero provenance only through an exact register-to-register copy.
+                if (opaqueEpKnownZeroRegisters[registerCopy[2].toUpperCase()]) {
+                    opaqueEpKnownZeroRegisters[registerCopy[1].toUpperCase()] = true;
+                } else {
+                    // The source is unknown, so only the overwritten destination loses proof.
+                    delete opaqueEpKnownZeroRegisters[registerCopy[1].toUpperCase()];
+                }
+
+                if (opaqueEpRegister && opaqueEpNeutralInstructionCount < 4) {
+                    opaqueEpNeutralInstructionCount++;
+                }
+            } else if (zeroTestRegister && opaqueEpKnownZeroRegisters[zeroTestRegister[1].toUpperCase()]) {
+                // TEST/OR of a proven zero register re-establishes deterministic EFLAGS.
+                opaqueEpRegister = zeroTestRegister[1].toUpperCase();
+                opaqueEpOriginInstruction = currentEpInstruction;
                 opaqueEpNeutralInstructionCount = 0;
             } else if (conditionalBranch && opaqueEpRegister &&
                 PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 &&
@@ -5068,15 +5115,37 @@ function scanForObfuscations_Native() {
                     opaqueEpNeverTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1)) {
                 var opaqueEpBranchType = opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ? "always taken" : "never taken";
 
-                log(logType.any, "Opaque " + opaqueEpBranchType + " branch near EP: XOR " + opaqueEpRegister + ", " + opaqueEpRegister + "; " + currentEpInstruction);
+                log(logType.any, "Opaque " + opaqueEpBranchType + " branch near EP: " + opaqueEpOriginInstruction + "; " + currentEpInstruction);
 
                 isOpaqueEpBranchPresent = true;
+            } else if (flagsNeutralRegisterWrite) {
+                // A flags-neutral write invalidates only its destination, not candidate EFLAGS.
+                // This retains a constant branch even when polymorphic junk changes another register.
+                delete opaqueEpKnownZeroRegisters[flagsNeutralRegisterWrite[1].toUpperCase()];
+                if (opaqueEpRegister && opaqueEpNeutralInstructionCount < 4) {
+                    opaqueEpNeutralInstructionCount++;
+                }
             } else if (isNeutralInstruction && opaqueEpRegister && opaqueEpNeutralInstructionCount < 4) {
                 opaqueEpNeutralInstructionCount++;
+            } else if (registerWrite) {
+                // A flags-changing write destroys both the candidate and this register's value.
+                // Other known-zero registers remain valid until they are individually overwritten.
+                delete opaqueEpKnownZeroRegisters[registerWrite[1].toUpperCase()];
+                opaqueEpRegister = String();
+                opaqueEpOriginInstruction = String();
+                opaqueEpNeutralInstructionCount = 0;
+            } else if (currentEpOpCode === "CALL" || currentEpOpCode === "JMP" ||
+                currentEpOpCode === "RET" || currentEpOpCode === "RETN" ||
+                currentEpOpCode === "INT" || currentEpOpCode === "UD2" ||
+                currentEpOpCode === "HLT") {
+                // Do not linearly join instructions from a subsequent basic block.
+                break;
             } else {
                 // Any other instruction may alter EFLAGS or the intended control-flow sequence.
                 opaqueEpRegister = String();
+                opaqueEpOriginInstruction = String();
                 opaqueEpNeutralInstructionCount = 0;
+                opaqueEpKnownZeroRegisters = {};
             }
         }
     }
