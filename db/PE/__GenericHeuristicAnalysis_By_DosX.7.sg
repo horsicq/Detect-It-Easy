@@ -287,6 +287,12 @@ function initializeCache() {
         /* String  */ nameOfNetAssemblyName: PE["getNetAssemblyName"],
         /* String  */ nameOfNetModuleName: PE["getNetModuleName"],
         /* Local functions */
+        /* String  */ architecture: getPeArchitecture,
+        /* Boolean */ isI386: function () { return getPeArchitecture() === "I386"; },
+        /* Boolean */ isAMD64: function () { return getPeArchitecture() === "AMD64"; },
+        /* Boolean */ isARM: function () { return getPeArchitecture() === "ARM"; },
+        /* Boolean */ isThumb: function () { const architecture = getPeArchitecture(); return architecture === "ARMNT" || architecture === "THUMB"; },
+        /* Boolean */ isARM64: function () { return getPeArchitecture() === "ARM64"; },
         /* Boolean */ isArchX86: isArchX86,
         /* Boolean */ isCppClrLikeApp: isCppClrLikeApp,
         /* Boolean */ isVbNetStandardLibraryPresent: isVbNetStandardLibraryPresent,
@@ -2629,6 +2635,15 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 isStrangeCallOrJmpPresent = true;
             }
         }
+    } else if (PE_Cached.isARM64) {
+        firstOpCode = getAsmOpCode(PE_Cached.firstEpAsmInstruction);
+
+        if (!PE_Cached.isDynamicLinkLibrary && isLastSectionEP &&
+            (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BR" || firstOpCode === "BLR")) {
+            log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
+
+            isStrangeCallOrJmpPresent = true;
+        }
     }
 
     if (isStrangeCallOrJmpPresent) options = addOption(options, "Strange " + firstOpCode.toLowerCase() + " at EP");
@@ -3477,7 +3492,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
     var isSteamStubPresent = false;
 
-    if (PE.compareEP("E800000000") && PE.section[PE_Cached.numberOfSections - 1].Name === ".bind") {
+    if (PE_Cached.isArchX86 && PE.compareEP("E800000000") && PE.section[PE_Cached.numberOfSections - 1].Name === ".bind") {
         isSteamStubPresent = true;
     }
 
@@ -4786,12 +4801,11 @@ function scanForObfuscations_Native() {
                 }
             }
         }
-    } else {
+    } else if (PE_Cached.isARM) {
         /*
-         * NOP-equivalent instructions for ARM/ARM64:
+         * NOP-equivalent instructions for ARM/A32:
          * Standard NOP instructions:
          * - 0x00 0xF0 0x20 0xE3               -> NOP (ARM32 explicit)
-         * - 0x1F 0x20 0x03 0xD5               -> NOP (ARM64 explicit)
          * 
          * Functional equivalents of NOP:
          * - 0x00 0x00 0xA0 0xE1               -> MOV R0, R0   (ARM32)
@@ -4807,49 +4821,31 @@ function scanForObfuscations_Native() {
          * - 0x0A 0xA0 0xA0 0xE1               -> MOV R10, R10 (ARM32)
          * - 0x0B 0xB0 0xA0 0xE1               -> MOV R11, R11 (ARM32)
          * - 0x0C 0xC0 0xA0 0xE1               -> MOV R12, R12 (ARM32)
-         * - 0xE0 0x03 0x00 0xAA               -> MOV X0, X0   (ARM64)
-         * - 0xE1 0x03 0x01 0xAA               -> MOV X1, X1   (ARM64)
-         * - 0xE2 0x03 0x02 0xAA               -> MOV X2, X2   (ARM64)
-         * - 0xE3 0x03 0x03 0xAA               -> MOV X3, X3   (ARM64)
-         * - 0xE4 0x03 0x04 0xAA               -> MOV X4, X4   (ARM64)
-         * - 0xE5 0x03 0x05 0xAA               -> MOV X5, X5   (ARM64)
-         * - 0xE6 0x03 0x06 0xAA               -> MOV X6, X6   (ARM64)
-         * - 0xE7 0x03 0x07 0xAA               -> MOV X7, X7   (ARM64)
-         * - 0xE0 0x03 0x00 0x2A               -> MOV W0, W0   (ARM64)
-         * - 0xE1 0x03 0x01 0x2A               -> MOV W1, W1   (ARM64)
-         * - 0xE2 0x03 0x02 0x2A               -> MOV W2, W2   (ARM64)
-         * - 0xE3 0x03 0x03 0x2A               -> MOV W3, W3   (ARM64)
          */
 
-        // ARM/ARM64 NOP equivalents
-        const nopEquivalentsArm = [
-            "NOP",
-            "MOV R0, R0", "MOV R1, R1", "MOV R2, R2", "MOV R3, R3",
-            "MOV R4, R4", "MOV R5, R5", "MOV R6, R6", "MOV R7, R7",
-            "MOV R8, R8", "MOV R9, R9", "MOV R10, R10", "MOV R11, R11",
-            "MOV R12, R12", "MOV R13, R13", "MOV R14, R14", "MOV R15, R15"
-        ];
-
-        const nopEquivalentsArm64 = [
-            "NOP",
-            "MOV X0, X0", "MOV X1, X1", "MOV X2, X2", "MOV X3, X3",
-            "MOV X4, X4", "MOV X5, X5", "MOV X6, X6", "MOV X7, X7",
-            "MOV W0, W0", "MOV W1, W1", "MOV W2, W2", "MOV W3, W3"
-        ];
-
-        const nopEquivalents = PE_Cached.is64bit ? nopEquivalentsArm64 : nopEquivalentsArm;
-
-        // Check for standard NOP opcode
-        if (getFirstEpAsmOpCode() === "NOP") {
-            isStartsWithNop = true;
-        } else {
-            // Check for functional NOP equivalents
-            for (var i = 0; i < nopEquivalents.length && !isStartsWithNop; i++) {
-                if (PE_Cached.firstEpAsmInstruction === nopEquivalents[i]) {
-                    isStartsWithNop = true;
-                }
-            }
-        }
+        // MOV Rn, Rn is a functional NOP for every A32 general-purpose register.
+        isStartsWithNop = getFirstEpAsmOpCode() === "NOP" ||
+            /^MOV R(\d+), R\1$/.test(PE_Cached.firstEpAsmInstruction);
+    } else if (PE_Cached.isThumb) {
+        // Thumb/Thumb-2 also supports MOV Rn, Rn as a functional NOP.
+        isStartsWithNop = getFirstEpAsmOpCode() === "NOP" ||
+            /^MOV R(\d+), R\1$/.test(PE_Cached.firstEpAsmInstruction);
+    } else if (PE_Cached.isARM64) {
+        /*
+         * NOP-equivalent instructions for ARM64/AArch64:
+         * - 0x1F 0x20 0x03 0xD5 -> NOP
+         * - 0xE0 0x03 0x00 0xAA -> MOV X0, X0
+         * - 0xE1 0x03 0x01 0xAA -> MOV X1, X1
+         * - 0xE2 0x03 0x02 0xAA -> MOV X2, X2
+         * - 0xE3 0x03 0x03 0xAA -> MOV X3, X3
+         * - 0xE0 0x03 0x00 0x2A -> MOV W0, W0
+         * - 0xE1 0x03 0x01 0x2A -> MOV W1, W1
+         * - 0xE2 0x03 0x02 0x2A -> MOV W2, W2
+         * - 0xE3 0x03 0x03 0x2A -> MOV W3, W3
+         */
+        // MOV Xn, Xn and MOV Wn, Wn are functional NOPs for all integer registers.
+        isStartsWithNop = getFirstEpAsmOpCode() === "NOP" ||
+            /^MOV ([XW])(\d+), \1\2$/.test(PE_Cached.firstEpAsmInstruction);
     }
 
     if (isStartsWithNop) options = addOption(options, "Nop at EP");
@@ -4947,12 +4943,15 @@ function scanForObfuscations_Native() {
                 /^RET(?: \d+)?$/.test(PE_Cached.firstEpAsmInstruction)) {  // All types of RET
                 isTlsWithBadEpPresent = true;
             }
-        } else {
-            // ARM: Check for breakpoint or return instructions
+        } else if (PE_Cached.isARM || PE_Cached.isThumb) {
+            // ARM/Thumb: Check for breakpoint or return instructions
             if (/^BKPT/.test(PE_Cached.firstEpAsmInstruction) ||         // BKPT  (breakpoint)
-                /^BRK/.test(PE_Cached.firstEpAsmInstruction) ||          // BRK   (ARM64 breakpoint)
-                /^RET/.test(PE_Cached.firstEpAsmInstruction) ||          // RET   (ARM64 return)
-                /^BX(?: )?LR$/.test(PE_Cached.firstEpAsmInstruction)) {  // BX LR (ARM32 return)) {
+                /^BX(?: )?LR$/.test(PE_Cached.firstEpAsmInstruction)) {  // BX LR (ARM32 return)
+                isTlsWithBadEpPresent = true;
+            }
+        } else if (PE_Cached.isARM64) {
+            if (/^BRK/.test(PE_Cached.firstEpAsmInstruction) ||          // BRK (breakpoint)
+                /^RET(?: )?/.test(PE_Cached.firstEpAsmInstruction)) {    // RET (return)
                 isTlsWithBadEpPresent = true;
             }
         }
@@ -5359,16 +5358,46 @@ function scanForObfuscations_Native() {
  *                               undefined if the architecture is unknown or not recognized.
  */
 function isArchX86() {
-    switch (PE.getOperationSystemOptions().split(',')[0]) {
+    const architecture = getPeArchitecture();
+
+    return architecture === "I386" || architecture === "AMD64";
+}
+
+
+
+/**
+ * Returns the architecture label reported by the PE parser.
+ *
+ * @returns {string} The first `getOperationSystemOptions()` field, or an empty string.
+ */
+function getPeArchitecture() {
+    const operationSystemOptions = PE.getOperationSystemOptions();
+
+    return operationSystemOptions ? operationSystemOptions.split(',')[0] : String();
+}
+
+
+
+/**
+ * Returns the architecture-aware assembly language label used by fallback heuristics.
+ *
+ * @returns {string} A generic or architecture-specific ASM label.
+ */
+function getAsmLanguageName() {
+    switch (PE_Cached.architecture) {
         case "I386":  // x86
+            return "ASMx86";
         case "AMD64": // x86_64
-            return true;
+            return "ASMx64";
         case "ARM":   // ARM
-        case "ARMNT": // ARMv7
+            return "ASM ARM";
+        case "ARMNT": // ARMv7 Thumb-2
         case "THUMB": // ARM Thumb
-            return false;
+            return "ASM Thumb";
+        case "ARM64": // AArch64
+            return "ASM ARM64";
         default:
-            return undefined;
+            return "ASM";
     }
 }
 
