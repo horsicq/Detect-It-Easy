@@ -3178,6 +3178,29 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+
+    // Standard zero-filled sections are allowed above, but they must not be executable
+
+    var isExecutableZeroFilledSectionPresent = false;
+
+    var executableZeroFilledSectionIndex = -1;
+
+    for (var t = 0; t < PE_Cached.numberOfSections && !isExecutableZeroFilledSectionPresent; t++) {
+        const currentSection = PE.section[t];
+
+        if (standardSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(t)) !== -1 &&
+            currentSection.FileSize === 0x00 &&
+            (currentSection.Characteristics & SECTION_FLAGS_EXECUTE)) {
+            isExecutableZeroFilledSectionPresent = true;
+            executableZeroFilledSectionIndex = t;
+        }
+    }
+
+    if (isExecutableZeroFilledSectionPresent) options = addOption(options, "Section #" + executableZeroFilledSectionIndex + " (\"" + cleanSectionName(PE.getSectionName(executableZeroFilledSectionIndex)) + "\") executable zero-fill");
+
+
+
+
     // Check for sections with identical offsets
 
     var isSectionHasDuplicateOffset = false;
