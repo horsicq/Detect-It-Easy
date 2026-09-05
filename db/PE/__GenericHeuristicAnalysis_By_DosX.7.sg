@@ -2975,7 +2975,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         ["RedWolf", null, [".!rc!", ".redwolf"]],
         ["SIS Cryptor", null, "SISCrypt"],
         ["ProCrypt", null, "ProCrypt"],
-        ["YaWiGonaDown Team's Cryptor", null, ".WeGonaD"]
+        ["YaWiGonaDown Team's Cryptor", null, ".WeGonaD"],
+        ["BinPakker", null, ".pk00"]
     ];
 
     const sectionNamesValidatingResult = validateSectionNames(dbCollectionOfSectionNamesDict.concat(
@@ -3871,9 +3872,12 @@ function isJscriptNetStandardLibraryPresent() {
 
 
 /**
- * Determines if the current PE file is a .NET component.
+ * Determines whether the current PE is a framework-style .NET component.
  *
- * @returns {boolean} Returns true if the PE file is identified as a .NET component, otherwise false.
+ * A component is identified as a System-prefixed .NET DLL whose module name
+ * matches its assembly name and which has no global CLR constructor.
+ *
+ * @returns {boolean} True for a matching System.* framework DLL; otherwise false.
  */
 function isFrameworkComponent() {
     if (!PE_Cached.isDotNet || !PE_Cached.isDynamicLinkLibrary || PE_Cached.isNetGlobalCctorPresent) {
@@ -3894,13 +3898,17 @@ function isFrameworkComponent() {
 
 
 /**
- * Validates the presence of a signature (pattern) within a specified range in a PE file.
+ * Searches the PE body for a DIE signature pattern.
  *
- * Searches for the given pattern starting from the DOS stub end until the PE size excluding the overlay.
- * Logs a message if the pattern is found and returns a boolean indicating the result.
+ * Searches from the end of the DOS stub to the end of the PE body, excluding
+ * the overlay. On success it logs the pattern and updates `lastOffsetDetected`.
  *
  * @param {string} pattern - The pattern to search for within the file.
  * @returns {boolean} True if the pattern is found, false otherwise.
+ * @example
+ * if (validateSignature("'UPX0'")) {
+ *     // A matching signature was found in the PE body.
+ * }
  */
 function validateSignature(pattern) {
     const
@@ -3959,10 +3967,11 @@ function validateNetByteCode(byteCode) {
 
 
 /**
- * Validates if the given .NET object is present in the PE file.
+ * Checks whether a .NET metadata object is present in the current PE.
  *
- * @param {Object} object - The object to be validated.
- * @returns {boolean} - Returns true if the object is a .NET object, otherwise false.
+ * @param {string} object - The metadata object name to search for.
+ * @returns {boolean} True if the object is present; otherwise false.
+ * @sideEffects Writes a .NET log entry when the object is found.
  */
 function validateNetObject(object) {
     const result = PE.isNetObjectPresent(object);
@@ -3973,10 +3982,11 @@ function validateNetObject(object) {
 
 
 /**
- * Validates if a .NET Unicode string is present in the PE file.
+ * Checks whether a .NET user string is present in the current PE metadata.
  *
  * @param {string} ustring - The Unicode string to validate.
- * @returns {boolean} - Returns true if the Unicode string is present, otherwise false.
+ * @returns {boolean} True if the string is present; otherwise false.
+ * @sideEffects Writes a .NET log entry when the string is found.
  */
 function validateNetUnicodeString(ustring) {
     const result = PE.isNetUStringPresent(ustring);
@@ -4040,10 +4050,11 @@ function convertStringToUnicodeSignature(ustring) {
 
 
 /**
- * Checks if all .NET objects in the provided array are missing.
+ * Checks that none of the provided .NET metadata objects are present.
  *
  * @param {Array} objects - An array of .NET object names to check.
  * @returns {boolean} - Returns true if all .NET objects are missing, otherwise false.
+ * @see isAllNetObjectsPresent
  */
 function isAllNetObjectsMissing(objects) {
     // Iterate through the array of .NET objects
@@ -4064,10 +4075,11 @@ function isAllNetObjectsMissing(objects) {
 
 
 /**
- * Checks if all .NET objects in the provided array are present.
+ * Checks that every provided .NET metadata object is present.
  *
  * @param {Array} objects - An array of .NET object names to check.
  * @returns {boolean} - Returns true if all .NET objects are present, otherwise false.
+ * @see isAllNetObjectsMissing
  */
 function isAllNetObjectsPresent(objects) {
     // Iterate through the array of .NET objects
@@ -4088,11 +4100,13 @@ function isAllNetObjectsPresent(objects) {
 
 
 /**
- * Searches for a signature in the first section of a PE file and marks it if found.
+ * Searches for a null-prefixed string signature in the first PE section.
  *
  * @param {string} sign - The signature to search for.
  * @param {boolean} isFullName - A flag indicating whether to append '00' to the signature.
  * @returns {string} - The found signature if present, otherwise an empty string.
+ * @example
+ * findAndMark("UPX0", true); // "UPX0" when the full null-terminated name exists
  */
 function findAndMark(sign, isFullName) {
     if (PE.isSignatureInSectionPresent(0,
@@ -5363,11 +5377,13 @@ function isArchX86() {
 const _patternSplitter = "|";
 
 /**
- * Generates a pattern of assembly instructions or opcodes from the entry point.
+ * Generates a delimiter-bounded pattern of instructions or opcodes from the entry point.
  *
  * @param {boolean} onlyOpCodes - If true, only the opcodes of the instructions are included in the pattern.
  * @param {number} numberOf - The number of instructions to include in the pattern.
- * @returns {string} The generated assembly pattern.
+ * @returns {string} A `|`-delimited pattern, truncated if disassembly ends early.
+ * @example
+ * emulateAndGetEpAsmPattern(true, 2); // "|PUSH|MOV|"
  */
 function emulateAndGetEpAsmPattern(onlyOpCodes, numberOf) {
     // Initialize the result with a pattern splitter
@@ -5406,10 +5422,13 @@ function emulateAndGetEpAsmPattern(onlyOpCodes, numberOf) {
 var epAsmInstructions = [];
 
 /**
- * Retrieves the assembly instruction at the specified index from the entry point of a PE file.
+ * Retrieves the assembly instruction at the specified zero-based index from the PE entry point.
  *
  * @param {number} index - The index of the assembly instruction to retrieve.
- * @returns {string} The assembly instruction at the specified index.
+ * @returns {string|undefined} The disassembled instruction, or undefined when unavailable.
+ * @sideEffects Caches retrieved instructions in the global `epAsmInstructions` array.
+ * @example
+ * emulateAndGetAsmInstructionByIndex(0); // "PUSH EBP"
  */
 function emulateAndGetAsmInstructionByIndex(index) {
     // Check if the instruction is already cached
@@ -5487,10 +5506,12 @@ function getFirstEpAsmInstruction() {
 
 
 /**
- * Extracts the opcode from an assembly instruction.
+ * Extracts the leading opcode token from a disassembled instruction.
  *
  * @param {string} instruction - The assembly instruction.
- * @returns {string} - The opcode of the instruction.
+ * @returns {string|undefined} The opcode, the original one-token instruction, or a falsy input.
+ * @example
+ * getAsmOpCode("MOV EAX, 4"); // "MOV"
  */
 function getAsmOpCode(instruction) {
     return instruction ? (instruction.indexOf(" ") !== -1 ? instruction.split(" ")[0] : instruction) : instruction;
@@ -5880,12 +5901,15 @@ function getNameOfMangledItem(itemPattern) {
 
 
 /**
- * Validates import hashes within a database collection.
- * Iterates through each entry in the collection, checking if the import position hash is present.
- * If a matching hash is found, returns the corresponding entry; otherwise, returns null.
+ * Matches import-position hashes against a signature database collection.
+ *
+ * Each entry stores the import position at index 2 and either one hash or an
+ * array of acceptable hashes at index 3. The first matching entry is returned.
  *
  * @param {Array} dbCollection - The database collection to validate, where each entry is an array containing at least a position and hash.
  * @returns {Array|null} The first entry with a matching import position hash, or null if none found.
+ * @example
+ * validateImportHashes([["UPX", null, 0, 0xD4FDCAB1]]);
  */
 function validateImportHashes(dbCollection) {
     for (var i = 0; i < dbCollection.length; i++) {
@@ -5905,11 +5929,15 @@ function validateImportHashes(dbCollection) {
 
 
 /**
- * Validates section names within a database collection against known PE section names or regular expressions.
- * Iterates through the collection and checks if any section signature matches a known section name or passes a regular expression test.
+ * Matches PE section names against string or regular-expression signatures in a database collection.
+ *
+ * An entry whose name at index 0 is null acts as an exclusion and immediately
+ * cancels the match. Entries with more than three fields are reported as malformed.
  *
  * @param {Array} dbCollection - The database collection to validate, where each item is expected to have a section signature at index 2.
  * @returns {Array|null} The first matching item from the collection, or null if no match is found.
+ * @example
+ * validateSectionNames([["UPX", null, "UPX0"]]);
  */
 function validateSectionNames(dbCollection) {
     var result = null;
@@ -5941,11 +5969,15 @@ function validateSectionNames(dbCollection) {
 
 
 /**
- * Validates resource names within a database collection against known PE resource names or regular expressions.
- * Iterates through the collection and checks if any resource signature matches a known resource name or passes a regular expression test.
+ * Matches PE resource names against string or regular-expression signatures in a database collection.
+ *
+ * An entry whose name at index 0 is null acts as an exclusion and immediately
+ * cancels the match. Entries with more than three fields are reported as malformed.
  *
  * @param {Array} dbCollection - The database collection to validate, where each item is expected to have a resource signature at index 2.
  * @returns {Array|null} The first matching item from the collection, or null if no match is found.
+ * @example
+ * validateResourceNames([["Installer", null, /^SETUP$/i]]);
  */
 function validateResourceNames(dbCollection) {
     var result = null;
@@ -5994,13 +6026,13 @@ function getOptHeaderOffset() {
 
 
 /**
- * Checks if the .NET CLR metadata directory is present in the PE file.
+ * Checks whether the PE Optional Header contains a non-empty CLR Runtime Header directory.
  *
- * This function determines the presence of the .NET CLR Runtime Header
- * by reading the appropriate Data Directory entry from the PE Optional Header.
- * It supports both PE32 and PE32+ formats.
+ * This low-level fallback reads `NumberOfRvaAndSizes`, then the CLR directory's
+ * RVA and size. It supports PE32 and PE32+ and rejects header offsets outside
+ * the file bounds. It does not validate the directory contents.
  *
- * @returns {boolean} True if the .NET CLR metadata directory is present, false otherwise.
+ * @returns {boolean} True if the declared CLR directory has non-zero RVA and size; otherwise false.
  */
 function isNetMetaDataPresent() {
     var optHeaderOffset = getOptHeaderOffset();
