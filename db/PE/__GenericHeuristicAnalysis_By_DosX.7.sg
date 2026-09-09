@@ -3855,6 +3855,108 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+    // Validate the section table as one virtual and physical map. Individual fields may
+    // remain in range while two sections overlap, appear out of RVA order, begin inside
+    // the headers, or extend beyond the memory reserved by SizeOfImage.
+
+    var isInvalidSectionLayoutPresent = false;
+
+    var invalidSectionLayoutReason = String();
+
+    const
+        sectionLayoutSizeOfHeaders = PE.getImageOptionalHeader("SizeOfHeaders"),
+        sectionLayoutSizeOfImage = PE.getImageOptionalHeader("SizeOfImage");
+
+    var previousMappedSectionRva = -1;
+
+    for (var i = 0; i < PE_Cached.numberOfSections && !isInvalidSectionLayoutPresent; i++) {
+        const
+            currentSectionRva = PE.getSectionVirtualAddress(i),
+            currentSectionRawOffset = PE.getSectionFileOffset(i),
+            currentSectionRawSize = PE.getSectionFileSize(i),
+            currentSectionVirtualSize = PE.getSectionVirtualSize(i),
+            currentSectionMappedSize = currentSectionVirtualSize !== 0 ? currentSectionVirtualSize : currentSectionRawSize,
+            currentSectionVirtualEnd = currentSectionRva + currentSectionMappedSize;
+
+        // A zero raw offset is already reported by the dedicated offset/size rule.
+        if (currentSectionRawSize !== 0 && currentSectionRawOffset !== 0 &&
+            currentSectionRawOffset < sectionLayoutSizeOfHeaders) {
+            invalidSectionLayoutReason = "section #" + i + " raw data begins inside headers";
+            isInvalidSectionLayoutPresent = true;
+        } else if (currentSectionMappedSize !== 0 && sectionLayoutSizeOfImage !== 0 &&
+            currentSectionVirtualEnd > sectionLayoutSizeOfImage) {
+            invalidSectionLayoutReason = "section #" + i + " exceeds SizeOfImage";
+            isInvalidSectionLayoutPresent = true;
+        } else if (currentSectionMappedSize !== 0 && previousMappedSectionRva !== -1 &&
+            currentSectionRva < previousMappedSectionRva) {
+            invalidSectionLayoutReason = "section #" + i + " is out of RVA order";
+            isInvalidSectionLayoutPresent = true;
+        }
+
+        if (currentSectionMappedSize !== 0) previousMappedSectionRva = currentSectionRva;
+
+        // Compare declared mapped intervals without alignment rounding. Adjacent sections
+        // remain valid; any positive intersection makes the loader view ambiguous.
+        for (var d = i + 1; d < PE_Cached.numberOfSections && !isInvalidSectionLayoutPresent; d++) {
+            const
+                comparedSectionRva = PE.getSectionVirtualAddress(d),
+                comparedSectionVirtualSize = PE.getSectionVirtualSize(d),
+                comparedSectionMappedSize = comparedSectionVirtualSize !== 0 ?
+                    comparedSectionVirtualSize : PE.getSectionFileSize(d),
+                comparedSectionVirtualEnd = comparedSectionRva + comparedSectionMappedSize;
+
+            if (currentSectionMappedSize !== 0 && comparedSectionMappedSize !== 0 &&
+                currentSectionRva < comparedSectionVirtualEnd &&
+                comparedSectionRva < currentSectionVirtualEnd) {
+                invalidSectionLayoutReason = "sections #" + i + " and #" + d + " overlap in memory";
+                isInvalidSectionLayoutPresent = true;
+            }
+        }
+    }
+
+    if (isInvalidSectionLayoutPresent) {
+        log(logType.any, "Invalid section layout: " + invalidSectionLayoutReason);
+    }
+
+    if (isInvalidSectionLayoutPresent) options = addOption(options, "Invalid section layout");
+
+
+
+
+    // BaseOfCode is advisory and some low-level Microsoft images legitimately point it at
+    // a non-code section. Treat only a non-zero RVA outside all physical sections as stale.
+
+    var isBaseOfCodeMismatchPresent = false;
+
+    const baseOfCodeRva = PE.getImageOptionalHeader("BaseOfCode");
+
+    if (baseOfCodeRva !== 0) {
+        var isBaseOfCodeMapped = false;
+
+        for (var i = 0; i < PE_Cached.numberOfSections && !isBaseOfCodeMapped; i++) {
+            const
+                baseOfCodeSectionRva = PE.getSectionVirtualAddress(i),
+                baseOfCodeSectionRawSize = PE.getSectionFileSize(i);
+
+            if (baseOfCodeRva >= baseOfCodeSectionRva &&
+                baseOfCodeRva < baseOfCodeSectionRva + baseOfCodeSectionRawSize &&
+                PE.VAToOffset(PE_Cached.imageBase + baseOfCodeRva) !== -1) {
+                isBaseOfCodeMapped = true;
+            }
+        }
+
+        if (!isBaseOfCodeMapped) {
+            log(logType.any, "BaseOfCode RVA 0x" + baseOfCodeRva.toString(16) + " is not file-backed");
+
+            isBaseOfCodeMismatchPresent = true;
+        }
+    }
+
+    if (isBaseOfCodeMismatchPresent) options = addOption(options, "BaseOfCode mismatch");
+
+
+
+
     // Check for correct section headers
 
     var isRelocsTableIncorrect = false;
