@@ -3348,6 +3348,10 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     var wrongOffset = false,
         wrongSize = false;
 
+    var sectionWithWrongOffsetOrSizeLabel = String(),
+        wrongOffsetOrSizeDetails = String(),
+        wrongOffsetOrSizeLogDetails = String();
+
     for (var t = 0; t < PE_Cached.numberOfSections && !isSectionHasWrongOffsetOrSize; t++) {
         sectionWithWrongOffsetOrSizeIndex = t;
         if (standardSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(sectionWithWrongOffsetOrSizeIndex)) === -1) {
@@ -3370,14 +3374,21 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             isSectionHasWrongOffsetOrSize = wrongOffset || wrongSize;
 
             if (isSectionHasWrongOffsetOrSize) {
-                log(logType.any,
-                    "Section #" + sectionWithWrongOffsetOrSizeIndex + " (\"" + cleanSectionName(PE.getSectionName(sectionWithWrongOffsetOrSizeIndex)) + "\") has wrong " +
-                    (wrongOffset ? "offset (0x" + currentSection.FileOffset.toString(16) + ")" : String()) + (wrongOffset && wrongSize ? ", " : String()) + (wrongSize ? "size (0x" + currentSection.FileSize.toString(16) + ")" : String()));
+                sectionWithWrongOffsetOrSizeLabel = "Section #" + sectionWithWrongOffsetOrSizeIndex +
+                    " (\"" + cleanSectionName(PE.getSectionName(sectionWithWrongOffsetOrSizeIndex)) + "\")";
+                wrongOffsetOrSizeDetails = (wrongOffset ? "offset" : String()) +
+                    (wrongOffset && wrongSize ? "/" : String()) +
+                    (wrongSize ? "size" : String());
+                wrongOffsetOrSizeLogDetails = (wrongOffset ? "offset (0x" + currentSection.FileOffset.toString(16) + ")" : String()) +
+                    (wrongOffset && wrongSize ? ", " : String()) +
+                    (wrongSize ? "size (0x" + currentSection.FileSize.toString(16) + ")" : String());
+
+                log(logType.any, sectionWithWrongOffsetOrSizeLabel + " has wrong " + wrongOffsetOrSizeLogDetails);
             }
         }
     }
 
-    if (isSectionHasWrongOffsetOrSize) options = addOption(options, "Section #" + sectionWithWrongOffsetOrSizeIndex + " (\"" + cleanSectionName(PE.getSectionName(sectionWithWrongOffsetOrSizeIndex)) + "\") has wrong " + (wrongOffset ? "offset" : String()) + (wrongOffset && wrongSize ? "/" : String()) + (wrongSize ? "size" : String()));
+    if (isSectionHasWrongOffsetOrSize) options = addOption(options, sectionWithWrongOffsetOrSizeLabel + " has wrong " + wrongOffsetOrSizeDetails);
 
 
 
@@ -4479,9 +4490,17 @@ function validateNetByteCode(byteCode) {
         if (PE_Cached.numberOfSections > 1) {
             if (sectionOffset === 0 || sectionSize === 0) {
                 continue;
-            } else if (i === PE_Cached.indexOfResourceSection && sectionName === ".rsrc" && i !== PE_Cached.indexOfRelocsSection && i !== PE_Cached.indexOfEntryPointSection && i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection) {
-                continue;
-            } else if (i === PE_Cached.indexOfRelocsSection && sectionName === ".reloc" && i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection && i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection) {
+            }
+
+            var isDedicatedResourceSection = i === PE_Cached.indexOfResourceSection && sectionName === ".rsrc" &&
+                i !== PE_Cached.indexOfRelocsSection && i !== PE_Cached.indexOfEntryPointSection &&
+                i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection;
+
+            var isDedicatedRelocsSection = i === PE_Cached.indexOfRelocsSection && sectionName === ".reloc" &&
+                i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection &&
+                i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection;
+
+            if (isDedicatedResourceSection || isDedicatedRelocsSection) {
                 continue;
             }
         }
@@ -11419,13 +11438,25 @@ function scanForMaliciousCode_NET_and_Native() {
             if (PE_Cached.numberOfSections > 1) {
                 if (sectionOffset === 0 || sectionSize < 0x2000) {
                     continue;
-                } else if (!PE_Cached.isDotNet && i === PE_Cached.indexOfEntryPointSection && sectionName === ".text" && i === 0) {
-                    continue;
-                } else if (i === PE_Cached.indexOfResourceSection && sectionName === ".rsrc" && i !== PE_Cached.indexOfImportsSection && i !== PE_Cached.indexOfEntryPointSection && i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfRelocsSection) {
-                    continue;
-                } else if (i === PE_Cached.indexOfImportsSection && sectionName === ".idata" && i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection && i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfRelocsSection) {
-                    continue;
-                } else if (i === PE_Cached.indexOfRelocsSection && sectionName === ".reloc" && i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection && i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection) {
+                }
+
+                var isBase64PrimaryNativeCodeSection = !PE_Cached.isDotNet && i === PE_Cached.indexOfEntryPointSection &&
+                    sectionName === ".text" && i === 0;
+
+                var isBase64DedicatedResourceSection = i === PE_Cached.indexOfResourceSection && sectionName === ".rsrc" &&
+                    i !== PE_Cached.indexOfImportsSection && i !== PE_Cached.indexOfEntryPointSection &&
+                    i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfRelocsSection;
+
+                var isBase64DedicatedImportsSection = i === PE_Cached.indexOfImportsSection && sectionName === ".idata" &&
+                    i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection &&
+                    i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfRelocsSection;
+
+                var isBase64DedicatedRelocsSection = i === PE_Cached.indexOfRelocsSection && sectionName === ".reloc" &&
+                    i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection &&
+                    i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection;
+
+                if (isBase64PrimaryNativeCodeSection || isBase64DedicatedResourceSection ||
+                    isBase64DedicatedImportsSection || isBase64DedicatedRelocsSection) {
                     continue;
                 }
             }
@@ -11631,7 +11662,10 @@ function scanForMaliciousCode_NET_and_Native() {
             var maxScanSize = Math.min(resourceSize, 0x1000),
                 dataBuffer = PE.readBytes(resourceOffset, maxScanSize);
 
-            if (scanBuffer(dataBuffer, maxScanSize)) { isEncPePresent = true; break; }
+            if (scanBuffer(dataBuffer, maxScanSize)) {
+                isEncPePresent = true;
+                break;
+            }
         }
     }
 
@@ -11658,13 +11692,25 @@ function scanForMaliciousCode_NET_and_Native() {
             if (PE_Cached.numberOfSections > 1) {
                 if (sectionOffset === 0 || sectionSize < 0x2500) {
                     continue;
-                } if (!PE_Cached.isDotNet && i === PE_Cached.indexOfEntryPointSection && sectionName === ".text" && i === 0) {
-                    continue;
-                } else if (i === PE_Cached.indexOfResourceSection && sectionName === ".rsrc" && i !== PE_Cached.indexOfImportsSection && i !== PE_Cached.indexOfEntryPointSection && i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfRelocsSection) {
-                    continue;
-                } else if (i === PE_Cached.indexOfImportsSection && sectionName === ".idata" && i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection && i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfRelocsSection) {
-                    continue;
-                } else if (i === PE_Cached.indexOfRelocsSection && sectionName === ".reloc" && i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection && i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection) {
+                }
+
+                var isEncryptedPePrimaryNativeCodeSection = !PE_Cached.isDotNet && i === PE_Cached.indexOfEntryPointSection &&
+                    sectionName === ".text" && i === 0;
+
+                var isEncryptedPeDedicatedResourceSection = i === PE_Cached.indexOfResourceSection && sectionName === ".rsrc" &&
+                    i !== PE_Cached.indexOfImportsSection && i !== PE_Cached.indexOfEntryPointSection &&
+                    i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfRelocsSection;
+
+                var isEncryptedPeDedicatedImportsSection = i === PE_Cached.indexOfImportsSection && sectionName === ".idata" &&
+                    i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection &&
+                    i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfRelocsSection;
+
+                var isEncryptedPeDedicatedRelocsSection = i === PE_Cached.indexOfRelocsSection && sectionName === ".reloc" &&
+                    i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection &&
+                    i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection;
+
+                if (isEncryptedPePrimaryNativeCodeSection || isEncryptedPeDedicatedResourceSection ||
+                    isEncryptedPeDedicatedImportsSection || isEncryptedPeDedicatedRelocsSection) {
                     continue;
                 }
             }
@@ -11674,7 +11720,10 @@ function scanForMaliciousCode_NET_and_Native() {
                 Math.min(sectionSize, sectionName.match(/^\.[rex]?data$/i) ? 0x12000 : 0x6000),
                 dataBuffer = PE.readBytes(sectionOffset, maxScanSize);
 
-            if (scanBuffer(dataBuffer, maxScanSize)) { isEncPePresent = true; break; }
+            if (scanBuffer(dataBuffer, maxScanSize)) {
+                isEncPePresent = true;
+                break;
+            }
         }
     }
 
