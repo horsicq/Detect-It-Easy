@@ -6900,7 +6900,11 @@ function scanForObfuscations_Native() {
         epPolymorphismStackImbalanceRequiredCount = 4,
         epPolymorphismTransformRequiredCount = 7,
         epPolymorphismTransformKindRequiredCount = 5,
-        epPolymorphismDensityRequiredCount = 30;
+        epPolymorphismDensityRequiredCount = 30,
+        epInvalidBranchSourceMaximumDistance = 0x100,
+        epRedundantPrefixSourceMaximumDistance = 0x1000,
+        epRedundantPrefixRequiredInstructionCount = 2,
+        epRedundantPrefixImmediateCount = 4;
 
     var epNoncanonicalShiftCount = 0,
         epStackMutationCount = 0,
@@ -6916,13 +6920,20 @@ function scanForObfuscations_Native() {
         epPolymorphismDominantTransformCount = 0,
         epBitstreamAdcCount = 0,
         epBitstreamMovsbCount = 0,
+        epRedundantPrefixInstructionCount = 0,
+        epMaximumRedundantPrefixCount = 0,
         epCallPopIpRecoveryAddress = -1,
         epSelfModifyingCallStubAddress = -1,
+        epInvalidBranchSourceAddress = -1,
+        epInvalidBranchTargetAddress = -1,
         epFlagsTransferPresent = false,
         epRolPresent = false,
         epRorPresent = false,
         epAdcPresent = false,
-        epBitstreamIndirectTransferPresent = false;
+        epBitstreamIndirectTransferPresent = false,
+        epConflictingPrefixPresent = false;
+
+    var epInvalidBranchTargetOpCode = String();
 
     // Count generic self-modifying call stubs per section; one loose match is insufficient.
     var epRepeatedSelfModifyingCallStubCountBySection = {};
@@ -6934,6 +6945,7 @@ function scanForObfuscations_Native() {
         // Patterns describe semantics rather than concrete registers or byte sequences.
         const
             epPolymorphismInstructionLimit = 256,
+            epPolymorphismImageSize = PE.getImageOptionalHeader("SizeOfImage"),
             epCallPopIpRecoveryLookaheadLimit = 16,
             epSelfModifyingCallStubLookaheadLimit = 16,
             epSelfModifyingCallStubNeutralInstructionLimit = 2,
@@ -6990,8 +7002,11 @@ function scanForObfuscations_Native() {
             epPolymorphismVisitedInstructionCount = 0,
             epPolymorphismTransformOpCodesFound = {},
             epRareBitOpCodesFound = {},
+            epDecodedInstructionLengthByAddress = {},
             epDirectCallTargets = {},
-            epPopRegisterByAddress = {};
+            epPopRegisterByAddress = {},
+            epInvalidBranchCandidates = [],
+            epRedundantPrefixCandidates = [];
 
         // A statically proven synthetic Ret is an unconditional branch in disguise. Continue
         // from its image target so the shared CFG sees the real decoder behind the EP facade.
@@ -7034,7 +7049,82 @@ function scanForObfuscations_Native() {
                 epPolymorphismOpCode = getAsmOpCode(epPolymorphismInstruction),
                 epPolymorphismInstructionLength = PE.getDisasmLength(epPolymorphismCurrentAddress);
 
+            // Inspect the encoded instruction prefix groups at the already proven physical
+            // boundary. A compiler may need one prefix from each group, but repeated members
+            // are ignored or overridden by the CPU and therefore expose generated padding.
+            var epPolymorphismInstructionOffset = PE.VAToOffset(epPolymorphismCurrentAddress),
+                epPolymorphismSectionFileEnd = PE.getSectionFileOffset(epPolymorphismSectionIndex) +
+                    PE.getSectionFileSize(epPolymorphismSectionIndex),
+                epCurrentPrefixCount = 0,
+                epCurrentPrefixGroupOneCount = 0,
+                epCurrentPrefixGroupThreeCount = 0,
+                epCurrentPrefixGroupFourCount = 0,
+                epCurrentRexPrefixCount = 0,
+                epCurrentGroupOnePrefix = -1,
+                epCurrentConflictingPrefixPresent = false,
+                epCurrentRedundantPrefixPresent = false;
+
+            var epCurrentGroupTwoPrefixesFound = {};
+
+            // Some disassemblers normalize repeated equal prefixes out of the reported
+            // instruction length. Read the architectural prefix limit directly instead.
+            for (var p = 0; p < 14 && epPolymorphismInstructionOffset + p < epPolymorphismSectionFileEnd; p++) {
+                var epCurrentPrefixByte = PE.readByte(epPolymorphismInstructionOffset + p);
+
+                if (epCurrentPrefixByte === 0xF0 || epCurrentPrefixByte === 0xF2 || epCurrentPrefixByte === 0xF3) {
+                    if (epCurrentGroupOnePrefix !== -1 && epCurrentGroupOnePrefix !== epCurrentPrefixByte) {
+                        epCurrentConflictingPrefixPresent = true;
+                    }
+
+                    epCurrentGroupOnePrefix = epCurrentPrefixByte;
+                    epCurrentPrefixGroupOneCount++;
+                    epCurrentRedundantPrefixPresent = epCurrentRedundantPrefixPresent || epCurrentPrefixGroupOneCount > 1;
+                } else if (epCurrentPrefixByte === 0x2E || epCurrentPrefixByte === 0x36 ||
+                    epCurrentPrefixByte === 0x3E || epCurrentPrefixByte === 0x26 ||
+                    epCurrentPrefixByte === 0x64 || epCurrentPrefixByte === 0x65) {
+                    var epCurrentGroupTwoPrefixKey = epCurrentPrefixByte.toString();
+
+                    // Different segment overrides may be printable inline data after a Call.
+                    // Repeating the same override remains unambiguous redundant encoding.
+                    if (epCurrentGroupTwoPrefixesFound[epCurrentGroupTwoPrefixKey]) {
+                        epCurrentRedundantPrefixPresent = true;
+                    } else {
+                        epCurrentGroupTwoPrefixesFound[epCurrentGroupTwoPrefixKey] = true;
+                    }
+                } else if (epCurrentPrefixByte === 0x66) {
+                    epCurrentPrefixGroupThreeCount++;
+                    epCurrentRedundantPrefixPresent = epCurrentRedundantPrefixPresent || epCurrentPrefixGroupThreeCount > 1;
+                } else if (epCurrentPrefixByte === 0x67) {
+                    epCurrentPrefixGroupFourCount++;
+                    epCurrentRedundantPrefixPresent = epCurrentRedundantPrefixPresent || epCurrentPrefixGroupFourCount > 1;
+                } else if (PE_Cached.isAMD64 && epCurrentPrefixByte >= 0x40 && epCurrentPrefixByte <= 0x4F) {
+                    epCurrentRexPrefixCount++;
+                    epCurrentRedundantPrefixPresent = epCurrentRedundantPrefixPresent || epCurrentRexPrefixCount > 1;
+                } else {
+                    break;
+                }
+
+                epCurrentPrefixCount++;
+            }
+
+            // Save raw candidates until every decoded boundary is known. Linkers deliberately
+            // encode long Nop instructions with repeated 66 prefixes for alignment.
+            if (epCurrentRedundantPrefixPresent && epPolymorphismOpCode !== "NOP" &&
+                Math.abs(epPolymorphismCurrentAddress - PE_Cached.addressOfUnmanagedEntryPoint) <=
+                epRedundantPrefixSourceMaximumDistance) {
+                epRedundantPrefixCandidates.push({
+                    Address: epPolymorphismCurrentAddress,
+                    PrefixCount: epCurrentPrefixCount,
+                    IsConflicting: epCurrentConflictingPrefixPresent
+                });
+            }
+
+            // Prefix evidence remains useful even when the disassembler rejects an otherwise
+            // valid instruction because of deliberately excessive encoding. Semantic analysis
+            // below still requires a decoded opcode and a positive instruction length.
             if (!epPolymorphismOpCode || epPolymorphismInstructionLength <= 0) continue;
+
+            epDecodedInstructionLengthByAddress[epPolymorphismAddressKey] = epPolymorphismInstructionLength;
 
             // Count explicit stack traffic. Calls are kept separate because their implicit
             // return-address push has normal compiler semantics and must not inflate Push.
@@ -7146,6 +7236,45 @@ function scanForObfuscations_Native() {
             if (epPolymorphismDirectControlFlow) {
                 var epPolymorphismTargetAddress = parseInt(epPolymorphismDirectControlFlow[2], 0);
 
+                // A direct branch into unmapped, virtual-only or non-executable bytes is not
+                // compiler control flow. Calls are excluded because this rule should not make
+                // assumptions about unusual external or loader-provided call destinations.
+                if (epPolymorphismOpCode !== "CALL") {
+                    var epPolymorphismTargetRva = epPolymorphismTargetAddress - PE_Cached.imageBase,
+                        isEpPolymorphismTargetExecutable = false;
+
+                    for (var d = 0; d < PE_Cached.numberOfSections && !isEpPolymorphismTargetExecutable; d++) {
+                        var epPolymorphismTargetSectionRva = PE.getSectionVirtualAddress(d),
+                            epPolymorphismTargetSectionRawSize = PE.getSectionFileSize(d);
+
+                        if (epPolymorphismTargetRva >= epPolymorphismTargetSectionRva &&
+                            epPolymorphismTargetRva < epPolymorphismTargetSectionRva + epPolymorphismTargetSectionRawSize &&
+                            (PE.section[d].Characteristics & SECTION_FLAGS_EXECUTE) &&
+                            PE.VAToOffset(epPolymorphismTargetAddress) !== -1) {
+                            isEpPolymorphismTargetExecutable = true;
+                        }
+                    }
+
+                    const
+                        isEpPolymorphismTargetWithinImage = epPolymorphismTargetRva >= 0 &&
+                            epPolymorphismTargetRva < epPolymorphismImageSize,
+                        isEpPolymorphismBranchNearEntryPoint = Math.abs(
+                            epPolymorphismCurrentAddress - PE_Cached.addressOfUnmanagedEntryPoint
+                        ) <= epInvalidBranchSourceMaximumDistance;
+
+                    // An internal invalid target is loader-visible proof at any reachable depth.
+                    // A target beyond the image additionally requires a spatially near startup
+                    // branch, filtering distant false instruction boundaries in ordinary code.
+                    if (!isEpPolymorphismTargetExecutable &&
+                        (isEpPolymorphismTargetWithinImage || isEpPolymorphismBranchNearEntryPoint)) {
+                        epInvalidBranchCandidates.push({
+                            SourceAddress: epPolymorphismCurrentAddress,
+                            TargetAddress: epPolymorphismTargetAddress,
+                            OpCode: epPolymorphismOpCode
+                        });
+                    }
+                }
+
                 // Direct backward calls and branches both form dispatcher return edges.
                 if (epPolymorphismTargetAddress < epPolymorphismCurrentAddress) {
                     epPolymorphismBackwardControlFlowCount++;
@@ -7171,6 +7300,56 @@ function scanForObfuscations_Native() {
                 epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
             } else if (epScanStopOpCodes.indexOf(epPolymorphismOpCode) === -1) {
                 epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
+            }
+        }
+
+        // Resolve bad-target candidates after traversal so queue order cannot promote an
+        // alternative address located inside a later decoded instruction boundary.
+        for (var i = 0; i < epInvalidBranchCandidates.length && epInvalidBranchTargetAddress === -1; i++) {
+            var epInvalidBranchCandidate = epInvalidBranchCandidates[i],
+                isEpInvalidBranchCandidateOverlapping = false;
+
+            for (var p = 1; p < 15 && !isEpInvalidBranchCandidateOverlapping; p++) {
+                var epInvalidBranchPreviousAddress = epInvalidBranchCandidate.SourceAddress - p,
+                    epInvalidBranchPreviousInstructionLength =
+                        epDecodedInstructionLengthByAddress[epInvalidBranchPreviousAddress.toString()];
+
+                if (epInvalidBranchPreviousInstructionLength > p) {
+                    isEpInvalidBranchCandidateOverlapping = true;
+                }
+            }
+
+            if (isEpInvalidBranchCandidateOverlapping) continue;
+
+            epInvalidBranchSourceAddress = epInvalidBranchCandidate.SourceAddress;
+            epInvalidBranchTargetAddress = epInvalidBranchCandidate.TargetAddress;
+            epInvalidBranchTargetOpCode = epInvalidBranchCandidate.OpCode;
+        }
+
+        // Resolve prefix candidates only after every reachable instruction boundary is known.
+        // A candidate inside another decoded instruction comes from an alternative x86 decode
+        // path and cannot independently prove redundant prefixes.
+        for (var i = 0; i < epRedundantPrefixCandidates.length; i++) {
+            var epRedundantPrefixCandidate = epRedundantPrefixCandidates[i],
+                isEpRedundantPrefixCandidateOverlapping = false;
+
+            for (var p = 1; p < 15 && !isEpRedundantPrefixCandidateOverlapping; p++) {
+                var epRedundantPrefixPreviousAddress = epRedundantPrefixCandidate.Address - p,
+                    epRedundantPrefixPreviousInstructionLength =
+                        epDecodedInstructionLengthByAddress[epRedundantPrefixPreviousAddress.toString()];
+
+                if (epRedundantPrefixPreviousInstructionLength > p) {
+                    isEpRedundantPrefixCandidateOverlapping = true;
+                }
+            }
+
+            if (isEpRedundantPrefixCandidateOverlapping) continue;
+
+            epRedundantPrefixInstructionCount++;
+            epConflictingPrefixPresent = epConflictingPrefixPresent || epRedundantPrefixCandidate.IsConflicting;
+
+            if (epRedundantPrefixCandidate.PrefixCount > epMaximumRedundantPrefixCount) {
+                epMaximumRedundantPrefixCount = epRedundantPrefixCandidate.PrefixCount;
             }
         }
 
@@ -7510,9 +7689,47 @@ function scanForObfuscations_Native() {
         epPolymorphismVisitedAddresses = undefined;
         epPolymorphismTransformOpCodesFound = undefined;
         epRareBitOpCodesFound = undefined;
+        epDecodedInstructionLengthByAddress = undefined;
         epDirectCallTargets = undefined;
         epPopRegisterByAddress = undefined;
+        epInvalidBranchCandidates = undefined;
+        epRedundantPrefixCandidates = undefined;
     }
+
+
+
+
+    // Check for direct branches from reachable EP code into invalid image locations
+
+    var isInvalidEpBranchTargetPresent = false;
+
+    if (epInvalidBranchTargetAddress !== -1) {
+        log(logType.emulation, "Invalid " + epInvalidBranchTargetOpCode[0] +
+            epInvalidBranchTargetOpCode.substring(1).toLowerCase() + " target near EP: 0x" +
+            epInvalidBranchSourceAddress.toString(16) + " -> 0x" +
+            epInvalidBranchTargetAddress.toString(16));
+
+        isInvalidEpBranchTargetPresent = true;
+    }
+
+    if (isInvalidEpBranchTargetPresent) options = addOption(options, "Invalid branch target near EP");
+
+
+
+
+    // Check for repeated or conflicting x86 instruction-prefix groups in reachable EP code
+
+    var isRedundantEpPrefixPresent = false;
+
+    if (epConflictingPrefixPresent ||
+        epRedundantPrefixInstructionCount >= epRedundantPrefixRequiredInstructionCount ||
+        epMaximumRedundantPrefixCount >= epRedundantPrefixImmediateCount) {
+        log(logType.emulation, "Redundant prefixes near EP: instructions/max: " + epRedundantPrefixInstructionCount + "/" + epMaximumRedundantPrefixCount);
+
+        isRedundantEpPrefixPresent = true;
+    }
+
+    if (isRedundantEpPrefixPresent) options = addOption(options, "Redundant prefixes near EP");
 
 
 
