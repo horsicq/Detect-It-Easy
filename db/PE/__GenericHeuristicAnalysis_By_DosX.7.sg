@@ -3445,6 +3445,44 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    // Check for partially overlapping physical section ranges. Equal starting offsets are
+    // reported by the preceding rule, while this rule covers every remaining intersection.
+
+    var isSectionDataOverlappingPresent = false;
+
+    for (var i = 0; i < PE_Cached.numberOfSections && !isSectionDataOverlappingPresent; i++) {
+        const
+            firstSectionFileOffset = PE.getSectionFileOffset(i),
+            firstSectionFileSize = PE.getSectionFileSize(i),
+            firstSectionFileEnd = firstSectionFileOffset + firstSectionFileSize;
+
+        if (firstSectionFileOffset === 0 || firstSectionFileSize === 0) continue;
+
+        for (var d = i + 1; d < PE_Cached.numberOfSections && !isSectionDataOverlappingPresent; d++) {
+            const
+                secondSectionFileOffset = PE.getSectionFileOffset(d),
+                secondSectionFileSize = PE.getSectionFileSize(d),
+                secondSectionFileEnd = secondSectionFileOffset + secondSectionFileSize;
+
+            if (secondSectionFileOffset === 0 || secondSectionFileSize === 0 ||
+                firstSectionFileOffset === secondSectionFileOffset) continue;
+
+            if (firstSectionFileOffset < secondSectionFileEnd &&
+                secondSectionFileOffset < firstSectionFileEnd) {
+                log(logType.any, "Section #" + i + " (\"" + cleanSectionName(PE.getSectionName(i)) +
+                    "\") and #" + d + " (\"" + cleanSectionName(PE.getSectionName(d)) +
+                    "\") data overlap");
+
+                isSectionDataOverlappingPresent = true;
+            }
+        }
+    }
+
+    if (isSectionDataOverlappingPresent) options = addOption(options, "Overlapping section data");
+
+
+
+
     // Check for 'MZ' signature in the overlay
 
     var isPeAtOverlayDetected = false;
