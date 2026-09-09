@@ -2342,7 +2342,10 @@ const
     SECTION_FLAGS_READ = 0x40000000,    // IMAGE_SCN_MEM_READ
     SECTION_FLAGS_WRITE = 0x80000000,   // IMAGE_SCN_MEM_WRITE
     SECTION_FLAGS_CODE = 0x00000020,    // IMAGE_SCN_CNT_CODE
-    IMAGE_FILE_RELOCS_STRIPPED = 0x0001;
+    IMAGE_FILE_RELOCS_STRIPPED = 0x0001,
+    IMAGE_DIRECTORY_ENTRY_SECURITY = 4,
+    IMAGE_DIRECTORY_ENTRY_TLS = 9,
+    IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16;
 
 const
     SECTION_FLAGS_RWX_MASK = SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ | SECTION_FLAGS_WRITE,
@@ -4006,6 +4009,168 @@ function scanForBadFileFormat_NET_and_Native() {
     }
 
     if (isResourcesTableIncorrect) options = addOption(options, "Resources");
+
+
+
+
+    // Validate every declared PE data-directory range. The certificate table is the only
+    // standard entry whose first field is a file offset; all remaining entries contain RVAs.
+
+    var isUnmappedDataDirectoryPresent = false;
+
+    var unmappedDataDirectoryName = String();
+
+    const
+        dataDirectoryOptionalHeaderOffset = getOptHeaderOffset(),
+        dataDirectoryNumberOffset = dataDirectoryOptionalHeaderOffset + (PE_Cached.is64bit ? 0x6C : 0x5C),
+        dataDirectoryTableOffset = dataDirectoryOptionalHeaderOffset + (PE_Cached.is64bit ? 0x70 : 0x60),
+        dataDirectoryOptionalHeaderSize = PE.readWord(dataDirectoryOptionalHeaderOffset - 4),
+        dataDirectoryOptionalHeaderEnd = Math.min(
+            dataDirectoryOptionalHeaderOffset + dataDirectoryOptionalHeaderSize,
+            PE_Cached.fileSize
+        );
+
+    var dataDirectoryNames = [
+        "EAT", "Imports", "Resources", "Exceptions", "Security", "Relocs", "Debug", "Architecture",
+        "GlobalPtr", "TLS", "Load config", "Bound imports", "IAT", "Delay imports", "CLR", "Reserved"
+    ];
+
+    if (dataDirectoryNumberOffset + 4 <= dataDirectoryOptionalHeaderEnd &&
+        dataDirectoryTableOffset < dataDirectoryOptionalHeaderEnd) {
+        const dataDirectoryCount = Math.min(
+            PE.read_uint32(dataDirectoryNumberOffset),
+            IMAGE_NUMBEROF_DIRECTORY_ENTRIES,
+            Math.floor((dataDirectoryOptionalHeaderEnd - dataDirectoryTableOffset) / 8)
+        );
+
+        for (var i = 0; i < dataDirectoryCount && !isUnmappedDataDirectoryPresent; i++) {
+            var currentDataDirectoryOffset = dataDirectoryTableOffset + i * 8,
+                currentDataDirectoryRva = PE.read_uint32(currentDataDirectoryOffset),
+                currentDataDirectorySize = PE.read_uint32(currentDataDirectoryOffset + 4);
+
+            // A partially empty entry is tolerated here because old linkers occasionally
+            // preserve a stale RVA. Only a complete declared range is used as strong proof.
+            if (currentDataDirectoryRva === 0 || currentDataDirectorySize === 0) continue;
+
+            if (i === IMAGE_DIRECTORY_ENTRY_SECURITY) {
+                // WIN_CERTIFICATE is addressed by physical file offset and may live in overlay.
+                if (currentDataDirectoryRva >= PE_Cached.fileSize ||
+                    currentDataDirectoryRva + currentDataDirectorySize > PE_Cached.fileSize) {
+                    isUnmappedDataDirectoryPresent = true;
+                }
+            } else {
+                var currentDataDirectoryEndRva = currentDataDirectoryRva + currentDataDirectorySize - 1;
+
+                if (currentDataDirectoryRva >= sectionLayoutSizeOfImage ||
+                    currentDataDirectoryEndRva >= sectionLayoutSizeOfImage ||
+                    PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryRva) === -1 ||
+                    PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryEndRva) === -1) {
+                    isUnmappedDataDirectoryPresent = true;
+                }
+            }
+
+            if (isUnmappedDataDirectoryPresent) {
+                unmappedDataDirectoryName = dataDirectoryNames[i];
+
+                log(logType.any, unmappedDataDirectoryName + " data directory is not fully file-backed");
+            }
+        }
+    }
+
+    // Clean up: release the data-directory name collection
+    dataDirectoryNames = undefined;
+
+    if (isUnmappedDataDirectoryPresent) options = addOption(options, "Unmapped data directory (" + unmappedDataDirectoryName + ")");
+
+
+
+
+    // Resolve the TLS callback array and require every declared callback to point to
+    // physically backed executable code. Merely having a TLS directory is not suspicious.
+
+    var isTlsCallbackOutsideCodePresent = false;
+
+    var tlsCallbackOutsideCodeAddress = -1;
+
+    if (PE.isTLSPresent() && dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_TLS + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        const
+            tlsDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_TLS * 8,
+            tlsDirectoryRva = PE.read_uint32(tlsDirectoryEntryOffset),
+            tlsDirectorySize = PE.read_uint32(tlsDirectoryEntryOffset + 4),
+            tlsDirectoryMinimumSize = PE_Cached.is64bit ? 0x28 : 0x18,
+            tlsDirectoryOffset = tlsDirectoryRva !== 0 ? PE.VAToOffset(PE_Cached.imageBase + tlsDirectoryRva) : -1;
+
+        if (tlsDirectorySize >= tlsDirectoryMinimumSize && tlsDirectoryOffset !== -1 &&
+            tlsDirectoryOffset + tlsDirectoryMinimumSize <= PE_Cached.fileSize) {
+            var tlsCallbacksAddress;
+
+            if (PE_Cached.is64bit) {
+                tlsCallbacksAddress = PE.read_uint32(tlsDirectoryOffset + 0x18) +
+                    PE.read_uint32(tlsDirectoryOffset + 0x1C) * 0x100000000;
+            } else {
+                tlsCallbacksAddress = PE.read_uint32(tlsDirectoryOffset + 0x0C);
+            }
+
+            if (tlsCallbacksAddress !== 0) {
+                var tlsCallbacksOffset = PE.VAToOffset(tlsCallbacksAddress),
+                    tlsCallbackPointerSize = PE_Cached.is64bit ? 8 : 4;
+
+                if (tlsCallbacksOffset === -1) {
+                    isTlsCallbackOutsideCodePresent = true;
+                } else {
+                    // The callback array is null-terminated. The bound prevents a damaged
+                    // image from turning a structural validation into an unbounded scan.
+                    for (var i = 0; i < 64 && !isTlsCallbackOutsideCodePresent; i++) {
+                        var tlsCallbackPointerOffset = tlsCallbacksOffset + i * tlsCallbackPointerSize;
+
+                        if (tlsCallbackPointerOffset + tlsCallbackPointerSize > PE_Cached.fileSize) {
+                            isTlsCallbackOutsideCodePresent = true;
+                            break;
+                        }
+
+                        var tlsCallbackAddress;
+
+                        if (PE_Cached.is64bit) {
+                            tlsCallbackAddress = PE.read_uint32(tlsCallbackPointerOffset) +
+                                PE.read_uint32(tlsCallbackPointerOffset + 4) * 0x100000000;
+                        } else {
+                            tlsCallbackAddress = PE.read_uint32(tlsCallbackPointerOffset);
+                        }
+
+                        if (tlsCallbackAddress === 0) break;
+
+                        var tlsCallbackRva = tlsCallbackAddress - PE_Cached.imageBase,
+                            isTlsCallbackExecutable = false;
+
+                        for (var d = 0; d < PE_Cached.numberOfSections && !isTlsCallbackExecutable; d++) {
+                            var tlsCallbackSectionRva = PE.getSectionVirtualAddress(d),
+                                tlsCallbackSectionRawSize = PE.getSectionFileSize(d);
+
+                            if (tlsCallbackRva >= tlsCallbackSectionRva &&
+                                tlsCallbackRva < tlsCallbackSectionRva + tlsCallbackSectionRawSize &&
+                                (PE.section[d].Characteristics & SECTION_FLAGS_EXECUTE) &&
+                                PE.VAToOffset(tlsCallbackAddress) !== -1) {
+                                isTlsCallbackExecutable = true;
+                            }
+                        }
+
+                        if (!isTlsCallbackExecutable) {
+                            tlsCallbackOutsideCodeAddress = tlsCallbackAddress;
+                            isTlsCallbackOutsideCodePresent = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (isTlsCallbackOutsideCodePresent) {
+        log(logType.any, tlsCallbackOutsideCodeAddress !== -1 ?
+            "TLS callback outside executable code: 0x" + tlsCallbackOutsideCodeAddress.toString(16) :
+            "TLS callback array is not file-backed");
+    }
+
+    if (isTlsCallbackOutsideCodePresent) options = addOption(options, "TLS callback outside code");
 
 
 
