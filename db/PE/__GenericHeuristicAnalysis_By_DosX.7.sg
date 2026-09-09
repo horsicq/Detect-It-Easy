@@ -6783,7 +6783,9 @@ function scanForObfuscations_Native() {
             trapFlagPopPattern = PE_Cached.isI386 ? /^(?:POPF|POPFD)$/ : /^(?:POPF|POPFQ)$/,
             trapFlagPopRegisterPattern = new RegExp("^POP (" + trapFlagNativeRegister + ")$", "i"),
             trapFlagRegisterTestPattern = new RegExp("^(?:TEST|AND) (" + epGeneralPurposeRegister + "), (?:0X0*100|256)$|^BT (" + epGeneralPurposeRegister + "), (?:0X0*8|8)$", "i"),
-            trapFlagStackSetPattern = new RegExp("^(?:OR|XOR) (?:(?:DWORD|QWORD) PTR )?\\[" + trapFlagStackPointer + "\\], (?:0X0*100|256)$", "i");
+            trapFlagStackSetPattern = new RegExp("^(?:OR|XOR) (?:(?:DWORD|QWORD) PTR )?\\[" + trapFlagStackPointer + "\\], (?:0X0*100|256)$", "i"),
+            trapFlagBitTestBranchOpCodes = ["JAE", "JB", "JC", "JNAE", "JNB", "JNC"],
+            trapFlagValueTestBranchOpCodes = ["JE", "JNE", "JNZ", "JZ"];
 
         // State 1 tracks flags saved on the stack; state 2 follows the matching
         // native-width POP; state 3 waits for a condition compatible with the
@@ -6809,14 +6811,28 @@ function scanForObfuscations_Native() {
                 flagsNeutralRegisterWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern),
                 registerWrite = flagsNeutralRegisterWrite || currentEpInstruction.match(epTrackedRegisterWritePattern),
                 registerWriteKey = registerWrite ? registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()) : String(),
-                isRegisterOnlyInstruction = registerWrite && currentEpOpCode !== "POP",
-                isStatePreservingInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
-                    currentEpOpCode === "PAUSE" || simplePolymorphicInstruction ||
-                    ((trapFlagState === 1 || trapFlagState === 4) &&
-                        (isRegisterOnlyInstruction || /^(?:CMP|TEST)$/.test(currentEpOpCode))) ||
-                    (trapFlagState === 2 && ((isRegisterOnlyInstruction && registerWriteKey !== trapFlagRegister) ||
-                        valuePreservingInstruction)) ||
-                    (trapFlagState === 3 && flagsNeutralRegisterWrite);
+                testedFlagsRegisterKey = testedFlagsRegister ?
+                    (testedFlagsRegister[1] || testedFlagsRegister[2]).toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()) :
+                    String(),
+                isRegisterOnlyInstruction = registerWrite && currentEpOpCode !== "POP";
+
+            var isTrapFlagStatePreservingInstruction = ((trapFlagState === 1 || trapFlagState === 4) &&
+                (isRegisterOnlyInstruction || /^(?:CMP|TEST)$/.test(currentEpOpCode))) ||
+                (trapFlagState === 2 && ((isRegisterOnlyInstruction && registerWriteKey !== trapFlagRegister) ||
+                    valuePreservingInstruction)) ||
+                (trapFlagState === 3 && flagsNeutralRegisterWrite);
+
+            var isStatePreservingInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
+                currentEpOpCode === "PAUSE" || simplePolymorphicInstruction ||
+                isTrapFlagStatePreservingInstruction;
+
+            var isTrapFlagTestedRegister = trapFlagState === 2 && testedFlagsRegister &&
+                trapFlagRegister === testedFlagsRegisterKey;
+
+            var isTrapFlagBranchCompatible = trapFlagState === 3 && conditionalBranch && (
+                (trapFlagTestOpCode === "BT" && trapFlagBitTestBranchOpCodes.indexOf(currentEpOpCode) !== -1) ||
+                (trapFlagTestOpCode !== "BT" && trapFlagValueTestBranchOpCodes.indexOf(currentEpOpCode) !== -1)
+            );
 
             if (trapFlagPushPattern.test(currentEpOpCode)) {
                 // State 1: EFLAGS/RFLAGS has been copied to the current stack top.
@@ -6838,16 +6854,12 @@ function scanForObfuscations_Native() {
                 trapFlagRegister = poppedFlagsRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
                 trapFlagState = 2;
                 trapFlagNeutralInstructionCount = 0;
-            } else if (trapFlagState === 2 && testedFlagsRegister && trapFlagRegister ===
-                (testedFlagsRegister[1] || testedFlagsRegister[2]).toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())) {
+            } else if (isTrapFlagTestedRegister) {
                 // State 3: the same saved value is tested specifically for bit 8 / 0x100.
                 trapFlagState = 3;
                 trapFlagTestOpCode = currentEpOpCode;
                 trapFlagNeutralInstructionCount = 0;
-            } else if (trapFlagState === 3 && conditionalBranch && (
-                (trapFlagTestOpCode === "BT" && ["JAE", "JB", "JC", "JNAE", "JNB", "JNC"].indexOf(currentEpOpCode) !== -1) ||
-                (trapFlagTestOpCode !== "BT" && ["JE", "JNE", "JNZ", "JZ"].indexOf(currentEpOpCode) !== -1)
-            )) {
+            } else if (isTrapFlagBranchCompatible) {
                 // Accept only branch families which consume the flags produced by BT or TEST/AND.
                 log(logType.emulation, "Trap flag checked near EP: " + currentEpInstruction);
 
@@ -7409,45 +7421,54 @@ function scanForObfuscations_Native() {
 
                         if (!epSelfModifyingCallStubOpCode || epSelfModifyingCallStubInstructionLength <= 0) break;
 
-                        if (epSelfModifyingCallStubState === 0) {
-                            // Stage 0 consumes the call return address into writable memory.
-                            epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubReturnStorePattern.test(epSelfModifyingCallStubInstruction);
-                        } else if (epSelfModifyingCallStubState === 1) {
-                            // Stage 1 preserves the native accumulator before using EAX as a decoder.
-                            epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubAccumulatorPushPattern.test(epSelfModifyingCallStubInstruction);
-                        } else if (epSelfModifyingCallStubState === 2) {
-                            // Stage 2 materializes a DWORD key or encoded instruction value.
-                            epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubKeyLoadPattern.test(epSelfModifyingCallStubInstruction);
-                        } else if (epSelfModifyingCallStubState === 3) {
-                            // Stage 3 transforms that DWORD without requiring one concrete key.
-                            epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubDecodePattern.test(epSelfModifyingCallStubInstruction);
-                        } else if (epSelfModifyingCallStubState === 4) {
-                            // Stage 4 atomically exchanges the decoded DWORD with executable bytes.
-                            epSelfModifyingCallStubWrite = epSelfModifyingCallStubInstruction.match(epSelfModifyingCallStubWritePattern);
-                            epSelfModifyingCallStubStageMatched = Boolean(epSelfModifyingCallStubWrite);
+                        switch (epSelfModifyingCallStubState) {
+                            case 0:
+                                // Stage 0 consumes the call return address into writable memory.
+                                epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubReturnStorePattern.test(epSelfModifyingCallStubInstruction);
+                                break;
+                            case 1:
+                                // Stage 1 preserves the native accumulator before using EAX as a decoder.
+                                epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubAccumulatorPushPattern.test(epSelfModifyingCallStubInstruction);
+                                break;
+                            case 2:
+                                // Stage 2 materializes a DWORD key or encoded instruction value.
+                                epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubKeyLoadPattern.test(epSelfModifyingCallStubInstruction);
+                                break;
+                            case 3:
+                                // Stage 3 transforms that DWORD without requiring one concrete key.
+                                epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubDecodePattern.test(epSelfModifyingCallStubInstruction);
+                                break;
+                            case 4:
+                                // Stage 4 atomically exchanges the decoded DWORD with executable bytes.
+                                epSelfModifyingCallStubWrite = epSelfModifyingCallStubInstruction.match(epSelfModifyingCallStubWritePattern);
+                                epSelfModifyingCallStubStageMatched = Boolean(epSelfModifyingCallStubWrite);
 
-                            if (epSelfModifyingCallStubWrite) {
-                                if (epSelfModifyingCallStubWrite[3]) {
-                                    // The disassembler may print a direct absolute write target.
-                                    epSelfModifyingCallStubWriteAddress = parseInt(epSelfModifyingCallStubWrite[3], 0);
-                                } else {
-                                    // Resolve a RIP-relative displacement against the following instruction.
-                                    var epSelfModifyingCallStubDisplacement = parseInt(epSelfModifyingCallStubWrite[2], 0);
+                                if (epSelfModifyingCallStubWrite) {
+                                    if (epSelfModifyingCallStubWrite[3]) {
+                                        // The disassembler may print a direct absolute write target.
+                                        epSelfModifyingCallStubWriteAddress = parseInt(epSelfModifyingCallStubWrite[3], 0);
+                                    } else {
+                                        // Resolve a RIP-relative displacement against the following instruction.
+                                        var epSelfModifyingCallStubDisplacement = parseInt(epSelfModifyingCallStubWrite[2], 0);
 
-                                    if (epSelfModifyingCallStubWrite[1] === "-") epSelfModifyingCallStubDisplacement = -epSelfModifyingCallStubDisplacement;
+                                        if (epSelfModifyingCallStubWrite[1] === "-") epSelfModifyingCallStubDisplacement = -epSelfModifyingCallStubDisplacement;
 
-                                    epSelfModifyingCallStubWriteAddress = epSelfModifyingCallStubCurrentAddress +
-                                        epSelfModifyingCallStubInstructionLength + epSelfModifyingCallStubDisplacement;
+                                        epSelfModifyingCallStubWriteAddress = epSelfModifyingCallStubCurrentAddress +
+                                            epSelfModifyingCallStubInstructionLength + epSelfModifyingCallStubDisplacement;
+                                    }
                                 }
-                            }
-                        } else if (epSelfModifyingCallStubState === 5) {
-                            // Stage 5 restores the accumulator saved before reconstruction.
-                            epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubAccumulatorPopPattern.test(epSelfModifyingCallStubInstruction);
-                        } else if (epSelfModifyingCallStubState === 6) {
-                            // The bundled disassembler may canonicalize F3 90 to Nop even
-                            // though the prefix deliberately serializes the code rewrite.
-                            epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubOpCode === "PAUSE" ||
-                                PE.compare("F3 90", PE.VAToOffset(epSelfModifyingCallStubCurrentAddress));
+
+                                break;
+                            case 5:
+                                // Stage 5 restores the accumulator saved before reconstruction.
+                                epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubAccumulatorPopPattern.test(epSelfModifyingCallStubInstruction);
+                                break;
+                            case 6:
+                                // The bundled disassembler may canonicalize F3 90 to Nop even
+                                // though the prefix deliberately serializes the code rewrite.
+                                epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubOpCode === "PAUSE" ||
+                                    PE.compare("F3 90", PE.VAToOffset(epSelfModifyingCallStubCurrentAddress));
+                                break;
                         }
 
                         if (epSelfModifyingCallStubStageMatched) {
@@ -10757,33 +10778,48 @@ function scanForMaliciousCode_NET_and_Native() {
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.parite
 
     if (verdicts.length === 0 && PE_Cached.isArchX86) {
-        var pariteAddr = PE_Cached.addressOfUnmanagedEntryPoint,
+        var pariteAddress = PE_Cached.addressOfUnmanagedEntryPoint,
             pariteLoopCount = 0,
-            pariteState = 0; // 0=init, 1=push/xor found, 2=sub found
+            pariteState = 0; // 0 = initial, 1 = Push/Xor found, 2 = Sub found
 
         for (var i = 0; i < 364; i++) {
-            var currentInstruction = PE.getDisasmString(pariteAddr),
+            var currentInstruction = PE.getDisasmString(pariteAddress),
                 currentOpCode = getAsmOpCode(currentInstruction);
 
             if (!currentInstruction) break; // Safety check
 
-            if (pariteState === 0 && /^(?:PUSH|XOR) DWORD PTR \[E[A-Z]{2} \+ E[A-Z]{2}\]/.test(currentInstruction)) {
-                pariteState = 1;
-            } else if (pariteState === 1 && currentOpCode === "SUB" && currentInstruction.match(/^SUB E[A-Z]{2}, [2-4]$/)) {
-                pariteState = 2;
-            } else if (pariteState === 2 && currentOpCode === "JNE") {
-                var jneTargetMatch = currentInstruction.match(/^JNE 0X([0-9A-F]+)$/);
+            switch (pariteState) {
+                case 0:
+                    if (/^(?:PUSH|XOR) DWORD PTR \[E[A-Z]{2} \+ E[A-Z]{2}\]/.test(currentInstruction)) {
+                        pariteState = 1;
+                    }
 
-                if (jneTargetMatch && parseInt(jneTargetMatch[1], 16) < pariteAddr) {
-                    pariteLoopCount++;
-                }
+                    break;
+                case 1:
+                    if (currentOpCode === "SUB" && currentInstruction.match(/^SUB E[A-Z]{2}, [2-4]$/)) {
+                        pariteState = 2;
+                    } else if (currentOpCode === "JNE" || currentOpCode === "JMP") {
+                        pariteState = 0;
+                    }
 
-                pariteState = 0;
-            } else if (currentOpCode === "JNE" || currentOpCode === "JMP") {
-                pariteState = 0;
+                    break;
+                case 2:
+                    if (currentOpCode === "JNE") {
+                        var jneTargetMatch = currentInstruction.match(/^JNE 0X([0-9A-F]+)$/);
+
+                        if (jneTargetMatch && parseInt(jneTargetMatch[1], 16) < pariteAddress) {
+                            pariteLoopCount++;
+                        }
+
+                        pariteState = 0;
+                    } else if (currentOpCode === "JMP") {
+                        pariteState = 0;
+                    }
+
+                    break;
             }
 
-            pariteAddr = PE.getDisasmNextAddress(pariteAddr);
+            pariteAddress = PE.getDisasmNextAddress(pariteAddress);
         }
 
         if (pariteLoopCount >= 0x20) {
