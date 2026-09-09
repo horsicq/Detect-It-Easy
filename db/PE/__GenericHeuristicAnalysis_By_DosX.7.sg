@@ -3908,40 +3908,6 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
-    // BaseOfCode is advisory and some low-level Microsoft images legitimately point it at
-    // a non-code section. Treat only a non-zero RVA outside all physical sections as stale.
-
-    var isBaseOfCodeMismatchPresent = false;
-
-    const baseOfCodeRva = PE.getImageOptionalHeader("BaseOfCode");
-
-    if (baseOfCodeRva !== 0) {
-        var isBaseOfCodeMapped = false;
-
-        for (var i = 0; i < PE_Cached.numberOfSections && !isBaseOfCodeMapped; i++) {
-            const
-                baseOfCodeSectionRva = PE.getSectionVirtualAddress(i),
-                baseOfCodeSectionRawSize = PE.getSectionFileSize(i);
-
-            if (baseOfCodeRva >= baseOfCodeSectionRva &&
-                baseOfCodeRva < baseOfCodeSectionRva + baseOfCodeSectionRawSize &&
-                PE.VAToOffset(PE_Cached.imageBase + baseOfCodeRva) !== -1) {
-                isBaseOfCodeMapped = true;
-            }
-        }
-
-        if (!isBaseOfCodeMapped) {
-            log(logType.any, "BaseOfCode RVA 0x" + baseOfCodeRva.toString(16) + " is not file-backed");
-
-            isBaseOfCodeMismatchPresent = true;
-        }
-    }
-
-    if (isBaseOfCodeMismatchPresent) options = addOption(options, "BaseOfCode mismatch");
-
-
-
-
     // Check for correct section headers
 
     var isRelocsTableIncorrect = false;
@@ -8124,6 +8090,38 @@ function scanForObfuscations_Native() {
 
 
 
+    // BaseOfCode is advisory and protectors may deliberately leave it pointing at a
+    // virtual-only startup section. Treat this as a structural anomaly, not corruption.
+
+    var isBaseOfCodeMismatchPresent = false;
+
+    const baseOfCodeRva = PE.getImageOptionalHeader("BaseOfCode");
+
+    if (baseOfCodeRva !== 0) {
+        var isBaseOfCodeMapped = false;
+
+        for (var i = 0; i < PE_Cached.numberOfSections && !isBaseOfCodeMapped; i++) {
+            const
+                baseOfCodeSectionRva = PE.getSectionVirtualAddress(i),
+                baseOfCodeSectionRawSize = PE.getSectionFileSize(i);
+
+            if (baseOfCodeRva >= baseOfCodeSectionRva &&
+                baseOfCodeRva < baseOfCodeSectionRva + baseOfCodeSectionRawSize &&
+                PE.VAToOffset(PE_Cached.imageBase + baseOfCodeRva) !== -1) {
+                isBaseOfCodeMapped = true;
+            }
+        }
+
+        if (!isBaseOfCodeMapped) {
+            log(logType.any, "BaseOfCode RVA 0x" + baseOfCodeRva.toString(16) + " is not file-backed");
+
+            isBaseOfCodeMismatchPresent = true;
+        }
+    }
+
+
+
+
     // A valid physical EP in executable code contradicts a zero SizeOfCode header value.
 
     var isUnreportedCodePresent = false;
@@ -8274,8 +8272,14 @@ function scanForObfuscations_Native() {
         }
     }
 
-    if (isUnderreportedStartupCodePresent) options = addOption(options, "SizeOfCode mismatch (EP)");
-    else if (isSeverelyUnderreportedCodePresent) options = addOption(options, "SizeOfCode mismatch");
+    const isSizeOfCodeMismatchPresent = isUnderreportedStartupCodePresent || isSeverelyUnderreportedCodePresent;
+
+    const baseOrSizeOfCodeMismatchDetails = (isBaseOfCodeMismatchPresent ? "Base" : String()) +
+        (isBaseOfCodeMismatchPresent && isSizeOfCodeMismatchPresent ? "/" : String()) +
+        (isSizeOfCodeMismatchPresent ? "Size" : String());
+
+    if (isBaseOfCodeMismatchPresent || isSizeOfCodeMismatchPresent) options = addOption(options, baseOrSizeOfCodeMismatchDetails +
+        " of code mismatch" + (isUnderreportedStartupCodePresent && !isBaseOfCodeMismatchPresent ? " (EP)" : String()));
 
 
 
