@@ -3715,8 +3715,11 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
     if (options.length === 0) {
         const licensingStringContextLength = 256;
 
-        // Validation strings provide independent licensing context around an anchor.
-        // Repeating the anchor text here would unnecessarily restrict its variations.
+        // Entry: { marker, strings[, prefixVariants] }; variant: { prefix, strings }.
+        // Each marker requires an expensive full-area engine search, so share suffixes.
+        // strings holds lowercase local context and must not repeat marker; null makes
+        // marker sufficient. prefixVariants classifies characters immediately before
+        // marker and adds variant-only context without anchor self-validation.
         const licensingStringsDictionary = [
             { marker: /* [T/Se] */ "rial ", strings: ["enter", "key", "invalid", "wrong", "expired", "required", "activation", "activate", "license", "full version", "purchase", "unlock", "registration", "free", "version", "period", "mode", "ended", "subscription", "upgrade", "demo"], prefixVariants: [{ prefix: "t", strings: ["serial"] }, { prefix: "se", strings: ["trial"] }] },
             { marker: /* [A] */ "ctivat", strings: ["wrong", "license", "serial", "product", "subscription", "trial", "demo", "purchase", "your copy", "key", "invalid", "expired", "required", "full version", "unlock", "registration"] },
@@ -5052,6 +5055,11 @@ function isTokenObfuscated(token) {
         }
     }
     if (digitLetterTransitions >= 8) return true;
+
+    // Product filenames may combine a short name, release year and build number.
+    // Keep this below deterministic obfuscation checks so a valid-looking suffix
+    // cannot hide a keyboard walk or another unambiguous anomalous pattern.
+    if (token.match(/^[a-z]{2,}[a-z0-9_-]{0,30}(?:19|20)\d{2}(?:[._-]\d{1,5}){0,3}(?:\.(?:exe|dll|sys|msi|msu|msp|cpl|scr|ocx|drv))?$/i)) return false;
 
     // Statistical thresholds for obfuscation
     return (
