@@ -3718,7 +3718,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
         // Validation strings provide independent licensing context around an anchor.
         // Repeating the anchor text here would unnecessarily restrict its variations.
         const licensingStringsDictionary = [
-            { marker: /* [T/Se] */ "rial ", strings: ["enter", "key", "invalid", "wrong", "expired", "required", "activation", "activate", "license", "full version", "purchase", "unlock", "registration", "free", "version", "period", "mode", "ended", "subscription", "upgrade"] },
+            { marker: /* [T/Se] */ "rial ", strings: ["enter", "key", "invalid", "wrong", "expired", "required", "activation", "activate", "license", "full version", "purchase", "unlock", "registration", "free", "version", "period", "mode", "ended", "subscription", "upgrade"], prefixVariants: [{ prefix: "t", strings: ["serial"] }, { prefix: "se", strings: ["trial"] }] },
             { marker: /* [A] */ "ctivat", strings: ["wrong", "license", "serial", "product", "subscription", "trial", "purchase", "your copy", "key", "invalid", "expired", "required", "full version", "unlock", "registration"] },
             { marker: /* [L] */ "icen", strings: ["expire", "key", "wrong", "valid", "invalid", "required", "not found", "missing", "revoked", "activation", "activate", "validation", "verification", "serial", "trial", "subscription", "purchase", "full version", "unlock", "registration"] },
             { marker: /* [F] */ "ull version", strings: ["unlock", "purchase", "upgrade", "activate", "require", "license", "serial", "trial", "subscription", "key", "registration"] },
@@ -3747,6 +3747,10 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
                 if (markerOffset === -1) break;
 
+                var advanced = markerOffset - currentOffset + characterSize;
+                currentOffset += advanced;
+                remainingSize -= advanced;
+
                 // Read the short prefix in one operation, then decode it locally.
                 // This lets a shared anchor validate phrases which begin before it
                 // without issuing a separate engine comparison for every phrase.
@@ -3769,6 +3773,25 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
                 var stringBoundary = candidateString.lastIndexOf("\0");
                 if (stringBoundary !== -1) candidateString = candidateString.substring(stringBoundary + 1);
 
+                // Prefix variants let several complete words share one engine anchor.
+                // Reject unrelated suffix matches before requesting the remaining string.
+                var markerVariantStrings = null;
+
+                if (dictionaryEntry.prefixVariants !== undefined) {
+                    for (var i = 0; i < dictionaryEntry.prefixVariants.length; i++) {
+                        var currentPrefixVariant = dictionaryEntry.prefixVariants[i],
+                            prefixOffset = candidateString.length - currentPrefixVariant.prefix.length;
+
+                        if (prefixOffset >= 0 && candidateString.substring(prefixOffset).toLowerCase() === currentPrefixVariant.prefix) {
+                            markerVariantStrings = currentPrefixVariant.strings;
+
+                            break;
+                        }
+                    }
+
+                    if (markerVariantStrings === null) continue;
+                }
+
                 // The remaining characters are obtained in one engine call. Keep
                 // the read inside the current scan area to preserve its boundaries.
                 var remainingCharacterCount = Math.min(licensingStringContextLength,
@@ -3784,9 +3807,11 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
                     if (candidateString.indexOf(validatingStrings[i]) !== -1) return true;
                 }
 
-                var advanced = markerOffset - currentOffset + characterSize;
-                currentOffset += advanced;
-                remainingSize -= advanced;
+                if (markerVariantStrings !== null) {
+                    for (var i = 0; i < markerVariantStrings.length; i++) {
+                        if (candidateString.indexOf(markerVariantStrings[i]) !== -1) return true;
+                    }
+                }
             }
 
             return false;
