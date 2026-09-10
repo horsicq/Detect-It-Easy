@@ -4254,24 +4254,41 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     var isPdbFullPathPresent = false;
 
-    var pdbExtensionPatternOffset = PE.findSignature(
-        PE_Cached.dosStubSize,
-        PE_Cached.imageBodySize,
-        "%% %% %% '.pdb' 00"
-    );
+    var numberOfDebugDataRecords = PE.getNumberOfDebugDataRecords(),
+        pdbExtensionPatternOffset = -1,
+        pdbDebugDataOffset = 0,
+        pdbDebugDataSize = 0;
 
-    var pdbPathBeginOffset = 0,
+    // A PDB path is part of a Debug Directory record. Restricting the search to
+    // these records avoids both unrelated `.pdb` strings and a full image scan.
+    for (var i = 0; i < numberOfDebugDataRecords && pdbExtensionPatternOffset === -1; i++) {
+        var currentDebugDataOffset = PE.getDebugDataOffset(i),
+            currentDebugDataSize = PE.getDebugDataSize(i);
+
+        if (PE.getDebugDataType(i) === "CODEVIEW" && currentDebugDataOffset > 0 &&
+            currentDebugDataSize > 6 && currentDebugDataOffset < PE_Cached.fileSize) {
+            currentDebugDataSize = Math.min(currentDebugDataSize, PE_Cached.fileSize - currentDebugDataOffset);
+            pdbExtensionPatternOffset = PE.findSignature(currentDebugDataOffset, currentDebugDataSize, "%% %% %% '.pdb' 00");
+
+            if (pdbExtensionPatternOffset !== -1) {
+                pdbDebugDataOffset = currentDebugDataOffset;
+                pdbDebugDataSize = currentDebugDataSize;
+            }
+        }
+    }
+
+    var pdbPathBeginOffset = pdbDebugDataOffset,
         pdbPath = String();
 
     if (pdbExtensionPatternOffset !== -1) {
-
-        for (var i = pdbExtensionPatternOffset; i > PE_Cached.dosStubSize && pdbPathBeginOffset === 0; i--) {
+        for (var i = pdbExtensionPatternOffset; i > pdbDebugDataOffset && pdbPathBeginOffset === pdbDebugDataOffset; i--) {
             if (PE.readByte(i) === 0x00) {
                 pdbPathBeginOffset = i + 1;
             }
         }
 
-        pdbPath = File.cleanString(PE.getString(pdbPathBeginOffset, 256));
+        var pdbPathMaxSize = Math.min(256, pdbDebugDataOffset + pdbDebugDataSize - pdbPathBeginOffset);
+        pdbPath = File.cleanString(PE.getString(pdbPathBeginOffset, pdbPathMaxSize));
 
         if (pdbPath.length > 255)
             pdbPath = pdbPath.substring(0, 255) + " . . .";
@@ -4297,7 +4314,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
     var pdbTextType = String();
 
     if (pdbPath && pdbPath[0] !== '.' && !isPdbFullPathPresent) {
-        pdbTextType = validateSignature("00 52 53 44 53") ? "Embedded" : "Portable";
+        pdbTextType = pdbDebugDataOffset > 0 && PE.compare("00 52 53 44 53", pdbDebugDataOffset - 1) ? "Embedded" : "Portable";
 
         log(logType.any, pdbTextType + " PDB name: \"" + pdbPath + "\"");
 
