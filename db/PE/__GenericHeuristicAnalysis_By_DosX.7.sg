@@ -449,6 +449,8 @@ function scanForObfuscations_NET() {
 
             // Check if the signature is not present in the default .NET section
             if (!PE.isSignatureInSectionPresent(defaultNetSection, "00'#" + headerName + "'00")) {
+                log(logType.net, "Managed entry point position appears unusual");
+
                 isStrangeEpPosition = true;
             }
         }
@@ -494,7 +496,7 @@ function scanForObfuscations_NET() {
     var isDosMessageModified = false;
 
     if (PE.findSignature(PE_Cached.dosStubOffset, PE_Cached.dosStubSize, "'This program cannot be run in DOS mode.'") === -1) {
-        log(logType.net, "DOS-stub modified!");
+        log(logType.any, "DOS-stub modified!");
 
         isDosMessageModified = true;
     }
@@ -509,7 +511,7 @@ function scanForObfuscations_NET() {
     var isOneSectionFile = false;
 
     if (PE_Cached.numberOfSections === 1) {
-        log(logType.net, "Only one section found!");
+        log(logType.any, "Only one section found!");
 
         isOneSectionFile = true;
     }
@@ -525,13 +527,19 @@ function scanForObfuscations_NET() {
 
     const badChars = '_-=+~!@#$%^&*()"№;%:?*():;,/\\|\'`<>.0123456789'; // Very very bad!
 
-    if (PE_Cached.numberOfSections > (!PE_Cached.isCppClrLikeApp ? 6 : 10) || !PE.section[".text"]) { isStrangeSectionsPresent = true; } else {
+    if (PE_Cached.numberOfSections > (!PE_Cached.isCppClrLikeApp ? 6 : 10) || !PE.section[".text"]) {
+        log(logType.any, "Unusual section layout detected");
+
+        isStrangeSectionsPresent = true;
+    } else {
         // Iterate through each section
         for (var i = 0; i < PE_Cached.numberOfSections && !isStrangeSectionsPresent; i++) {
             const sectionName = PE.getSectionName(i);
 
             // Check if the first character is not "." and the length of name is less than 3
             if (sectionName[0] !== "." && sectionName.length < 3) {
+                log(logType.any, "Unusual section name detected: \"" + File.cleanString(sectionName) + "\"");
+
                 isStrangeSectionsPresent = true;
                 break;
             }
@@ -540,11 +548,15 @@ function scanForObfuscations_NET() {
             // Check if the character is in the badChars list
             for (var d = 0; d < badChars.length && !isStrangeSectionsPresent; d++) {
                 if (sectionName.substring(1).indexOf(badChars[d]) !== -1) {
+                    log(logType.any, "Unusual section name detected: \"" + File.cleanString(sectionName) + "\"");
+
                     isStrangeSectionsPresent = true;
                 }
             }
 
             if (!isAsciiString(sectionName) && !isStrangeSectionsPresent) {
+                log(logType.any, "Non-ASCII section name detected");
+
                 isStrangeSectionsPresent = true;
             }
         }
@@ -563,7 +575,7 @@ function scanForObfuscations_NET() {
         const unmanagedResourceName = PE.getResourceNameByNumber(i);
 
         if (unmanagedResourceName && (!isAsciiString(unmanagedResourceName) || isNameObfuscated(unmanagedResourceName))) {
-            log(logType.net, "Strange unmanaged resource name: " + unmanagedResourceName);
+            log(logType.any, "Strange unmanaged resource name: \"" + File.cleanString(unmanagedResourceName) + "\"");
 
             isStrangeUnmanagedResourcesPresent = true;
         }
@@ -579,6 +591,8 @@ function scanForObfuscations_NET() {
     var tooManySectionsPresent = false;
 
     if (PE_Cached.numberOfSections > 10) {
+        log(logType.any, "Unusually high section count detected");
+
         tooManySectionsPresent = true;
     }
 
@@ -667,6 +681,8 @@ function scanForObfuscations_NET() {
             ]
         ) && !isFrameworkComponent()
     ) {
+        log(logType.net, "Delegate-based call indirection may be present");
+
         callsEncrypt = true;
     }
 
@@ -680,6 +696,8 @@ function scanForObfuscations_NET() {
     var isAntiIldasmPresent = false;
 
     if (validateNetObject("SuppressIldasmAttribute")) {
+        log(logType.net, "IL disassembly suppression attribute detected");
+
         isAntiIldasmPresent = true;
     }
 
@@ -919,8 +937,11 @@ function scanForObfuscations_NET() {
             strangePatternsCounter++;
         }
 
-        if (strangePatternsCounter > 2)
+        if (strangePatternsCounter > 2) {
+            log(logType.net, "Obfuscated naming patterns detected");
+
             badNamings = true;
+        }
 
     }
 
@@ -1212,6 +1233,8 @@ function scanForObfuscations_NET() {
             signaturesCounter++;
 
             if (signaturesCounter > 1) {
+                log(logType.net, "Multiple obfuscator attributes detected");
+
                 isFakeSignaturesPresent = true;
                 break;
             }
@@ -1236,6 +1259,8 @@ function scanForObfuscations_NET() {
             validateSignature("'ObfuscatorAttribute'") ||
             validateNetObject("ObfuscationAttribute")
         )) && !isFrameworkComponent()) { // System.Reflection.ObfuscationAttribute
+            log(logType.net, "Obfuscation watermark pattern detected");
+
             isWatermarkPresent = true;
         }
     }
@@ -1257,12 +1282,11 @@ function scanForObfuscations_NET() {
         buildAssemblyName = buildAssemblyName.substring(8, buildAssemblyName.length);
     }
 
-    if (buildAssemblyName !== getFileNameWithoutExtension(buildModuleName) || buildAssemblyName === buildModuleName) {
-        isBuildInfoModified = true;
+    if ((buildAssemblyName !== getFileNameWithoutExtension(buildModuleName) || buildAssemblyName === buildModuleName) &&
+        !(PE_Cached.isJscriptNetStandardLibraryPresent && buildModuleName === "JScript Module")) {
+        log(logType.net, "Managed assembly and module names do not match");
 
-        if (PE_Cached.isJscriptNetStandardLibraryPresent && buildModuleName === "JScript Module") {
-            isBuildInfoModified = false;
-        }
+        isBuildInfoModified = true;
     }
 
     if (isBuildInfoModified) options = addOption(options, "Modified build info");
@@ -1366,6 +1390,8 @@ function scanForAntiAnalysis_NET() {
             )
         ) && !isFrameworkComponent()
     ) {
+        log(logType.net, "Debugger detection pattern detected");
+
         isAntiDebugPresent = true;
     }
 
@@ -1411,6 +1437,8 @@ function scanForAntiAnalysis_NET() {
             )
         )
     ) {
+        log(logType.net, "Memory-based anti-dump pattern detected");
+
         isAntiDumpPresent = true;
     }
 
@@ -1438,6 +1466,8 @@ function scanForAntiAnalysis_NET() {
             validateGlobalUnicodeString(dnSpyName) ||
             validateSignature("'" + dnSpyName + "'")
         ) {
+            log(logType.net, "dnSpy-related anti-analysis references detected");
+
             isAntiDnSpyPresent = true;
         }
     }
@@ -1466,6 +1496,8 @@ function scanForAntiAnalysis_NET() {
             validateGlobalUnicodeString(ilSpyName) ||
             validateSignature("'" + ilSpyName + "'")
         ) {
+            log(logType.net, "ILSpy-related anti-analysis references detected");
+
             isAntiIlSpyPresent = true;
         }
     }
@@ -1501,6 +1533,8 @@ function scanForAntiAnalysis_NET() {
                 validateGlobalUnicodeString(sbieLib) ||
                 validateSignature("'" + sbieLib + "'")
             ) {
+                log(logType.any, "Sandboxie-related environment markers detected");
+
                 isAntiSbiePresent = true;
             }
         }
@@ -1533,6 +1567,8 @@ function scanForAntiAnalysis_NET() {
                 validateGlobalUnicodeString(comodoLib) ||
                 validateSignature("'" + comodoLib + "'")
             ) {
+                log(logType.any, "Comodo sandbox markers detected");
+
                 isAntiComodoPresent = true;
             }
         }
@@ -1563,6 +1599,8 @@ function scanForAntiAnalysis_NET() {
                 validateGlobalUnicodeString(qihoo360Lib) ||
                 validateSignature("'" + qihoo360Lib + "'")
             ) {
+                log(logType.any, "Qihoo 360 sandbox markers detected");
+
                 isAntiQihoo360Present = true;
             }
         }
@@ -1593,6 +1631,8 @@ function scanForAntiAnalysis_NET() {
                 validateGlobalUnicodeString(cuckooLib) ||
                 validateSignature("'" + cuckooLib + "'")
             ) {
+                log(logType.any, "Cuckoo sandbox markers detected");
+
                 isAntiCuckooPresent = true;
             }
         }
@@ -1613,6 +1653,8 @@ function scanForAntiAnalysis_NET() {
         validateGlobalUnicodeString(wineGetUnixFileName) ||
         validateSignature("'" + wineGetUnixFileName + "'")
     )) {
+        log(logType.any, "Wine environment marker detected");
+
         isAntiWinePresent = true;
     }
 
@@ -1629,6 +1671,8 @@ function scanForAntiAnalysis_NET() {
         validateNetUnicodeString("VMBusHID") ||
         validateNetUnicodeString("vmware") ||
         validateGlobalUnicodeString("WDAGUtilityAccount")) {
+        log(logType.any, "Virtual-machine environment markers detected");
+
         isAntiVmPresent = true;
     }
 
