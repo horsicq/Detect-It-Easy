@@ -5251,7 +5251,11 @@ function scanForObfuscations_Native() {
         }
     }
 
-    if (isStrangeSectionsPresent) options = addOption(options, "Strange sections");
+    if (isStrangeSectionsPresent) {
+        log(logType.any, "Unusual section names detected");
+
+        options = addOption(options, "Strange sections");
+    }
 
 
 
@@ -5263,6 +5267,8 @@ function scanForObfuscations_Native() {
 
     // If DOS stub size is 0, set flag for missing DOS
     if (PE_Cached.dosStubSize === 0) {
+        log(logType.any, "DOS stub is missing");
+
         isDosMissing = true;
     } else {
         // Define messages to check for custom DOS
@@ -5286,6 +5292,10 @@ function scanForObfuscations_Native() {
                 isCustomDosPresent = false;
             }
         }
+
+        if (isCustomDosPresent) {
+            log(logType.any, "Nonstandard DOS stub detected");
+        }
     }
 
     // Add appropriate option based on DOS presence
@@ -5300,6 +5310,8 @@ function scanForObfuscations_Native() {
     var isImportTableMutated = false;
 
     if (PE.isLibraryPresentExp(/^\.[\\/]\.[\\/]/)) {
+        log(logType.any, "Import library path mutation detected");
+
         isImportTableMutated = true;
     }
 
@@ -5318,9 +5330,13 @@ function scanForObfuscations_Native() {
 
         if (libraryName.length > 4) {
             if (libraryName[libraryName.length - 4] !== ".") {
+                log(logType.any, "Import library without a filename extension detected: \"" + File.cleanString(libraryName) + "\"");
+
                 isContainsNoExtensionLibrary = true;
             }
         } else { /* if (libraryName.indexOf(".") === -1) */
+            log(logType.any, "Import library without a filename extension detected: \"" + File.cleanString(libraryName) + "\"");
+
             isContainsNoExtensionLibrary = true;
         }
     }
@@ -5339,6 +5355,8 @@ function scanForObfuscations_Native() {
 
         if (libraryName.length > 4) {
             if (libraryName !== "ntoskrnl.exe" && libraryName.substring(libraryName.length - 4) === ".exe") {
+                log(logType.any, "Executable image referenced as an import: \"" + File.cleanString(libraryName) + "\"");
+
                 exeInImports = true;
             }
         }
@@ -5355,6 +5373,8 @@ function scanForObfuscations_Native() {
 
     for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isUnreadableResourcesPresent; i++) {
         if (PE.getResourceOffsetByNumber(i) === -1) {
+            log(logType.any, "One or more resources are not file-backed");
+
             isUnreadableResourcesPresent = true;
         }
     }
@@ -5371,6 +5391,8 @@ function scanForObfuscations_Native() {
 
     if (PE_Cached.isDynamicLinkLibrary &&
         PE.isExportFunctionPresentExp(/^(?:Start|main|_start|(?:w)?WinMain|EntryPoint)$/)) {
+        log(logType.any, "DLL exports an application-style entry point");
+
         exeAsDll = true;
     }
 
@@ -5384,6 +5406,8 @@ function scanForObfuscations_Native() {
     var isTextSectionNotFirst = false;
 
     if (PE_Cached.numberOfSections > 0 && (PE.section[0].Name !== ".text" && PE.section[0].Name !== ".textbss" && PE.section[0].Name !== ".code") && (PE.isSectionNamePresent(".text") || PE.isSectionNamePresent(".textbss"))) {
+        log(logType.any, "Primary code section is not first");
+
         isTextSectionNotFirst = true;
     }
 
@@ -5398,8 +5422,12 @@ function scanForObfuscations_Native() {
         isEmptyIatPresent = false;
 
     if (PE_Cached.indexOfImportsSection === -1 && !PE_Cached.isDynamicLinkLibrary) { // DLLs can be resource-only
+        log(logType.any, "Import table is missing");
+
         isIatMissing = true;
     } else if (PE_Cached.indexOfImportsSection !== -1 && !PE_Cached.numberOfUnmanagedImports) {
+        log(logType.any, "Import table is present but empty");
+
         isEmptyIatPresent = true;
     }
 
@@ -5414,6 +5442,8 @@ function scanForObfuscations_Native() {
     var isDllIatAndEatMissing = false;
 
     if (PE_Cached.isDynamicLinkLibrary && PE_Cached.addressOfUnmanagedEntryPoint && (PE_Cached.indexOfImportsSection === -1 && PE_Cached.indexOfExportsSection === -1)) { // DLLs without imports/exports and with EP (not a resource-only DLL)
+        log(logType.any, "DLL import and export tables are missing");
+
         isDllIatAndEatMissing = true;
     }
 
@@ -5429,8 +5459,12 @@ function scanForObfuscations_Native() {
 
     if (!isDllIatAndEatMissing && PE_Cached.isDynamicLinkLibrary) {
         if (PE_Cached.indexOfExportsSection === -1 && PE_Cached.addressOfUnmanagedEntryPoint) { // DLL without exports and with EP (not a resource-only DLL)
+            log(logType.any, "DLL export table is missing");
+
             isDllEatMissing = true;
         } else if (PE_Cached.indexOfExportsSection !== -1 && PE_Cached.numberOfUnmanagedExports === 0) { // DLL with empty exports
+            log(logType.any, "DLL export table is present but empty");
+
             isDllEmptyEatPresent = true;
         }
     }
@@ -5447,6 +5481,8 @@ function scanForObfuscations_Native() {
     var isPhantomEatPresent = false;
 
     if (PE_Cached.numberOfUnmanagedExports === 0 && PE_Cached.indexOfExportsSection !== -1) {
+        log(logType.any, "Export directory has no export entries");
+
         isPhantomEatPresent = true;
     }
 
@@ -5583,7 +5619,11 @@ function scanForObfuscations_Native() {
             /^MOV ([XW])(\d+), \1\2$/.test(PE_Cached.firstEpAsmInstruction);
     }
 
-    if (isStartsWithNop) options = addOption(options, "Nop at EP");
+    if (isStartsWithNop) {
+        log(logType.emulation, "Instruction with no effect at EP: " + PE_Cached.firstEpAsmInstruction);
+
+        options = addOption(options, "Nop at EP");
+    }
 
 
 
@@ -8180,17 +8220,23 @@ function scanForObfuscations_Native() {
         } else if (PE_Cached.isArchX86) {
             if (/^INT(?: )?3$/.test(PE_Cached.firstEpAsmInstruction) ||    // INT3 (0xCC) / INT 3 (0xCD 0x03)
                 /^RET(?: \d+)?$/.test(PE_Cached.firstEpAsmInstruction)) {  // All types of RET
+                log(logType.emulation, "TLS startup bypasses the formal EP: " + PE_Cached.firstEpAsmInstruction);
+
                 isTlsHiddenEpPresent = true;
             }
         } else if (PE_Cached.isARM || PE_Cached.isThumb) {
             // ARM/Thumb: Check for breakpoint or return instructions
             if (/^BKPT/.test(PE_Cached.firstEpAsmInstruction) ||         // BKPT  (breakpoint)
                 /^BX(?: )?LR$/.test(PE_Cached.firstEpAsmInstruction)) {  // BX LR (ARM32 return)
+                log(logType.emulation, "TLS startup bypasses the formal EP: " + PE_Cached.firstEpAsmInstruction);
+
                 isTlsHiddenEpPresent = true;
             }
         } else if (PE_Cached.isARM64) {
             if (/^BRK/.test(PE_Cached.firstEpAsmInstruction) ||          // BRK (breakpoint)
                 /^RET(?: )?/.test(PE_Cached.firstEpAsmInstruction)) {    // RET (return)
+                log(logType.emulation, "TLS startup bypasses the formal EP: " + PE_Cached.firstEpAsmInstruction);
+
                 isTlsHiddenEpPresent = true;
             }
         }
@@ -8211,6 +8257,8 @@ function scanForObfuscations_Native() {
         PE.compareEP("E9 ## ## ## ## EB") ||
         PE.compareEP("E9 ## ## ## ## E9")
     )) {
+        log(logType.any, "Proxy jump chain detected at EP");
+
         proxyJumpsAtEpPresent = true;
     }
 
@@ -8230,6 +8278,8 @@ function scanForObfuscations_Native() {
 
         if ((currentSectionCharacteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK ||
             (currentSectionCharacteristics & SECTION_FLAGS_RWX_CODE_MASK) === SECTION_FLAGS_RWX_CODE_MASK) {
+            log(logType.any, "RWX permissions detected in section #" + i + " (\"" + File.cleanString(PE.getSectionName(i)) + "\")");
+
             isRwxSectionPresent = true;
             rwxSectionIndex = i;
         }
@@ -8252,6 +8302,8 @@ function scanForObfuscations_Native() {
 
         if ((currentSectionCharacteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE) &&
             !(currentSectionCharacteristics & SECTION_FLAGS_READ)) {
+            log(logType.any, "Write-execute section without read access detected: #" + i + " (\"" + File.cleanString(PE.getSectionName(i)) + "\")");
+
             isWxWithoutReadSectionPresent = true;
             wxWithoutReadSectionIndex = i;
         }
@@ -8282,11 +8334,15 @@ function scanForObfuscations_Native() {
             entryPointRva < sectionVirtualAddress + sectionVirtualSize) {
             entryPointSectionIndex = i;
             if (!(PE.section[i].Characteristics & SECTION_FLAGS_EXECUTE)) {
+                log(logType.any, "Entry point is located in a non-executable section");
+
                 isEpInNonExecutableSection = true;
             }
 
             // Check for zero padding at the beginning of the section
             if (PE.compare("00 00 00", PE.getSectionFileOffset(entryPointSectionIndex))) {
+                log(logType.any, "Zero padding detected at the beginning of EP section #" + entryPointSectionIndex);
+
                 isEpSectionZeroPaddingPresent = true;
             }
         }
@@ -8308,6 +8364,8 @@ function scanForObfuscations_Native() {
         PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
         (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) &&
         !(PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_CODE)) {
+        log(logType.any, "Executable EP section is not marked as code");
+
         isEpInNonCodeSection = true;
     }
 
@@ -8324,6 +8382,8 @@ function scanForObfuscations_Native() {
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
         entryPointSectionIndex !== -1 &&
         (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_DISCARDABLE)) {
+        log(logType.any, "Entry point section is marked discardable");
+
         isDiscardableEpSectionPresent = true;
     }
 
@@ -8374,6 +8434,8 @@ function scanForObfuscations_Native() {
         PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
         (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) &&
         PE.getSizeOfCode() === 0) {
+        log(logType.any, "Executable code is present while SizeOfCode is zero");
+
         isUnreportedCodePresent = true;
     }
 
@@ -8531,6 +8593,8 @@ function scanForObfuscations_Native() {
     var tooManySectionsPresent = false;
 
     if (PE_Cached.numberOfSections > 20) {
+        log(logType.any, "Unusually high section count detected");
+
         tooManySectionsPresent = true;
     }
 
@@ -8548,6 +8612,8 @@ function scanForObfuscations_Native() {
         const iatDirOffset = getOptHeaderOffset() + (PE_Cached.is64bit ? 0x70 : 0x60) + 12 * 8;
 
         if (PE_Cached.indexOfImportsSection !== -1 && PE.read_int32(iatDirOffset) === 0) {
+            log(logType.any, "IAT data directory is empty despite existing imports");
+
             isIatDirEmpty = true;
         }
     }
@@ -8567,6 +8633,8 @@ function scanForObfuscations_Native() {
         var exceptionDirOffset = getOptHeaderOffset() + (PE_Cached.is64bit ? 0x88 : 0x78);
 
         if (PE.read_int32(exceptionDirOffset) === 0 && PE.read_int32(exceptionDirOffset + 4) === 0) {
+            log(logType.any, "Exception section has no matching data directory");
+
             isUnusedExceptionSectionPresent = true;
         }
     }
@@ -8590,6 +8658,8 @@ function scanForObfuscations_Native() {
 
     if ((coffCharacteristics & IMAGE_FILE_RELOCS_STRIPPED) &&
         (dllCharacteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)) {
+        log(logType.any, "ASLR is enabled while relocations are marked stripped");
+
         isAslrWithStrippedRelocs = true;
     }
 
@@ -8603,6 +8673,8 @@ function scanForObfuscations_Native() {
     var isDllCharsReservedBitsSet = false;
 
     if (dllCharacteristics & 0x001F) { // 0x001F -> bits 0-4 -> 0b0000000000011111
+        log(logType.any, "Reserved DLL characteristic flags are set");
+
         isDllCharsReservedBitsSet = true;
     }
 
@@ -8617,6 +8689,8 @@ function scanForObfuscations_Native() {
 
     if ((dllCharacteristics & IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA) &&
         !(dllCharacteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)) {
+        log(logType.any, "High-entropy VA is enabled without ASLR");
+
         isHighEntropyWithoutAslr = true;
     }
 
@@ -8631,6 +8705,8 @@ function scanForObfuscations_Native() {
 
     if ((dllCharacteristics & IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA) &&
         !PE_Cached.is64bit) {
+        log(logType.any, "High-entropy VA is enabled on a 32-bit image");
+
         isHighEntropyOn32bit = true;
     }
 
@@ -8645,6 +8721,8 @@ function scanForObfuscations_Native() {
 
     if ((dllCharacteristics & IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY) &&
         !(dllCharacteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)) {
+        log(logType.any, "Force integrity is enabled without ASLR");
+
         isForceIntegrityWithoutAslr = true;
     }
 
@@ -8659,6 +8737,8 @@ function scanForObfuscations_Native() {
 
     if ((dllCharacteristics & IMAGE_DLLCHARACTERISTICS_GUARD_CF) &&
         !(dllCharacteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE)) {
+        log(logType.any, "CFG is enabled without ASLR");
+
         isGuardCfWithoutAslr = true;
     }
 
@@ -8672,6 +8752,8 @@ function scanForObfuscations_Native() {
     var isNoSehOn64bit = false;
 
     if ((dllCharacteristics & IMAGE_DLLCHARACTERISTICS_NO_SEH) && PE_Cached.is64bit) {
+        log(logType.any, "No-SEH is set on a 64-bit image");
+
         isNoSehOn64bit = true;
     }
 
@@ -8689,6 +8771,8 @@ function scanForObfuscations_Native() {
             const functionName = PE.getExportFunctionName(i);
 
             if (functionName && (/^\d/.test(functionName) || !isAsciiString(functionName))) {
+                log(logType.any, "Unusual export name detected: \"" + File.cleanString(functionName) + "\"");
+
                 isStrangeExportsPresent = true;
             }
         }
@@ -8711,10 +8795,14 @@ function scanForObfuscations_Native() {
         if (isAsciiString(libraryName)) {
             for (var l = 0; l < badImportChars.length && !isStrangeImportsPresent; l++) {
                 if (libraryName.indexOf(badImportChars[l]) !== -1) {
+                    log(logType.any, "Unusual import library name detected: \"" + File.cleanString(libraryName) + "\"");
+
                     isStrangeImportsPresent = true;
                 }
             }
         } else if (libraryName.indexOf("MZ") !== 0) { // 'MZ' -> IAT corrupted
+            log(logType.any, "Non-ASCII import library name detected");
+
             isStrangeImportsPresent = true;
         }
     }
@@ -8732,7 +8820,7 @@ function scanForObfuscations_Native() {
         const resourceName = PE.getResourceNameByNumber(i);
 
         if (resourceName && (!isAsciiString(resourceName) || isNameObfuscated(resourceName))) {
-            log(logType.any, "Strange resource name: " + resourceName);
+            log(logType.any, "Strange resource name: \"" + File.cleanString(resourceName) + "\"");
 
             isStrangeResourcesPresent = true;
         }
@@ -8748,6 +8836,8 @@ function scanForObfuscations_Native() {
     var isZeroLinkerVersionPresent = false;
 
     if (PE.getMajorLinkerVersion() === 0 && PE.getMinorLinkerVersion() === 0) {
+        log(logType.any, "Linker version is zero");
+
         isZeroLinkerVersionPresent = true;
     }
 
@@ -8761,6 +8851,8 @@ function scanForObfuscations_Native() {
     var isNetMetaDataInNativePresent = false;
 
     if (isNetMetaDataPresent() && PE_Cached.numberOfUnmanagedImports > 0) {
+        log(logType.net, "Managed metadata detected in a native image");
+
         isNetMetaDataInNativePresent = true;
     }
 
@@ -8774,6 +8866,8 @@ function scanForObfuscations_Native() {
     var isNetRuntimeAttachFunctionPresent = false;
 
     if (PE.isFunctionPresent("_CorExeMain") || PE.isFunctionPresent("_CorDllMain")) {
+        log(logType.net, ".NET runtime attachment import detected");
+
         isNetRuntimeAttachFunctionPresent = true;
     }
 
@@ -9724,10 +9818,14 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
                 richCount = PE.getRichCount(j);
 
             if (richId === 0x000d && richVersion === 9782 && richCount === 0x0001) {
+                log(logType.any, "Microsoft Visual Basic 6.0 build metadata detected");
+
                 _setResult("~compiler", "Microsoft Visual Basic", "6.0", String());
                 _setLangByHeur("VB");
                 break;
             } else if (richId === 0x0103) {
+                log(logType.any, "MASM build metadata detected");
+
                 _setResult("~compiler", "MASM", String(), String());
                 break;
             }
@@ -9759,6 +9857,8 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
         }
 
         if (isIl2cpp) {
+            log(logType.any, "IL2CPP build characteristics detected");
+
             _setResult("~compiler", "IL2CPP Technology", String(), String());
             _setLangByHeur("Native MSIL/C#");
         }
@@ -9783,8 +9883,12 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
             PE.isSectionNamePresent(".00cfg")
         )) {
             if (PE.isSectionNamePresent(".gfids") || PE.isSectionNamePresent(".giats") || PE.isSectionNamePresent(".gljmp") || PE.isSectionNamePresent(".voltbl")) {
+                log(logType.any, "Microsoft Visual Studio build markers detected");
+
                 _setResult("~tool", "Microsoft Visual Studio", String(), String())
             }
+
+            log(logType.any, "Microsoft linker and compiler characteristics detected");
 
             _setResult("~linker", "Microsoft Linker", (majorLinkerVersion !== 0 ? (majorLinkerVersion + "." + minorLinkerVersion) : String()), String());
             _setResult("~compiler", "Microsoft Visual C/C++", String(), String());
@@ -9802,12 +9906,16 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
                 (PE.isSectionNamePresent(".tls") || PE.isSectionNamePresent(".bss")) || PE.isSectionNamePresent(".buildid")
             )) {
 
+            log(logType.any, "MinGW toolchain characteristics detected");
+
             _setResult("~compiler", "MinGW", String(), String());
 
             if (!_isLangDetected() && isCLikeLibsNotFound) {
                 _setLangByHeur("C/C++");
             }
         } else if (PE.isSectionNamePresent(".flat") && !isPpLibraryPresent) {
+            log(logType.any, "FASM toolchain characteristics detected");
+
             _setResult("~compiler", "FASM", String(), String());
             _setLangByHeur(getAsmLanguageName());
         }
@@ -12186,6 +12294,8 @@ function scanForMaliciousCode_NET_and_Native() {
     for (var v = 0; v < verdicts.length; v++) {
         var verdict = verdicts[v];
 
+        log(logType.any, "Potential malware match: " + verdict.type + (verdict.version ? " " + verdict.version : String()));
+
         _setResult("~malware", verdict.type, verdict.version, verdict.details);
     }
 }
@@ -12220,6 +12330,8 @@ function scanForInterestingMarkers_NET_and_Native() {
             if (gdfResourceOffset !== -1 && PE.isSignaturePresent(
                 gdfResourceOffset,
                 PE.getResourceSizeByNumber(i), convertStringToUnicodeSignature("GameDefinitionFile"))) {
+                log(logType.any, "Image contains a Windows Game Definition File");
+
                 isGdfSchemaPresent = true;
             }
         }
@@ -12235,6 +12347,8 @@ function scanForInterestingMarkers_NET_and_Native() {
     var isAppContainerImage = false;
 
     if (dllCharacteristics & IMAGE_DLLCHARACTERISTICS_APPCONTAINER) {
+        log(logType.any, "Image requests AppContainer isolation");
+
         isAppContainerImage = true;
     }
 
@@ -12362,6 +12476,8 @@ function scanNameForAnomalies_FileSystem_NET_and_Native() {
     var isSpecializedExecutableFileSystemExtension = false;
 
     if (hasExecutableFileSystemExtensionType && executableFileSystemExtensionType !== null) {
+        log(logType.any, "Image uses the recognized ." + File.cleanString(executableFileSystemExtension.toUpperCase()) + " extension for " + executableFileSystemExtensionType);
+
         isSpecializedExecutableFileSystemExtension = true;
     }
 
@@ -12375,6 +12491,8 @@ function scanNameForAnomalies_FileSystem_NET_and_Native() {
     var isExecutableFileSystemExtensionEmpty = false;
 
     if (executableFileSystemExtension === String()) {
+        log(logType.any, "Executable image has no filename extension");
+
         isExecutableFileSystemExtensionEmpty = true;
     }
 
@@ -12388,6 +12506,8 @@ function scanNameForAnomalies_FileSystem_NET_and_Native() {
     var isCustomExecutableFileSystemExtension = false;
 
     if (executableFileSystemExtension.length <= 0xC && !isExecutableFileSystemExtensionEmpty && !executableFileSystemExtensionType && executableFileSystemExtensionType !== null) {
+        log(logType.any, "Executable image uses the unrecognized ." + File.cleanString(executableFileSystemExtension.toUpperCase()) + " extension");
+
         isCustomExecutableFileSystemExtension = true;
     }
 
@@ -12406,6 +12526,8 @@ function scanNameForAnomalies_FileSystem_NET_and_Native() {
     var hasDllExtensionWithoutDllCharacteristic = false;
 
     if (executableFileSystemExtension === "dll" && !PE_Cached.isDynamicLinkLibrary) {
+        log(logType.any, "Application image uses the .DLL extension. A host process may be expected.");
+
         hasDllExtensionWithoutDllCharacteristic = true;
     }
 
@@ -12419,6 +12541,8 @@ function scanNameForAnomalies_FileSystem_NET_and_Native() {
     var hasExeExtensionWithDllCharacteristic = false;
 
     if (executableFileSystemExtension === "exe" && PE_Cached.isDynamicLinkLibrary) {
+        log(logType.any, "DLL image uses the .EXE extension");
+
         hasExeExtensionWithDllCharacteristic = true;
     }
 
