@@ -3713,15 +3713,16 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
     // Besides avoiding redundant details, this prevents many full-body searches in
     // large protected images after the licensing system has already been identified.
     if (options.length === 0) {
-        const maxLicensingStringAnchorCandidates = 32;
+        const licensingStringContextLength = 256;
 
+        // Validation strings provide independent licensing context around an anchor.
+        // Repeating the anchor text here would unnecessarily restrict its variations.
         const licensingStringsDictionary = [
-            { marker: "erial", strings: [/*[E]*/ "nter serial ", /*[S]*/ "erial key "] },
-            { marker: "activat", strings: [/*[W]*/ "rong activation", " activate "] },
-            { marker: "icen", strings: [/*[W]*/ "rong licens", /*[L]*/ "icense expire", /*[L]*/ "icense key", "valid license"] },
-            { marker: " trial ", strings: null },
-            { marker: " full version", strings: null },
-            { marker: " purchase a ", strings: null }
+            { marker: /* [T/Se] */ "rial ", strings: ["enter", "key", "invalid", "wrong", "expired", "required", "activation", "activate", "license", "full version", "purchase", "unlock", "registration", "free", "version", "period", "mode", "ended", "subscription", "upgrade"] },
+            { marker: /* [A] */ "ctivat", strings: ["wrong", "license", "serial", "product", "subscription", "trial", "purchase", "your copy", "key", "invalid", "expired", "required", "full version", "unlock", "registration"] },
+            { marker: /* [L] */ "icen", strings: ["expire", "key", "wrong", "valid", "invalid", "required", "not found", "missing", "revoked", "activation", "activate", "validation", "verification", "serial", "trial", "subscription", "purchase", "full version", "unlock", "registration"] },
+            { marker: /* [F] */ "ull version", strings: ["unlock", "purchase", "upgrade", "activate", "require", "license", "serial", "trial", "subscription", "key", "registration"] },
+            { marker: /* [P] */ "urchase a ", strings: ["license", "subscription", "full version", "unlock", "serial", "activation", "trial", "upgrade"] }
         ];
 
         function isLicensingStringGroupPresent(areaOffset, areaSize, dictionaryEntry, isUnicode) {
@@ -3730,19 +3731,13 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
                 markerPattern = isUnicode ? convertStringToUnicodeSignature(currentMarker) : currentMarker,
                 characterSize = isUnicode ? 2 : 1,
                 currentOffset = areaOffset,
-                remainingSize = areaSize,
-                candidateCount = 0,
-                maxPrefixLength = 0;
+                remainingSize = areaSize;
 
             // A null dictionary entry means the marker itself is the complete
             // original pattern, so no candidate extraction is necessary.
             if (validatingStrings === null) {
                 return (isUnicode ? PE.findSignature(areaOffset, areaSize, markerPattern) :
                     PE.findString(areaOffset, areaSize, markerPattern)) !== -1;
-            }
-
-            for (var i = 0; i < validatingStrings.length; i++) {
-                maxPrefixLength = Math.max(maxPrefixLength, validatingStrings[i].indexOf(currentMarker));
             }
 
             while (remainingSize >= currentMarker.length * characterSize) {
@@ -3755,7 +3750,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
                 // Read the short prefix in one operation, then decode it locally.
                 // This lets a shared anchor validate phrases which begin before it
                 // without issuing a separate engine comparison for every phrase.
-                var prefixSize = Math.min(maxPrefixLength * characterSize, markerOffset - areaOffset);
+                var prefixSize = Math.min(licensingStringContextLength * characterSize, markerOffset - areaOffset);
                 prefixSize -= prefixSize % characterSize;
 
                 var prefixBytes = PE.readBytes(markerOffset - prefixSize, prefixSize),
@@ -3769,14 +3764,21 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
                     candidateString += String.fromCharCode(characterCode);
                 }
 
+                // Ignore adjacent null-terminated strings so their unrelated words
+                // cannot validate the marker found in the current string.
+                var stringBoundary = candidateString.lastIndexOf("\0");
+                if (stringBoundary !== -1) candidateString = candidateString.substring(stringBoundary + 1);
+
                 // The remaining characters are obtained in one engine call. Keep
                 // the read inside the current scan area to preserve its boundaries.
-                var remainingCharacterCount = Math.min(256,
+                var remainingCharacterCount = Math.min(licensingStringContextLength,
                     Math.floor((areaOffset + areaSize - markerOffset) / characterSize));
 
                 candidateString += isUnicode ?
                     File.read_unicodeString(markerOffset, remainingCharacterCount) :
                     PE.getString(markerOffset, remainingCharacterCount);
+
+                candidateString = candidateString.toLowerCase();
 
                 for (var i = 0; i < validatingStrings.length; i++) {
                     if (candidateString.indexOf(validatingStrings[i]) !== -1) return true;
@@ -3785,18 +3787,6 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
                 var advanced = markerOffset - currentOffset + characterSize;
                 currentOffset += advanced;
                 remainingSize -= advanced;
-
-                // Bound work on marker-rich data. Searching every original phrase
-                // over the complete area is a safe fallback and cannot lose a match.
-                if (++candidateCount === maxLicensingStringAnchorCandidates) {
-                    for (var i = 0; i < validatingStrings.length; i++) {
-                        var validatingPattern = isUnicode ? convertStringToUnicodeSignature(validatingStrings[i]) : validatingStrings[i];
-
-                        if ((isUnicode ? PE.findSignature(areaOffset, areaSize, validatingPattern) : PE.findString(areaOffset, areaSize, validatingPattern)) !== -1) return true;
-                    }
-
-                    break;
-                }
             }
 
             return false;
