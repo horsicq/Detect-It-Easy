@@ -3713,31 +3713,106 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
     // Besides avoiding redundant details, this prevents many full-body searches in
     // large protected images after the licensing system has already been identified.
     if (options.length === 0) {
-        const licesingStrings = [
-            /*[E]*/ "nter serial ",
-            /*[S]*/ "erial key ",
-            /*[W]*/ "rong activation",
-            /*[W]*/ "rong licens",
-            /*[L]*/ "icense expire",
-            /*[L]*/ "icense key",
-            " activate ",
-            " trial ",
-            "valid license",
-            " full version",
-            " purchase a "
+        const maxLicensingStringAnchorCandidates = 32;
+
+        const licensingStringsDictionary = [
+            { marker: "erial", strings: [/*[E]*/ "nter serial ", /*[S]*/ "erial key "] },
+            { marker: "activat", strings: [/*[W]*/ "rong activation", " activate "] },
+            { marker: "icen", strings: [/*[W]*/ "rong licens", /*[L]*/ "icense expire", /*[L]*/ "icense key", "valid license"] },
+            { marker: " trial ", strings: null },
+            { marker: " full version", strings: null },
+            { marker: " purchase a ", strings: null }
         ];
 
-        for (var i = 0; i < licesingStrings.length && !isInterestingStringsFound; i++) {
-            const currentPatternToFind = licesingStrings[i];
+        function isLicensingStringGroupPresent(areaOffset, areaSize, dictionaryEntry, isUnicode) {
+            var currentMarker = dictionaryEntry.marker,
+                validatingStrings = dictionaryEntry.strings,
+                markerPattern = isUnicode ? convertStringToUnicodeSignature(currentMarker) : currentMarker,
+                characterSize = isUnicode ? 2 : 1,
+                currentOffset = areaOffset,
+                remainingSize = areaSize,
+                candidateCount = 0,
+                maxPrefixLength = 0;
 
-            if ((!PE_Cached.isDotNet && PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.imageBodySize, "'" + currentPatternToFind + "'")) ||
-                PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.imageBodySize, convertStringToUnicodeSignature(currentPatternToFind))) {
+            // A null dictionary entry means the marker itself is the complete
+            // original pattern, so no candidate extraction is necessary.
+            if (validatingStrings === null) {
+                return (isUnicode ? PE.findSignature(areaOffset, areaSize, markerPattern) :
+                    PE.findString(areaOffset, areaSize, markerPattern)) !== -1;
+            }
+
+            for (var i = 0; i < validatingStrings.length; i++) {
+                maxPrefixLength = Math.max(maxPrefixLength, validatingStrings[i].indexOf(currentMarker));
+            }
+
+            while (remainingSize >= currentMarker.length * characterSize) {
+                var markerOffset = isUnicode ?
+                    PE.findSignature(currentOffset, remainingSize, markerPattern) :
+                    PE.findString(currentOffset, remainingSize, currentMarker);
+
+                if (markerOffset === -1) break;
+
+                // Read the short prefix in one operation, then decode it locally.
+                // This lets a shared anchor validate phrases which begin before it
+                // without issuing a separate engine comparison for every phrase.
+                var prefixSize = Math.min(maxPrefixLength * characterSize, markerOffset - areaOffset);
+                prefixSize -= prefixSize % characterSize;
+
+                var prefixBytes = PE.readBytes(markerOffset - prefixSize, prefixSize),
+                    candidateString = String();
+
+                for (var i = 0; i < prefixBytes.length; i += characterSize) {
+                    var characterCode = prefixBytes[i];
+
+                    if (isUnicode) characterCode |= prefixBytes[i + 1] << 8;
+
+                    candidateString += String.fromCharCode(characterCode);
+                }
+
+                // The remaining characters are obtained in one engine call. Keep
+                // the read inside the current scan area to preserve its boundaries.
+                var remainingCharacterCount = Math.min(256,
+                    Math.floor((areaOffset + areaSize - markerOffset) / characterSize));
+
+                candidateString += isUnicode ?
+                    File.read_unicodeString(markerOffset, remainingCharacterCount) :
+                    PE.getString(markerOffset, remainingCharacterCount);
+
+                for (var i = 0; i < validatingStrings.length; i++) {
+                    if (candidateString.indexOf(validatingStrings[i]) !== -1) return true;
+                }
+
+                var advanced = markerOffset - currentOffset + characterSize;
+                currentOffset += advanced;
+                remainingSize -= advanced;
+
+                // Bound work on marker-rich data. Searching every original phrase
+                // over the complete area is a safe fallback and cannot lose a match.
+                if (++candidateCount === maxLicensingStringAnchorCandidates) {
+                    for (var i = 0; i < validatingStrings.length; i++) {
+                        var validatingPattern = isUnicode ? convertStringToUnicodeSignature(validatingStrings[i]) : validatingStrings[i];
+
+                        if ((isUnicode ? PE.findSignature(areaOffset, areaSize, validatingPattern) : PE.findString(areaOffset, areaSize, validatingPattern)) !== -1) return true;
+                    }
+
+                    break;
+                }
+            }
+
+            return false;
+        }
+
+        for (var i = 0; i < licensingStringsDictionary.length && !isInterestingStringsFound; i++) {
+            const currentDictionaryEntry = licensingStringsDictionary[i];
+
+            if ((!PE_Cached.isDotNet && isLicensingStringGroupPresent(PE_Cached.dosStubSize, PE_Cached.imageBodySize, currentDictionaryEntry, false)) ||
+                isLicensingStringGroupPresent(PE_Cached.dosStubSize, PE_Cached.imageBodySize, currentDictionaryEntry, true)) {
                 isInterestingStringsFound = true;
             }
         }
     }
 
-    if (isInterestingStringsFound) options = addOption(options, "Strings");
+    if (isInterestingStringsFound) options = "Strings";
 
 
 
