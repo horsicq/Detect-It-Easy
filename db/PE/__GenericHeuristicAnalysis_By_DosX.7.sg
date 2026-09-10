@@ -11387,41 +11387,76 @@ function scanForMaliciousCode_NET_and_Native() {
 
     var base64Version = String();
 
-    var rawBase64PostfixSigns = [
+    const maxBase64PeHeaderAnchorCandidates = 64;
+
+    const base64PeHeaderPostfixSigns = [
         "oAAA", // ~[00 00 00 00 00]
         "qQAA", // ~[90 00 03]
         "pQAA", // ~[50 00 02]
         "p4AA"  // ~[78 00 01]
     ];
 
-    function scanArea(areaOffset, areaSize) {
-        if (areaSize <= 0 || areaOffset <= 0 || isBase64Payload) return;
+    function isBase64PeHeaderPresent(areaOffset, areaSize, isUnicode) {
+        var anchorPattern = isUnicode ? convertStringToUnicodeSignature("TV") : "TV",
+            postfixOffsetDelta = isUnicode ? 4 : 2,
+            completePatternSize = isUnicode ? 12 : 6,
+            currentOffset = areaOffset,
+            remainingSize = areaSize,
+            candidateCount = 0;
 
-        for (var i = 0; i < rawBase64PostfixSigns.length && !isBase64Payload; i++) {
-            if (PE.findString(areaOffset, areaSize, "TV" + rawBase64PostfixSigns[i]) !== -1) {
-                base64Version = "ASCII";
-                isBase64Payload = true;
-                return;
-            }
-        }
+        while (remainingSize >= completePatternSize) {
+            var anchorOffset = isUnicode ?
+                PE.findSignature(currentOffset, remainingSize, anchorPattern) :
+                PE.findString(currentOffset, remainingSize, anchorPattern);
 
-        var currentOffset = areaOffset,
-            remainingSize = areaSize;
-
-        while (remainingSize > 0 && !isBase64Payload) {
-            var anchorOffset = PE.findSignature(currentOffset, remainingSize, "54 00 56 00");
             if (anchorOffset === -1) break;
 
-            var advanced = (anchorOffset - currentOffset) + 4;
+            if (anchorOffset + completePatternSize <= areaOffset + areaSize) {
+                for (var i = 0; i < base64PeHeaderPostfixSigns.length; i++) {
+                    var postfixPattern = isUnicode ?
+                        convertStringToUnicodeSignature(base64PeHeaderPostfixSigns[i]) :
+                        "'" + base64PeHeaderPostfixSigns[i] + "'";
+
+                    if (PE.compare(postfixPattern, anchorOffset + postfixOffsetDelta)) return true;
+                }
+            }
+
+            var advanced = (anchorOffset - currentOffset) + postfixOffsetDelta;
             currentOffset += advanced;
             remainingSize -= advanced;
 
-            for (var k = 0; k < rawBase64PostfixSigns.length && !isBase64Payload; k++) {
-                if (PE.compare(convertStringToUnicodeSignature(rawBase64PostfixSigns[k]), anchorOffset + 4)) {
-                    base64Version = "UTF-16LE";
-                    isBase64Payload = true;
+            // Short anchors normally reduce four full scans to one. If an area is
+            // unusually rich in `TV`, stop enumerating candidates and let the native
+            // search routine look for the four complete, selective patterns instead.
+            if (++candidateCount === maxBase64PeHeaderAnchorCandidates) {
+                for (var i = 0; i < base64PeHeaderPostfixSigns.length; i++) {
+                    var completePattern = "TV" + base64PeHeaderPostfixSigns[i];
+
+                    if (isUnicode) completePattern = convertStringToUnicodeSignature(completePattern);
+
+                    if ((isUnicode ? PE.findSignature(currentOffset, remainingSize, completePattern) :
+                        PE.findString(currentOffset, remainingSize, completePattern)) !== -1) return true;
                 }
+
+                break;
             }
+        }
+
+        return false;
+    }
+
+    function scanArea(areaOffset, areaSize) {
+        if (areaSize <= 0 || areaOffset <= 0 || isBase64Payload) return;
+
+        if (isBase64PeHeaderPresent(areaOffset, areaSize, false)) {
+            base64Version = "ASCII";
+            isBase64Payload = true;
+            return;
+        }
+
+        if (isBase64PeHeaderPresent(areaOffset, areaSize, true)) {
+            base64Version = "UTF-16LE";
+            isBase64Payload = true;
         }
     }
 
