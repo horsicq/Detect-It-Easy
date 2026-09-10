@@ -3802,12 +3802,43 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
             return false;
         }
 
-        for (var i = 0; i < licensingStringsDictionary.length && !isInterestingStringsFound; i++) {
-            const currentDictionaryEntry = licensingStringsDictionary[i];
+        function isLicensingStringPresentInArea(areaOffset, areaSize) {
+            for (var i = 0; i < licensingStringsDictionary.length; i++) {
+                const currentDictionaryEntry = licensingStringsDictionary[i];
 
-            if ((!PE_Cached.isDotNet && isLicensingStringGroupPresent(PE_Cached.dosStubSize, PE_Cached.imageBodySize, currentDictionaryEntry, false)) ||
-                isLicensingStringGroupPresent(PE_Cached.dosStubSize, PE_Cached.imageBodySize, currentDictionaryEntry, true)) {
-                isInterestingStringsFound = true;
+                if ((!PE_Cached.isDotNet && isLicensingStringGroupPresent(areaOffset, areaSize, currentDictionaryEntry, false)) || isLicensingStringGroupPresent(areaOffset, areaSize, currentDictionaryEntry, true)) return true;
+            }
+
+            return false;
+        }
+
+        for (var i = 0; i < PE_Cached.numberOfSections && !isInterestingStringsFound; i++) {
+            var sectionOffset = PE.getSectionFileOffset(i),
+                sectionSize = PE.getSectionFileSize(i),
+                sectionName = PE.getSectionName(i);
+
+            // Skip only canonical areas whose role excludes licensing messages.
+            // Resources are not excluded by role because user-facing text commonly lives there.
+            if (PE_Cached.numberOfSections > 1) {
+                if (sectionOffset === 0 || sectionSize < 0x2000) continue;
+
+                var isLicensingPrimaryNativeCodeSection = !PE_Cached.isDotNet && i === PE_Cached.indexOfEntryPointSection &&
+                    sectionName === ".text" && i === 0;
+
+                var isLicensingDedicatedImportsSection = i === PE_Cached.indexOfImportsSection && sectionName === ".idata" &&
+                    i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection &&
+                    i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfRelocsSection;
+
+                var isLicensingDedicatedRelocsSection = i === PE_Cached.indexOfRelocsSection && sectionName === ".reloc" &&
+                    i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection &&
+                    i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection;
+
+                if (isLicensingPrimaryNativeCodeSection || isLicensingDedicatedImportsSection || isLicensingDedicatedRelocsSection) continue;
+            }
+
+            if (sectionOffset > 0 && sectionOffset < PE_Cached.fileSize) {
+                sectionSize = Math.min(sectionSize, PE_Cached.fileSize - sectionOffset);
+                isInterestingStringsFound = isLicensingStringPresentInArea(sectionOffset, sectionSize);
             }
         }
     }
