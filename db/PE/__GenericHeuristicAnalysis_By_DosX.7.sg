@@ -2393,6 +2393,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 "Load" // MSIL: '*.Assembly::Load(uint8[])'
             ]
         )) {
+            log(logType.net, "Dynamic assembly invocation pattern detected");
+
             isAssemblyInvokeFound = true;
 
             options = "Assembly invoke";
@@ -2561,7 +2563,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         for (var l = 0; l < overlayPatterns.length; l++) {
             if (PE.compareOverlay(overlayPatterns[l])) {
-                log(logType.nothing, "SFX overlay pattern: " + overlayPatterns[l]);
+                log(logType.any, "SFX archive pattern detected in overlay");
 
                 isSfx = true;
             }
@@ -2604,7 +2606,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             if (PE_Cached.isArchX86) {
                 for (var k = 0; k < sfxEntries.length; k++) {
                     if (PE.compareEP(sfxEntries[k])) {
-                        log(logType.nothing, "EP like SFX: \"" + sfxEntries[k] + "\"");
+                        log(logType.any, "SFX-style entry point pattern detected");
 
                         isSfx = true;
                     }
@@ -2671,7 +2673,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
             // If the entry point matches the current entry, set the flag to true and break the loop
             if (PE.compareEP(entryToCheck)) {
-                log(logType.nothing, "EP like a packer: \"" + entryToCheck + "\"");
+                log(logType.any, "Packer-like entry point pattern detected");
 
                 entryLikePacker = true;
             }
@@ -2699,7 +2701,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             (PE.section[2].Characteristics & (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)
         )
     ) {
-        log(logType.nothing, "UPX-like structure detected: [0]RWX/[1]RWX/[2]R(W)");
+        log(logType.any, "UPX-like section layout detected");
 
         isUpxLikeStructure = true;
 
@@ -2735,7 +2737,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             case "PUSHA":
             case "PUSHF":
             case "POPA":
-                log(logType.nothing, "\"" + firstEpAsmOpCode + "\" at EP");
+                log(logType.emulation, "\"" + firstEpAsmOpCode + "\" at EP");
 
                 isStartsWithStackOperation = true;
         }
@@ -2748,7 +2750,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             case "LDMIA":
             case "STMFD":
             case "LDMFD":
-                log(logType.nothing, "\"" + firstEpAsmOpCode + "\" at EP");
+                log(logType.emulation, "\"" + firstEpAsmOpCode + "\" at EP");
 
                 isStartsWithStackOperation = true;
         }
@@ -2756,7 +2758,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         firstEpAsmOpCode = getFirstEpAsmOpCode();
 
         if (firstEpAsmOpCode === "LDP") {
-            log(logType.nothing, "\"" + firstEpAsmOpCode + "\" at EP");
+            log(logType.emulation, "\"" + firstEpAsmOpCode + "\" at EP");
 
             isStartsWithStackOperation = true;
         }
@@ -2785,7 +2787,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
             // Check if a valid last-section address was found and the entry point is at or after it
             if (lastSectionAddress !== -1 && entryPointAddress >= lastSectionAddress) {
-                log(logType.nothing, "EP address (0x" + entryPointAddress.toString(16) + ") more than last section address (0x" + lastSectionAddress.toString(16) + ")");
+                log(logType.any, "EP address (0x" + entryPointAddress.toString(16) + ") more than last section address (0x" + lastSectionAddress.toString(16) + ")");
 
                 isLastSectionEP = true;
             }
@@ -2807,7 +2809,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         if (!PE_Cached.isDynamicLinkLibrary) {
             if (isLastSectionEP && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
-                log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
+                log(logType.emulation, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
 
                 isStrangeCallOrJmpPresent = true;
             }
@@ -2819,7 +2821,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         if (!PE_Cached.isDynamicLinkLibrary) {
             // ARM uses B (branch) and BL (branch with link) for jumps and calls
             if (isLastSectionEP && (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BX" || firstOpCode === "BLX")) {
-                log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
+                log(logType.emulation, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
 
                 isStrangeCallOrJmpPresent = true;
             }
@@ -2829,7 +2831,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         if (!PE_Cached.isDynamicLinkLibrary && isLastSectionEP &&
             (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BR" || firstOpCode === "BLR")) {
-            log(logType.nothing, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
+            log(logType.emulation, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
 
             isStrangeCallOrJmpPresent = true;
         }
@@ -2968,7 +2970,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (importValidatingResult !== null) {
         versionByImportsDetected = importValidatingResult[1];
 
-        log(logType.nothing, "Imports hash like " + importValidatingResult[0] + (versionByImportsDetected ? " (version " + versionByImportsDetected + ")" : String()));
+        log(logType.any, "Imports hash like " + importValidatingResult[0] + (versionByImportsDetected ? " (version " + versionByImportsDetected + ")" : String()));
 
         isImportsLikePacker = true;
     }
@@ -3220,7 +3222,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (sectionNamesValidatingResult !== null) {
         versionBySectionDetected = sectionNamesValidatingResult[1];
 
-        log(logType.nothing, "Sections like " + sectionNamesValidatingResult[0] + (versionBySectionDetected ? " (v" + versionBySectionDetected + ")" : String()));
+        log(logType.any, "Sections like " + sectionNamesValidatingResult[0] + (versionBySectionDetected ? " (v" + versionBySectionDetected + ")" : String()));
 
         isSectionNameLikePacker = true;
     }
@@ -3260,7 +3262,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (resourceNamesValidatingResult !== null) {
         versionByResourceDetected = resourceNamesValidatingResult[1];
 
-        log(logType.nothing, "Resources like " + resourceNamesValidatingResult[0] + (versionByResourceDetected ? " (v" + versionByResourceDetected + ")" : String()));
+        log(logType.any, "Resources like " + resourceNamesValidatingResult[0] + (versionByResourceDetected ? " (v" + versionByResourceDetected + ")" : String()));
 
         isResourceNameLikePacker = true;
     }
@@ -3282,7 +3284,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Check if there is a collision
     if (sectionNameCollision.length) {
-        log(logType.nothing, "Section names collision: \"" + cleanSectionName(sectionNameCollision) + "\"");
+        log(logType.any, "Section names collision: \"" + File.cleanString(sectionNameCollision) + "\"");
 
         isCollisionInSectionsPresent = true;
     }
@@ -3302,7 +3304,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         var sectionName = PE.getSectionName(i);
         sectionNamesDict[sectionName] = (sectionNamesDict[sectionName] || 0) + 1;
         if (sectionNamesDict[sectionName] > 1) {
-            log(logType.nothing, "Section names repeating: \"" + cleanSectionName(sectionName) + "\"");
+            log(logType.any, "Section names repeating: \"" + File.cleanString(sectionName) + "\"");
 
             isSectionNamesRepeatingPresent = true;
         }
@@ -3421,6 +3423,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         if (standardSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(t)) !== -1 &&
             currentSection.FileSize === 0x00 &&
             (currentSection.Characteristics & SECTION_FLAGS_EXECUTE)) {
+            log(logType.any, "Executable zero-filled section detected: #" + t + " (\"" + cleanSectionName(PE.getSectionName(t)) + "\")");
+
             isExecutableZeroFilledSectionPresent = true;
             executableZeroFilledSectionIndex = t;
         }
@@ -3576,6 +3580,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     // Checks for high entropy (ignore overlay)
     if (!(PE_Cached.isDynamicLinkLibrary && (PE.section[".rdata"] || PE.isSectionNamePresent(".rsrc"))) && // .dll with resources
         PE.calculateEntropy(PE_Cached.dosStubSize, PE_Cached.imageBodySize) > 7.3) {
+        log(logType.any, "High overall image entropy detected");
+
         isHighEntropy = true;
     }
 
@@ -3595,7 +3601,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             var name = PE.getImportLibraryName(i);
             importNamesDict[name] = (importNamesDict[name] || 0) + 1;
             if (importNamesDict[name] >= 3) {
-                log(logType.nothing, "Recurring import name: \"" + name + "\"");
+                log(logType.any, "Recurring import name: \"" + File.cleanString(name) + "\"");
 
                 recurringImports = true;
             }
@@ -3681,6 +3687,8 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
         var isLicenseCheckingPresent = false;
 
         if (validateNetObject("CheckLicense") || validateNetObject("set_License") || validateNetObject("Licensing")) {
+            log(logType.net, "Managed image contains licensing-related methods");
+
             isLicenseCheckingPresent = true;
         }
 
@@ -3694,6 +3702,8 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
         var isLicenseProviderPresent = false;
 
         if (validateNetObject("LicenseProviderAttribute")) {
+            log(logType.net, "Managed image uses the standard .NET license provider attribute");
+
             isLicenseProviderPresent = true;
         }
 
@@ -3707,6 +3717,8 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
         var isLicenseManagerPresent = false;
 
         if (validateNetObject("LicenseManager")) {
+            log(logType.net, "Managed image uses the standard .NET license manager");
+
             isLicenseManagerPresent = true;
         }
 
@@ -3728,6 +3740,8 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
             PE.isExportFunctionPresentExp(/^GetDenuvo(?:TimeTicketRequest|TicketLocation)$/)
         )
     )) {
+        log(logType.any, "Denuvo-like licensing layout detected");
+
         isDenuvoLibraryPresent = true;
     }
 
@@ -3741,6 +3755,8 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
     var isSteamStubPresent = false;
 
     if (PE_Cached.isArchX86 && PE.compareEP("E800000000") && PE.section[PE_Cached.numberOfSections - 1].Name === ".bind") {
+        log(logType.any, "SteamStub-like DRM layout detected");
+
         isSteamStubPresent = true;
     }
 
@@ -3900,7 +3916,11 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
             if (sectionOffset > 0 && sectionOffset < PE_Cached.fileSize) {
                 sectionSize = Math.min(sectionSize, PE_Cached.fileSize - sectionOffset);
-                isInterestingStringsFound = isLicensingStringPresentInArea(sectionOffset, sectionSize);
+                if (isLicensingStringPresentInArea(sectionOffset, sectionSize)) {
+                    log(logType.any, "Licensing-related string context detected");
+
+                    isInterestingStringsFound = true;
+                }
             }
         }
     }
@@ -3966,6 +3986,8 @@ function scanForBadFileFormat_NET_and_Native() {
     // It is expected when a TLS callback owns a deliberately virtual-only startup area.
     if (!isTlsVirtualEntryPoint &&
         (!isEntryPointCorrect || /^DB /.test(PE_Cached.firstEpAsmInstruction))) {
+        log(logType.any, "Entry point appears invalid or points to data");
+
         isEntryPointIncorrect = true;
     }
 
@@ -3979,6 +4001,8 @@ function scanForBadFileFormat_NET_and_Native() {
     var isSectionAlignmentIncorrect = false;
 
     if (!PE.isSectionAlignmentCorrect()) {
+        log(logType.any, "Section alignment appears invalid");
+
         isSectionAlignmentIncorrect = true;
     }
 
@@ -3992,6 +4016,8 @@ function scanForBadFileFormat_NET_and_Native() {
     var isFileAlignmentIncorrect = false;
 
     if (!PE.isFileAlignmentCorrect()) {
+        log(logType.any, "File alignment appears invalid");
+
         isFileAlignmentIncorrect = true;
     }
 
@@ -4005,6 +4031,8 @@ function scanForBadFileFormat_NET_and_Native() {
     var isHeaderIncorrect = false;
 
     if (!PE.isHeaderCorrect()) {
+        log(logType.any, "PE header validation failed");
+
         isHeaderIncorrect = true;
     }
 
@@ -4086,6 +4114,8 @@ function scanForBadFileFormat_NET_and_Native() {
     var isRelocsTableIncorrect = false;
 
     if (!PE.isRelocsTableCorrect()) {
+        log(logType.any, "Relocation table appears malformed");
+
         isRelocsTableIncorrect = true;
     }
 
@@ -4100,6 +4130,8 @@ function scanForBadFileFormat_NET_and_Native() {
     var isImportTableIncorrect = false;
 
     if (!PE.isImportTableCorrect()) {
+        log(logType.any, "Import table appears malformed");
+
         isImportTableIncorrect = true;
     }
 
@@ -4113,6 +4145,8 @@ function scanForBadFileFormat_NET_and_Native() {
     var isExportTableIncorrect = false;
 
     if (PE_Cached.isDynamicLinkLibrary && !PE.isExportTableCorrect()) {
+        log(logType.any, "Export table appears malformed");
+
         isExportTableIncorrect = true;
     }
 
@@ -4126,6 +4160,8 @@ function scanForBadFileFormat_NET_and_Native() {
     var isResourcesTableIncorrect = false;
 
     if (!PE.isResourcesTableCorrect()) {
+        log(logType.any, "Resource table appears malformed");
+
         isResourcesTableIncorrect = true;
     }
 
@@ -4301,6 +4337,8 @@ function scanForBadFileFormat_NET_and_Native() {
     var isNetImportsCorrupted = false;
 
     if (!PE_Cached.isDotNet && isNetMetaDataPresent() && PE_Cached.numberOfUnmanagedImports === 0) {
+        log(logType.net, "Managed metadata has no usable import table");
+
         isNetImportsCorrupted = true;
     }
 
@@ -4314,6 +4352,8 @@ function scanForBadFileFormat_NET_and_Native() {
     var isNetClrVersionCorrupted = false;
 
     if (PE_Cached.isDotNet && !isAsciiString(PE.getNETVersion())) {
+        log(logType.net, "CLR version string appears malformed");
+
         isNetClrVersionCorrupted = true;
     }
 
@@ -4330,6 +4370,8 @@ function scanForBadFileFormat_NET_and_Native() {
         var securityDirOffset = getOptHeaderOffset() + (PE_Cached.is64bit ? 0x90 : 0x80);
 
         if (PE.read_int32(securityDirOffset) !== 0 && PE.read_int32(securityDirOffset + 4) !== 0) {
+            log(logType.any, "Authenticode directory appears to reference missing data");
+
             isWindowsAuthenticodeStripped = true;
         }
     }
@@ -4393,7 +4435,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
     var isNetNativeDebugDataPresent = false;
 
     if (!PE_Cached.isDotNet && PE.isExportFunctionPresent("DotNetRuntimeDebugHeader")) {
-        log(logType.any, ".NET Native debug symbols detected");
+        log(logType.net, ".NET Native debug symbols detected");
 
         isNetNativeDebugDataPresent = true;
     }
@@ -4693,7 +4735,7 @@ function validateNetUnicodeString(ustring) {
  */
 function validateGlobalUnicodeString(ustring) {
     const result = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.imageBodySize, convertStringToUnicodeSignature(ustring)) !== -1;
-    if (result) log(logType.nothing, "Unicode string found: \"" + ustring + "\"");
+    if (result) log(logType.any, "Unicode string found: \"" + ustring + "\"");
     return result;
 }
 
@@ -4835,7 +4877,7 @@ function isNameObfuscated(name) {
             }
 
             if (isTokenObfuscated(currentToken)) {
-                log(logType.nothing, "Obfuscated string segment: \"" + currentToken + "\" in \"" + name + "\"");
+                log(logType.any, "Obfuscated string segment: \"" + File.cleanString(currentToken) + "\" in \"" + File.cleanString(name) + "\"");
 
                 return true;
             }
@@ -4850,7 +4892,7 @@ function isNameObfuscated(name) {
     for (var start = 0; start < name.length; start += CHUNK_SIZE) {
         const chunk = name.substring(start, start + CHUNK_SIZE);
         if (isTokenObfuscated(chunk)) {
-            log(logType.nothing, "Obfuscated string chunk: \"" + chunk + "\" in \"" + name + "\"");
+            log(logType.any, "Obfuscated string chunk: \"" + File.cleanString(chunk) + "\" in \"" + File.cleanString(name) + "\"");
 
             return true;
         }
