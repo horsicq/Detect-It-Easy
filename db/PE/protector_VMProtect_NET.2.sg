@@ -18,9 +18,12 @@ function detect() {
         PE.isNetObjectPresent("get_IsAttached") &&
         PE.isNetObjectPresent("OpCodes")) {
 
+        var firstSection = PE.section[0];
+
         const
             chunk = "%% %% %% %% %% %% %% %% 00", // chunk size is 8 bytes
-            scanBytes = PE.getSize() - PE.getOverlaySize();
+            imageEndOffset = PE.getSize() - PE.getOverlaySize(),
+            scanBytes = imageEndOffset - firstSection.FileOffset;
 
         var globalBigPattern = "00";
 
@@ -28,9 +31,8 @@ function detect() {
             globalBigPattern += chunk;
         }
 
-        var firstSection = PE.section[0];
-
-        if (PE.isSignaturePresent(firstSection.FileOffset, scanBytes, "'<Module>' 00" + chunk) &&
+        if (scanBytes > 0 &&
+            PE.isSignaturePresent(firstSection.FileOffset, scanBytes, "'<Module>' 00" + chunk) &&
             PE.isSignaturePresent(firstSection.FileOffset, scanBytes, globalBigPattern)) {
             sVersion = "3.X";
             bDetected = true;

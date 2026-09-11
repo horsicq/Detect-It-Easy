@@ -281,7 +281,8 @@ function initializeCache() {
 
     var cacheMap = {
         /* Computed values */
-        /* Number  */ imageBodySize: function () { return fileSize - overlaySize - dosStubOffset - dosStubSize; },
+        /* Number  */ imageBodyOffset: function () { return dosStubOffset + dosStubSize; },
+        /* Number  */ imageBodySize: function () { return Math.max(0, fileSize - overlaySize - dosStubOffset - dosStubSize); },
         /* Number  */ fileSize: function () { return fileSize; },
         /* Number  */ imageSubsystem: function () { return PE.getImageOptionalHeader("Subsystem"); },
         /* RegExp  */ obfuscationWhitelist: function () { return new RegExp(obfuscationWhitelistSources.join("|")); },
@@ -843,7 +844,7 @@ function scanForObfuscations_NET() {
 
 
 
-    const ctorSignatureOffset = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.imageBodySize, "'<Module>'00**");
+    const ctorSignatureOffset = PE.findSignature(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize, "'<Module>'00**");
     const afterCtorOffset = ctorSignatureOffset !== -1 ? ctorSignatureOffset + 8 : -1;
 
 
@@ -985,10 +986,12 @@ function scanForObfuscations_NET() {
 
     var isModuleCtorMultiple = false;
 
-    var currentCtorOffset = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.imageBodySize, "00'<Module>'00");
+    var currentCtorOffset = PE.findSignature(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize, "00'<Module>'00");
 
     if (currentCtorOffset !== -1) {
-        var secondCtorNameOffset = PE.findSignature(currentCtorOffset + 10, PE_Cached.imageBodySize, "'<Module>'");
+        var secondCtorSearchOffset = currentCtorOffset + 10,
+            secondCtorSearchSize = PE_Cached.fileSize - PE_Cached.overlaySize - secondCtorSearchOffset,
+            secondCtorNameOffset = secondCtorSearchSize > 0 ? PE.findSignature(secondCtorSearchOffset, secondCtorSearchSize, "'<Module>'") : -1;
 
         if (secondCtorNameOffset !== -1 && PE.readByte(secondCtorNameOffset + 8) !== 0x00) {
             log(logType.net, "Fake <Module> detected! Offset: 0x" + Number(secondCtorNameOffset).toString(16));
@@ -4629,7 +4632,7 @@ function isFrameworkComponent() {
  */
 function validateSignature(pattern) {
     const
-        offsetFound = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.imageBodySize, pattern),
+        offsetFound = PE.findSignature(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize, pattern),
         resultBool = offsetFound !== -1;
 
     if (resultBool) {
@@ -4733,7 +4736,7 @@ function validateNetUnicodeString(ustring) {
  * @sideEffects Writes a general log entry when the string is found.
  */
 function validateGlobalUnicodeString(ustring) {
-    const result = PE.findSignature(PE_Cached.dosStubSize, PE_Cached.imageBodySize, convertStringToUnicodeSignature(ustring)) !== -1;
+    const result = PE.findSignature(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize, convertStringToUnicodeSignature(ustring)) !== -1;
     if (result) log(logType.any, "Unicode string found: \"" + ustring + "\"");
     return result;
 }
@@ -9694,7 +9697,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
             langName = extdb[i][0],
             langExtName = extdb[i][1];
 
-        if (PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.imageBodySize, "%% %% %% %% %% %% %% %% '." + langExtName + "' 00")) {
+        if (PE.isSignaturePresent(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize, "%% %% %% %% %% %% %% %% '." + langExtName + "' 00")) {
             log(logType.any, "Lines of ." + langExtName + " files (" + langName + ") detected");
 
             _setLangByHeur(langName);
@@ -9702,7 +9705,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
     }
 
 
-    if (!_isLangDetected("C++") && PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.imageBodySize, "%% %% %% %% %% %% %% %% %% %% '.c' 00")) {
+    if (!_isLangDetected("C++") && PE.isSignaturePresent(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize, "%% %% %% %% %% %% %% %% %% %% '.c' 00")) {
         log(logType.any, "Lines of .c files (C) detected (not a C++)");
 
         _setLangByHeur("C");
@@ -9938,7 +9941,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
         }
     }
 
-    if (isPpLibraryPresent || (c_cpp && PE.isSignaturePresent(PE_Cached.dosStubSize, PE_Cached.imageBodySize, "' C++ '"))) {
+    if (isPpLibraryPresent || (c_cpp && PE.isSignaturePresent(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize, "' C++ '"))) {
         _setLangByHeur("C++");
     } else if (!_isLangPresent("C++") && isCLibraryPresent && (PE.isFunctionPresent("_iob") || PE.isFunctionPresent("printf") || PE.isFunctionPresent("malloc") || PE.isFunctionPresent("memset"))) {
         _setLangByHeur("C");
@@ -11063,7 +11066,8 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://en.wikipedia.org/wiki/CIH_(computer_virus)
 
-    if (verdicts.length === 0 && PE_Cached.isArchX86 && !PE_Cached.is64bit && PE.compareEP("55")) { // push ebp
+    if (verdicts.length === 0 && PE_Cached.isArchX86 && !PE_Cached.is64bit &&
+        PE_Cached.indexOfEntryPointSection !== -1 && PE.compareEP("55")) { // push ebp
         const instructionsOfWin9xCih = [
             "8D 44 24 F8" +    // lea eax, [esp - 8]
             ".. DB",           // xor/sub/... ebx, ebx
@@ -11076,10 +11080,14 @@ function scanForMaliciousCode_NET_and_Native() {
             "50"               // push eax
         ];
 
-        var offsetSearchFrom = PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint);
+        var offsetSearchFrom = PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint),
+            entryPointSectionEndOffset = PE.getSectionFileOffset(PE_Cached.indexOfEntryPointSection) +
+                PE.getSectionFileSize(PE_Cached.indexOfEntryPointSection);
 
         for (var i = 0; i < instructionsOfWin9xCih.length; i++) {
-            var foundInstructionPatternAt = PE.findSignature(offsetSearchFrom, 0x20, instructionsOfWin9xCih[i]);
+            var instructionSearchSize = Math.min(0x20, entryPointSectionEndOffset - offsetSearchFrom);
+            var foundInstructionPatternAt = instructionSearchSize > 0 ?
+                PE.findSignature(offsetSearchFrom, instructionSearchSize, instructionsOfWin9xCih[i]) : -1;
 
             if (foundInstructionPatternAt === -1) {
                 break;
@@ -11242,7 +11250,7 @@ function scanForMaliciousCode_NET_and_Native() {
             /^[RW]$/.test(PE.getResourceNameByNumber(0)) ||   // "R" or "W"
             /^[A-Z]{3}$/.test(PE.getResourceNameByNumber(0))  // like "XIA"
         )) {
-            if (PE.isSignaturePresent(PE.resource[0].FileOffset, 32, "'MZ' 90") && // Embedded PE
+            if (PE.isSignaturePresent(PE.resource[0].FileOffset, Math.min(PE.resource[0].FileSize, 32), "'MZ' 90") && // Embedded PE
                 PE.isSignaturePresent(PE.resource[0].FileOffset, PE.resource[0].FileSize, "%% '.wnry'")) {
                 isWannaCryDetected = true;
             } else { // Embedded ZIP and other modified variants
