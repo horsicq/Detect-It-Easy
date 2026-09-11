@@ -7565,6 +7565,9 @@ function scanForObfuscations_Native() {
         epBitstreamMovsbCount = 0,
         epRedundantPrefixInstructionCount = 0,
         epMaximumRedundantPrefixCount = 0,
+        epExportResolverFieldCount = 0,
+        epApiHashMaximumTransformCount = 0,
+        epApiHashMaximumTransformKindCount = 0,
         epCallPopIpRecoveryAddress = -1,
         epSelfModifyingCallStubAddress = -1,
         epInvalidBranchSourceAddress = -1,
@@ -7578,8 +7581,20 @@ function scanForObfuscations_Native() {
 
     var epInvalidBranchTargetOpCode = String();
 
+    var epExportResolverHeaderAccessPresent = false;
+
+    var epExportResolverDirectoryAccessPresent = false,
+        epApiHashByteReadPresent = false,
+        epApiHashBackwardControlFlowPresent = false,
+        epHashedApiResolverIndirectTransferPresent = false;
+
     // Count generic self-modifying call stubs per section; one loose match is insufficient.
     var epRepeatedSelfModifyingCallStubCountBySection = {};
+
+    // These service facts are retained only for a previously proven PEB loader walk.
+    // They are converted into one verdict after the shared EP traversal is complete.
+    var epExportResolverFieldsFound = {},
+        epApiHashTransformsByRegister = {};
 
     if ((!PE_Cached.isDynamicLinkLibrary || hasWritableExecutableSection) &&
         !PE_Cached.isDriver && PE_Cached.isArchX86 &&
@@ -7597,6 +7612,18 @@ function scanForObfuscations_Native() {
             epRepeatedSelfModifyingCallStubMaximumWriteDistance = 0x100,
             epShiftRotatePattern = /^(?:SAL|SHL|SHR|SAR|ROL|ROR|RCL|RCR) (.+), (0X[0-9A-F]+|\d+)$/i,
             epStackMutationPattern = /^(ADD|SUB|ADC|SBB|AND|OR|XOR|INC|DEC|NEG|NOT|SAL|SHL|SHR|SAR|ROL|ROR|RCL|RCR|XADD|XCHG) (?:(?:BYTE|WORD|DWORD|QWORD) PTR )?(?:[A-Z]+:)?\[[^\]]*\b(?:ESP|RSP)\b[^\]]*\](?:,|$)/i,
+            // Follow the architecture-neutral manual export-resolution sequence:
+            // DOS.e_lfanew, the PE32/PE32+ Export directory slot, then independent
+            // IMAGE_EXPORT_DIRECTORY fields. Constants alone never produce a verdict.
+            epExportResolverHeaderAccessPattern = /\[[^\]]*\+\s*(?:0X0*3C|60)(?:\]|\s|\+|-)/i,
+            epExportResolverDirectoryAccessPattern = PE_Cached.isI386 ?
+                /\[[^\]]*\+\s*(?:0X0*78|120)(?:\]|\s|\+|-)/i :
+                /\[[^\]]*\+\s*(?:0X0*88|136)(?:\]|\s|\+|-)/i,
+            epExportResolverFieldAccessPattern = /\[[^\]]*\+\s*(0X0*(?:18|1C|20|24)|24|28|32|36)(?:\]|\s|\+|-)/i,
+            epApiHashByteReadPattern = /^(?:MOV(?:ZX|SX)? [^,]+, BYTE PTR (?:[A-Z]+:)?\[[^\]]+\]|LODSB(?: |$))/i,
+            // Hash arithmetic must accumulate on one physical register. Register spelling
+            // is normalized later so EAX/RAX and R8D/R8 cannot split the same data flow.
+            epApiHashTransformPattern = new RegExp("^(ROR|ROL|XOR|ADD|ADC|SUB|IMUL) (" + epGeneralPurposeRegister + "),", "i"),
             epPopGeneralPurposeRegisterPattern = new RegExp("^POP (" + epGeneralPurposeRegister + ")$", "i"),
             epBitstreamGeneralPurposeRegister = "(?:[ABCD][HL]|BPL|SIL|DIL|R(?:8|9|1[0-5])B|" + epFlagsGeneralPurposeRegister + ")",
             epBitstreamAdcPattern = new RegExp("^ADC (" + epBitstreamGeneralPurposeRegister + "), \\1$", "i"),
