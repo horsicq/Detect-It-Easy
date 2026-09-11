@@ -1733,7 +1733,7 @@ function scanForAntiAnalysis_Native() {
     var isNativeAntiDebugPresent = false,
         nativeAntiDebugType = String();
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const antiDebugNativeRegister = PE_Cached.isI386 ? "E(?:AX|BX|CX|DX|SI|DI|BP)" :
             "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
@@ -6074,7 +6074,7 @@ function scanForObfuscations_Native() {
     if (PE_Cached.isArchX86) {
         // Check first 30 instructions for "Stack-push address near EP"
         // This trick uses "CALL $+5" (E8 00 00 00 00) to push next instruction address on stack
-        if (!PE_Cached.isDynamicLinkLibrary) {
+        if (PE_Cached.isEntryPointAnalysisAllowed) {
             for (var i = 0; i < 32 && !isAddrToStackTrickPresent; i++) {
                 var currentInstruction = emulateAndGetAsmInstructionByIndex(i),
                     addrToStackOpCode = getAsmOpCode(currentInstruction);
@@ -6176,7 +6176,7 @@ function scanForObfuscations_Native() {
 
     var isStackPivotEpTransferPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         // Track only statically proven image addresses. Unknown instructions invalidate this
         // lightweight state, preventing a generic PUSH register; RET sequence from matching.
         var syntheticEpTargetAddress = String(),
@@ -6386,7 +6386,7 @@ function scanForObfuscations_Native() {
 
     var isOpaqueEpBranchPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         const opaqueEpAllOnesFlagsAlwaysTakenBranches = [
             "JA", "JNBE", "JAE", "JNB", "JNC", "JNE", "JNZ", "JL",
             "JNGE", "JLE", "JNG", "JNO", "JS", "JP", "JPE"
@@ -6564,6 +6564,8 @@ function scanForObfuscations_Native() {
 
     var isRedundantEpRegisterSelfMovePresent = false;
 
+    // Microsoft hybrid-architecture DLL thunks can contain a genuine register self-move.
+    // Keep this weak standalone signal executable-only instead of labeling compatibility code.
     if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
         for (var i = 0; i < 32 && !isRedundantEpRegisterSelfMovePresent; i++) {
             var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
@@ -6590,7 +6592,7 @@ function scanForObfuscations_Native() {
 
     var isDegenerateEpConditionalBranchPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         var degenerateEpBranchOpCode = String(),
             degenerateEpBranchTarget = -1,
             degenerateEpNeutralInstructionCount = 0,
@@ -6671,7 +6673,7 @@ function scanForObfuscations_Native() {
 
     var isRedundantEpStackRoundTripPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         var redundantEpPushedRegister = String(),
             redundantEpStackNeutralInstructionCount = 0;
 
@@ -6719,7 +6721,7 @@ function scanForObfuscations_Native() {
 
     var isReversibleEpJunkPairPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         var reversibleEpOpCode = String(),
             reversibleEpRegister = String(),
             reversibleEpLiteral = String(),
@@ -6813,7 +6815,7 @@ function scanForObfuscations_Native() {
 
     var isConstantOpaqueEpComparisonPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         var constantEpKnownRegisterValues = {},
             constantEpComparisonOrigin = String(),
             constantEpNeutralInstructionCount = 0;
@@ -6945,7 +6947,7 @@ function scanForObfuscations_Native() {
 
     var isPebModuleWalkPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const pebModuleWalkNativeRegister = PE_Cached.isI386 ? "E(?:AX|BX|CX|DX|SI|DI|BP)" :
             "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
@@ -7052,7 +7054,7 @@ function scanForObfuscations_Native() {
 
     var isFpuEpRecoveryPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && PE_Cached.isI386 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isI386 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         var isFpuEnvironmentStored = false,
             fpuEpNeutralInstructionCount = 0,
@@ -7130,7 +7132,7 @@ function scanForObfuscations_Native() {
 
     var privilegedEpOpCodeDetected = String();
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const privilegedEpOpCodes = [
             "CLAC", "CLGI", "CLI", "CLTS", "HLT", "IN", "INSB", "INSD", "INSW",
@@ -7174,7 +7176,7 @@ function scanForObfuscations_Native() {
 
     var isSystemEpProbePresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const systemEpProbeOpCodes = ["SGDT", "SIDT", "SLDT", "SMSW", "STR"];
 
@@ -7207,7 +7209,7 @@ function scanForObfuscations_Native() {
 
     var isDirectEpSystemCallPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         // Scan the bounded startup stream for kernel-entry instructions emitted directly
         // by the image rather than reached through an imported operating-system wrapper.
@@ -7239,7 +7241,7 @@ function scanForObfuscations_Native() {
 
     var isOverlappingEpCodePresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         var overlappingEpInstructionStarts = {},
             overlappingEpBranchTargets = [],
@@ -7307,7 +7309,7 @@ function scanForObfuscations_Native() {
 
     var isIndirectEpTransferPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const indirectEpTransferPattern = new RegExp("^(JMP|CALL) (" + epGeneralPurposeRegister + ")$", "i"),
             indirectEpRegisterWritePattern = new RegExp("^(?:MOV(?:ABS)?|MOVZX|MOVSX|MOVSXD|LEA|XOR|ADD|SUB|ADC|SBB|AND|OR|NOT|NEG|INC|DEC|POP) (" + epGeneralPurposeRegister + ")(?:,|$)", "i");
@@ -7429,7 +7431,7 @@ function scanForObfuscations_Native() {
 
     var isEpTrapFlagCheckPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const trapFlagNativeRegister = PE_Cached.isI386 ? "E(?:AX|BX|CX|DX|SI|DI|BP)" :
             "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
@@ -8696,28 +8698,28 @@ function scanForObfuscations_Native() {
         "RDSEED"  // 0F C7 /7
     ], strangeOpCodeDetected = String();
 
-    if (PE_Cached.isArchX86) {
+    // Report the exact observable opcode without inferring why the image executes it.
+    // CPU dispatch, timing, anti-analysis and protected startup remain distinguishable.
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         for (var x = 0; x < strangeOpCodesNearEp.length; x++) {
             const opCodeToCheck = strangeOpCodesNearEp[x];
-            // Check the first 15 instructions for the current unusual opcode.
-            if (!PE_Cached.isDynamicLinkLibrary) {
-                for (var i = 0; i < 15 && !isStrangeOpCodeNearEpPresent; i++) {
-                    var asmInstruction = emulateAndGetAsmInstructionByIndex(i);
 
-                    if (!asmInstruction) break; // Safety check
+            for (var i = 0; i < 15 && !isStrangeOpCodeNearEpPresent; i++) {
+                var asmInstruction = emulateAndGetAsmInstructionByIndex(i);
 
-                    var currentEpOpCode = getAsmOpCode(asmInstruction);
+                if (!asmInstruction) break; // Safety check
 
-                    // Check whether the instruction matches the requested opcode.
-                    if (currentEpOpCode === opCodeToCheck) {
-                        log(logType.emulation, opCodeToCheck + " near EP found at instruction index: " + i);
+                var currentEpOpCode = getAsmOpCode(asmInstruction);
 
-                        strangeOpCodeDetected = opCodeToCheck;
+                // Check whether the instruction matches the requested opcode.
+                if (currentEpOpCode === opCodeToCheck) {
+                    log(logType.emulation, opCodeToCheck + " near EP found at instruction index: " + i);
 
-                        isStrangeOpCodeNearEpPresent = true;
-                    } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") {
-                        break;
-                    }
+                    strangeOpCodeDetected = opCodeToCheck;
+
+                    isStrangeOpCodeNearEpPresent = true;
+                } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") {
+                    break;
                 }
             }
         }
@@ -8807,7 +8809,7 @@ function scanForObfuscations_Native() {
 
     var proxyJumpsAtEpPresent = false;
 
-    if (PE_Cached.isArchX86 && (
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 && (
         PE.compareEP("EB $$ EB") ||
         PE.compareEP("EB $$ E9") ||
         PE.compareEP("E9 ## ## ## ## EB") ||
