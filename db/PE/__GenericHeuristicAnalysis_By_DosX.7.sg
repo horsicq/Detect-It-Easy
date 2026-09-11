@@ -6146,9 +6146,11 @@ function scanForObfuscations_Native() {
 
     // Check for a non-standard entry-point transfer through RET. Normal PE startup code
     // does not return to a caller, while protected stubs use RET to conceal a direct jump.
-    // Supported variants: direct VA, a VA propagated through registers, and a x86 stack pivot.
+    // Supported variants: direct VA, a VA propagated through registers, and an x86/x64 stack pivot.
 
     var isSyntheticEpTransferPresent = false;
+
+    var isStackPivotEpTransferPresent = false;
 
     if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
         // Track only statically proven image addresses. Unknown instructions invalidate this
@@ -6172,12 +6174,20 @@ function scanForObfuscations_Native() {
             syntheticEpStoredRegisterPattern = new RegExp("^MOV " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (" + syntheticEpStackTransferRegister + ")$", "i"),
             syntheticEpPoppedRegisterPattern = new RegExp("^POP (" + epGeneralPurposeRegister + ")$", "i"),
             syntheticEpExchangedRegisterPattern = new RegExp("^XCHG " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (" + syntheticEpStackTransferRegister + ")$", "i"),
-            syntheticEpStoredAddressPattern = new RegExp("^MOV " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (0X[0-9A-F]+|\\d+)$", "i");
+            syntheticEpStoredAddressPattern = new RegExp("^MOV " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (0X[0-9A-F]+|\\d+)$", "i"),
+            // A pivot is accepted only when SP receives a complete native-width value.
+            // Scaled/indexed LEA forms are excluded because their result is not tracked.
+            syntheticEpStackPivotLiteralPattern = new RegExp("^MOV(?:ABS)? " + syntheticEpStackPointer + ", (0X[0-9A-F]+|\\d+)$", "i"),
+            syntheticEpStackPivotRegisterPattern = new RegExp("^(?:MOV|XCHG) " + syntheticEpStackPointer +
+                ", (" + syntheticEpStackTransferRegister + ")$|^LEA " + syntheticEpStackPointer +
+                ", \\[(" + syntheticEpStackTransferRegister + ")\\]$", "i");
 
         // Two related states are tracked independently: known register VAs and the value
         // currently proven to occupy the top stack slot. RET matches only the latter.
 
-        // Inspect the whole usual entry stub while using cached linear disassembly.
+        // Keep the stateful linear proof below the broader 256-instruction CFG budget.
+        // Register and stack provenance cannot safely cross arbitrary branch convergence;
+        // 128 instructions covers a substantial startup stub while bounding linear work.
         for (var i = 0; i < 128 && !isSyntheticEpTransferPresent; i++) {
             var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
                 currentEpOpCode = getAsmOpCode(currentEpInstruction);
