@@ -2364,6 +2364,7 @@ const
     IMAGE_DIRECTORY_ENTRY_EXCEPTION = 3,
     IMAGE_DIRECTORY_ENTRY_SECURITY = 4,
     IMAGE_DIRECTORY_ENTRY_TLS = 9,
+    IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG = 10,
     IMAGE_DIRECTORY_ENTRY_RESERVED = 15;
 
 const
@@ -4453,6 +4454,134 @@ function scanForBadFileFormat_NET_and_Native() {
     }
 
     if (isMalformedCertificateTablePresent) options = addOption(options, "Malformed certificate table");
+
+
+
+
+    // Validate only CFG fields physically present in the declared Load Config structure.
+    // Optional empty tables remain valid; contradictory pointer/count pairs and impossible
+    // mapped ranges are strong corruption evidence independent of compiler generation.
+
+    var isInvalidGuardCfMetadataPresent = false;
+
+    if (dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        // Load Config is versioned by its leading Size field. First prove that the directory
+        // itself exists, then never read beyond the smaller of both advertised sizes.
+        const
+            loadConfigDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG * 8,
+            loadConfigDirectoryRva = PE.read_uint32(loadConfigDirectoryEntryOffset),
+            loadConfigDirectorySize = PE.read_uint32(loadConfigDirectoryEntryOffset + 4),
+            loadConfigDirectoryAddress = PE_Cached.imageBase + loadConfigDirectoryRva,
+            guardCfMinimumLoadConfigSize = PE_Cached.is64bit ? 0x94 : 0x5C;
+
+        if (loadConfigDirectoryRva !== 0 && loadConfigDirectorySize >= 4 &&
+            isVirtualAddressRangeFileBacked(loadConfigDirectoryAddress, loadConfigDirectorySize, 0)) {
+            var loadConfigDirectoryOffset = PE.VAToOffset(loadConfigDirectoryAddress),
+                declaredLoadConfigSize = PE.read_uint32(loadConfigDirectoryOffset),
+                effectiveLoadConfigSize = Math.min(loadConfigDirectorySize, declaredLoadConfigSize);
+
+            if (effectiveLoadConfigSize >= guardCfMinimumLoadConfigSize) {
+                // Field offsets differ between PE32 and PE32+ because every VA-sized member
+                // expands to eight bytes in PE32+. GuardFlags itself remains a DWORD.
+                var guardCfCheckPointerOffset = PE_Cached.is64bit ? 0x70 : 0x48,
+                    guardCfDispatchPointerOffset = PE_Cached.is64bit ? 0x78 : 0x4C,
+                    guardCfFunctionTableOffset = PE_Cached.is64bit ? 0x80 : 0x50,
+                    guardCfFunctionCountOffset = PE_Cached.is64bit ? 0x88 : 0x54,
+                    guardCfFlagsOffset = PE_Cached.is64bit ? 0x90 : 0x58,
+                    guardCfCheckPointer = PE_Cached.is64bit ? readUnsignedQword(loadConfigDirectoryOffset + guardCfCheckPointerOffset) :
+                        PE.read_uint32(loadConfigDirectoryOffset + guardCfCheckPointerOffset),
+                    guardCfDispatchPointer = PE_Cached.is64bit ? readUnsignedQword(loadConfigDirectoryOffset + guardCfDispatchPointerOffset) :
+                        PE.read_uint32(loadConfigDirectoryOffset + guardCfDispatchPointerOffset),
+                    guardCfFunctionTable = PE_Cached.is64bit ? readUnsignedQword(loadConfigDirectoryOffset + guardCfFunctionTableOffset) :
+                        PE.read_uint32(loadConfigDirectoryOffset + guardCfFunctionTableOffset),
+                    guardCfFunctionCount = PE_Cached.is64bit ? readUnsignedQword(loadConfigDirectoryOffset + guardCfFunctionCountOffset) :
+                        PE.read_uint32(loadConfigDirectoryOffset + guardCfFunctionCountOffset),
+                    guardCfFlags = PE.read_uint32(loadConfigDirectoryOffset + guardCfFlagsOffset),
+                    isGuardCfMetadataDeclared = (PE.getImageOptionalHeader("DllCharacteristics") &
+                        IMAGE_DLLCHARACTERISTICS_GUARD_CF) || (guardCfFlags & 0x00000700);
+
+                // Old Load Config versions can physically contain these offsets without
+                // enabling CFG. Validate them only when the image explicitly declares CFG.
+                // Values beyond JavaScript's exact integer range cannot be safely classified.
+                // Skip those theoretical high-VA images instead of manufacturing corruption.
+                if (isGuardCfMetadataDeclared && guardCfCheckPointer !== -1 &&
+                    guardCfDispatchPointer !== -1 && guardCfFunctionTable !== -1 &&
+                    guardCfFunctionCount !== -1) {
+                    var nativePointerSize = PE_Cached.is64bit ? 8 : 4;
+
+                    // Check and dispatch fields are VAs of pointer-storage cells, not direct
+                    // function targets. They therefore need mapped storage, not executable code.
+                    if (guardCfCheckPointer !== 0 &&
+                        !isVirtualAddressRangeMapped(guardCfCheckPointer, nativePointerSize, 0)) {
+                        log(logType.any, "Guard CF check-function pointer is outside the mapped image: VA 0x" + guardCfCheckPointer.toString(16));
+
+                        isInvalidGuardCfMetadataPresent = true;
+                    } else if (guardCfDispatchPointer !== 0 &&
+                        !isVirtualAddressRangeMapped(guardCfDispatchPointer, nativePointerSize, 0)) {
+                        log(logType.any, "Guard CF dispatch-function pointer is outside the mapped image: VA 0x" + guardCfDispatchPointer.toString(16));
+
+                        isInvalidGuardCfMetadataPresent = true;
+                    } else if ((guardCfFunctionTable === 0) !== (guardCfFunctionCount === 0)) {
+                        // A table without a count is unused, and a count without a table is
+                        // impossible for the loader to enumerate; only the mismatched pair fails.
+                        log(logType.any, "Guard CF function-table pointer and entry count are inconsistent");
+
+                        isInvalidGuardCfMetadataPresent = true;
+                    } else if (guardCfFunctionTable !== 0) {
+                        // GuardFlags[31:28] extends each four-byte RVA with per-entry metadata.
+                        // Multiplication is checked before any conversion back to file offsets.
+                        var guardCfFunctionEntrySize = 4 + ((guardCfFlags >>> 28) & 0x0F),
+                            guardCfFunctionTableSize = guardCfFunctionCount * guardCfFunctionEntrySize,
+                            guardCfFunctionTableEnd = guardCfFunctionTable + guardCfFunctionTableSize - 1;
+
+                        if (guardCfFunctionTableSize <= 0 ||
+                            guardCfFunctionTableSize > 0x1FFFFFFFFFFFFF ||
+                            guardCfFunctionTableEnd > 0x1FFFFFFFFFFFFF ||
+                            PE.VAToOffset(guardCfFunctionTable) === -1 ||
+                            PE.VAToOffset(guardCfFunctionTableEnd) === -1) {
+                            log(logType.any, "Guard CF function table exceeds file-backed image data: VA 0x" + guardCfFunctionTable.toString(16));
+
+                            isInvalidGuardCfMetadataPresent = true;
+                        } else if (isVirtualAddressRangeFileBacked(guardCfFunctionTable, guardCfFunctionTableSize, 0)) {
+                            // A physically contiguous table can be decoded in one engine call.
+                            // Legal cross-section tables are left to the loader instead of
+                            // being misclassified through non-contiguous file offsets.
+                            var guardCfFunctionTableFileOffset = PE.VAToOffset(guardCfFunctionTable),
+                                guardCfFunctionTableData = PE.readBytes(guardCfFunctionTableFileOffset, guardCfFunctionTableSize),
+                                previousGuardCfFunctionRva = -1;
+
+                            for (var i = 0; i < guardCfFunctionTableData.length &&
+                                !isInvalidGuardCfMetadataPresent; i += guardCfFunctionEntrySize) {
+                                var guardCfFunctionIndex = i / guardCfFunctionEntrySize,
+                                    guardCfFunctionRva = readUnsignedDwordFromBuffer(guardCfFunctionTableData, i);
+
+                                // The loader binary-searches this table, so descending RVAs are
+                                // contradictory. Equal RVAs remain allowed for toolchain metadata.
+                                if (guardCfFunctionRva < previousGuardCfFunctionRva) {
+                                    log(logType.any, "Guard CF function entry #" + guardCfFunctionIndex +
+                                        " is out of order: RVA 0x" + guardCfFunctionRva.toString(16));
+
+                                    isInvalidGuardCfMetadataPresent = true;
+                                } else if (!isVirtualAddressRangeFileBacked(PE_Cached.imageBase + guardCfFunctionRva, 1, SECTION_FLAGS_EXECUTE)) {
+                                    log(logType.any, "Guard CF function entry #" + guardCfFunctionIndex +
+                                        " points outside executable code: RVA 0x" + guardCfFunctionRva.toString(16));
+
+                                    isInvalidGuardCfMetadataPresent = true;
+                                }
+
+                                previousGuardCfFunctionRva = guardCfFunctionRva;
+                            }
+
+                            // Clean up: release the potentially large Guard CF table buffer
+                            guardCfFunctionTableData = undefined;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (isInvalidGuardCfMetadataPresent) options = addOption(options, "Invalid Guard CF metadata");
 
 
 
