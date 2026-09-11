@@ -7548,18 +7548,6 @@ function scanForObfuscations_Native() {
     // verdicts. Direct calls and conditional branches retain both possible continuations;
     // unconditional jumps retain only their target, and terminal instructions end the path.
 
-    var hasWritableExecutableSection = false;
-
-    if (PE_Cached.isDynamicLinkLibrary) {
-        // DLL startup is normally compiler-generated. Admit it to this expensive pass only
-        // when writable executable memory provides a concrete self-modification prerequisite.
-        for (var i = 0; i < PE_Cached.numberOfSections && !hasWritableExecutableSection; i++) {
-            if ((PE.section[i].Characteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) {
-                hasWritableExecutableSection = true;
-            }
-        }
-    }
-
     // Collect orthogonal behavioral facts during one CFG walk. Separate counters let the
     // verdict rules below combine only the evidence relevant to their own FP threshold.
     const
@@ -7622,7 +7610,7 @@ function scanForObfuscations_Native() {
     var epExportResolverFieldsFound = {},
         epApiHashTransformsByRegister = {};
 
-    if ((!PE_Cached.isDynamicLinkLibrary || hasWritableExecutableSection) &&
+    if (PE_Cached.isEntryPointAnalysisAllowed &&
         !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         // Global and local limits bound the reachable graph and every secondary proof.
@@ -8499,9 +8487,9 @@ function scanForObfuscations_Native() {
 
     var isHashedApiResolverPresent = false;
 
-    // Limit the standalone resolver verdict to executable startup. DLL initialization can
-    // legitimately enumerate loader modules and resolve optional exports during attachment.
-    if (!PE_Cached.isDynamicLinkLibrary && isPebModuleWalkPresent &&
+    // A complete resolver remains abnormal in either process or DLL startup. Ordinary DLL
+    // initialization may inspect loader state, but does not satisfy the full export/hash chain.
+    if (PE_Cached.isEntryPointAnalysisAllowed && isPebModuleWalkPresent &&
         epExportResolverHeaderAccessPresent && epExportResolverDirectoryAccessPresent &&
         epExportResolverFieldCount >= 2 && epApiHashByteReadPresent &&
         epApiHashMaximumTransformCount >= 2 && epApiHashMaximumTransformKindCount >= 2 &&
@@ -8555,7 +8543,7 @@ function scanForObfuscations_Native() {
 
     var isCallPopEpIpRecoveryPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && epCallPopIpRecoveryAddress !== -1) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && epCallPopIpRecoveryAddress !== -1) {
         // The shared pass already validated both the Pop target and later pointer use.
         log(logType.emulation, "Call/Pop IP recovery near EP");
 
@@ -8589,7 +8577,7 @@ function scanForObfuscations_Native() {
 
     var isBitstreamEpUnpackerPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary &&
+    if (PE_Cached.isEntryPointAnalysisAllowed &&
         epBitstreamAdcCount >= 8 && epBitstreamMovsbCount >= 2 && epBitstreamIndirectTransferPresent) {
         // Require all three independent components before reporting the compound behavior.
         log(logType.emulation, "Bitstream unpacker near EP: Adc: " + epBitstreamAdcCount + ", Rep Movsb: " + epBitstreamMovsbCount);
@@ -8606,7 +8594,7 @@ function scanForObfuscations_Native() {
 
     var isNoncanonicalEpShiftPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && epNoncanonicalShiftCount >= 5) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && epNoncanonicalShiftCount >= 5) {
         // Five encodings establish a generator habit rather than one hand-written oddity.
         log(logType.emulation, "Noncanonical shifts near EP: " + epNoncanonicalShiftCount);
 
@@ -8622,7 +8610,7 @@ function scanForObfuscations_Native() {
 
     var isComplexEpStackMutationPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && epStackMutationCount >= 4 && epComplexStackMutationCount !== 0) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && epStackMutationCount >= 4 && epComplexStackMutationCount !== 0) {
         // Density supplies repetition; the uncommon transform supplies specificity.
         log(logType.emulation, "Stack mutations near EP: " + epStackMutationCount + " (complex: " + epComplexStackMutationCount + ")");
 
@@ -8640,7 +8628,7 @@ function scanForObfuscations_Native() {
 
     var isMixedEpBitOpsPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary &&
+    if (PE_Cached.isEntryPointAnalysisAllowed &&
         epFlagsTransferPresent && epRolPresent && epRorPresent && epAdcPresent && epRareBitOpCount >= 5) {
         // Every mandatory family must be reachable; isolated arithmetic is insufficient.
         log(logType.emulation, "Mixed bit-operation families near EP: " + epRareBitOpCount);
@@ -8659,7 +8647,7 @@ function scanForObfuscations_Native() {
 
     var isPolymorphicEpFlowPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary &&
+    if (PE_Cached.isEntryPointAnalysisAllowed &&
         epPolymorphismBranchCount >= epPolymorphismBranchRequiredCount &&
         epPolymorphismBackwardControlFlowCount !== 0 &&
         epPolymorphismCallCount >= epPolymorphismCallRequiredCount &&
