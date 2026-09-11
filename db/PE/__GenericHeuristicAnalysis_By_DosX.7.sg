@@ -9630,6 +9630,114 @@ function getOptHeaderOffset() {
 
 
 /**
+ * Reads an unsigned little-endian DWORD from an already bounded byte buffer.
+ *
+ * @param {Array} dataBuffer - Byte array returned by PE.readBytes().
+ * @param {number} offset - Zero-based offset inside the array.
+ * @returns {number} Unsigned 32-bit value.
+ */
+function readUnsignedDwordFromBuffer(dataBuffer, offset) {
+    // JavaScript bitwise operators return signed 32-bit values. The final unsigned
+    // shift preserves RVA values above 0x7FFFFFFF as positive Numbers.
+    return (dataBuffer[offset] |
+        (dataBuffer[offset + 1] << 8) |
+        (dataBuffer[offset + 2] << 16) |
+        (dataBuffer[offset + 3] << 24)) >>> 0;
+}
+
+
+
+/**
+ * Reads a little-endian QWORD when JavaScript can represent it exactly.
+ *
+ * @param {number} offset - File offset of the eight-byte value.
+ * @returns {number} Exact unsigned value, or -1 when it exceeds Number precision.
+ */
+function readUnsignedQword(offset) {
+    var lowDword = PE.read_uint32(offset),
+        highDword = PE.read_uint32(offset + 4);
+
+    // Number.MAX_SAFE_INTEGER has only 53 exact integer bits. Reject a high part wider
+    // than 21 bits instead of silently rounding an address to adjacent file data.
+    if (highDword > 0x1FFFFF) return -1;
+
+    // Arithmetic composition is intentional: bitwise operators would truncate the QWORD.
+    return lowDword + highDword * 0x100000000;
+}
+
+
+
+/**
+ * Proves that a virtual-address range belongs to one mapped image section.
+ *
+ * @param {number} address - Virtual address at the beginning of the range.
+ * @param {number} size - Required byte count.
+ * @param {number} requiredSectionFlags - Complete section-characteristic mask, or zero.
+ * @returns {boolean} True when the loader maps the whole range with every required flag.
+ */
+function isVirtualAddressRangeMapped(address, size, requiredSectionFlags) {
+    // Reject empty and wrapped ranges before subtracting ImageBase. Keeping all values
+    // as Numbers avoids signed 32-bit truncation on normal PE32+ addresses.
+    if (address < PE_Cached.imageBase || size <= 0 || address + size <= address) return false;
+
+    var rangeRva = address - PE_Cached.imageBase;
+
+    for (var i = 0; i < PE_Cached.numberOfSections; i++) {
+        // The loader maps the larger virtual/raw extent. Requiring the complete range to
+        // stay in one section prevents a valid start from hiding an unmapped tail.
+        var sectionRva = PE.getSectionVirtualAddress(i),
+            sectionMappedSize = Math.max(PE.getSectionVirtualSize(i), PE.getSectionFileSize(i)),
+            rangeOffsetInSection = rangeRva - sectionRva;
+
+        // Unsigned comparison is required for IMAGE_SCN_MEM_WRITE (0x80000000), which
+        // JavaScript otherwise represents as a negative bitwise result.
+        if (rangeOffsetInSection >= 0 && rangeOffsetInSection + size <= sectionMappedSize &&
+            ((PE.section[i].Characteristics & requiredSectionFlags) >>> 0) === (requiredSectionFlags >>> 0)) return true;
+    }
+
+    return false;
+}
+
+
+
+/**
+ * Proves that a virtual-address range belongs to one physically backed section.
+ *
+ * @param {number} address - Virtual address at the beginning of the range.
+ * @param {number} size - Required byte count.
+ * @param {number} requiredSectionFlags - Complete section-characteristic mask, or zero.
+ * @returns {boolean} True only when the whole range is file-backed and has every required flag.
+ */
+function isVirtualAddressRangeFileBacked(address, size, requiredSectionFlags) {
+    // This helper is intentionally stricter than isVirtualAddressRangeMapped(): callers
+    // intend to read bytes from disk, so virtual padding is never an acceptable match.
+    if (address < PE_Cached.imageBase || size <= 0 || address + size <= address) return false;
+
+    var rangeRva = address - PE_Cached.imageBase;
+
+    for (var i = 0; i < PE_Cached.numberOfSections; i++) {
+        var sectionRva = PE.getSectionVirtualAddress(i),
+            sectionRawSize = PE.getSectionFileSize(i),
+            rangeOffsetInSection = rangeRva - sectionRva;
+
+        if (rangeOffsetInSection >= 0 && rangeOffsetInSection + size <= sectionRawSize &&
+            ((PE.section[i].Characteristics & requiredSectionFlags) >>> 0) === (requiredSectionFlags >>> 0)) {
+            var rangeOffset = PE.getSectionFileOffset(i) + rangeOffsetInSection;
+
+            // Validate both endpoints through the engine as well as local section math.
+            // This rejects truncated files, overlapping mappings and translation anomalies.
+            return rangeOffset >= 0 && rangeOffset + size <= PE_Cached.fileSize &&
+                PE.VAToOffset(address) === rangeOffset &&
+                PE.VAToOffset(address + size - 1) === rangeOffset + size - 1;
+        }
+    }
+
+    return false;
+}
+
+
+
+/**
  * Checks whether the PE Optional Header contains a non-empty CLR Runtime Header directory.
  *
  * This low-level fallback reads `NumberOfRvaAndSizes`, then the CLR directory's
