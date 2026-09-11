@@ -260,7 +260,20 @@ function initializeCache() {
         fileSize = PE.getSize(),
         overlaySize = PE.getOverlaySize(),
         dosStubOffset = PE.getDosStubOffset(),
-        dosStubSize = PE.getDosStubSize();
+        dosStubSize = PE.getDosStubSize(),
+        imageBase = PE.getImageBase(),
+        addressOfUnmanagedEntryPoint = PE.getAddressOfEntryPoint(),
+        isDynamicLinkLibrary = PE.isDll(),
+        isDriver = PE.isDriver(),
+        isEntryPointCorrect = PE.isEntryPointCorrect();
+
+    // A DLL with AddressOfEntryPoint zero has no loader initializer. Requiring a valid,
+    // file-backed address keeps resource-only and deliberately entryless DLLs out of every
+    // EP rule. Drivers and executable images retain their established analysis policy.
+    const hasUnmanagedEntryPoint = addressOfUnmanagedEntryPoint > imageBase;
+    const isEntryPointAnalysisAllowed = !isDynamicLinkLibrary ||
+        (!isDriver && hasUnmanagedEntryPoint && isEntryPointCorrect &&
+            PE.VAToOffset(addressOfUnmanagedEntryPoint) !== -1);
 
     var obfuscationWhitelistSources = [],
         obfuscationWhitelistInsensitiveSources = [];
@@ -287,15 +300,18 @@ function initializeCache() {
         /* Number  */ imageSubsystem: function () { return PE.getImageOptionalHeader("Subsystem"); },
         /* RegExp  */ obfuscationWhitelist: function () { return new RegExp(obfuscationWhitelistSources.join("|")); },
         /* RegExp  */ obfuscationWhitelistInsensitive: function () { return new RegExp(obfuscationWhitelistInsensitiveSources.join("|"), "i"); },
+        /* Boolean */ hasUnmanagedEntryPoint: function () { return hasUnmanagedEntryPoint; },
+        /* Boolean */ isEntryPointAnalysisAllowed: function () { return isEntryPointAnalysisAllowed; },
         /* Native functions */
         /* Boolean */ is64bit: PE["is64"],
         /* Boolean */ isDotNet: PE["isNet"],
-        /* Boolean */ isDynamicLinkLibrary: PE["isDll"],
-        /* Boolean */ isDriver: PE["isDriver"],
+        /* Boolean */ isDynamicLinkLibrary: function () { return isDynamicLinkLibrary; },
+        /* Boolean */ isEntryPointCorrect: function () { return isEntryPointCorrect; },
+        /* Boolean */ isDriver: function () { return isDriver; },
         /* Boolean */ isNetGlobalCctorPresent: PE["isNetGlobalCctorPresent"],
         /* Boolean */ isRichSignaturePresent: PE["isRichSignaturePresent"],
-        /* Number  */ addressOfUnmanagedEntryPoint: PE["getAddressOfEntryPoint"],
-        /* Number  */ imageBase: PE["getImageBase"],
+        /* Number  */ addressOfUnmanagedEntryPoint: function () { return addressOfUnmanagedEntryPoint; },
+        /* Number  */ imageBase: function () { return imageBase; },
         /* Number  */ dosStubOffset: function () { return dosStubOffset; },
         /* Number  */ dosStubSize: function () { return dosStubSize; },
         /* Number  */ overlayOffset: PE["getOverlayOffset"],
@@ -324,7 +340,9 @@ function initializeCache() {
         /* Boolean */ isCppClrLikeApp: isCppClrLikeApp,
         /* Boolean */ isVbNetStandardLibraryPresent: isVbNetStandardLibraryPresent,
         /* Boolean */ isJscriptNetStandardLibraryPresent: isJscriptNetStandardLibraryPresent,
-        /* String  */ firstEpAsmInstruction: getFirstEpAsmInstruction
+        /* String  */ firstEpAsmInstruction: function () {
+            return isEntryPointAnalysisAllowed ? getFirstEpAsmInstruction() : undefined;
+        }
     };
 
     for (var key in cacheMap) {
@@ -442,7 +460,8 @@ function scanForObfuscations_NET() {
     // Specify the default .NET section index
     const defaultNetSection = 0;
 
-    // Check conditions for a strange entry point position (not for CLR apps)
+    // Check conditions for a strange entry point position (not for CLR apps). Reference and
+    // interop DLLs legitimately use layouts that violate the executable-image convention.
     if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.numberOfSections > 1 && !PE_Cached.isCppClrLikeApp) {
         // Iterate through .NET metadata headers
         for (var s = 0; s < netMetaHeaders.length && !isStrangeEpPosition; s++) {
@@ -466,6 +485,8 @@ function scanForObfuscations_NET() {
 
     var isNativeEntryPointModified = false;
 
+    // Managed interop DLLs may expose a legitimate native loader entry point, so the
+    // executable-only CLR startup convention cannot be applied to them safely.
     if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isCppClrLikeApp) { // not for CLR apps
         if (PE_Cached.isI386) {
             // FF2500????00: jmp dword ptr [ ... ]
@@ -3962,7 +3983,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
     var isTlsVirtualEntryPoint = false;
 
-    const isEntryPointCorrect = PE.isEntryPointCorrect();
+    const isEntryPointCorrect = PE_Cached.isEntryPointCorrect;
 
     if (PE.isTLSPresent()) {
         const corruptedDataEntryPointRva = PE_Cached.addressOfUnmanagedEntryPoint - PE_Cached.imageBase;
@@ -3988,7 +4009,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
     // A DB pseudo-instruction normally means that the EP is damaged or points to data.
     // It is expected when a TLS callback owns a deliberately virtual-only startup area.
-    if (!isTlsVirtualEntryPoint &&
+    if ((!PE_Cached.isDynamicLinkLibrary || PE_Cached.hasUnmanagedEntryPoint) && !isTlsVirtualEntryPoint &&
         (!isEntryPointCorrect || /^DB /.test(PE_Cached.firstEpAsmInstruction))) {
         log(logType.any, "Entry point appears invalid or points to data");
 
@@ -9516,6 +9537,10 @@ var epAsmInstructions = [],
  * emulateAndGetAsmInstructionByIndex(0); // "PUSH EBP"
  */
 function emulateAndGetAsmInstructionByIndex(index) {
+    // Resource-only and entryless DLLs do not have initialization code to emulate. The
+    // centralized guard also protects future EP rules from decoding ImageBase by accident.
+    if (!PE_Cached.isEntryPointAnalysisAllowed) return undefined;
+
     // Check if the instruction is already cached
     if (epAsmInstructions[index] !== undefined) {
         return epAsmInstructions[index] || undefined;
