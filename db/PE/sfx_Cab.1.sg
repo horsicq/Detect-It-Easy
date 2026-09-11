@@ -10,7 +10,8 @@ function detect() {
         // The version is probably for what's being installed, not what's doing
         // the installing; it does seem, though, the raw product version is for
         // the installer itself. Take a punt, anyway.
-        overlayOffset = PE.findSignature(overlayOffset - 0xE00, 0xE00, "BD04EFFE00000100");
+        var preOverlaySearchSize = Math.min(overlayOffset, 0xE00);
+        overlayOffset = PE.findSignature(overlayOffset - preOverlaySearchSize, preOverlaySearchSize, "BD04EFFE00000100");
 
         if (overlayOffset !== -1) {
             overlayOffset += 16;
@@ -23,9 +24,10 @@ function detect() {
 
         // There's two version resources, locate the second.
         if (rsrcSection) {
-            var overlayOffset = rsrcSection.FileOffset + rsrcSection.VirtualSize;
+            var resourceEndOffset = rsrcSection.FileOffset + rsrcSection.FileSize,
+                resourceSearchSize = Math.min(rsrcSection.FileSize, 0x600);
 
-            overlayOffset = PE.findSignature(overlayOffset - 0x600, 0x600, "BD04EFFE00000100");
+            overlayOffset = PE.findSignature(resourceEndOffset - resourceSearchSize, resourceSearchSize, "BD04EFFE00000100");
             if (overlayOffset !== -1) {
                 overlayOffset += 8;
                 sVersion = PE.readWord(overlayOffset + 2) + "." + PE.readWord(overlayOffset) + "." +
