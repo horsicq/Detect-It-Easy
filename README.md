@@ -37,7 +37,7 @@ Detect It Easy’s **flexible signature system** and **scripting capabilities** 
 
 A signature can tell you what a file resembles. The [Generic Heuristic Analysis engine](db/PE/__GenericHeuristicAnalysis_By_DosX.7.sg) goes further: it reports concrete structural and behavioral anomalies together with the evidence behind them. The PE heuristic engine is created and maintained by [DosX](https://github.com/DosX-dev).
 
-With heuristic scanning enabled, DiE makes a series of specialized passes over native and managed PE images. The file is never launched. Instead, the engine works with headers, data directories, sections, imports, exports, resources, .NET metadata, bytecode, overlays, debug records, and reachable startup code rooted at the entry point. This makes it useful both when an exact signature is known and when a sample has been modified enough to evade ordinary identification.
+With heuristic scanning enabled, DiE makes a series of specialized passes over native and managed PE images. The file is never launched. Instead, the engine works with headers, data directories, sections, imports, exports, resources, .NET metadata, bytecode, overlays, debug records, and reachable startup code rooted at the entry point. The same coverage extends to DLL initialization code, closing a common blind spot when protected or suspicious behavior begins inside a library rather than an application. This makes it useful both when an exact signature is known and when a sample has been modified enough to evade ordinary identification.
 
 Native analysis combines cached linear disassembly with bounded traversal of reachable startup code and purpose-built state machines. It tracks the register, flag, stack, address-provenance, and instruction-boundary facts required by each rule without pretending to be a sandbox or full CPU emulator. This allows DiE to expose opaque and degenerate branches, synthetic and indirect transfers, overlapping instruction streams, position-independent and self-modifying stubs, bitstream unpackers, anti-analysis probes, and irregular control flow used by polymorphic packers and protectors. The checks remain effective across register substitution, neutral padding, equivalent arithmetic forms, and bounded reordering of independent instructions commonly produced by commercial generators and private cryptors.
 
@@ -49,63 +49,99 @@ These are the main passes rather than a complete inventory of every check:
 
 #### Code, protection, and evasion
 
--   🧩 **.NET obfuscation**
+<details>
+<summary>(click) 🧩 <strong>.NET obfuscation</strong></summary>
 
-    -   Operand-aware MSIL patterns, modified managed entry points, odd CLR constructors and sections, indirect calls, control-flow tricks, integer confusion, encrypted strings, invalid opcodes, anti-tamper, fake metadata, watermarks, and virtualization-like code.
+-   Operand-aware MSIL patterns, modified managed entry points, odd CLR constructors and sections, indirect calls, control-flow tricks, integer confusion, encrypted strings, invalid opcodes, anti-tamper, fake metadata, watermarks, and virtualization-like code.
 
--   🕵️ **.NET anti-analysis**
+</details>
 
-    -   Static signs of anti-debugging and anti-dumping, plus checks aimed at dnSpy, ILSpy, SandBoxie, Cuckoo, Wine, VMs, and some security products.
-    -   This gives the analyst fair warning when ordinary debugging, decompilation, or dumping may be deliberately obstructed.
+<details>
+<summary>(click) 🕵️ <strong>.NET anti-analysis</strong></summary>
 
--   🛡️ **Native anti-analysis**
+-   Static signs of anti-debugging and anti-dumping, plus checks aimed at dnSpy, ILSpy, SandBoxie, Cuckoo, Wine, VMs, and some security products.
+-   This gives the analyst fair warning when ordinary debugging, decompilation, or dumping may be deliberately obstructed.
 
-    -   State-aware inspection of startup code exposes direct `PEB` and debug-register access, Trap Flag tricks, low-level system and virtual-environment probes, privileged instructions, direct syscalls, and other attempts to detect or disrupt analysis before the main program begins.
+</details>
 
--   🧱 **Native anomalies**
+<details>
+<summary>(click) 🛡️ <strong>Native anti-analysis</strong></summary>
 
-    -   Architecture-aware inspection follows reachable control flow around the entry point and recognizes synthetic or indirect transfers, overlapping instructions, `Call/Pop` and FPU-based position recovery, self-modifying stubs, bitstream unpackers, opaque branches, and irregular polymorphic control flow.
-    -   Section permissions, declared code size, TLS startup, and the actual placement of executable code are cross-checked with `IAT/EAT`, image flags, linker values, and other structural signals.
+-   State-aware inspection of startup code exposes direct `PEB` and debug-register access, Trap Flag tricks, low-level system and virtual-environment probes, privileged instructions, direct syscalls, and other attempts to detect or disrupt analysis before the main program begins.
+-   The engine also recognizes manual, hash-based API resolution that avoids an ordinary import trail, including variants that do not depend on one fixed hash constant.
 
--   📦 **Packers and protectors**
+</details>
 
-    -   Packers, cryptors, SFX archives, `RunPE`-like behavior, compression and crypto clues, overlays, high entropy, embedded PE files, and damaged unpacking results.
-    -   A **large curated database** covers positional import hashes, section and resource names, managed-object sets, and artifacts left by dumpers and reconstructors such as Scylla, ImpRec, and OllyDump.
+<details>
+<summary>(click) 🧱 <strong>Native anomalies</strong></summary>
 
--   🔑 **Licensing / DRM**
+-   Architecture-aware inspection follows reachable control flow around the entry point and recognizes synthetic or indirect transfers, overlapping instructions, `Call/Pop` and FPU-based position recovery, self-modifying stubs, bitstream unpackers, opaque branches, and irregular polymorphic control flow.
+-   Validated x86/x64 stack pivots and concealed `RET`-based transfers are covered as part of the same startup-flow analysis.
+-   Section permissions, declared code size, TLS startup, and the actual placement of executable code are cross-checked with `IAT/EAT`, image flags, linker values, and other structural signals.
 
-    -   .NET licensing APIs and attributes, license managers, activation strings, SteamStub, Denuvo markers, and similar traces.
-    -   This context can explain why a commercial application is packed or unusually structured without presenting license enforcement itself as malicious behavior.
+</details>
+
+<details>
+<summary>(click) 📦 <strong>Packers and protectors</strong></summary>
+
+-   Packers, cryptors, SFX archives, `RunPE`-like behavior, compression and crypto clues, overlays, high entropy, embedded PE files, and damaged unpacking results.
+-   A **large curated database** covers positional import hashes, section and resource names, managed-object sets, and artifacts left by dumpers and reconstructors such as Scylla, ImpRec, and OllyDump.
+
+</details>
+
+<details>
+<summary>(click) 🔑 <strong>Licensing / DRM</strong></summary>
+
+-   .NET licensing APIs and attributes, license managers, activation strings, SteamStub, Denuvo markers, and similar traces.
+-   This context can explain why a commercial application is packed or unusually structured without presenting license enforcement itself as malicious behavior.
+
+</details>
 
 #### Structure, provenance, and triage
 
--   🩺 **Format integrity**
+<details>
+<summary>(click) 🩺 <strong>Format integrity</strong></summary>
 
-    -   Headers, entry points, alignment, relocations, `IAT/EAT`/resources, CLR metadata and version strings, and Authenticode placement are checked for damage or tampering.
-    -   Instead of merely calling a file broken, DiE points to the affected structures—useful when deciding whether a sample is original, damaged, dumped from memory, or only partially reconstructed.
+-   Headers, entry points, alignment, relocations, `IAT/EAT`/resources, CLR metadata and version strings, and Authenticode placement are checked for damage or tampering.
+-   Deeper consistency checks cover overlapping sections and data-directory mappings, AMD64 unwind records, Guard CF metadata, and chained `WIN_CERTIFICATE` entries.
+-   Instead of merely calling a file broken, DiE points to the affected structures—useful when deciding whether a sample is original, damaged, dumped from memory, or only partially reconstructed.
 
--   🧾 **Debug leftovers**
+</details>
 
-    -   Debug sections, exported symbols, .NET Native data, absolute, portable, or embedded PDB records, and Costura.Fody artifacts.
-    -   These leftovers can expose build paths and project names, clarify how the image was produced, and give reverse engineers a useful starting point even in an otherwise opaque release build.
+<details>
+<summary>(click) 🧾 <strong>Debug leftovers</strong></summary>
 
--   ☣️ **Malware-related patterns**
+-   Debug sections, exported symbols, .NET Native data, absolute, portable, or embedded PDB records, and Costura.Fody artifacts.
+-   These leftovers can expose build paths and project names, clarify how the image was produced, and give reverse engineers a useful starting point even in an otherwise opaque release build.
 
-    -   Correlations between imports, strings, bytecode, opcodes, metadata, resources, payload markers, and PE structure.
-    -   Identity checks connect version fields, signing state, build metadata, and protection results to expose masquerading, fake system files, and suspicious builds.
+</details>
 
--   🛠️ **Toolchain / platform**
+<details>
+<summary>(click) ☣️ <strong>Malware-related patterns</strong></summary>
 
-    -   Compiler, linker, and language inference from mangled symbols, Rich records, runtime libraries, section layout, and source-file residue, plus Windows-facing markers such as AppContainer and Game Definition File data.
-    -   Together, these clues can recover useful build provenance even when no exact compiler signature survives.
+-   Correlations between imports, strings, bytecode, opcodes, metadata, resources, payload markers, and PE structure.
+-   Identity checks connect version fields, signing state, build metadata, and protection results to expose masquerading, fake system files, and suspicious builds.
 
--   🏷️ **Filename anomalies**
+</details>
 
-    -   PE-aware classification instead of a blanket warning for every unusual suffix.
-    -   AutoCAD, Total Commander, 3ds Max, Microsoft Excel, Borland/Delphi, CPython, Node.js, MATLAB, and other ecosystems deliberately use PE modules with specialized extensions.
-    -   DiE names known roles directly—for example, `.bpl` as **Borland Package**, `.xll` as **Microsoft Excel Add-In**, `.arx` as **AutoCAD ObjectARX Module**, or `.wcx` as **Total Commander Packer Plug-In**—while missing, custom, or misleading extensions, application images carrying a `.dll` suffix, and DLL images presented as `.exe` files are reported separately.
+<details>
+<summary>(click) 🛠️ <strong>Toolchain / platform</strong></summary>
 
-This is not a black-box malware score. DiE produces a practical evidence map for triage: what probably built the file, whether the image looks original, damaged, dumped, or reconstructed, which protection or DRM may explain its structure, and which artifacts deserve attention next. A heuristic result is a lead, not automatic proof of malicious intent. Verbose scan messages label instruction-derived evidence as `[HEUR/EMU]`, making it explicit which findings were established through emulation. Use `--heuristicscan` together with `--verbose` to see the fullest report.
+-   Compiler, linker, and language inference from mangled symbols, Rich records, runtime libraries, section layout, and source-file residue, plus Windows-facing markers such as AppContainer and Game Definition File data.
+-   Together, these clues can recover useful build provenance even when no exact compiler signature survives.
+
+</details>
+
+<details>
+<summary>(click) 🏷️ <strong>Filename anomalies</strong></summary>
+
+-   PE-aware classification instead of a blanket warning for every unusual suffix.
+-   AutoCAD, Total Commander, 3ds Max, Microsoft Excel, Borland/Delphi, CPython, Node.js, MATLAB, and other ecosystems deliberately use PE modules with specialized extensions.
+-   DiE names known roles directly—for example, `.bpl` as **Borland Package**, `.xll` as **Microsoft Excel Add-In**, `.arx` as **AutoCAD ObjectARX Module**, or `.wcx` as **Total Commander Packer Plug-In**—while missing, custom, or misleading extensions, application images carrying a `.dll` suffix, and DLL images presented as `.exe` files are reported separately.
+
+</details>
+
+This is not a black-box malware score. DiE produces a practical evidence map for triage: what probably built the file, whether the image looks original, damaged, dumped, or reconstructed, which protection or DRM may explain its structure, and which artifacts deserve attention next. A heuristic result is a lead, not automatic proof of malicious intent. Verbose scan messages keep general, managed-code, and instruction-derived evidence visibly separated as `[HEUR/Any]`, `[HEUR/.NET]`, and `[HEUR/EMU]`. Use `--heuristicscan` together with `--verbose` to see the fullest report.
 
 ### Malware clues without pretending to be an antivirus
 
@@ -168,7 +204,7 @@ PE is the largest heuristic module, but it is not the only one shipped with DiE:
 
 The desktop version of DiE is not limited to its own scanning engine. It brings several independent analyzers into the same interface, each with a different rule model and a different idea of what constitutes a useful match. On a difficult or unfamiliar file, running them in turn can expose details that one database alone would miss. Their output is complementary rather than a vote: three engines repeating a weak signature do not turn it into proof.
 
--   **Detect It Easy (DiE)** is the primary, format-aware engine. Its DiE-JS rules can combine executable structures, metadata, imports, sections, entry-point code, antipatterns, and bounded byte searches, while the PE heuristic layer adds broader anomaly and behavioral analysis.
+-   **Detect It Easy (DiE)** is the primary, format-aware engine. Its DiE-JS rules can combine executable structures, metadata, imports, sections, entry-point code, antipatterns, and bounded byte searches, while the PE heuristic layer adds broader anomaly and behavioral analysis. The signature database can also recover application context from recognizable .NET dependencies spanning data access, logging and background jobs, HTTP and browser automation, content tooling, cryptography, testing, and more.
 -   **[Nauz File Detector](https://github.com/horsicq/Nauz-File-Detector) (NFD)** provides an independent view of linkers, compilers, tools, and packers. It has no user-rule workflow comparable to DiE-JS or YARA, its heuristic logic is much simpler, and its database is updated relatively infrequently. That makes it useful as a second opinion, not as a replacement for the main engine.
 -   **[YARA](https://github.com/VirusTotal/yara)** adds direct rule-based matching with textual, binary, and logical conditions. It is a de facto standard for malware researchers and threat hunters, and DiE ships its own [basic](yara_rules/DiE_BasicHeuristics_by_DosX.yar) and [enhanced](yara_rules/DiE_EnhancedHeuristics_by_DosX.yar) YARA-side heuristics. These provide a lighter cross-check of suspicious PE traits rather than duplicating the full DiE heuristic engine.
 -   **[PEiD](https://github.com/horsicq/XPEID)** is included for compatibility with the classic "old-school" detector and its `userdb` ecosystem. The [bundled database](peid_rules/PE) preserves a large amount of historical material imported from the original PEiD rules. It remains useful for reproducing legacy detections, but many signatures are noisy by modern standards and can produce convincing-looking false positives, so its results should be treated as secondary evidence.
