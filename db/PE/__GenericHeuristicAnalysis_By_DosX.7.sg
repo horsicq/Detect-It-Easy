@@ -4052,7 +4052,10 @@ function scanForBadFileFormat_NET_and_Native() {
     var invalidSectionLayoutReason = String();
 
     const
-        sectionLayoutSizeOfHeaders = PE.getImageOptionalHeader("SizeOfHeaders"),
+        sectionLayoutOptionalHeaderOffset = getOptHeaderOffset(),
+        sectionLayoutOptionalHeaderSize = PE.read_uint32(sectionLayoutOptionalHeaderOffset - 4) & 0xFFFF,
+        sectionLayoutHeadersEnd = sectionLayoutOptionalHeaderOffset + sectionLayoutOptionalHeaderSize +
+            PE_Cached.numberOfSections * 40,
         sectionLayoutSizeOfImage = PE.getImageOptionalHeader("SizeOfImage");
 
     var previousMappedSectionRva = -1;
@@ -4066,9 +4069,11 @@ function scanForBadFileFormat_NET_and_Native() {
             currentSectionMappedSize = currentSectionVirtualSize !== 0 ? currentSectionVirtualSize : currentSectionRawSize,
             currentSectionVirtualEnd = currentSectionRva + currentSectionMappedSize;
 
+        // SizeOfHeaders may include alignment padding beyond the section table. Only bytes
+        // occupied by actual PE structures make an early raw offset structurally invalid.
         // A zero raw offset is already reported by the dedicated offset/size rule.
         if (currentSectionRawSize !== 0 && currentSectionRawOffset !== 0 &&
-            currentSectionRawOffset < sectionLayoutSizeOfHeaders) {
+            currentSectionRawOffset < sectionLayoutHeadersEnd) {
             invalidSectionLayoutReason = "section #" + i + " raw data begins inside headers";
             isInvalidSectionLayoutPresent = true;
         } else if (currentSectionMappedSize !== 0 && sectionLayoutSizeOfImage !== 0 &&
