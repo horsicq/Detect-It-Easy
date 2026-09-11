@@ -6,6 +6,12 @@
 meta("protector", "Private EXE Protector");
 
 function detect() {
+    var entryPointOffset = PE.getEntryPointOffset(),
+        entryPointSection = PE.getEntryPointSection(),
+        entryPointSectionEndOffset = entryPointSection !== -1 ?
+            PE.getSectionFileOffset(entryPointSection) + PE.getSectionFileSize(entryPointSection) : entryPointOffset,
+        entryPointSearchSize = Math.min(0xB00, entryPointSectionEndOffset - entryPointOffset);
+
     if (PE.compareEP("558BEC83C4F4FC5357568B7424208B7C242466813E4A430F85A502000083C60A33DB")) {
         sVersion = "1.9.7";
         bDetected = true;
@@ -33,10 +39,10 @@ function detect() {
     } else if (PE.compareEP("53bb........c703........5bff35........c3")) {
         sVersion = "3.4.0";
         bDetected = true;
-    } else if (PE.findSignature(PE.getEntryPointOffset(), 0xB00, "b900000000f3ae") != -1) {
+    } else if (entryPointSearchSize > 0 && PE.findSignature(entryPointOffset, entryPointSearchSize, "b900000000f3ae") != -1) {
         sVersion = "3.0.0-3.3.5";
         bDetected = true;
-    } else if (PE.findSignature(PE.getEntryPointOffset(), 0xB00, "b900000000f366") != -1) {
+    } else if (entryPointSearchSize > 0 && PE.findSignature(entryPointOffset, entryPointSearchSize, "b900000000f366") != -1) {
         sVersion = "3.0.0-3.3.5";
         bDetected = true;
     } else if (PE.getNumberOfImports() == 1 &&
