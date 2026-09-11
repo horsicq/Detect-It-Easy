@@ -4380,6 +4380,83 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+    // Walk every WIN_CERTIFICATE entry according to the PE quadword-alignment rules.
+    // Certificate revisions and content types are intentionally left open for compatibility;
+    // only a chain which cannot fit the declared Security directory is considered malformed.
+
+    var isMalformedCertificateTablePresent = false;
+
+    if (dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_SECURITY + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        // Unlike the other data directories, Security stores a raw file offset rather than
+        // an RVA. Passing it through VAToOffset would corrupt validation of signed overlays.
+        const
+            certificateDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_SECURITY * 8,
+            certificateTableOffset = PE.read_uint32(certificateDirectoryEntryOffset),
+            certificateTableSize = PE.read_uint32(certificateDirectoryEntryOffset + 4);
+
+        if (certificateTableOffset !== 0 && certificateTableSize !== 0 &&
+            certificateTableOffset + certificateTableSize <= PE_Cached.fileSize) {
+            // Both the table start and aggregate size follow the same quadword boundary
+            // consumed by ImageEnumerateCertificates and Authenticode tooling.
+            if (certificateTableOffset % 8 !== 0 || certificateTableSize % 8 !== 0) {
+                log(logType.any, "Certificate table range violates the required 8-byte alignment");
+
+                isMalformedCertificateTablePresent = true;
+            } else {
+                var certificateTableData = PE.readBytes(certificateTableOffset, certificateTableSize),
+                    certificateRecordOffset = 0,
+                    certificateRecordIndex = 0;
+
+                while (certificateRecordOffset < certificateTableData.length &&
+                    !isMalformedCertificateTablePresent) {
+                    // dwLength, wRevision and wCertificateType form the mandatory
+                    // eight-byte header; checking the remainder prevents partial reads.
+                    if (certificateTableData.length - certificateRecordOffset < 8) {
+                        log(logType.any, "Certificate entry #" + certificateRecordIndex + " has a truncated WIN_CERTIFICATE header");
+
+                        isMalformedCertificateTablePresent = true;
+                        break;
+                    }
+
+                    var certificateRecordLength = readUnsignedDwordFromBuffer(certificateTableData, certificateRecordOffset),
+                        certificateNextRecordOffset = Math.ceil((certificateRecordOffset + certificateRecordLength) / 8) * 8;
+
+                    // dwLength excludes alignment padding. Round the next record up without
+                    // interpreting the certificate payload, revision or content type.
+                    if (certificateRecordLength < 8) {
+                        log(logType.any, "Certificate entry #" + certificateRecordIndex + " is shorter than its WIN_CERTIFICATE header");
+
+                        isMalformedCertificateTablePresent = true;
+                    } else if (certificateRecordOffset + certificateRecordLength > certificateTableData.length ||
+                        certificateNextRecordOffset > certificateTableData.length) {
+                        log(logType.any, "Certificate entry #" + certificateRecordIndex + " exceeds the declared certificate table");
+
+                        isMalformedCertificateTablePresent = true;
+                    } else {
+                        certificateRecordOffset = certificateNextRecordOffset;
+                        certificateRecordIndex++;
+                    }
+                }
+
+                if (!isMalformedCertificateTablePresent && certificateRecordOffset !== certificateTableData.length) {
+                    // Exact consumption rejects an orphan tail while permitting any number
+                    // of independently aligned certificates in the declared directory.
+                    log(logType.any, "Certificate entries do not consume the declared table size");
+
+                    isMalformedCertificateTablePresent = true;
+                }
+
+                // Clean up: release the certificate-table buffer
+                certificateTableData = undefined;
+            }
+        }
+    }
+
+    if (isMalformedCertificateTablePresent) options = addOption(options, "Malformed certificate table");
+
+
+
+
     // Resolve the TLS callback array and require every declared callback to point to
     // physically backed executable code. Merely having a TLS directory is not suspicious.
 
