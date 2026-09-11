@@ -7723,8 +7723,7 @@ function scanForObfuscations_Native() {
             // boundary. A compiler may need one prefix from each group, but repeated members
             // are ignored or overridden by the CPU and therefore expose generated padding.
             var epPolymorphismInstructionOffset = PE.VAToOffset(epPolymorphismCurrentAddress),
-                epPolymorphismSectionFileEnd = PE.getSectionFileOffset(epPolymorphismSectionIndex) +
-                    PE.getSectionFileSize(epPolymorphismSectionIndex),
+                epPolymorphismSectionFileEnd = PE.getSectionFileOffset(epPolymorphismSectionIndex) + PE.getSectionFileSize(epPolymorphismSectionIndex),
                 epCurrentPrefixCount = 0,
                 epCurrentPrefixGroupOneCount = 0,
                 epCurrentPrefixGroupThreeCount = 0,
@@ -7894,6 +7893,74 @@ function scanForObfuscations_Native() {
                 epRareBitOpCount++;
             }
 
+            // Accumulate resolver facts inside the shared traversal to avoid a second
+            // 256-instruction pass. PEB->Ldr must already be proven before collection.
+            if (isPebModuleWalkPresent) {
+                // Observe the stages in order. A later constant or byte loop is ignored until
+                // the preceding PE-header relationship has appeared on reachable code paths.
+                epExportResolverHeaderAccessPresent = epExportResolverHeaderAccessPresent ||
+                    epExportResolverHeaderAccessPattern.test(epPolymorphismInstruction);
+
+                if (epExportResolverHeaderAccessPresent &&
+                    epExportResolverDirectoryAccessPattern.test(epPolymorphismInstruction)) {
+                    epExportResolverDirectoryAccessPresent = true;
+                }
+
+                if (epExportResolverDirectoryAccessPresent) {
+                    epApiHashByteReadPresent = epApiHashByteReadPresent ||
+                        epApiHashByteReadPattern.test(epPolymorphismInstruction);
+
+                    var epExportResolverFieldAccess = epPolymorphismInstruction.match(epExportResolverFieldAccessPattern);
+
+                    if (epExportResolverFieldAccess) {
+                        var epExportResolverFieldKey = parseInt(epExportResolverFieldAccess[1], 0).toString();
+
+                        // Count distinct fields, not repeated reads of one field inside a loop.
+                        // This separates export parsing from unrelated structure traversal.
+                        if (!epExportResolverFieldsFound[epExportResolverFieldKey]) {
+                            epExportResolverFieldsFound[epExportResolverFieldKey] = true;
+                            epExportResolverFieldCount++;
+                        }
+                    }
+
+                    var epApiHashTransform = epPolymorphismInstruction.match(epApiHashTransformPattern);
+
+                    if (epApiHashTransform) {
+                        var epApiHashRegisterName = epApiHashTransform[2].toUpperCase(),
+                            epApiHashRegisterKey = epApiHashRegisterName.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                            epApiHashTransformOpCode = epApiHashTransform[1].toUpperCase();
+
+                        if (!epApiHashTransformsByRegister[epApiHashRegisterKey]) {
+                            // Keep the count and opcode diversity together per accumulator;
+                            // combining arithmetic from unrelated registers would inflate noise.
+                            epApiHashTransformsByRegister[epApiHashRegisterKey] = {
+                                Count: 0,
+                                KindCount: 0,
+                                Kinds: {}
+                            };
+                        }
+
+                        epApiHashTransformsByRegister[epApiHashRegisterKey].Count++;
+
+                        if (!epApiHashTransformsByRegister[epApiHashRegisterKey].Kinds[epApiHashTransformOpCode]) {
+                            epApiHashTransformsByRegister[epApiHashRegisterKey].Kinds[epApiHashTransformOpCode] = true;
+                            epApiHashTransformsByRegister[epApiHashRegisterKey].KindCount++;
+                        }
+
+                        // Only the strongest single-register chain is carried to the final
+                        // predicate. This keeps the post-traversal test constant-time.
+                        epApiHashMaximumTransformCount = Math.max(
+                            epApiHashMaximumTransformCount,
+                            epApiHashTransformsByRegister[epApiHashRegisterKey].Count
+                        );
+                        epApiHashMaximumTransformKindCount = Math.max(
+                            epApiHashMaximumTransformKindCount,
+                            epApiHashTransformsByRegister[epApiHashRegisterKey].KindCount
+                        );
+                    }
+                }
+            }
+
             var epPolymorphismNextAddress = epPolymorphismCurrentAddress + epPolymorphismInstructionLength,
                 epPolymorphismDirectControlFlow = epPolymorphismInstruction.match(/^(CALL|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
 
@@ -7901,6 +7968,15 @@ function scanForObfuscations_Native() {
             if (!epPolymorphismDirectControlFlow &&
                 (epPolymorphismOpCode === "CALL" || epPolymorphismOpCode === "JMP" || epPolymorphismOpCode === "JMPF")) {
                 epBitstreamIndirectTransferPresent = true;
+
+                // An indirect transfer becomes resolver evidence only after export parsing
+                // and a credible name-hash loop have already been established.
+                if (isPebModuleWalkPresent && epExportResolverHeaderAccessPresent &&
+                    epExportResolverDirectoryAccessPresent && epExportResolverFieldCount >= 2 &&
+                    epApiHashByteReadPresent && epApiHashMaximumTransformCount >= 2 &&
+                    epApiHashMaximumTransformKindCount >= 2) {
+                    epHashedApiResolverIndirectTransferPresent = true;
+                }
             }
 
             if (epPolymorphismDirectControlFlow) {
@@ -7948,6 +8024,15 @@ function scanForObfuscations_Native() {
                 // Direct backward calls and branches both form dispatcher return edges.
                 if (epPolymorphismTargetAddress < epPolymorphismCurrentAddress) {
                     epPolymorphismBackwardControlFlowCount++;
+
+                    // A backward edge proves iteration without assuming one compiler-specific
+                    // loop spelling. It is retained only for the already formed hash chain.
+                    if (isPebModuleWalkPresent && epExportResolverHeaderAccessPresent &&
+                        epExportResolverDirectoryAccessPresent && epExportResolverFieldCount >= 2 &&
+                        epApiHashByteReadPresent && epApiHashMaximumTransformCount >= 2 &&
+                        epApiHashMaximumTransformKindCount >= 2) {
+                        epApiHashBackwardControlFlowPresent = true;
+                    }
                 }
 
                 if (epPolymorphismOpCode === "CALL") {
@@ -8373,6 +8458,8 @@ function scanForObfuscations_Native() {
         epPopRegisterByAddress = undefined;
         epInvalidBranchCandidates = undefined;
         epRedundantPrefixCandidates = undefined;
+        epExportResolverFieldsFound = undefined;
+        epApiHashTransformsByRegister = undefined;
     }
 
 
