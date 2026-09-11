@@ -8465,6 +8465,31 @@ function scanForObfuscations_Native() {
 
 
 
+    // Convert the resolver facts collected by the shared EP traversal into a verdict.
+    // PEB enumeration, PE export parsing, byte-wise hashing, a loop, and a final indirect
+    // transfer are required independently; ordinary loader introspection cannot match alone.
+    // Two distinct export fields and two transform kinds are the smallest useful cross-check;
+    // no seed or literal hash constant is fixed, preserving polymorphic implementations.
+
+    var isHashedApiResolverPresent = false;
+
+    // Limit the standalone resolver verdict to executable startup. DLL initialization can
+    // legitimately enumerate loader modules and resolve optional exports during attachment.
+    if (!PE_Cached.isDynamicLinkLibrary && isPebModuleWalkPresent &&
+        epExportResolverHeaderAccessPresent && epExportResolverDirectoryAccessPresent &&
+        epExportResolverFieldCount >= 2 && epApiHashByteReadPresent &&
+        epApiHashMaximumTransformCount >= 2 && epApiHashMaximumTransformKindCount >= 2 &&
+        epApiHashBackwardControlFlowPresent && epHashedApiResolverIndirectTransferPresent) {
+        log(logType.emulation, "Manual API resolver hashes export names before an indirect transfer near EP");
+
+        isHashedApiResolverPresent = true;
+    }
+
+    if (isHashedApiResolverPresent) options = addOption(options, "Hashed API resolver near EP");
+
+
+
+
     // Check for direct branches from reachable EP code into invalid image locations
 
     var isInvalidEpBranchTargetPresent = false;
