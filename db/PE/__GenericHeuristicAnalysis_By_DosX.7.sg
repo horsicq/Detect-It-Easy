@@ -2361,6 +2361,7 @@ const
     SECTION_FLAGS_WRITE = 0x80000000,
     SECTION_FLAGS_CODE = 0x00000020,
     IMAGE_FILE_RELOCS_STRIPPED = 0x0001,
+    IMAGE_DIRECTORY_ENTRY_EXCEPTION = 3,
     IMAGE_DIRECTORY_ENTRY_SECURITY = 4,
     IMAGE_DIRECTORY_ENTRY_TLS = 9,
     IMAGE_DIRECTORY_ENTRY_RESERVED = 15;
@@ -4246,6 +4247,135 @@ function scanForBadFileFormat_NET_and_Native() {
     dataDirectoryNames = undefined;
 
     if (isUnmappedDataDirectoryPresent) options = addOption(options, "Unmapped data directory (" + unmappedDataDirectoryName + ")");
+
+
+
+
+    // Validate AMD64 exception-table layout, code ranges, and unwind references.
+    // Leaf functions may legitimately have no entry, so only present metadata is inspected
+    // and only impossible ranges or record relationships are reported.
+
+    var isInvalidUnwindMetadataPresent = false;
+
+    if (PE_Cached.isAMD64 &&
+        dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_EXCEPTION + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        // The directory slot is read only when SizeOfOptionalHeader physically contains it.
+        // This matters for truncated or deliberately shortened optional headers.
+        const
+            exceptionDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_EXCEPTION * 8,
+            exceptionDirectoryRva = PE.read_uint32(exceptionDirectoryEntryOffset),
+            exceptionDirectorySize = PE.read_uint32(exceptionDirectoryEntryOffset + 4),
+            exceptionDirectoryAddress = PE_Cached.imageBase + exceptionDirectoryRva;
+
+        if (exceptionDirectoryRva !== 0 && exceptionDirectorySize !== 0 &&
+            isVirtualAddressRangeFileBacked(exceptionDirectoryAddress, exceptionDirectorySize, 0)) {
+            // AMD64 uses fixed 12-byte RUNTIME_FUNCTION records. A non-zero remainder
+            // cannot describe even a future unwind format without changing the directory.
+            if (exceptionDirectorySize < 12 || exceptionDirectorySize % 12 !== 0) {
+                log(logType.any, "AMD64 unwind table ends with an incomplete function entry");
+
+                isInvalidUnwindMetadataPresent = true;
+            } else {
+                var exceptionDirectoryOffset = PE.VAToOffset(exceptionDirectoryAddress),
+                    exceptionDirectoryData = PE.readBytes(exceptionDirectoryOffset, exceptionDirectorySize),
+                    runtimeFunctionSectionRanges = [];
+
+                // Snapshot the small section table once; exception directories may contain
+                // hundreds of thousands of records and engine calls dominate local parsing.
+                for (var d = 0; d < PE_Cached.numberOfSections; d++) {
+                    runtimeFunctionSectionRanges.push({
+                        Rva: PE.getSectionVirtualAddress(d),
+                        MappedSize: Math.max(PE.getSectionVirtualSize(d), PE.getSectionFileSize(d)),
+                        Characteristics: PE.section[d].Characteristics
+                    });
+                }
+
+                for (var i = 0; i < exceptionDirectoryData.length && !isInvalidUnwindMetadataPresent; i += 12) {
+                    var runtimeFunctionIndex = i / 12,
+                        runtimeFunctionBeginRva = readUnsignedDwordFromBuffer(exceptionDirectoryData, i),
+                        runtimeFunctionEndRva = readUnsignedDwordFromBuffer(exceptionDirectoryData, i + 4),
+                        runtimeFunctionUnwindRva = readUnsignedDwordFromBuffer(exceptionDirectoryData, i + 8),
+                        runtimeFunctionSize = runtimeFunctionEndRva - runtimeFunctionBeginRva,
+                        isRuntimeFunctionCodeRangeValid = false,
+                        isRuntimeFunctionUnwindPointerValid = runtimeFunctionBeginRva === 0 &&
+                            runtimeFunctionEndRva === 0 && runtimeFunctionUnwindRva === 0,
+                        isRuntimeFunctionIndirect = runtimeFunctionUnwindRva % 2 !== 0;
+
+                    // RUNTIME_FUNCTION_INDIRECT stores another .pdata entry RVA with bit 0
+                    // set instead of an UNWIND_INFO RVA. Validate that tagged reference
+                    // against the complete exception table before checking normal pointers.
+                    if (isRuntimeFunctionIndirect) {
+                        var indirectRuntimeFunctionRva = runtimeFunctionUnwindRva - 1,
+                            indirectRuntimeFunctionOffset = indirectRuntimeFunctionRva - exceptionDirectoryRva;
+
+                        // The untagged RVA must select the beginning of another complete
+                        // record in this exact table; merely mapping somewhere is insufficient.
+                        isRuntimeFunctionUnwindPointerValid =
+                            indirectRuntimeFunctionOffset >= 0 &&
+                            indirectRuntimeFunctionOffset + 12 <= exceptionDirectorySize &&
+                            indirectRuntimeFunctionOffset % 12 === 0;
+                    }
+
+                    // Use section-header values already exposed by the engine, but keep the
+                    // per-entry checks local. Calling VA translation for every function makes
+                    // large commercial exception tables disproportionately expensive.
+                    // Accept both code and execute flags: current Windows kernels describe
+                    // discardable initialization code without the execute characteristic.
+                    for (var d = 0; d < runtimeFunctionSectionRanges.length &&
+                        (!isRuntimeFunctionCodeRangeValid || !isRuntimeFunctionUnwindPointerValid); d++) {
+                        var runtimeFunctionSectionRange = runtimeFunctionSectionRanges[d],
+                            runtimeFunctionSectionRva = runtimeFunctionSectionRange.Rva,
+                            runtimeFunctionSectionMappedSize = runtimeFunctionSectionRange.MappedSize;
+
+                        if (runtimeFunctionSize > 0 &&
+                            runtimeFunctionBeginRva >= runtimeFunctionSectionRva &&
+                            runtimeFunctionEndRva <= runtimeFunctionSectionRva + runtimeFunctionSectionMappedSize &&
+                            (runtimeFunctionSectionRange.Characteristics & (SECTION_FLAGS_CODE | SECTION_FLAGS_EXECUTE))) {
+                            isRuntimeFunctionCodeRangeValid = true;
+                        }
+
+                        // Ordinary UNWIND_INFO is DWORD-aligned but may live in any mapped
+                        // section. Requiring executable or physically backed xdata here would
+                        // reject valid packed images and virtual-only metadata produced by linkers.
+                        if (!isRuntimeFunctionIndirect && runtimeFunctionUnwindRva % 4 === 0 &&
+                            runtimeFunctionUnwindRva >= runtimeFunctionSectionRva &&
+                            runtimeFunctionUnwindRva + 4 <= runtimeFunctionSectionRva + runtimeFunctionSectionMappedSize) {
+                            isRuntimeFunctionUnwindPointerValid = true;
+                        }
+                    }
+
+                    // Current Microsoft system images may contain zeroed padding or zero-length
+                    // entries with valid metadata; accepted third-party images are not always sorted.
+                    // Consequently, the rule rejects only relationships that cannot describe
+                    // a function instead of enforcing one linker's preferred table layout.
+                    if (runtimeFunctionSize < 0) {
+                        log(logType.any, "AMD64 unwind function entry #" + runtimeFunctionIndex +
+                            " has a reversed range: RVA 0x" + runtimeFunctionBeginRva.toString(16) +
+                            "-0x" + runtimeFunctionEndRva.toString(16));
+
+                        isInvalidUnwindMetadataPresent = true;
+                    } else if (runtimeFunctionSize > 0 && !isRuntimeFunctionCodeRangeValid) {
+                        log(logType.any, "AMD64 unwind function entry #" + runtimeFunctionIndex +
+                            " references a non-code range: RVA 0x" + runtimeFunctionBeginRva.toString(16) +
+                            "-0x" + runtimeFunctionEndRva.toString(16));
+
+                        isInvalidUnwindMetadataPresent = true;
+                    } else if (!isRuntimeFunctionUnwindPointerValid) {
+                        log(logType.any, "AMD64 unwind function entry #" + runtimeFunctionIndex +
+                            " references invalid metadata: RVA 0x" + runtimeFunctionUnwindRva.toString(16));
+
+                        isInvalidUnwindMetadataPresent = true;
+                    }
+                }
+
+                // Clean up: release the potentially large exception-directory buffer
+                exceptionDirectoryData = undefined;
+                runtimeFunctionSectionRanges = undefined;
+            }
+        }
+    }
+
+    if (isInvalidUnwindMetadataPresent) options = addOption(options, "Invalid unwind metadata");
 
 
 
