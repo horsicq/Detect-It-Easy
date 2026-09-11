@@ -6203,7 +6203,8 @@ function scanForObfuscations_Native() {
                 exchangedRegister = currentEpInstruction.match(syntheticEpExchangedRegisterPattern),
                 pushedAddress = currentEpInstruction.match(/^PUSH (0X[0-9A-F]+|\d+)$/i),
                 storedAddress = currentEpInstruction.match(syntheticEpStoredAddressPattern),
-                stackPivotAddress = PE_Cached.isI386 ? currentEpInstruction.match(/^MOV ESP, (0X[0-9A-F]+|\d+)$/i) : null,
+                stackPivotLiteral = currentEpInstruction.match(syntheticEpStackPivotLiteralPattern),
+                stackPivotRegister = currentEpInstruction.match(syntheticEpStackPivotRegisterPattern),
                 targetAddress = pushedAddress || storedAddress,
                 targetAddressValue = targetAddress ? parseInt(targetAddress[1], 0) : -1,
                 registerWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern) ||
@@ -6217,18 +6218,35 @@ function scanForObfuscations_Native() {
                     currentEpOpCode === "STC" || currentEpOpCode === "CMC" ||
                     (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
 
-            if (stackPivotAddress) {
-                // A pivot is accepted only when its new stack contains an image VA.
-                var stackOffset = PE.VAToOffset(parseInt(stackPivotAddress[1], 0)),
-                    returnAddress = stackOffset !== -1 ? PE.read_int32(stackOffset) >>> 0 : -1;
+            if (stackPivotLiteral || stackPivotRegister) {
+                // A literal or register-propagated pivot is accepted only when the new stack
+                // is writable, physically backed, and already contains an executable image VA.
+                // Normalize subregister spelling to the physical register key used by the
+                // existing address-provenance map; no value is inferred from an unknown key.
+                var stackPivotRegisterName = stackPivotRegister ? (stackPivotRegister[1] || stackPivotRegister[2]).toUpperCase() : String(),
+                    stackPivotRegisterKey = stackPivotRegisterName.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    stackPivotAddress = stackPivotLiteral ? parseInt(stackPivotLiteral[1], 0) : parseInt(syntheticEpKnownAddresses[stackPivotRegisterKey], 0),
+                    stackPivotPointerSize = PE_Cached.isI386 ? 4 : 8,
+                    stackOffset = isVirtualAddressRangeFileBacked(stackPivotAddress, stackPivotPointerSize,
+                        SECTION_FLAGS_WRITE) ? PE.VAToOffset(stackPivotAddress) : -1,
+                    returnAddress = stackOffset === -1 ? -1 : (PE_Cached.isI386 ?
+                        PE.read_uint32(stackOffset) : readUnsignedQword(stackOffset));
 
+                // Replacing SP invalidates every earlier top-of-stack fact. The new RET target
+                // is trusted only when its full pointer is present in writable image storage.
                 syntheticEpTargetAddress = String();
                 syntheticEpTargetType = String();
 
-                if (returnAddress !== -1 && PE.VAToOffset(returnAddress) !== -1) {
+                if (returnAddress !== -1 &&
+                    isVirtualAddressRangeFileBacked(returnAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                    // Requiring a file-backed executable destination prevents ordinary stack
+                    // setup, heap stacks and unresolved runtime addresses from becoming hits.
                     syntheticEpTargetAddress = returnAddress;
                     syntheticEpTargetType = "stack pivot";
                     syntheticEpNeutralInstructionCount = 0;
+                } else {
+                    // An unresolved stack replacement invalidates every later linear stack fact.
+                    break;
                 }
             } else if (targetAddress && (PE_Cached.isI386 || targetAddressValue <= 0x7FFFFFFF) &&
                 PE.VAToOffset(targetAddressValue) !== -1) {
@@ -6269,19 +6287,28 @@ function scanForObfuscations_Native() {
             } else if (pushedRegister && syntheticEpKnownAddresses[pushedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
                 syntheticEpTargetAddress = syntheticEpKnownAddresses[pushedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
                 syntheticEpTargetType = "register push";
+
                 syntheticEpNeutralInstructionCount = 0;
             } else if (storedRegister && syntheticEpKnownAddresses[storedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
                 syntheticEpTargetAddress = syntheticEpKnownAddresses[storedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
                 syntheticEpTargetType = "register stack write";
+
                 syntheticEpNeutralInstructionCount = 0;
             } else if (exchangedRegister && syntheticEpKnownAddresses[exchangedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
                 // XCHG [ESP/RSP], reg replaces the return address without a direct MOV.
                 syntheticEpTargetAddress = syntheticEpKnownAddresses[exchangedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
                 syntheticEpTargetType = "register stack exchange";
+
                 syntheticEpNeutralInstructionCount = 0;
             } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetAddress) {
                 // RET at a process entry point is meaningful here only as a concealed transfer.
-                log(logType.emulation, "Synthetic " + syntheticEpTargetType + "/ret transfer near EP to 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
+                if (syntheticEpTargetType === "stack pivot") {
+                    log(logType.emulation, "Stack pivot redirects Ret near EP to executable code at 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
+
+                    isStackPivotEpTransferPresent = true;
+                } else {
+                    log(logType.emulation, "Synthetic " + syntheticEpTargetType + "/Ret transfer near EP to 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
+                }
 
                 isSyntheticEpTransferPresent = true;
             } else if (isNeutralInstruction && syntheticEpNeutralInstructionCount < epNeutralInstructionLimit) {
@@ -6325,7 +6352,7 @@ function scanForObfuscations_Native() {
         }
     }
 
-    if (isSyntheticEpTransferPresent) options = addOption(options, "Synthetic EP transfer");
+    if (isSyntheticEpTransferPresent) options = addOption(options, isStackPivotEpTransferPresent ? "Stack pivot near EP" : "Synthetic EP transfer");
 
 
 
