@@ -2694,7 +2694,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Iterate through the entries to check against the entry point
     for (var e = 0; e < entries.length && !entryLikePacker; e++) {
-        if (PE_Cached.isArchX86) {
+        if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
             const entryToCheck = entries[e];
 
             // If the entry point matches the current entry, set the flag to true and break the loop
@@ -2799,8 +2799,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isLastSectionEP = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary) {
-        if (PE_Cached.numberOfSections > 1 && PE.isEntryPointCorrect()) {
+    if (PE_Cached.isEntryPointAnalysisAllowed) {
+        if (PE_Cached.numberOfSections > 1 && PE_Cached.isEntryPointCorrect) {
             // Get addresses of the last section and entry point
 
             var lastSectionAddress = -1,
@@ -2833,7 +2833,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (PE_Cached.isArchX86) {
         firstOpCode = getAsmOpCode(PE_Cached.firstEpAsmInstruction);
 
-        if (!PE_Cached.isDynamicLinkLibrary) {
+        if (PE_Cached.isEntryPointAnalysisAllowed) {
             if (isLastSectionEP && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
                 log(logType.emulation, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
 
@@ -2844,7 +2844,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         // ARM/Thumb: Check for strange branch instructions
         firstOpCode = getAsmOpCode(PE_Cached.firstEpAsmInstruction);
 
-        if (!PE_Cached.isDynamicLinkLibrary) {
+        if (PE_Cached.isEntryPointAnalysisAllowed) {
             // ARM uses B (branch) and BL (branch with link) for jumps and calls
             if (isLastSectionEP && (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BX" || firstOpCode === "BLX")) {
                 log(logType.emulation, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
@@ -2855,7 +2855,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     } else if (PE_Cached.isARM64) {
         firstOpCode = getAsmOpCode(PE_Cached.firstEpAsmInstruction);
 
-        if (!PE_Cached.isDynamicLinkLibrary && isLastSectionEP &&
+        if (PE_Cached.isEntryPointAnalysisAllowed && isLastSectionEP &&
             (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BR" || firstOpCode === "BLR")) {
             log(logType.emulation, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
 
@@ -3779,7 +3779,8 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
     var isSteamStubPresent = false;
 
-    if (PE_Cached.isArchX86 && PE.compareEP("E800000000") && PE.section[PE_Cached.numberOfSections - 1].Name === ".bind") {
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 &&
+        PE.compareEP("E800000000") && PE.section[PE_Cached.numberOfSections - 1].Name === ".bind") {
         log(logType.any, "SteamStub-like DRM layout detected");
 
         isSteamStubPresent = true;
@@ -5818,7 +5819,9 @@ function scanForObfuscations_Native() {
 
     var isDllIatAndEatMissing = false;
 
-    if (PE_Cached.isDynamicLinkLibrary && PE_Cached.addressOfUnmanagedEntryPoint && (PE_Cached.indexOfImportsSection === -1 && PE_Cached.indexOfExportsSection === -1)) { // DLLs without imports/exports and with EP (not a resource-only DLL)
+    // An explicit loader entry point distinguishes executable DLL code from a resource-only image.
+    if (PE_Cached.isDynamicLinkLibrary && PE_Cached.hasUnmanagedEntryPoint &&
+        PE_Cached.indexOfImportsSection === -1 && PE_Cached.indexOfExportsSection === -1) {
         log(logType.any, "DLL import and export tables are missing");
 
         isDllIatAndEatMissing = true;
@@ -5835,7 +5838,7 @@ function scanForObfuscations_Native() {
         isDllEmptyEatPresent = false;
 
     if (!isDllIatAndEatMissing && PE_Cached.isDynamicLinkLibrary) {
-        if (PE_Cached.indexOfExportsSection === -1 && PE_Cached.addressOfUnmanagedEntryPoint) { // DLL without exports and with EP (not a resource-only DLL)
+        if (PE_Cached.indexOfExportsSection === -1 && PE_Cached.hasUnmanagedEntryPoint) { // DLL without exports and with EP (not a resource-only DLL)
             log(logType.any, "DLL export table is missing");
 
             isDllEatMissing = true;
@@ -8911,9 +8914,9 @@ function scanForObfuscations_Native() {
 
     var isEpInNonCodeSection = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
-        entryPointSectionIndex !== -1 && PE.isEntryPointCorrect() &&
+        entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect &&
         PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
         (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) &&
         !(PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_CODE)) {
@@ -8927,11 +8930,11 @@ function scanForObfuscations_Native() {
 
 
 
-    // A normal user-mode process cannot discard the section containing its entry point.
+    // A loader-visible process or DLL entry point cannot reside in discardable startup code.
 
     var isDiscardableEpSectionPresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
         entryPointSectionIndex !== -1 &&
         (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_DISCARDABLE)) {
@@ -8981,9 +8984,9 @@ function scanForObfuscations_Native() {
 
     var isUnreportedCodePresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
-        entryPointSectionIndex !== -1 && PE.isEntryPointCorrect() &&
+        entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect &&
         PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
         (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) &&
         PE.getSizeOfCode() === 0) {
@@ -9005,7 +9008,7 @@ function scanForObfuscations_Native() {
         isSeverelyUnderreportedCodePresent = false,
         isUnderreportedStartupCodePresent = false;
 
-    if (!PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
         PE.getSizeOfCode() !== 0) {
         var physicalCodeSize = 0,
@@ -9035,7 +9038,7 @@ function scanForObfuscations_Native() {
     }
 
     if (isUnderreportedCodePresent && PE_Cached.numberOfSections > 1 &&
-        entryPointSectionIndex !== -1 && PE.isEntryPointCorrect()) {
+        entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect) {
         // Treat the final section as a startup-code candidate only after the global
         // SizeOfCode mismatch has independently established underreported physical code.
         const
@@ -11655,7 +11658,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     if (verdicts.length === 0 && (
         PE.isSectionNamePresent(".rmnet") ||
-        (PE_Cached.isI386 && PE.compareEP(
+        (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isI386 && PE.compareEP(
             "60" +                 // pushal
             "E8 00 00 00 00" +     // call $+5
             "5D" +                 // pop ebp
@@ -11677,7 +11680,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.neshta
 
-    if (verdicts.length === 0 && PE_Cached.isArchX86 && PE.compareEP(
+    if (verdicts.length === 0 && PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 && PE.compareEP(
         "55" +              // push ebp
         "8B EC" +           // mov ebp, esp
         "83 C4 E0" +        // add esp, -0x20
@@ -11708,7 +11711,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://www.securityhome.eu/malware/malware.php?mal_id=17234082845c832fbf144826.79985377
 
-    if (verdicts.length === 0 && PE_Cached.isArchX86 && PE.compareEP(
+    if (verdicts.length === 0 && PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 && PE.compareEP(
         "60" +                    // pushal
         "E8 00 00 00 00" +        // call $+5
         "5B 81 EB .. .. .. .." +  // sub ebx, ...
@@ -11729,7 +11732,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://en.wikipedia.org/wiki/CIH_(computer_virus)
 
-    if (verdicts.length === 0 && PE_Cached.isArchX86 && !PE_Cached.is64bit &&
+    if (verdicts.length === 0 && PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 && !PE_Cached.is64bit &&
         PE_Cached.indexOfEntryPointSection !== -1 && PE.compareEP("55")) { // push ebp
         const instructionsOfWin9xCih = [
             "8D 44 24 F8" +    // lea eax, [esp - 8]
@@ -11773,7 +11776,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://community.avast.com/t/win95-dupator/591940
 
-    if (verdicts.length === 0 && ((PE_Cached.isI386 && PE.compareEP(
+    if (verdicts.length === 0 && ((PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isI386 && PE.compareEP(
         "60" +                 // pushal
         "8B E8" +              // mov ebp, eax
         "81 ED 00 10 40 00" +  // sub ebp, 0x401000
@@ -11791,7 +11794,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.parite
 
-    if (verdicts.length === 0 && PE_Cached.isArchX86) {
+    if (verdicts.length === 0 && PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         var pariteAddress = PE_Cached.addressOfUnmanagedEntryPoint,
             pariteLoopCount = 0,
             pariteState = 0; // 0 = initial, 1 = Push/Xor found, 2 = Sub found
@@ -11850,7 +11853,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // http://www.microsoft.com/security/portal/threat/encyclopedia/entry.aspx?Name=Virus%3AWin32%2FPolip.A
 
-    if (verdicts.length === 0 && PE_Cached.isArchX86 && !PE_Cached.is64bit &&
+    if (verdicts.length === 0 && PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 && !PE_Cached.is64bit &&
         PE_Cached.numberOfSections >= 2 && (
             getAsmOpCode(PE_Cached.firstEpAsmInstruction) === "PUSH" ||
             getAsmOpCode(PE_Cached.firstEpAsmInstruction) === "CALL"
@@ -11903,7 +11906,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.wannacryptor
 
-    if (verdicts.length === 0 && PE_Cached.isArchX86 && PE.compareEP(
+    if (verdicts.length === 0 && PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 && PE.compareEP(
         "55" +   // push ebp
         "8B EC"  // mov ebp, esp
     )) {
@@ -11943,7 +11946,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://citec.us/forum/showthread.php/15998-ConsoleDevil
 
-    if (verdicts.length === 0 && PE_Cached.isArchX86 && PE.compareEP(
+    if (verdicts.length === 0 && PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 && PE.compareEP(
         "68 .. .. .. .." +  // push [...]
         "68 00 00 00 00" +  // push 0
         "68 .. .. .. .." +  // push [...]
@@ -11973,7 +11976,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.poison_ivy
 
-    if (verdicts.length === 0 && PE_Cached.isArchX86 && PE.compareEP(
+    if (verdicts.length === 0 && PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 && PE.compareEP(
         "B8 00 04 40 00" +  // mov eax, 0x400400
         "FF D0" +           // call eax
         "6A 00"             // push 0
