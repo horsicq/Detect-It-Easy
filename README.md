@@ -14,6 +14,9 @@
 -   [📋 Changelog](https://github.com/horsicq/Detect-It-Easy/blob/master/changelog.txt)
 -   [💬 Contribute to Translations](https://github.com/horsicq/XTranslation)
 
+> [!WARNING]
+> `detectiteasy.com` is not affiliated with the Detect It Easy project or its official website. Do not trust it as an official source or use it to download DiE. Use only the release links provided in this repository.
+
 ![Screenshot](docs/1.png)
 
 ## 💡 Why use Detect It Easy?
