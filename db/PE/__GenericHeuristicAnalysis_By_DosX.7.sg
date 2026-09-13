@@ -4665,6 +4665,45 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+    // The certificate table must remain outside every mapped image region. Unlike a strict
+    // end-of-file requirement, overlap validation still accepts legitimate trailing overlays.
+
+    var isCertificateTableOverlapPresent = false;
+
+    if (dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_SECURITY + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        const
+            certificateOverlapDirectoryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_SECURITY * 8,
+            certificateOverlapOffset = PE.read_uint32(certificateOverlapDirectoryOffset),
+            certificateOverlapSize = PE.read_uint32(certificateOverlapDirectoryOffset + 4),
+            certificateOverlapEnd = certificateOverlapOffset + certificateOverlapSize;
+
+        if (certificateOverlapOffset !== 0 && certificateOverlapSize !== 0 && certificateOverlapEnd <= PE_Cached.fileSize) {
+            if (certificateOverlapOffset < sectionLayoutHeadersEnd) {
+                log(logType.any, "Certificate table overlaps PE headers");
+
+                isCertificateTableOverlapPresent = true;
+            }
+
+            for (var i = 0; i < PE_Cached.numberOfSections && !isCertificateTableOverlapPresent; i++) {
+                var certificateOverlapSectionOffset = PE.getSectionFileOffset(i),
+                    certificateOverlapSectionSize = PE.getSectionFileSize(i),
+                    certificateOverlapSectionEnd = certificateOverlapSectionOffset + certificateOverlapSectionSize;
+
+                if (certificateOverlapSectionOffset !== 0 && certificateOverlapSectionSize !== 0 &&
+                    certificateOverlapOffset < certificateOverlapSectionEnd && certificateOverlapSectionOffset < certificateOverlapEnd) {
+                    log(logType.any, "Certificate table overlaps section #" + i + " raw data");
+
+                    isCertificateTableOverlapPresent = true;
+                }
+            }
+        }
+    }
+
+    if (isCertificateTableOverlapPresent) options = addOption(options, "Certificate table overlaps image data");
+
+
+
+
     // Walk every WIN_CERTIFICATE entry according to the PE quadword-alignment rules.
     // Certificate revisions and content types are intentionally left open for compatibility;
     // only a chain which cannot fit the declared Security directory is considered malformed.
