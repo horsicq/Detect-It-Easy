@@ -35,7 +35,7 @@ Detect It Easy combines format-aware parsing, signature matching, and programmab
 
 ### PE heuristic engine: analysis beyond a signature match
 
-A signature can tell you what a file resembles. The [Generic Heuristic Analysis engine](db/PE/__GenericHeuristicAnalysis_By_DosX.7.sg) goes further: it reports concrete structural and behavioral anomalies together with the evidence behind them. The PE heuristic engine is created and maintained by [DosX](https://github.com/DosX-dev).
+A signature can tell you what a file resembles. The [Generic Heuristic Analysis engine (`__GenericHeuristicAnalysis_By_DosX.7.sg`)](db/PE/__GenericHeuristicAnalysis_By_DosX.7.sg) goes further: it reports concrete structural and behavioral anomalies together with the evidence behind them. The PE heuristic engine is created and maintained by [DosX](https://github.com/DosX-dev).
 
 > [!NOTE]
 > DiE-JS is the implementation language of this analysis engine, not a shorthand for a few native detector calls. The native DiE core supplies format parsing, bounded reads, address translation, searching, and disassembly primitives. The PE heuristic engine builds analysis algorithms on those primitives: it selects candidates, maintains state, traverses bounded control flow, validates relationships across structures, rejects benign explanations, correlates independent evidence, and reconciles results.
