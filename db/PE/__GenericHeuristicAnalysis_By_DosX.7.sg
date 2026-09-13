@@ -4275,6 +4275,52 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+    // Reserve values describe the complete address-space reservation; committing more
+    // than that range is impossible regardless of linker defaults or loader policy.
+
+    var isCommitAboveReservePresent = false;
+
+    var commitAboveReserveDetails = String();
+
+    const optionalHeaderCommitFieldsEnd = dataDirectoryOptionalHeaderOffset + (PE_Cached.is64bit ? 0x68 : 0x58);
+
+    if (optionalHeaderCommitFieldsEnd <= dataDirectoryOptionalHeaderEnd) {
+        var stackReserve, stackCommit, heapReserve, heapCommit;
+
+        if (PE_Cached.is64bit) {
+            stackReserve = readUnsignedQword(dataDirectoryOptionalHeaderOffset + 0x48);
+            stackCommit = readUnsignedQword(dataDirectoryOptionalHeaderOffset + 0x50);
+            heapReserve = readUnsignedQword(dataDirectoryOptionalHeaderOffset + 0x58);
+            heapCommit = readUnsignedQword(dataDirectoryOptionalHeaderOffset + 0x60);
+        } else {
+            stackReserve = PE.read_uint32(dataDirectoryOptionalHeaderOffset + 0x48);
+            stackCommit = PE.read_uint32(dataDirectoryOptionalHeaderOffset + 0x4C);
+            heapReserve = PE.read_uint32(dataDirectoryOptionalHeaderOffset + 0x50);
+            heapCommit = PE.read_uint32(dataDirectoryOptionalHeaderOffset + 0x54);
+        }
+
+        if (stackReserve !== -1 && stackCommit !== -1 && stackCommit > stackReserve) {
+            commitAboveReserveDetails = "Stack";
+
+            log(logType.any, "Stack commit size exceeds its reserve size");
+
+            isCommitAboveReservePresent = true;
+        }
+
+        if (heapReserve !== -1 && heapCommit !== -1 && heapCommit > heapReserve) {
+            commitAboveReserveDetails += (commitAboveReserveDetails.length !== 0 ? "/" : String()) + "Heap";
+
+            log(logType.any, "Heap commit size exceeds its reserve size");
+
+            isCommitAboveReservePresent = true;
+        }
+    }
+
+    if (isCommitAboveReservePresent) options = addOption(options, commitAboveReserveDetails + " commit exceeds reserve");
+
+
+
+
     // Validate AMD64 exception-table layout, code ranges, and unwind references.
     // Leaf functions may legitimately have no entry, so only present metadata is inspected
     // and only impossible ranges or record relationships are reported.
