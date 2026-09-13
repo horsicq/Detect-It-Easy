@@ -5009,52 +5009,48 @@ function scanForBadFileFormat_NET_and_Native() {
 
     var isTlsCallbackOutsideCodePresent = false;
 
-    var tlsCallbackOutsideCodeAddress = -1;
-
     if (PE.isTLSPresent() && dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_TLS + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
         const
-            tlsDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_TLS * 8,
-            tlsDirectoryRva = PE.read_uint32(tlsDirectoryEntryOffset),
-            tlsDirectorySize = PE.read_uint32(tlsDirectoryEntryOffset + 4),
-            tlsDirectoryMinimumSize = PE_Cached.is64bit ? 0x28 : 0x18,
-            tlsDirectoryOffset = tlsDirectoryRva !== 0 ? PE.VAToOffset(PE_Cached.imageBase + tlsDirectoryRva) : -1;
+            tlsCallbackDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_TLS * 8,
+            tlsCallbackDirectoryRva = PE.read_uint32(tlsCallbackDirectoryEntryOffset),
+            tlsCallbackDirectorySize = PE.read_uint32(tlsCallbackDirectoryEntryOffset + 4),
+            tlsCallbackDirectoryMinimumSize = PE_Cached.is64bit ? 0x28 : 0x18,
+            tlsCallbackDirectoryOffset = tlsCallbackDirectoryRva !== 0 ?
+                PE.VAToOffset(PE_Cached.imageBase + tlsCallbackDirectoryRva) : -1;
 
-        if (tlsDirectorySize >= tlsDirectoryMinimumSize && tlsDirectoryOffset !== -1 &&
-            tlsDirectoryOffset + tlsDirectoryMinimumSize <= PE_Cached.fileSize) {
-            var tlsCallbacksAddress;
+        if (tlsCallbackDirectorySize >= tlsCallbackDirectoryMinimumSize && tlsCallbackDirectoryOffset !== -1 &&
+            tlsCallbackDirectoryOffset + tlsCallbackDirectoryMinimumSize <= PE_Cached.fileSize) {
+            var tlsCallbackArrayAddress;
 
             if (PE_Cached.is64bit) {
-                tlsCallbacksAddress = PE.read_uint32(tlsDirectoryOffset + 0x18) +
-                    PE.read_uint32(tlsDirectoryOffset + 0x1C) * 0x100000000;
+                tlsCallbackArrayAddress = readUnsignedQword(tlsCallbackDirectoryOffset + 0x18);
             } else {
-                tlsCallbacksAddress = PE.read_uint32(tlsDirectoryOffset + 0x0C);
+                tlsCallbackArrayAddress = PE.read_uint32(tlsCallbackDirectoryOffset + 0x0C);
             }
 
-            if (tlsCallbacksAddress !== 0) {
-                var tlsCallbacksOffset = PE.VAToOffset(tlsCallbacksAddress),
-                    tlsCallbackPointerSize = PE_Cached.is64bit ? 8 : 4;
+            if (tlsCallbackArrayAddress !== -1 && tlsCallbackArrayAddress !== 0) {
+                var tlsCallbackArrayOffset = PE.VAToOffset(tlsCallbackArrayAddress),
+                    tlsCallbackAddressSize = PE_Cached.is64bit ? 8 : 4;
 
-                if (tlsCallbacksOffset === -1) {
+                if (tlsCallbackArrayOffset === -1) {
+                    log(logType.any, "TLS callback array is not file-backed");
+
                     isTlsCallbackOutsideCodePresent = true;
                 } else {
                     // The callback array is null-terminated. The bound prevents a damaged
                     // image from turning a structural validation into an unbounded scan.
                     for (var i = 0; i < 64 && !isTlsCallbackOutsideCodePresent; i++) {
-                        var tlsCallbackPointerOffset = tlsCallbacksOffset + i * tlsCallbackPointerSize;
+                        var tlsCallbackAddressOffset = tlsCallbackArrayOffset + i * tlsCallbackAddressSize;
 
-                        if (tlsCallbackPointerOffset + tlsCallbackPointerSize > PE_Cached.fileSize) {
+                        if (tlsCallbackAddressOffset + tlsCallbackAddressSize > PE_Cached.fileSize) {
+                            log(logType.any, "TLS callback array exceeds file-backed data");
+
                             isTlsCallbackOutsideCodePresent = true;
                             break;
                         }
 
-                        var tlsCallbackAddress;
-
-                        if (PE_Cached.is64bit) {
-                            tlsCallbackAddress = PE.read_uint32(tlsCallbackPointerOffset) +
-                                PE.read_uint32(tlsCallbackPointerOffset + 4) * 0x100000000;
-                        } else {
-                            tlsCallbackAddress = PE.read_uint32(tlsCallbackPointerOffset);
-                        }
+                        var tlsCallbackAddress = PE_Cached.is64bit ?
+                            readUnsignedQword(tlsCallbackAddressOffset) : PE.read_uint32(tlsCallbackAddressOffset);
 
                         if (tlsCallbackAddress === 0) break;
 
@@ -5074,19 +5070,14 @@ function scanForBadFileFormat_NET_and_Native() {
                         }
 
                         if (!isTlsCallbackExecutable) {
-                            tlsCallbackOutsideCodeAddress = tlsCallbackAddress;
+                            log(logType.any, "TLS callback outside executable code: 0x" + tlsCallbackAddress.toString(16));
+
                             isTlsCallbackOutsideCodePresent = true;
                         }
                     }
                 }
             }
         }
-    }
-
-    if (isTlsCallbackOutsideCodePresent) {
-        log(logType.any, tlsCallbackOutsideCodeAddress !== -1 ?
-            "TLS callback outside executable code: 0x" + tlsCallbackOutsideCodeAddress.toString(16) :
-            "TLS callback array is not file-backed");
     }
 
     if (isTlsCallbackOutsideCodePresent) options = addOption(options, "TLS callback outside code");
