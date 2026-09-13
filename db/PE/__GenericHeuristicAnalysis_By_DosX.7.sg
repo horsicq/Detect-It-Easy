@@ -2384,6 +2384,7 @@ const
     IMAGE_FILE_RELOCS_STRIPPED = 0x0001,
     IMAGE_DIRECTORY_ENTRY_EXCEPTION = 3,
     IMAGE_DIRECTORY_ENTRY_SECURITY = 4,
+    IMAGE_DIRECTORY_ENTRY_BASERELOC = 5,
     IMAGE_DIRECTORY_ENTRY_ARCHITECTURE = 7,
     IMAGE_DIRECTORY_ENTRY_GLOBALPTR = 8,
     IMAGE_DIRECTORY_ENTRY_TLS = 9,
@@ -4373,6 +4374,32 @@ function scanForBadFileFormat_NET_and_Native() {
     }
 
     if (isReservedPeDataPresent) options = addOption(options, "Reserved PE data populated");
+
+
+
+
+    // A present relocation directory contradicts the COFF declaration that relocation
+    // information was stripped. This remains invalid even when ASLR itself is disabled.
+
+    var isRelocationStateMismatchPresent = false;
+
+    if (declaredDataDirectoryCount > IMAGE_DIRECTORY_ENTRY_BASERELOC &&
+        dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_BASERELOC + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        const
+            baseRelocationDirectoryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_BASERELOC * 8,
+            baseRelocationDirectoryRva = PE.read_uint32(baseRelocationDirectoryOffset),
+            baseRelocationDirectorySize = PE.read_uint32(baseRelocationDirectoryOffset + 4),
+            badFormatCoffCharacteristics = PE.readWord(dataDirectoryOptionalHeaderOffset - 2);
+
+        if ((badFormatCoffCharacteristics & IMAGE_FILE_RELOCS_STRIPPED) &&
+            baseRelocationDirectoryRva !== 0 && baseRelocationDirectorySize !== 0) {
+            log(logType.any, "Relocations are marked stripped while a relocation directory is present");
+
+            isRelocationStateMismatchPresent = true;
+        }
+    }
+
+    if (isRelocationStateMismatchPresent) options = addOption(options, "Relocation state mismatch");
 
 
 
