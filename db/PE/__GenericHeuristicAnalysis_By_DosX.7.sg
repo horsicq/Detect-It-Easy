@@ -2385,6 +2385,7 @@ const
     IMAGE_DIRECTORY_ENTRY_EXCEPTION = 3,
     IMAGE_DIRECTORY_ENTRY_SECURITY = 4,
     IMAGE_DIRECTORY_ENTRY_BASERELOC = 5,
+    IMAGE_DIRECTORY_ENTRY_DEBUG = 6,
     IMAGE_DIRECTORY_ENTRY_ARCHITECTURE = 7,
     IMAGE_DIRECTORY_ENTRY_GLOBALPTR = 8,
     IMAGE_DIRECTORY_ENTRY_TLS = 9,
@@ -4604,6 +4605,62 @@ function scanForBadFileFormat_NET_and_Native() {
     }
 
     if (isInvalidUnwindMetadataPresent) options = addOption(options, "Invalid unwind metadata");
+
+
+
+
+    // IMAGE_DEBUG_DIRECTORY is a fixed 28-byte record. Validate only relationships that
+    // are invariant across debug formats; the payload itself remains producer-specific.
+
+    var isMalformedDebugDirectoryPresent = false;
+
+    if (declaredDataDirectoryCount > IMAGE_DIRECTORY_ENTRY_DEBUG &&
+        dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_DEBUG + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        const
+            debugDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_DEBUG * 8,
+            debugDirectoryRva = PE.read_uint32(debugDirectoryEntryOffset),
+            debugDirectorySize = PE.read_uint32(debugDirectoryEntryOffset + 4),
+            debugDirectoryAddress = PE_Cached.imageBase + debugDirectoryRva;
+
+        if (debugDirectoryRva !== 0 && debugDirectorySize !== 0 &&
+            isVirtualAddressRangeFileBacked(debugDirectoryAddress, debugDirectorySize, 0)) {
+            if (debugDirectorySize % 28 !== 0) {
+                log(logType.any, "Debug directory ends with an incomplete entry");
+
+                isMalformedDebugDirectoryPresent = true;
+            } else {
+                var debugDirectoryOffset = PE.VAToOffset(debugDirectoryAddress),
+                    debugDirectoryData = PE.readBytes(debugDirectoryOffset, debugDirectorySize);
+
+                for (var i = 0; i < debugDirectoryData.length && !isMalformedDebugDirectoryPresent; i += 28) {
+                    var debugEntryIndex = i / 28,
+                        debugEntryCharacteristics = readUnsignedDwordFromBuffer(debugDirectoryData, i),
+                        debugEntryDataSize = readUnsignedDwordFromBuffer(debugDirectoryData, i + 16),
+                        debugEntryDataRva = readUnsignedDwordFromBuffer(debugDirectoryData, i + 20),
+                        debugEntryDataOffset = readUnsignedDwordFromBuffer(debugDirectoryData, i + 24);
+
+                    if (debugEntryCharacteristics !== 0) {
+                        log(logType.any, "Debug directory entry #" + debugEntryIndex + " has reserved characteristics set");
+
+                        isMalformedDebugDirectoryPresent = true;
+                    } else if (debugEntryDataSize !== 0 && debugEntryDataOffset !== 0 &&
+                        (debugEntryDataOffset >= PE_Cached.fileSize ||
+                            debugEntryDataOffset + debugEntryDataSize > PE_Cached.fileSize) &&
+                        (debugEntryDataRva === 0 || !isVirtualAddressRangeFileBacked(
+                            PE_Cached.imageBase + debugEntryDataRva, debugEntryDataSize, 0))) {
+                        log(logType.any, "Debug directory entry #" + debugEntryIndex + " references data outside the file");
+
+                        isMalformedDebugDirectoryPresent = true;
+                    }
+                }
+
+                // Clean up: release the debug-directory buffer
+                debugDirectoryData = undefined;
+            }
+        }
+    }
+
+    if (isMalformedDebugDirectoryPresent) options = addOption(options, "Malformed debug directory");
 
 
 
