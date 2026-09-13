@@ -4206,8 +4206,9 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
-    // Validate every declared PE data-directory range. The certificate table is the only
-    // standard entry whose first field is a file offset; all remaining entries contain RVAs.
+    // Validate every loader-mapped PE data-directory range against the loaded image.
+    // The certificate table stores a file offset and is handled by the dedicated checks
+    // below; treating that offset as mapped-image metadata produces false corruption.
 
     var isUnmappedDataDirectoryPresent = false;
 
@@ -4250,27 +4251,27 @@ function scanForBadFileFormat_NET_and_Native() {
             // preserve a stale RVA. Only a complete declared range is used as strong proof.
             if (currentDataDirectoryRva === 0 || currentDataDirectorySize === 0) continue;
 
-            if (i === IMAGE_DIRECTORY_ENTRY_SECURITY) {
-                // WIN_CERTIFICATE is addressed by physical file offset and may live in overlay.
-                if (currentDataDirectoryRva >= PE_Cached.fileSize ||
-                    currentDataDirectoryRva + currentDataDirectorySize > PE_Cached.fileSize) {
-                    isUnmappedDataDirectoryPresent = true;
-                }
-            } else {
-                var currentDataDirectoryEndRva = currentDataDirectoryRva + currentDataDirectorySize - 1;
+            // Security is not mapped by the image loader. Its offset can be stale in
+            // generated uninstallers without changing the loaded image or executable data.
+            if (i === IMAGE_DIRECTORY_ENTRY_SECURITY) continue;
 
-                if (currentDataDirectoryRva >= sectionLayoutSizeOfImage ||
-                    currentDataDirectoryEndRva >= sectionLayoutSizeOfImage ||
-                    PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryRva) === -1 ||
-                    PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryEndRva) === -1) {
-                    isUnmappedDataDirectoryPresent = true;
-                }
+            var currentDataDirectoryEndRva = currentDataDirectoryRva + currentDataDirectorySize - 1;
+
+            // VirtualSize beyond SizeOfRawData is mapped as zero-filled memory. Accept
+            // such ranges here; dedicated directory parsers separately report content
+            // that must be present in the file but cannot be read.
+            if (currentDataDirectoryRva >= sectionLayoutSizeOfImage ||
+                currentDataDirectoryEndRva >= sectionLayoutSizeOfImage ||
+                (!isVirtualAddressRangeMapped(PE_Cached.imageBase + currentDataDirectoryRva, currentDataDirectorySize, 0) &&
+                    (PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryRva) === -1 ||
+                    PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryEndRva) === -1))) {
+                isUnmappedDataDirectoryPresent = true;
             }
 
             if (isUnmappedDataDirectoryPresent) {
                 unmappedDataDirectoryName = dataDirectoryNames[i];
 
-                log(logType.any, unmappedDataDirectoryName + " data directory is not fully file-backed");
+                log(logType.any, unmappedDataDirectoryName + " data directory extends outside the mapped image");
             }
         }
     }
