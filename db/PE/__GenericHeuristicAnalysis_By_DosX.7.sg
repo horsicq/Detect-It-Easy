@@ -4909,6 +4909,101 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 
+    // Validate relationships inside the TLS directory without assigning significance to
+    // ordinary templates or callbacks. Only loader-impossible metadata is rejected.
+
+    var isInvalidTlsMetadataPresent = false;
+
+    if (PE.isTLSPresent() && dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_TLS + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        const
+            tlsDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_TLS * 8,
+            tlsDirectoryRva = PE.read_uint32(tlsDirectoryEntryOffset),
+            tlsDirectorySize = PE.read_uint32(tlsDirectoryEntryOffset + 4),
+            tlsDirectoryMinimumSize = PE_Cached.is64bit ? 0x28 : 0x18,
+            tlsDirectoryOffset = tlsDirectoryRva !== 0 ? PE.VAToOffset(PE_Cached.imageBase + tlsDirectoryRva) : -1;
+
+        if (tlsDirectorySize >= tlsDirectoryMinimumSize && tlsDirectoryOffset !== -1 &&
+            tlsDirectoryOffset + tlsDirectoryMinimumSize <= PE_Cached.fileSize) {
+            var tlsTemplateStartAddress, tlsTemplateEndAddress, tlsIndexAddress, tlsCallbacksAddress;
+
+            if (PE_Cached.is64bit) {
+                tlsTemplateStartAddress = readUnsignedQword(tlsDirectoryOffset);
+                tlsTemplateEndAddress = readUnsignedQword(tlsDirectoryOffset + 0x08);
+                tlsIndexAddress = readUnsignedQword(tlsDirectoryOffset + 0x10);
+                tlsCallbacksAddress = readUnsignedQword(tlsDirectoryOffset + 0x18);
+            } else {
+                tlsTemplateStartAddress = PE.read_uint32(tlsDirectoryOffset);
+                tlsTemplateEndAddress = PE.read_uint32(tlsDirectoryOffset + 0x04);
+                tlsIndexAddress = PE.read_uint32(tlsDirectoryOffset + 0x08);
+                tlsCallbacksAddress = PE.read_uint32(tlsDirectoryOffset + 0x0C);
+            }
+
+            if (tlsTemplateStartAddress !== -1 && tlsTemplateEndAddress !== -1 &&
+                tlsTemplateStartAddress !== 0 && tlsTemplateEndAddress !== 0 &&
+                tlsTemplateStartAddress > tlsTemplateEndAddress) {
+                log(logType.any, "TLS template range is reversed");
+
+                isInvalidTlsMetadataPresent = true;
+            } else if (tlsIndexAddress !== -1 && tlsIndexAddress !== 0 && !isVirtualAddressRangeMapped(tlsIndexAddress, 4, 0)) {
+                log(logType.any, "TLS index storage is outside the mapped image");
+
+                isInvalidTlsMetadataPresent = true;
+            }
+
+            if (!isInvalidTlsMetadataPresent && tlsCallbacksAddress !== -1 && tlsCallbacksAddress !== 0) {
+                var tlsCallbacksOffset = PE.VAToOffset(tlsCallbacksAddress),
+                    tlsCallbackPointerSize = PE_Cached.is64bit ? 8 : 4,
+                    tlsCallbacksAvailablePointerCount = -1;
+
+                if (tlsCallbacksOffset !== -1) {
+                    var tlsCallbacksRva = tlsCallbacksAddress - PE_Cached.imageBase;
+
+                    // Absence of a terminator is provable only when the complete physical
+                    // tail is short enough to inspect. Longer arrays stay inconclusive.
+                    for (var d = 0; d < PE_Cached.numberOfSections && tlsCallbacksAvailablePointerCount === -1; d++) {
+                        var tlsCallbacksSectionRva = PE.getSectionVirtualAddress(d),
+                            tlsCallbacksSectionRawSize = PE.getSectionFileSize(d),
+                            tlsCallbacksOffsetInSection = tlsCallbacksRva - tlsCallbacksSectionRva;
+
+                        if (tlsCallbacksOffsetInSection >= 0 && tlsCallbacksOffsetInSection < tlsCallbacksSectionRawSize &&
+                            PE.getSectionFileOffset(d) + tlsCallbacksOffsetInSection === tlsCallbacksOffset) {
+                            tlsCallbacksAvailablePointerCount = Math.floor(
+                                (tlsCallbacksSectionRawSize - tlsCallbacksOffsetInSection) / tlsCallbackPointerSize
+                            );
+                        }
+                    }
+
+                    if (tlsCallbacksAvailablePointerCount === 0) {
+                        log(logType.any, "TLS callback array begins at an incomplete pointer");
+
+                        isInvalidTlsMetadataPresent = true;
+                    } else if (tlsCallbacksAvailablePointerCount > 0 && tlsCallbacksAvailablePointerCount <= 64) {
+                        var isTlsCallbackArrayTerminated = false;
+
+                        for (var i = 0; i < tlsCallbacksAvailablePointerCount && !isTlsCallbackArrayTerminated; i++) {
+                            var tlsCallbackPointerOffset = tlsCallbacksOffset + i * tlsCallbackPointerSize,
+                                tlsCallbackAddress = PE_Cached.is64bit ?
+                                    readUnsignedQword(tlsCallbackPointerOffset) : PE.read_uint32(tlsCallbackPointerOffset);
+
+                            if (tlsCallbackAddress === 0) isTlsCallbackArrayTerminated = true;
+                        }
+
+                        if (!isTlsCallbackArrayTerminated) {
+                            log(logType.any, "TLS callback array is not null-terminated");
+
+                            isInvalidTlsMetadataPresent = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (isInvalidTlsMetadataPresent) options = addOption(options, "Invalid TLS metadata");
+
+
+
+
     // Resolve the TLS callback array and require every declared callback to point to
     // physically backed executable code. Merely having a TLS directory is not suspicious.
 
