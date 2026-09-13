@@ -2384,6 +2384,8 @@ const
     IMAGE_FILE_RELOCS_STRIPPED = 0x0001,
     IMAGE_DIRECTORY_ENTRY_EXCEPTION = 3,
     IMAGE_DIRECTORY_ENTRY_SECURITY = 4,
+    IMAGE_DIRECTORY_ENTRY_ARCHITECTURE = 7,
+    IMAGE_DIRECTORY_ENTRY_GLOBALPTR = 8,
     IMAGE_DIRECTORY_ENTRY_TLS = 9,
     IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG = 10,
     IMAGE_DIRECTORY_ENTRY_RESERVED = 15;
@@ -4219,6 +4221,10 @@ function scanForBadFileFormat_NET_and_Native() {
             PE_Cached.fileSize
         );
 
+    // Every rule below still validates its physical slot; caching only avoids repeated reads.
+    const declaredDataDirectoryCount = dataDirectoryNumberOffset + 4 <= dataDirectoryOptionalHeaderEnd ?
+        PE.read_uint32(dataDirectoryNumberOffset) : 0;
+
     var dataDirectoryNames = [
         "EAT", "Imports", "Resources", "Exceptions", "Security", "Relocs", "Debug", "Architecture",
         "GlobalPtr", "TLS", "Load config", "Bound imports", "IAT", "Delay imports", "CLR"
@@ -4228,7 +4234,7 @@ function scanForBadFileFormat_NET_and_Native() {
         dataDirectoryTableOffset < dataDirectoryOptionalHeaderEnd) {
         // The reserved entry is ignored by the loader and has no mapping semantics.
         const dataDirectoryCount = Math.min(
-            PE.read_uint32(dataDirectoryNumberOffset),
+            declaredDataDirectoryCount,
             IMAGE_DIRECTORY_ENTRY_RESERVED,
             Math.floor((dataDirectoryOptionalHeaderEnd - dataDirectoryTableOffset) / 8)
         );
@@ -4317,6 +4323,56 @@ function scanForBadFileFormat_NET_and_Native() {
     }
 
     if (isCommitAboveReservePresent) options = addOption(options, commitAboveReserveDetails + " commit exceeds reserve");
+
+
+
+
+    // Reserved optional-header fields and directory slots have no loader-defined payload.
+    // A non-zero value therefore cannot be explained by an uncommon but valid mapping.
+
+    var isReservedPeDataPresent = false;
+
+    if (dataDirectoryOptionalHeaderOffset + 0x38 <= dataDirectoryOptionalHeaderEnd &&
+        PE.read_uint32(dataDirectoryOptionalHeaderOffset + 0x34) !== 0) {
+        log(logType.any, "Reserved Win32VersionValue field is populated");
+
+        isReservedPeDataPresent = true;
+    }
+
+    const loaderFlagsOffset = dataDirectoryOptionalHeaderOffset + (PE_Cached.is64bit ? 0x68 : 0x58);
+
+    // Windows metadata images legitimately use LoaderFlags for managed metadata policy.
+    if (!isReservedPeDataPresent && !PE_Cached.isDotNet && loaderFlagsOffset + 4 <= dataDirectoryOptionalHeaderEnd &&
+        PE.read_uint32(loaderFlagsOffset) !== 0) {
+        log(logType.any, "Reserved LoaderFlags field is populated");
+
+        isReservedPeDataPresent = true;
+    }
+
+    if (!isReservedPeDataPresent && declaredDataDirectoryCount > IMAGE_DIRECTORY_ENTRY_ARCHITECTURE &&
+        dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_ARCHITECTURE + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        const architectureDirectoryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_ARCHITECTURE * 8;
+
+        if (PE.read_uint32(architectureDirectoryOffset) !== 0 || PE.read_uint32(architectureDirectoryOffset + 4) !== 0) {
+            log(logType.any, "Reserved Architecture data directory is populated");
+
+            isReservedPeDataPresent = true;
+        }
+    }
+
+    if (!isReservedPeDataPresent && declaredDataDirectoryCount > IMAGE_DIRECTORY_ENTRY_GLOBALPTR &&
+        dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_GLOBALPTR + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        const globalPointerDirectoryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_GLOBALPTR * 8;
+
+        // GlobalPtr may contain an RVA, but its Size field is explicitly reserved.
+        if (PE.read_uint32(globalPointerDirectoryOffset + 4) !== 0) {
+            log(logType.any, "GlobalPtr data directory has a non-zero reserved size");
+
+            isReservedPeDataPresent = true;
+        }
+    }
+
+    if (isReservedPeDataPresent) options = addOption(options, "Reserved PE data populated");
 
 
 
