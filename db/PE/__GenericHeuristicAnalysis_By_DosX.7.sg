@@ -4180,7 +4180,11 @@ function scanForBadFileFormat_NET_and_Native() {
 
     var isExportTableIncorrect = false;
 
-    if (PE_Cached.isDynamicLinkLibrary && !PE.isExportTableCorrect()) {
+    // Resource-only and compatibility DLLs may deliberately retain an empty
+    // IMAGE_EXPORT_DIRECTORY. The protection pass reports that unusual state on its
+    // own; table correctness is meaningful here only after an export was resolved.
+    if (PE_Cached.isDynamicLinkLibrary && PE_Cached.numberOfUnmanagedExports > 0 &&
+        !PE.isExportTableCorrect()) {
         log(logType.any, "Export table appears malformed");
 
         isExportTableIncorrect = true;
@@ -4573,17 +4577,10 @@ function scanForBadFileFormat_NET_and_Native() {
                         }
                     }
 
-                    // Current Microsoft system images may contain zeroed padding or zero-length
-                    // entries with valid metadata; accepted third-party images are not always sorted.
-                    // Consequently, the rule rejects only relationships that cannot describe
-                    // a function instead of enforcing one linker's preferred table layout.
-                    if (runtimeFunctionSize < 0) {
-                        log(logType.any, "AMD64 unwind function entry #" + runtimeFunctionIndex +
-                            " has a reversed range: RVA 0x" + runtimeFunctionBeginRva.toString(16) +
-                            "-0x" + runtimeFunctionEndRva.toString(16));
-
-                        isInvalidUnwindMetadataPresent = true;
-                    } else if (runtimeFunctionSize > 0 && !isRuntimeFunctionCodeRangeValid) {
+                    // Current Microsoft images may retain zero-length or reversed entries.
+                    // Neither can cover a control PC, so range ordering alone is not evidence
+                    // of corruption; positive ranges and every metadata pointer remain strict.
+                    if (runtimeFunctionSize > 0 && !isRuntimeFunctionCodeRangeValid) {
                         log(logType.any, "AMD64 unwind function entry #" + runtimeFunctionIndex +
                             " references a non-code range: RVA 0x" + runtimeFunctionBeginRva.toString(16) +
                             "-0x" + runtimeFunctionEndRva.toString(16));
