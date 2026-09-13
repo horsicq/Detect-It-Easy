@@ -4301,17 +4301,78 @@ function scanForBadFileFormat_NET_and_Native() {
             } else {
                 var exceptionDirectoryOffset = PE.VAToOffset(exceptionDirectoryAddress),
                     exceptionDirectoryData = PE.readBytes(exceptionDirectoryOffset, exceptionDirectorySize),
-                    runtimeFunctionSectionRanges = [];
+                    runtimeFunctionMappedRanges = [],
+                    runtimeFunctionCodeRanges = [];
 
-                // Snapshot the small section table once; exception directories may contain
-                // hundreds of thousands of records and engine calls dominate local parsing.
-                for (var d = 0; d < PE_Cached.numberOfSections; d++) {
-                    runtimeFunctionSectionRanges.push({
-                        Rva: PE.getSectionVirtualAddress(d),
-                        MappedSize: Math.max(PE.getSectionVirtualSize(d), PE.getSectionFileSize(d)),
-                        Characteristics: PE.section[d].Characteristics
+                // A prefix-maximum interval index answers whether one section contains a
+                // complete range in O(log n). Unlike a monotonic cursor, it remains exact
+                // for unsorted exception records and overlapping protector-made sections.
+                function prepareRuntimeFunctionRangeIndex(ranges) {
+                    ranges.sort(function (leftRange, rightRange) {
+                        return leftRange.Rva - rightRange.Rva;
                     });
+
+                    var maximumEndRva = 0,
+                        maximumEndRangeIndex = -1;
+
+                    for (var r = 0; r < ranges.length; r++) {
+                        if (ranges[r].EndRva > maximumEndRva) {
+                            maximumEndRva = ranges[r].EndRva;
+                            maximumEndRangeIndex = r;
+                        }
+
+                        ranges[r].MaximumEndRva = maximumEndRva;
+                        ranges[r].MaximumEndRangeIndex = maximumEndRangeIndex;
+                    }
                 }
+
+                function findRuntimeFunctionRangeIndex(ranges, beginRva, endRva) {
+                    var lowerIndex = 0,
+                        upperIndex = ranges.length;
+
+                    // Find the last interval beginning at or before the requested range.
+                    while (lowerIndex < upperIndex) {
+                        var middleIndex = lowerIndex + Math.floor((upperIndex - lowerIndex) / 2);
+
+                        if (ranges[middleIndex].Rva <= beginRva) {
+                            lowerIndex = middleIndex + 1;
+                        } else {
+                            upperIndex = middleIndex;
+                        }
+                    }
+
+                    var matchingRangeIndex = lowerIndex - 1;
+
+                    return matchingRangeIndex >= 0 && ranges[matchingRangeIndex].MaximumEndRva >= endRva ? ranges[matchingRangeIndex].MaximumEndRangeIndex : -1;
+                }
+
+                // Snapshot and index the section table once; exception directories may
+                // contain hundreds of thousands of fixed-size records.
+                for (var d = 0; d < PE_Cached.numberOfSections; d++) {
+                    var runtimeFunctionSectionRva = PE.getSectionVirtualAddress(d),
+                        runtimeFunctionSectionEndRva = runtimeFunctionSectionRva +
+                            Math.max(PE.getSectionVirtualSize(d), PE.getSectionFileSize(d));
+
+                    runtimeFunctionMappedRanges.push({
+                        Rva: runtimeFunctionSectionRva,
+                        EndRva: runtimeFunctionSectionEndRva
+                    });
+
+                    // Accept both code and execute flags: current Windows kernels describe
+                    // discardable initialization code without the execute characteristic.
+                    if ((PE.section[d].Characteristics & (SECTION_FLAGS_CODE | SECTION_FLAGS_EXECUTE)) !== 0) {
+                        runtimeFunctionCodeRanges.push({
+                            Rva: runtimeFunctionSectionRva,
+                            EndRva: runtimeFunctionSectionEndRva
+                        });
+                    }
+                }
+
+                prepareRuntimeFunctionRangeIndex(runtimeFunctionMappedRanges);
+                prepareRuntimeFunctionRangeIndex(runtimeFunctionCodeRanges);
+
+                var cachedRuntimeFunctionMappedRangeIndex = -1,
+                    cachedRuntimeFunctionCodeRangeIndex = -1;
 
                 for (var i = 0; i < exceptionDirectoryData.length && !isInvalidUnwindMetadataPresent; i += 12) {
                     var runtimeFunctionIndex = i / 12,
@@ -4323,6 +4384,26 @@ function scanForBadFileFormat_NET_and_Native() {
                         isRuntimeFunctionUnwindPointerValid = runtimeFunctionBeginRva === 0 &&
                             runtimeFunctionEndRva === 0 && runtimeFunctionUnwindRva === 0,
                         isRuntimeFunctionIndirect = runtimeFunctionUnwindRva % 2 !== 0;
+
+                    if (runtimeFunctionSize > 0) {
+                        var cachedRuntimeFunctionCodeRange = runtimeFunctionCodeRanges[cachedRuntimeFunctionCodeRangeIndex];
+
+                        // Adjacent records overwhelmingly reference the same code section.
+                        // Keep the binary index as an exact fallback for every other layout.
+                        if (cachedRuntimeFunctionCodeRange &&
+                            runtimeFunctionBeginRva >= cachedRuntimeFunctionCodeRange.Rva &&
+                            runtimeFunctionEndRva <= cachedRuntimeFunctionCodeRange.EndRva) {
+                            isRuntimeFunctionCodeRangeValid = true;
+                        } else {
+                            var runtimeFunctionCodeRangeIndex = findRuntimeFunctionRangeIndex(runtimeFunctionCodeRanges,
+                                runtimeFunctionBeginRva, runtimeFunctionEndRva);
+
+                            if (runtimeFunctionCodeRangeIndex !== -1) {
+                                cachedRuntimeFunctionCodeRangeIndex = runtimeFunctionCodeRangeIndex;
+                                isRuntimeFunctionCodeRangeValid = true;
+                            }
+                        }
+                    }
 
                     // RUNTIME_FUNCTION_INDIRECT stores another .pdata entry RVA with bit 0
                     // set instead of an UNWIND_INFO RVA. Validate that tagged reference
@@ -4339,31 +4420,24 @@ function scanForBadFileFormat_NET_and_Native() {
                             indirectRuntimeFunctionOffset % 12 === 0;
                     }
 
-                    // Use section-header values already exposed by the engine, but keep the
-                    // per-entry checks local. Calling VA translation for every function makes
-                    // large commercial exception tables disproportionately expensive.
-                    // Accept both code and execute flags: current Windows kernels describe
-                    // discardable initialization code without the execute characteristic.
-                    for (var d = 0; d < runtimeFunctionSectionRanges.length &&
-                        (!isRuntimeFunctionCodeRangeValid || !isRuntimeFunctionUnwindPointerValid); d++) {
-                        var runtimeFunctionSectionRange = runtimeFunctionSectionRanges[d],
-                            runtimeFunctionSectionRva = runtimeFunctionSectionRange.Rva,
-                            runtimeFunctionSectionMappedSize = runtimeFunctionSectionRange.MappedSize;
+                    // Ordinary UNWIND_INFO is DWORD-aligned but may live in any mapped
+                    // section. Requiring executable or physically backed xdata here would
+                    // reject valid packed images and virtual-only metadata produced by linkers.
+                    if (!isRuntimeFunctionIndirect && runtimeFunctionUnwindRva % 4 === 0) {
+                        var cachedRuntimeFunctionMappedRange = runtimeFunctionMappedRanges[cachedRuntimeFunctionMappedRangeIndex];
 
-                        if (runtimeFunctionSize > 0 &&
-                            runtimeFunctionBeginRva >= runtimeFunctionSectionRva &&
-                            runtimeFunctionEndRva <= runtimeFunctionSectionRva + runtimeFunctionSectionMappedSize &&
-                            (runtimeFunctionSectionRange.Characteristics & (SECTION_FLAGS_CODE | SECTION_FLAGS_EXECUTE))) {
-                            isRuntimeFunctionCodeRangeValid = true;
-                        }
-
-                        // Ordinary UNWIND_INFO is DWORD-aligned but may live in any mapped
-                        // section. Requiring executable or physically backed xdata here would
-                        // reject valid packed images and virtual-only metadata produced by linkers.
-                        if (!isRuntimeFunctionIndirect && runtimeFunctionUnwindRva % 4 === 0 &&
-                            runtimeFunctionUnwindRva >= runtimeFunctionSectionRva &&
-                            runtimeFunctionUnwindRva + 4 <= runtimeFunctionSectionRva + runtimeFunctionSectionMappedSize) {
+                        if (cachedRuntimeFunctionMappedRange &&
+                            runtimeFunctionUnwindRva >= cachedRuntimeFunctionMappedRange.Rva &&
+                            runtimeFunctionUnwindRva + 4 <= cachedRuntimeFunctionMappedRange.EndRva) {
                             isRuntimeFunctionUnwindPointerValid = true;
+                        } else {
+                            var runtimeFunctionMappedRangeIndex = findRuntimeFunctionRangeIndex(runtimeFunctionMappedRanges,
+                                runtimeFunctionUnwindRva, runtimeFunctionUnwindRva + 4);
+
+                            if (runtimeFunctionMappedRangeIndex !== -1) {
+                                cachedRuntimeFunctionMappedRangeIndex = runtimeFunctionMappedRangeIndex;
+                                isRuntimeFunctionUnwindPointerValid = true;
+                            }
                         }
                     }
 
@@ -4393,7 +4467,8 @@ function scanForBadFileFormat_NET_and_Native() {
 
                 // Clean up: release the potentially large exception-directory buffer
                 exceptionDirectoryData = undefined;
-                runtimeFunctionSectionRanges = undefined;
+                runtimeFunctionMappedRanges = undefined;
+                runtimeFunctionCodeRanges = undefined;
             }
         }
     }
