@@ -5,7 +5,7 @@
 [![GitHub All Releases](https://img.shields.io/github/downloads/horsicq/DIE-engine/total.svg)](http://ntinfo.biz)
 [![gitlocalized](https://gitlocalize.com/repo/4736/whole_project/badge.svg)](https://github.com/horsicq/XTranslation)
 
-**Detect It Easy (DiE)** is a powerful tool for file type identification, popular among **malware analysts**, **cybersecurity experts**, and **reverse engineers** worldwide. Supporting both **signature-based** and **heuristic analysis**, DiE enables efficient file inspections across a broad range of platforms, including **Windows, Linux, and MacOS**. Its adaptable, script-driven detection architecture makes it one of the most versatile tools in the field, with a comprehensive list of supported OS images.
+**Detect It Easy (DiE)** is a cross-platform tool for file identification and static inspection, used by **malware analysts**, **cybersecurity experts**, and **reverse engineers**. It combines native format parsers with an extensible DiE-JS analysis layer, supporting both compact signatures and multi-stage static analysis across **Windows, Linux, and MacOS**.
 
 ## 🚀 Getting started
 
@@ -21,29 +21,36 @@
 
 ## 💡 Why use Detect It Easy?
 
-Detect It Easy’s **flexible signature system** and **scripting capabilities** make it an essential tool for **malware analysis** and **digital forensics**. With traditional static analyzers often limited in scope and prone to false positives, DiE’s customizable design enables precise integration of new detection logic, ensuring reliable results across diverse file types.
+Detect It Easy combines format-aware parsing, signature matching, and programmable analysis for **malware analysis**, **reverse engineering**, and **digital forensics**. DiE-JS modules can use parsed structures and low-level inspection primitives to implement bounded algorithms while keeping detection policy reviewable in the database.
 
 ![Screenshot](docs/2.png)
 
 ### Key advantages:
 
--   **Flexible Signature Management**: Easily create, modify, and optimize detection scripts (rules).
+-   **Extensible Analysis Modules**: DiE-JS supports compact signatures as well as stateful, format-aware algorithms.
 -   **Cross-Platform Support**: Runs on Windows, Linux, and MacOS.
 -   **Conservative Heuristics**: Independent evidence, architecture gates, bounded scans, and explicit antipatterns help control false positives.
 
 ## 🧠 Heuristic engine
 
-### PE analysis that goes beyond a signature match
+### PE heuristic engine: analysis beyond a signature match
 
 A signature can tell you what a file resembles. The [Generic Heuristic Analysis engine](db/PE/__GenericHeuristicAnalysis_By_DosX.7.sg) goes further: it reports concrete structural and behavioral anomalies together with the evidence behind them. The PE heuristic engine is created and maintained by [DosX](https://github.com/DosX-dev).
 
-With heuristic scanning enabled, DiE makes a series of specialized passes over native and managed PE images. The file is never launched. Instead, the engine works with headers, data directories, sections, imports, exports, resources, .NET metadata, bytecode, overlays, debug records, and reachable startup code rooted at the entry point. The same coverage extends to DLL initialization code, closing a common blind spot when protected or suspicious behavior begins inside a library rather than an application. This makes it useful both when an exact signature is known and when a sample has been modified enough to evade ordinary identification.
+> [!NOTE]
+> DiE-JS is the implementation language of this analysis engine, not a shorthand for a few native detector calls. The native DiE core supplies format parsing, bounded reads, address translation, searching, and disassembly primitives. The PE heuristic engine builds analysis algorithms on those primitives: it selects candidates, maintains state, traverses bounded control flow, validates relationships across structures, rejects benign explanations, correlates independent evidence, and reconciles results.
 
-Native analysis combines cached linear disassembly with bounded traversal of reachable startup code and purpose-built state machines. It tracks the register, flag, stack, address-provenance, and instruction-boundary facts required by each rule without pretending to be a sandbox or full CPU emulator. This allows DiE to expose opaque and degenerate branches, synthetic and indirect transfers, overlapping instruction streams, position-independent and self-modifying stubs, bitstream unpackers, anti-analysis probes, and irregular control flow used by polymorphic packers and protectors. The checks remain effective across register substitution, neutral padding, equivalent arithmetic forms, and bounded reordering of independent instructions commonly produced by commercial generators and private cryptors.
+Heuristic analysis is not merely a fallback used when signatures fail. When enabled, it runs as a separate higher-level analysis engine and can corroborate, qualify, or reject earlier database results while keeping every heuristic conclusion visibly marked.
 
-Managed code receives instruction-aware treatment of its own. An internal MSIL opcode model is used to build operand-aware bytecode patterns for indirect calls and function pointers, control-flow transformations, arithmetic mutations, invalid instruction sequences, and other forms of obfuscation. It is not a CLR emulator, but it allows the engine to reason about executable IL patterns instead of treating a managed assembly as little more than metadata and strings.
+With heuristic scanning enabled, the PE heuristic engine makes a series of specialized passes over native and managed images. The file is never launched. Instead, the engine works with headers, data directories, sections, imports, exports, resources, .NET metadata, bytecode, overlays, debug records, and reachable startup code rooted at the entry point. The same coverage extends to DLL initialization code, closing a common blind spot when protected or suspicious behavior begins inside a library rather than an application. This makes it useful both when an exact signature is known and when a sample has been modified enough to evade ordinary identification.
 
-Much of the engine's strength comes from joining evidence across layers. It can relate version-resource identity to Authenticode state, Rich build metadata, runtime model, and detected protection; cross-check the file-system extension; interpret mangled import and export symbols used by MSVC, GNU/MinGW, Borland, and Swift; and recognize fingerprints left by dumpers, unpackers, and PE reconstructors. Native checks are architecture-aware across x86/x64 and the ARM family, while security-mitigation flags are checked as meaningful combinations rather than isolated bits.
+The PE heuristic engine's native-code analysis combines cached linear disassembly with bounded traversal of reachable startup code and purpose-built state machines. It tracks the register, flag, stack, address-provenance, and instruction-boundary facts required by each rule without pretending to be a sandbox or full CPU emulator. This allows DiE to expose opaque and degenerate branches, synthetic and indirect transfers, overlapping instruction streams, position-independent and self-modifying stubs, bitstream unpackers, anti-analysis probes, and irregular control flow used by polymorphic packers and protectors. The checks remain effective across register substitution, neutral padding, equivalent arithmetic forms, and bounded reordering of independent instructions commonly produced by commercial generators and private cryptors.
+
+For managed code, the PE heuristic engine uses an internal MSIL opcode model to build operand-aware bytecode patterns for indirect calls and function pointers, control-flow transformations, arithmetic mutations, invalid instruction sequences, and other forms of obfuscation. It is not a CLR emulator, but it allows the engine to reason about executable IL patterns instead of treating a managed assembly as little more than metadata and strings.
+
+Much of the analysis comes from joining evidence across layers. The engine can relate version-resource identity to Authenticode state, Rich build metadata, runtime model, and detected protection; cross-check the file-system extension; interpret mangled import and export symbols used by MSVC, GNU/MinGW, Borland, and Swift; and recognize fingerprints left by dumpers, unpackers, and PE reconstructors. Native checks are architecture-aware across x86/x64 and the ARM family, while security-mitigation flags are checked as meaningful combinations rather than isolated bits.
+
+A single scan may independently identify a known protector, recognize its characteristic section layout, describe entry-point transformations, recover toolchain or game-engine provenance, and associate licensing metadata. These findings come from separate analysis paths; no single backend predicate produces the complete report.
 
 These are the main passes rather than a complete inventory of every check:
 
@@ -194,7 +201,7 @@ PE32
 
 ### Smaller heuristics for everyday files
 
-PE is the largest heuristic module, but it is not the only one shipped with DiE:
+The PE heuristic engine is accompanied by smaller heuristic modules for other everyday file types:
 
 -   The [JavaScript heuristic](db/Binary/__MiniJavaScriptHeuristic_By_DosX.7.sg) recognizes common JavaScript variants, distinguishes text from bytecode, and spots minified or compiled-looking code without blindly matching content inside ordinary strings.
 -   The [file-extension heuristic](db/Binary/__MiniExtensionsHeuristic_By_DosX.7.sg) provides a broad fallback catalogue of formats and programming languages, cross-checking the extension against whether the file is actually textual or binary.
@@ -204,14 +211,16 @@ PE is the largest heuristic module, but it is not the only one shipped with DiE:
 
 The desktop version of DiE is not limited to its own scanning engine. It brings several independent analyzers into the same interface, each with a different rule model and a different idea of what constitutes a useful match. On a difficult or unfamiliar file, running them in turn can expose details that one database alone would miss. Their output is complementary rather than a vote: three engines repeating a weak signature do not turn it into proof.
 
--   **Detect It Easy (DiE)** is the primary, format-aware engine. Its DiE-JS rules can combine executable structures, metadata, imports, sections, entry-point code, antipatterns, and bounded byte searches, while the PE heuristic layer adds broader anomaly and behavioral analysis. The signature database can also recover application context from recognizable .NET dependencies spanning data access, logging and background jobs, HTTP and browser automation, content tooling, cryptography, testing, and more.
+-   **Detect It Easy (DiE)** is the primary, format-aware scanner. Its native core parses file formats and exposes bounded inspection primitives, while DiE-JS modules range from compact signatures to stateful analysis engines. The PE heuristic engine operates at this higher level, combining executable structures, metadata, imports, sections, entry-point code, antipatterns, and bounded byte searches. The signature database can also recover application context from recognizable .NET dependencies spanning data access, logging and background jobs, HTTP and browser automation, content tooling, cryptography, testing, and more.
 -   **[Nauz File Detector](https://github.com/horsicq/Nauz-File-Detector) (NFD)** provides an independent view of linkers, compilers, tools, and packers. It has no user-rule workflow comparable to DiE-JS or YARA, its heuristic logic is much simpler, and its database is updated relatively infrequently. That makes it useful as a second opinion, not as a replacement for the main engine.
 -   **[YARA](https://github.com/VirusTotal/yara)** adds direct rule-based matching with textual, binary, and logical conditions. It is a de facto standard for malware researchers and threat hunters, and DiE ships its own [basic](yara_rules/DiE_BasicHeuristics_by_DosX.yar) and [enhanced](yara_rules/DiE_EnhancedHeuristics_by_DosX.yar) YARA-side heuristics. These provide a lighter cross-check of suspicious PE traits rather than duplicating the full DiE heuristic engine.
 -   **[PEiD](https://github.com/horsicq/XPEID)** is included for compatibility with the classic "old-school" detector and its `userdb` ecosystem. The [bundled database](peid_rules/PE) preserves a large amount of historical material imported from the original PEiD rules. It remains useful for reproducing legacy detections, but many signatures are noisy by modern standards and can produce convincing-looking false positives, so its results should be treated as secondary evidence.
 
-## 🧩 Anatomy of a detection rule
+## 🧩 Anatomy of a minimal detection rule
 
-DiE rules are small DiE-JS modules. A typical standalone rule declares the kind of result it produces, inspects the current file through the format API, fills optional result fields, and returns the engine-built result:
+DiE database entries are DiE-JS modules ranging from compact signatures to stateful, multi-stage format analyzers. The example below intentionally demonstrates only the result contract of a minimal standalone rule; it is not representative of the PE heuristic engine.
+
+A typical standalone rule declares the kind of result it produces, inspects the current file through the format API, fills optional result fields, and returns the engine-built result:
 
 ```js
 // Detect It Easy: detection rule file
@@ -250,7 +259,7 @@ Before submitting a rule or script module, follow the complete [DiE-JS code-form
 
 ### Before writing a real rule
 
-The skeleton above is only the wrapper. DiE determines the file class first and then runs the rules from the matching directory, so format-specific logic belongs beside that format: PE rules use `db/PE`, ELF rules use `db/ELF`, and so on. `db/Binary` is intended for unclassified or genuinely format-independent data, not as a shortcut for code that belongs to a more specific parser.
+The skeleton above demonstrates syntax and result construction only. DiE determines the file class first and then runs the rules from the matching directory, so format-specific logic belongs beside that format: PE rules use `db/PE`, ELF rules use `db/ELF`, and so on. `db/Binary` is intended for unclassified or genuinely format-independent data, not as a shortcut for code that belongs to a more specific parser.
 
 The scripting API is documented in `help`. Start with the [global functions](help/Global.md), the common [Binary API](help/Binary.md), and the [signature-pattern reference](help/Signatures.md), then use the class reference for the format being inspected: [PE](help/PE.md), [.NET metadata](help/DOTNET.md), [ELF](help/ELF.md), [Mach-O](help/MACH.md), or another document from the same directory.
 
@@ -288,10 +297,11 @@ Unknown formats undergo heuristic analysis, providing identification for both kn
 
 ## 🔑 Key features
 
--   **Flexible Signature Management**: Define or modify detection rules.
--   **Scripted Detection**: Use a JavaScript-like scripting language (DiE-JS ES5 runtime) for custom detection algorithms.
+-   **Native Format Core**: Parse executable structures and expose bounded reading, addressing, searching, and disassembly primitives.
+-   **Extensible Analysis Engines**: Use the DiE-JS ES5 runtime for compact signatures or stateful, multi-stage detection algorithms.
+-   **Explainable Heuristics**: Keep inferred results separate and report the structural, metadata, or instruction-derived evidence behind them.
 -   **Cross-Platform Compatibility**: Available for Windows, Linux, and MacOS.
--   **Reduced False Positives**: Combines signature and heuristic scanning for accuracy.
+-   **False-Positive Controls**: Combine independent evidence with architecture gates, bounded scans, and explicit benign-case exclusions.
 
 ## 📥 Installation
 
