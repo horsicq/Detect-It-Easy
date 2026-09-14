@@ -10545,6 +10545,125 @@ function getOptHeaderOffset() {
 
 
 /**
+ * Returns the size of a structurally valid trailing Windows Authenticode table.
+ *
+ * The Security directory is the only PE data directory whose address is a raw file
+ * offset. Restricting the result to an aligned table which exactly consumes the file
+ * tail prevents malformed directory values from hiding unrelated overlay bytes.
+ *
+ * @returns {number} Certificate-table size in bytes, or zero when no valid trailing table exists.
+ */
+function getWinAuthCertificateSize() {
+    if (PE_Cached.overlaySize < 8) return 0;
+
+    const optionalHeaderOffset = getOptHeaderOffset();
+
+    if (optionalHeaderOffset < 4 || optionalHeaderOffset >= PE_Cached.fileSize) return 0;
+
+    const
+        optionalHeaderSize = PE.readWord(optionalHeaderOffset - 4),
+        optionalHeaderEnd = Math.min(optionalHeaderOffset + optionalHeaderSize, PE_Cached.fileSize),
+        securityDirectoryOffset = optionalHeaderOffset + (PE_Cached.is64bit ? 0x90 : 0x80);
+
+    if (securityDirectoryOffset + 8 > optionalHeaderEnd) return 0;
+
+    const
+        certificateOffset = PE.read_uint32(securityDirectoryOffset),
+        certificateSize = PE.read_uint32(securityDirectoryOffset + 4),
+        overlayEndOffset = PE_Cached.overlayOffset + PE_Cached.overlaySize;
+
+    if (certificateOffset < PE_Cached.overlayOffset || certificateSize < 8 ||
+        certificateOffset % 8 !== 0 || certificateSize % 8 !== 0 ||
+        certificateOffset + certificateSize !== overlayEndOffset) return 0;
+
+    return certificateSize;
+}
+
+
+
+/**
+ * Calculates entropy for a structurally homogeneous range with a conservative deterministic fast path.
+ *
+ * This is suitable for individual sections and overlay payloads, where uniformly compressed
+ * data is expected to remain dense throughout the range. It must not replace a whole-image
+ * calculation because PE headers and metadata make that input heterogeneous by design.
+ *
+ * Small and heterogeneous ranges retain an exact full-range calculation. Large ranges are
+ * sampled through seven evenly distributed 64 KiB windows, but the sample mean is accepted
+ * only when every window is independently high-entropy. Any uncertainty falls back
+ * to the complete range, preserving borderline and mixed-layout verdicts.
+ *
+ * @param {number} rangeOffset - File offset of the range.
+ * @param {number} rangeSize - Size of the range in bytes.
+ * @returns {number} Sample mean for uniformly compressed data, otherwise full-range entropy.
+ */
+function calculateStructuredDataEntropy(rangeOffset, rangeSize) {
+    if (rangeSize <= 0) return 0;
+
+    const
+        sampleCount = 7,
+        sampleSize = 0x10000,
+        minimumSampledRangeSize = 0x400000,
+        unanimousSampleEntropy = 7.7;
+
+    if (rangeSize < minimumSampledRangeSize) return PE.calculateEntropy(rangeOffset, rangeSize);
+
+    var accumulatedEntropy = 0;
+
+    const maximumSampleDisplacement = rangeSize - sampleSize;
+
+    for (var i = 0; i < sampleCount; i++) {
+        const
+            sampleDisplacement = Math.floor(maximumSampleDisplacement * (i + 1) / (sampleCount + 1)),
+            sampleEntropy = PE.calculateEntropy(rangeOffset + sampleDisplacement, sampleSize);
+
+        // A single non-uniform window invalidates the shortcut. The exact fallback keeps
+        // sparse archives, appended metadata and entropy values near the verdict boundary stable.
+        if (!(sampleEntropy > unanimousSampleEntropy)) return PE.calculateEntropy(rangeOffset, rangeSize);
+
+        accumulatedEntropy += sampleEntropy;
+    }
+
+    return accumulatedEntropy / sampleCount;
+}
+
+
+
+/**
+ * Derives rigorous entropy bounds for a complete range from one exact subrange.
+ *
+ * Shannon entropy is concave, so the weighted known entropy is a lower bound. Its
+ * upper bound adds the binary mixing entropy and assumes the unknown remainder reaches
+ * the byte alphabet maximum of eight bits. A caller may skip an exact full-range pass
+ * only when its verdict threshold lies outside the returned interval.
+ *
+ * @param {number} knownEntropy - Exact entropy of a subrange.
+ * @param {number} knownSize - Size of the subrange in bytes.
+ * @param {number} totalSize - Size of the complete range in bytes.
+ * @returns {Object} Minimum and maximum possible entropy of the complete range.
+ */
+function calculateEntropyBounds(knownEntropy, knownSize, totalSize) {
+    if (!(knownEntropy >= 0 && knownEntropy <= 8) || !(knownSize > 0) || !(totalSize > 0) || knownSize > totalSize) {
+        return { minimum: 0, maximum: 8 };
+    }
+
+    const knownWeight = knownSize / totalSize;
+
+    if (knownWeight === 1) return { minimum: knownEntropy, maximum: knownEntropy };
+
+    const
+        unknownWeight = 1 - knownWeight,
+        mixingEntropy = -(knownWeight * Math.log(knownWeight) + unknownWeight * Math.log(unknownWeight)) / Math.LN2;
+
+    return {
+        minimum: knownWeight * knownEntropy,
+        maximum: Math.min(8, mixingEntropy + knownWeight * knownEntropy + unknownWeight * 8)
+    };
+}
+
+
+
+/**
  * Reads an unsigned little-endian DWORD from an already bounded byte buffer.
  *
  * @param {Array} dataBuffer - Byte array returned by PE.readBytes().
