@@ -3357,11 +3357,26 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var compressedSectionName = String();
 
+    // If no section crosses the compression threshold, every stored entropy is exact:
+    // the structured-data helper can take its sampled path only above that threshold.
+    // The largest measured range later gives the tightest safe whole-image bounds.
+    var largestMeasuredSectionEntropy = -1;
+
+    var largestMeasuredSectionSize = 0;
+
     for (var t = 0; t < PE_Cached.numberOfSections && !isCompressedSectionPresent; t++) {
         compressedSectionIndex = t;
         if (PE.section[t].FileOffset === 0 || PE.section[t].FileSize < 0x1000) continue;
 
         var sectionEntropy = calculateStructuredDataEntropy(PE.getSectionFileOffset(compressedSectionIndex), PE.getSectionFileSize(compressedSectionIndex));
+
+        if (PE.section[t].FileSize > largestMeasuredSectionSize &&
+            PE.section[t].FileOffset >= PE_Cached.imageBodyOffset &&
+            PE.section[t].FileOffset + PE.section[t].FileSize <= PE_Cached.imageBodyOffset + PE_Cached.imageBodySize) {
+            largestMeasuredSectionEntropy = sectionEntropy;
+            largestMeasuredSectionSize = PE.section[t].FileSize;
+        }
+
         if (sectionEntropy > 7.4) {
             compressedSectionName = cleanSectionName(PE.getSectionName(compressedSectionIndex));
 
@@ -3628,12 +3643,19 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var isHighEntropy = false;
 
-    // Checks for high entropy (ignore overlay)
     if (!(PE_Cached.isDynamicLinkLibrary && (PE.section[".rdata"] || PE.isSectionNamePresent(".rsrc"))) && // .dll with resources
-        !isCompressedSectionPresent && PE.calculateEntropy(PE_Cached.dosStubSize, PE_Cached.imageBodySize) > 7.3) {
-        log(logType.any, "High overall image entropy detected");
+        !isCompressedSectionPresent) {
+        const wholeImageEntropyBounds = calculateEntropyBounds(largestMeasuredSectionEntropy, largestMeasuredSectionSize, PE_Cached.imageBodySize);
 
-        isHighEntropy = true;
+        // A strict bound can settle obvious cases using entropy already calculated for the
+        // largest section. Ambiguous mixtures retain the original exact whole-image pass.
+        if (wholeImageEntropyBounds.minimum > 7.3 ||
+            (wholeImageEntropyBounds.maximum > 7.3 &&
+                PE.calculateEntropy(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize) > 7.3)) {
+            log(logType.any, "High overall image entropy detected");
+
+            isHighEntropy = true;
+        }
     }
 
     if (isHighEntropy) options = addOption(options, "High entropy");
