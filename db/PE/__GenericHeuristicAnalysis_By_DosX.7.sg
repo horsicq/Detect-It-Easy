@@ -3641,6 +3641,30 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    // A dominant signed or otherwise exempt overlay can carry packed data while the mapped
+    // PE body remains ordinary. Unsigned overlays already reported by the broader rule above
+    // are excluded to keep the two verdicts independent.
+
+    var isOverlayHighEntropy = false;
+
+    if (!hasStrangeOverlay && !isHighEntropy && overlayPayloadSize >= 0x1000 &&
+        overlayPayloadSize > PE_Cached.imageBodySize) {
+        if (overlayEntropy < 0) {
+            overlayEntropy = calculateStructuredDataEntropy(PE_Cached.overlayOffset, overlayPayloadSize);
+        }
+
+        if (overlayEntropy > 7.3) {
+            log(logType.any, "High-entropy overlay dominates the executable image: " + overlayPayloadSize + " bytes; entropy: " + overlayEntropy);
+
+            isOverlayHighEntropy = true;
+        }
+    }
+
+    if (isOverlayHighEntropy) options = addOption(options, "Overlay high entropy");
+
+
+
+
     // Check for recurring import names
 
     var recurringImports = false;
