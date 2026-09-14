@@ -3578,15 +3578,25 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     var hasStrangeOverlay = false;
 
-    // Conditions to check for a strange overlay
-    if (!isPeAtOverlayDetected && !isSfx && !PE.isSigned() && PE.isOverlayPresent()) {
-        var overlayEntropy = PE.calculateEntropy(PE_Cached.overlayOffset, PE_Cached.overlaySize);
+    // Cache the payload entropy so the dedicated rule below can reuse the measurement.
+    var overlayEntropy = -1;
 
-        if (PE_Cached.overlaySize > 150 && overlayEntropy > 7 ||
-            PE_Cached.overlaySize > PE_Cached.imageBodySize) {
-            log(logType.any, "Overlay size: " + PE_Cached.overlaySize + " bytes; Entropy: " + overlayEntropy);
+    // A payload larger than the mapped image is independently anomalous, so entropy is
+    // calculated only for smaller overlays where it can actually change the verdict.
+    if (!isPeAtOverlayDetected && !isSfx &&
+        (overlayPayloadSize > 150 || overlayPayloadSize > PE_Cached.imageBodySize) && !PE.isSigned()) {
+        if (overlayPayloadSize > PE_Cached.imageBodySize) {
+            log(logType.any, "Overlay payload exceeds the executable image: " + overlayPayloadSize + " bytes");
 
             hasStrangeOverlay = true;
+        } else {
+            overlayEntropy = calculateStructuredDataEntropy(PE_Cached.overlayOffset, overlayPayloadSize);
+
+            if (overlayEntropy > 7) {
+                log(logType.any, "Overlay payload size: " + overlayPayloadSize + " bytes; entropy: " + overlayEntropy);
+
+                hasStrangeOverlay = true;
+            }
         }
     }
 
