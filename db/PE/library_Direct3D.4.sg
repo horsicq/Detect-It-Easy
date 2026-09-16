@@ -8,15 +8,35 @@
 meta("library", "Direct3D");
 
 function detect() {
-    var re = /d3dx?(\d{1,2})/i,
-        match = PE.isLibraryPresentExp(re);
+    var maxVersion = 0,
+        re = /d3dx?(\d{1,2})/i;
 
-    if (!match) {
-        match = PE.isExportFunctionPresentExpFastAnchor("d3d", re);
+    for (var n = 0; n < PE.getNumberOfImports(); n++) {
+        var name = PE.getImportLibraryName(n);
+
+        if (name.toLowerCase().indexOf("d3d") !== -1) {
+            var match = name.match(re);
+
+            if (match && /^\d+$/.test(match[1]) && Number(match[1]) > maxVersion) {
+                maxVersion = Number(match[1]);
+            }
+        }
     }
 
-    if (match && /^\d+$/.test(match[1]) && Number(match[1]) > 0 && Number(match[1]) <= 13) {
-        sVersion = match[1];
+    for (var n = 0; n < PE.getNumberOfExportFunctions(); n++) {
+        var name = PE.getExportFunctionName(n);
+
+        if (name.toLowerCase().indexOf("d3d") !== -1) {
+            var match = name.match(re);
+
+            if (match && /^\d+$/.test(match[1]) && Number(match[1]) > maxVersion) {
+                maxVersion = Number(match[1]);
+            }
+        }
+    }
+
+    if (maxVersion > 0 && maxVersion <= 13) {
+        sVersion = String(maxVersion);
         bDetected = true;
     } else {
         sVersion = PE.isLibraryPresentExp(/^d3d(\d{1,2})/i);
