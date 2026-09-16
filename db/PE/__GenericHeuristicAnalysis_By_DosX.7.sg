@@ -13465,6 +13465,22 @@ function scanForMaliciousCode_NET_and_Native() {
 
     var detectedAlgo = String();
 
+    var encryptedPeScanCache = {};
+
+    function scanEncryptedPeArea(areaOffset, areaSize) {
+        const cacheKey = areaOffset + ":" + areaSize;
+
+        if (encryptedPeScanCache[cacheKey] !== undefined) return encryptedPeScanCache[cacheKey];
+
+        const algorithm = scanBufferForEncryptedPe(PE.readBytes(areaOffset, areaSize), areaSize);
+
+        encryptedPeScanCache[cacheKey] = algorithm;
+
+        return algorithm;
+    }
+
+
+
     // 1. Scan Resources
     for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isEncPePresent; i++) {
         var resourceOffset = PE.getResourceOffsetByNumber(i),
@@ -13473,7 +13489,7 @@ function scanForMaliciousCode_NET_and_Native() {
         if (resourceOffset > 0 && resourceSize > 0x1000 && !PE.compare("28 00 00 00 ?? ?? 00 00 ?? ?? 00 00 01 00 ?? 00 00 00 00 00", resourceOffset)) {
             var maxScanSize = Math.min(resourceSize, 0x1000);
 
-            detectedAlgo = scanBufferForEncryptedPe(PE.readBytes(resourceOffset, maxScanSize), maxScanSize);
+            detectedAlgo = scanEncryptedPeArea(resourceOffset, maxScanSize);
 
             if (detectedAlgo) {
                 isEncPePresent = true;
@@ -13490,7 +13506,7 @@ function scanForMaliciousCode_NET_and_Native() {
         if (overlayOffset > 0 && overlaySize > 0x1000 && !PE.isSigned()) {
             var maxScanSize = Math.min(overlaySize, 0x14000);
 
-            detectedAlgo = scanBufferForEncryptedPe(PE.readBytes(overlayOffset, maxScanSize), maxScanSize);
+            detectedAlgo = scanEncryptedPeArea(overlayOffset, maxScanSize);
 
             if (detectedAlgo) isEncPePresent = true;
         }
@@ -13533,7 +13549,7 @@ function scanForMaliciousCode_NET_and_Native() {
                 Math.min(sectionSize, 0x64000) :
                 Math.min(sectionSize, sectionName.match(/^\.[rex]?data$/i) ? 0x12000 : 0x6000);
 
-            detectedAlgo = scanBufferForEncryptedPe(PE.readBytes(sectionOffset, maxScanSize), maxScanSize);
+            detectedAlgo = scanEncryptedPeArea(sectionOffset, maxScanSize);
 
             if (detectedAlgo) {
                 isEncPePresent = true;
