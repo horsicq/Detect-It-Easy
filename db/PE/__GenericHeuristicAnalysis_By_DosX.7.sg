@@ -10930,12 +10930,60 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
 
 
     const extdb = [
-        ["C++", "cpp"],
-        ["Rust", "rs"],
-        ["Java", "jar"],
-        ["Python", "pyd"],
-        ["Kotlin", "kt"]
+        ["C++", "cpp"],     // https://en.wikipedia.org/wiki/C++
+        ["Rust", "rs"],     // https://en.wikipedia.org/wiki/Rust_(programming_language)
+        ["Java", "jar"],    // https://en.wikipedia.org/wiki/Java
+        ["Python", "pyd"],  // https://en.wikipedia.org/wiki/Python_(programming_language)
+        ["Kotlin", "kt"]    // https://en.wikipedia.org/wiki/Kotlin
     ];
+
+
+    const sourceFileExtensionMinimumCount = 3,
+        sourceFileNameContextLength = 0x100;
+
+    function isSourceFileExtensionPresent(extension) {
+        var extensionMarker = "." + extension,
+            areaOffset = PE_Cached.imageBodyOffset,
+            areaEnd = areaOffset + PE_Cached.imageBodySize,
+            currentOffset = areaOffset,
+            remainingSize = PE_Cached.imageBodySize,
+            sourceFileCount = 0;
+
+        while (remainingSize >= extensionMarker.length + 1 && sourceFileCount < sourceFileExtensionMinimumCount) {
+            var extensionOffset = PE.findString(currentOffset, remainingSize, extensionMarker);
+
+            if (extensionOffset === -1) break;
+
+            var nextOffset = extensionOffset + extensionMarker.length;
+
+            currentOffset = nextOffset;
+            remainingSize = areaEnd - currentOffset;
+
+            // An extension is useful only as a cheap anchor. Validate the string
+            // terminator and the adjacent filename locally instead of making the
+            // signature engine scan the complete image through leading wildcards.
+            if (nextOffset >= areaEnd || PE.readByte(nextOffset) !== 0x00) continue;
+
+            var contextSize = Math.min(sourceFileNameContextLength, extensionOffset - areaOffset),
+                contextBytes = PE.readBytes(extensionOffset - contextSize, contextSize),
+                sourceFilePrefix = String();
+
+            for (var k = 0; k < contextBytes.length; k++) {
+                sourceFilePrefix += String.fromCharCode(contextBytes[k]);
+            }
+
+            var stringBoundary = sourceFilePrefix.lastIndexOf("\0");
+
+            if (stringBoundary !== -1) sourceFilePrefix = sourceFilePrefix.substring(stringBoundary + 1);
+
+            var pathSeparator = Math.max(sourceFilePrefix.lastIndexOf("\\"), sourceFilePrefix.lastIndexOf("/")),
+                sourceFileName = sourceFilePrefix.substring(pathSeparator + 1);
+
+            if (/^[A-Za-z0-9_$@][A-Za-z0-9_$@+ .(){}\[\]-]*$/.test(sourceFileName)) sourceFileCount++;
+        }
+
+        return sourceFileCount >= sourceFileExtensionMinimumCount;
+    }
 
 
     for (var i = 0; i < extdb.length; i++) {
@@ -10943,7 +10991,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
             langName = extdb[i][0],
             langExtName = extdb[i][1];
 
-        if (!_isLangPresent(langName) && PE.isSignaturePresent(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize, "%% %% %% %% %% %% %% %% '." + langExtName + "' 00")) {
+        if (!_isLangPresent(langName) && isSourceFileExtensionPresent(langExtName)) {
             log(logType.any, "Lines of ." + langExtName + " files (" + langName + ") detected");
 
             _setLangByHeur(langName);
@@ -10951,7 +10999,7 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
     }
 
 
-    if (!_isLangDetected("C++") && PE.isSignaturePresent(PE_Cached.imageBodyOffset, PE_Cached.imageBodySize, "%% %% %% %% %% %% %% %% %% %% '.c' 00")) {
+    if (!_isLangDetected("C++") && isSourceFileExtensionPresent("c")) {
         log(logType.any, "Lines of .c files (C) detected (not a C++)");
 
         _setLangByHeur("C");
