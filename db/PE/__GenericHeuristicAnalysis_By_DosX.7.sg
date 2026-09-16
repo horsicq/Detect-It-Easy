@@ -6862,6 +6862,7 @@ function scanForObfuscations_Native() {
 
         // Flags-preserving junk is allowed to make the check resilient to light polymorphism.
         var opaqueEpOriginInstruction = String(),
+            opaqueEpOriginAddress = -1,
             opaqueEpAlwaysTakenBranches = [],
             opaqueEpNeverTakenBranches = [],
             opaqueEpNeutralInstructionCount = 0,
@@ -6898,6 +6899,7 @@ function scanForObfuscations_Native() {
             if (zeroFlagsInstruction) {
                 // A zero result fixes CF, OF, SF, ZF, and PF regardless of the input value.
                 opaqueEpOriginInstruction = currentEpInstruction;
+                opaqueEpOriginAddress = epAsmInstructionAddresses[i];
                 opaqueEpAlwaysTakenBranches = epZeroFlagsAlwaysTakenBranches;
                 opaqueEpNeverTakenBranches = epZeroFlagsNeverTakenBranches;
                 opaqueEpNeutralInstructionCount = 0;
@@ -6921,12 +6923,14 @@ function scanForObfuscations_Native() {
 
                 delete opaqueEpKnownZeroRegisters[allOnesFlagsRegister];
                 opaqueEpOriginInstruction = currentEpInstruction;
+                opaqueEpOriginAddress = epAsmInstructionAddresses[i];
                 opaqueEpAlwaysTakenBranches = opaqueEpAllOnesFlagsAlwaysTakenBranches;
                 opaqueEpNeverTakenBranches = opaqueEpAllOnesFlagsNeverTakenBranches;
                 opaqueEpNeutralInstructionCount = 0;
             } else if (carryFlagsInstruction) {
                 // CLC and STC prove only CF, so accept exclusively carry-dependent branches.
                 opaqueEpOriginInstruction = currentEpInstruction;
+                opaqueEpOriginAddress = epAsmInstructionAddresses[i];
                 opaqueEpAlwaysTakenBranches = currentEpOpCode === "CLC" ?
                     opaqueEpCarryClearAlwaysTakenBranches : opaqueEpCarrySetAlwaysTakenBranches;
                 opaqueEpNeverTakenBranches = currentEpOpCode === "CLC" ?
@@ -6940,6 +6944,7 @@ function scanForObfuscations_Native() {
                 // of an older EFLAGS proof; expire that proof without losing known zeroes.
                 if (opaqueEpOriginInstruction && ++opaqueEpNeutralInstructionCount > epNeutralInstructionLimit) {
                     opaqueEpOriginInstruction = String();
+                    opaqueEpOriginAddress = -1;
                     opaqueEpNeutralInstructionCount = 0;
                 }
             } else if (registerCopy) {
@@ -6953,11 +6958,13 @@ function scanForObfuscations_Native() {
 
                 if (opaqueEpOriginInstruction && ++opaqueEpNeutralInstructionCount > epNeutralInstructionLimit) {
                     opaqueEpOriginInstruction = String();
+                    opaqueEpOriginAddress = -1;
                     opaqueEpNeutralInstructionCount = 0;
                 }
             } else if (zeroTestRegister && opaqueEpKnownZeroRegisters[zeroTestRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
                 // TEST/OR of a proven zero register re-establishes deterministic EFLAGS.
                 opaqueEpOriginInstruction = currentEpInstruction;
+                opaqueEpOriginAddress = epAsmInstructionAddresses[i];
                 opaqueEpAlwaysTakenBranches = epZeroFlagsAlwaysTakenBranches;
                 opaqueEpNeverTakenBranches = epZeroFlagsNeverTakenBranches;
                 opaqueEpNeutralInstructionCount = 0;
@@ -6965,9 +6972,16 @@ function scanForObfuscations_Native() {
                 PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 &&
                 (opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ||
                     opaqueEpNeverTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1)) {
-                var opaqueEpBranchType = opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ? "always taken" : "never taken";
+                var opaqueEpBranchType = opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ? "always taken" : "never taken",
+                    opaqueEpBranchAddress = epAsmInstructionAddresses[i],
+                    opaqueEpOriginOffset = PE.VAToOffset(opaqueEpOriginAddress),
+                    opaqueEpBranchOffset = PE.VAToOffset(opaqueEpBranchAddress);
 
-                log(logType.emulation, "Opaque " + opaqueEpBranchType + " branch near EP: " + opaqueEpOriginInstruction + "; " + currentEpInstruction);
+                log(logType.emulation, "Opaque " + opaqueEpBranchType + " branch near EP: " +
+                    opaqueEpOriginInstruction + " at VA 0x" + opaqueEpOriginAddress.toString(16) +
+                    " (offset 0x" + opaqueEpOriginOffset.toString(16) + "); " +
+                    currentEpInstruction + " at VA 0x" + opaqueEpBranchAddress.toString(16) +
+                    " (offset 0x" + opaqueEpBranchOffset.toString(16) + ")");
 
                 isOpaqueEpBranchPresent = true;
             } else if (conditionalBranch) {
@@ -6980,12 +6994,14 @@ function scanForObfuscations_Native() {
                 delete opaqueEpKnownZeroRegisters[flagsNeutralRegisterWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
                 if (opaqueEpOriginInstruction && ++opaqueEpNeutralInstructionCount > epNeutralInstructionLimit) {
                     opaqueEpOriginInstruction = String();
+                    opaqueEpOriginAddress = -1;
                     opaqueEpNeutralInstructionCount = 0;
                 }
             } else if (isNeutralInstruction) {
                 // Pure padding preserves both facts, but only within the configured distance.
                 if (opaqueEpOriginInstruction && ++opaqueEpNeutralInstructionCount > epNeutralInstructionLimit) {
                     opaqueEpOriginInstruction = String();
+                    opaqueEpOriginAddress = -1;
                     opaqueEpNeutralInstructionCount = 0;
                 }
             } else if (registerWrite) {
@@ -6993,6 +7009,7 @@ function scanForObfuscations_Native() {
                 // Other known-zero registers remain valid until they are individually overwritten.
                 delete opaqueEpKnownZeroRegisters[registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
                 opaqueEpOriginInstruction = String();
+                opaqueEpOriginAddress = -1;
                 opaqueEpNeutralInstructionCount = 0;
             } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1) {
                 // Do not linearly join instructions from a subsequent basic block.
@@ -7000,6 +7017,7 @@ function scanForObfuscations_Native() {
             } else {
                 // Any other instruction may alter EFLAGS or the intended control-flow sequence.
                 opaqueEpOriginInstruction = String();
+                opaqueEpOriginAddress = -1;
                 opaqueEpNeutralInstructionCount = 0;
                 opaqueEpKnownZeroRegisters = {};
             }
