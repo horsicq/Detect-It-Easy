@@ -13447,6 +13447,15 @@ function scanForMaliciousCode_NET_and_Native() {
         scanArea(PE_Cached.overlayOffset, PE_Cached.overlaySize);
     }
 
+    // A single detected packer normally suppresses the section pass. Its entry-point section
+    // may still contain a Base64 PE prefix, so inspect only that one representative range.
+    var base64FallbackSectionIndex = PE_Cached.indexOfEntryPointSection;
+
+    if (!isBase64Payload && numberOfPackerResults === 1 && numberOfProtectorResults === 0 &&
+        base64FallbackSectionIndex !== -1) {
+        scanArea(PE.getSectionFileOffset(base64FallbackSectionIndex), PE.getSectionFileSize(base64FallbackSectionIndex));
+    }
+
     if (isBase64Payload) {
         verdicts.push({
             type: "Encoded executable payload",
