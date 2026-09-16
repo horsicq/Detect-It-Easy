@@ -4580,11 +4580,22 @@ function scanForBadFileFormat_NET_and_Native() {
                 var cachedRuntimeFunctionMappedRangeIndex = -1,
                     cachedRuntimeFunctionCodeRangeIndex = -1;
 
+                // Large native images can contain hundreds of thousands of fixed-size entries.
+                // Decode this bounded hot path inline while preserving unsigned RVA values.
                 for (var i = 0; i < exceptionDirectoryData.length && !isInvalidUnwindMetadataPresent; i += 12) {
                     var runtimeFunctionIndex = i / 12,
-                        runtimeFunctionBeginRva = readUnsignedDwordFromBuffer(exceptionDirectoryData, i),
-                        runtimeFunctionEndRva = readUnsignedDwordFromBuffer(exceptionDirectoryData, i + 4),
-                        runtimeFunctionUnwindRva = readUnsignedDwordFromBuffer(exceptionDirectoryData, i + 8),
+                        runtimeFunctionBeginRva = (exceptionDirectoryData[i] |
+                            (exceptionDirectoryData[i + 1] << 8) |
+                            (exceptionDirectoryData[i + 2] << 16) |
+                            (exceptionDirectoryData[i + 3] << 24)) >>> 0,
+                        runtimeFunctionEndRva = (exceptionDirectoryData[i + 4] |
+                            (exceptionDirectoryData[i + 5] << 8) |
+                            (exceptionDirectoryData[i + 6] << 16) |
+                            (exceptionDirectoryData[i + 7] << 24)) >>> 0,
+                        runtimeFunctionUnwindRva = (exceptionDirectoryData[i + 8] |
+                            (exceptionDirectoryData[i + 9] << 8) |
+                            (exceptionDirectoryData[i + 10] << 16) |
+                            (exceptionDirectoryData[i + 11] << 24)) >>> 0,
                         runtimeFunctionSize = runtimeFunctionEndRva - runtimeFunctionBeginRva,
                         isRuntimeFunctionCodeRangeValid = false,
                         isRuntimeFunctionUnwindPointerValid = runtimeFunctionBeginRva === 0 &&
