@@ -13059,8 +13059,20 @@ function scanForMaliciousCode_NET_and_Native() {
         "p4AA"  // ~[78 00 01]
     ];
 
+    const base64PeHeaderAnchorPatterns = ["TV", convertStringToUnicodeSignature("TV")],
+        base64PeHeaderPostfixPatterns = [[], []],
+        base64PeHeaderCompletePatterns = [[], []];
+
+    for (var i = 0; i < base64PeHeaderPostfixSigns.length; i++) {
+        base64PeHeaderPostfixPatterns[0].push("'" + base64PeHeaderPostfixSigns[i] + "'");
+        base64PeHeaderPostfixPatterns[1].push(convertStringToUnicodeSignature(base64PeHeaderPostfixSigns[i]));
+        base64PeHeaderCompletePatterns[0].push("TV" + base64PeHeaderPostfixSigns[i]);
+        base64PeHeaderCompletePatterns[1].push(convertStringToUnicodeSignature("TV" + base64PeHeaderPostfixSigns[i]));
+    }
+
     function isBase64PeHeaderPresent(areaOffset, areaSize, isUnicode) {
-        var anchorPattern = isUnicode ? convertStringToUnicodeSignature("TV") : "TV",
+        var patternType = isUnicode ? 1 : 0,
+            anchorPattern = base64PeHeaderAnchorPatterns[patternType],
             postfixOffsetDelta = isUnicode ? 4 : 2,
             completePatternSize = isUnicode ? 12 : 6,
             currentOffset = areaOffset,
@@ -13076,11 +13088,8 @@ function scanForMaliciousCode_NET_and_Native() {
 
             if (anchorOffset + completePatternSize <= areaOffset + areaSize) {
                 for (var i = 0; i < base64PeHeaderPostfixSigns.length; i++) {
-                    var postfixPattern = isUnicode ?
-                        convertStringToUnicodeSignature(base64PeHeaderPostfixSigns[i]) :
-                        "'" + base64PeHeaderPostfixSigns[i] + "'";
-
-                    if (PE.compare(postfixPattern, anchorOffset + postfixOffsetDelta)) return true;
+                    if (PE.compare(base64PeHeaderPostfixPatterns[patternType][i],
+                        anchorOffset + postfixOffsetDelta)) return true;
                 }
             }
 
@@ -13093,9 +13102,7 @@ function scanForMaliciousCode_NET_and_Native() {
             // search routine look for the four complete, selective patterns instead.
             if (++candidateCount === maxBase64PeHeaderAnchorCandidates) {
                 for (var i = 0; i < base64PeHeaderPostfixSigns.length; i++) {
-                    var completePattern = "TV" + base64PeHeaderPostfixSigns[i];
-
-                    if (isUnicode) completePattern = convertStringToUnicodeSignature(completePattern);
+                    var completePattern = base64PeHeaderCompletePatterns[patternType][i];
 
                     if ((isUnicode ? PE.findSignature(currentOffset, remainingSize, completePattern) :
                         PE.findString(currentOffset, remainingSize, completePattern)) !== -1) return true;
