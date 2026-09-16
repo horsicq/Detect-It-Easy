@@ -34,23 +34,78 @@ PE.getEntryPointSignature = function (nOffset, nSize) {
 }
 
 
+var PE_generalOptionsEx;
+
 /**
  * Add console and/or administrator requirement to the general options.
  * @returns {String}
  */
 PE.getGeneralOptionsEx = function () {
-    sResult = PE.getGeneralOptions();
-    if (PE.isConsole()) {
-        sResult = sResult.append("console");
-    }
-    if (/requireAdministrator/.test(PE.getManifest())) {
-        sResult = sResult.append("admin");
-    }
-    if (PE.isSignedFile()) {
-        sResult = sResult.append("signed");
+    if (PE_generalOptionsEx === undefined) {
+        var sResult = PE.getGeneralOptions();
+
+        if (PE.isConsole()) {
+            sResult = sResult.append("console");
+        }
+        if (/requireAdministrator/.test(PE.getManifest())) {
+            sResult = sResult.append("admin");
+        }
+        if (PE.isSignedFile()) {
+            sResult = sResult.append("signed");
+        }
+
+        PE_generalOptionsEx = sResult;
     }
 
-    return sResult;
+    return PE_generalOptionsEx;
+}
+
+
+var PE_getImportLibraryName = PE.getImportLibraryName,
+    PE_getNumberOfImports = PE.getNumberOfImports,
+    PE_isLibraryPresent = PE.isLibraryPresent,
+    PE_numberOfImports = PE_getNumberOfImports(),
+    PE_importLibraryNames = [],
+    PE_librarySearchResults = {};
+
+for (var n = 0; n < PE_numberOfImports; n++) {
+    PE_importLibraryNames[n] = PE_getImportLibraryName(n);
+}
+
+/**
+ * Get an import library name from the cache.
+ * @returns {String}
+ */
+PE.getImportLibraryName = function (nNumber) {
+    if (nNumber >= 0 && nNumber < PE_numberOfImports) {
+        return PE_importLibraryNames[nNumber];
+    }
+
+    return PE_getImportLibraryName(nNumber);
+}
+
+
+/**
+ * Get the cached number of imported libraries.
+ * @returns {Number}
+ */
+PE.getNumberOfImports = function () {
+    return PE_numberOfImports;
+}
+
+
+/**
+ * Check if an imported library is present.
+ * @returns {Boolean} <code>true</code> if the library is present, otherwise <code>false</code>.
+ */
+PE.isLibraryPresent = function (sLibraryName) {
+    var sCacheKey = "$" + sLibraryName;
+
+    if (PE_librarySearchResults[sCacheKey] === undefined) {
+        PE_librarySearchResults[sCacheKey] = PE_isLibraryPresent(sLibraryName);
+    }
+
+    return PE_librarySearchResults[sCacheKey];
 }
 
 
