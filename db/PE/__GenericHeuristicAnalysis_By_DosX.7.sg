@@ -13074,6 +13074,10 @@ function scanForMaliciousCode_NET_and_Native() {
         base64PeHeaderCompletePatterns[1].push(convertStringToUnicodeSignature("TV" + base64PeHeaderPostfixSigns[i]));
     }
 
+    // Resources can alias an already scanned section. Only complete containment is reused,
+    // so partially overlapping and malformed ranges retain their original independent scan.
+    var scannedBase64Areas = [];
+
     function isBase64PeHeaderPresent(areaOffset, areaSize, isUnicode) {
         var patternType = isUnicode ? 1 : 0,
             anchorPattern = base64PeHeaderAnchorPatterns[patternType],
@@ -13134,6 +13138,18 @@ function scanForMaliciousCode_NET_and_Native() {
 
     function scanArea(areaOffset, areaSize) {
         if (areaSize <= 0 || areaOffset <= 0 || isBase64Payload) return;
+
+        var areaEnd = areaOffset + areaSize;
+
+        var isTrackableArea = areaEnd > areaOffset && areaEnd <= PE_Cached.fileSize;
+
+        if (isTrackableArea) {
+            for (var i = 0; i < scannedBase64Areas.length; i++) {
+                if (areaOffset >= scannedBase64Areas[i].Offset && areaEnd <= scannedBase64Areas[i].End) return;
+            }
+
+            scannedBase64Areas.push({ Offset: areaOffset, End: areaEnd });
+        }
 
         if (isBase64PeHeaderPresent(areaOffset, areaSize, false)) {
             base64Version = "ASCII";
