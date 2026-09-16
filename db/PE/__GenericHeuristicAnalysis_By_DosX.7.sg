@@ -123,7 +123,7 @@ function main() {
     initializeCache();
 
     if (PE.isHeuristicScan()) {
-        if (!PE.isVerbose()) {
+        if (!PE_Cached.isVerbose) {
             log(logType.warning, "To get the full heuristic scan result use \"--verbose\"");
         }
 
@@ -156,7 +156,7 @@ function main() {
         // Detection for suspicious or potentially malicious patterns
         scanForMaliciousCode_NET_and_Native();
 
-        if (PE.isVerbose()) {
+        if (PE_Cached.isVerbose) {
             // Detection of programming language, compiler, linker
             scanForLanguagesAndCompilers_NET_and_Native();
 
@@ -309,6 +309,8 @@ function initializeCache() {
         /* Boolean */ isEntryPointCorrect: function () { return isEntryPointCorrect; },
         /* Boolean */ isDriver: function () { return isDriver; },
         /* Boolean */ isOverlayPresent: PE["isOverlayPresent"],
+        /* Boolean */ isTlsPresent: PE["isTLSPresent"],
+        /* Boolean */ isVerbose: PE["isVerbose"],
         /* Boolean */ isNetGlobalCctorPresent: PE["isNetGlobalCctorPresent"],
         /* Boolean */ isRichSignaturePresent: PE["isRichSignaturePresent"],
         /* Number  */ addressOfUnmanagedEntryPoint: function () { return addressOfUnmanagedEntryPoint; },
@@ -1377,7 +1379,7 @@ function scanForObfuscations_NET() {
 
 
     if (isDetected) {
-        _setResult("~protection", "Obfuscation", String(), PE.isVerbose() ? options : String());
+        _setResult("~protection", "Obfuscation", String(), PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
@@ -1710,7 +1712,7 @@ function scanForAntiAnalysis_NET() {
 
 
     if (isDetected) {
-        _setResult("~protection", "Anti analysis", String(), PE.isVerbose() ? options : String());
+        _setResult("~protection", "Anti analysis", String(), PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
@@ -1851,7 +1853,7 @@ function scanForAntiAnalysis_Native() {
 
 
     if (isDetected) {
-        _setResult("~protection", "Anti analysis", String(), PE.isVerbose() ? options : String());
+        _setResult("~protection", "Anti analysis", String(), PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
@@ -3763,7 +3765,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (isDetected) {
         var detectedType = isCryptor ? "cryptor" : "packer";
 
-        _setResult("~" + detectedType, "Generic", String(), PE.isVerbose() ? options : String());
+        _setResult("~" + detectedType, "Generic", String(), PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
@@ -4034,7 +4036,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
 
     if (isDetected) {
-        _setResult("~licensing", "Contains", String(), PE.isVerbose() ? options : String());
+        _setResult("~licensing", "Contains", String(), PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
@@ -4060,7 +4062,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
     const isEntryPointCorrect = PE_Cached.isEntryPointCorrect;
 
-    if (PE.isTLSPresent()) {
+    if (PE_Cached.isTlsPresent) {
         const corruptedDataEntryPointRva = PE_Cached.addressOfUnmanagedEntryPoint - PE_Cached.imageBase;
 
         if (corruptedDataEntryPointRva > 0) {
@@ -4980,7 +4982,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
     var isInvalidTlsMetadataPresent = false;
 
-    if (PE.isTLSPresent() && dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_TLS + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+    if (PE_Cached.isTlsPresent && dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_TLS + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
         const
             tlsDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_TLS * 8,
             tlsDirectoryRva = PE.read_uint32(tlsDirectoryEntryOffset),
@@ -5075,7 +5077,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
     var isTlsCallbackOutsideCodePresent = false;
 
-    if (PE.isTLSPresent() && dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_TLS + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+    if (PE_Cached.isTlsPresent && dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_TLS + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
         const
             tlsCallbackDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_TLS * 8,
             tlsCallbackDirectoryRva = PE.read_uint32(tlsCallbackDirectoryEntryOffset),
@@ -5204,7 +5206,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
     if (isDetected) {
-        _setResult("~corrupted data", "Generic", String(), PE.isVerbose() ? options : String());
+        _setResult("~corrupted data", "Generic", String(), PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
@@ -5379,7 +5381,7 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
 
     if (isDetected) {
-        _setResult("~debug data", "Contains", String(), PE.isVerbose() ? options : String());
+        _setResult("~debug data", "Contains", String(), PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
@@ -9196,7 +9198,7 @@ function scanForObfuscations_Native() {
 
     var isTlsHiddenEpPresent = false;
 
-    if (PE.isTLSPresent()) {
+    if (PE_Cached.isTlsPresent) {
         const tlsEntryPointRva = PE_Cached.addressOfUnmanagedEntryPoint - PE_Cached.imageBase;
 
         var isTlsEntryPointInExecutableVirtualSection = false,
@@ -9907,7 +9909,7 @@ function scanForObfuscations_Native() {
 
 
     if (isDetected) {
-        _setResult("~protection", "Generic", String(), PE.isVerbose() ? options : String());
+        _setResult("~protection", "Generic", String(), PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
@@ -12978,7 +12980,7 @@ function scanForMaliciousCode_NET_and_Native() {
     // https://web.archive.org/web/20251224000209/https://sumhex151.github.io/ (decryptor)
 
     if (verdicts.length === 0 &&
-        !PE_Cached.isRichSignaturePresent && PE.isTLSPresent() && (
+        !PE_Cached.isRichSignaturePresent && PE_Cached.isTlsPresent && (
             (PE.isImportPositionHashPresent(18, 0xc3df3568) && PE.isSignatureInSectionPresent(0, "'lock_text'00")) ||
             (PE.isImportPositionHashPresent(4, 0xc3df3568) && PE.isImportPositionHashPresent(5, 0x622ae906)) // UPX packed
         )) {
@@ -13662,7 +13664,7 @@ function scanForInterestingMarkers_NET_and_Native() {
 
 
     if (isDetected) {
-        _setResult("~marker", "Contains", String(), PE.isVerbose() ? options : String());
+        _setResult("~marker", "Contains", String(), PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
