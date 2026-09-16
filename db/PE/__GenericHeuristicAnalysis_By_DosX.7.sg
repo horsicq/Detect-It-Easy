@@ -9472,12 +9472,14 @@ function scanForObfuscations_Native() {
 
     var isUnreportedCodePresent = false;
 
+    const declaredCodeSize = PE.getSizeOfCode();
+
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
         entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect &&
         PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
         (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) &&
-        PE.getSizeOfCode() === 0) {
+        declaredCodeSize === 0) {
         log(logType.any, "Executable code is present while SizeOfCode is zero");
 
         isUnreportedCodePresent = true;
@@ -9498,7 +9500,7 @@ function scanForObfuscations_Native() {
 
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
-        PE.getSizeOfCode() !== 0) {
+        declaredCodeSize !== 0) {
         var physicalCodeSize = 0,
             physicalCodeSectionCount = 0;
 
@@ -9517,11 +9519,11 @@ function scanForObfuscations_Native() {
         );
 
         // Report only the excess beyond both the PE header value and alignment tolerance.
-        if (physicalCodeSize > PE.getSizeOfCode() + codeSizeAlignmentTolerance) {
+        if (physicalCodeSize > declaredCodeSize + codeSizeAlignmentTolerance) {
             isUnderreportedCodePresent = true;
-            isSeverelyUnderreportedCodePresent = physicalCodeSize > PE.getSizeOfCode() * 2;
+            isSeverelyUnderreportedCodePresent = physicalCodeSize > declaredCodeSize * 2;
 
-            log(logType.any, "Physical code size (0x" + physicalCodeSize.toString(16) + ") exceeds SizeOfCode (0x" + PE.getSizeOfCode().toString(16) + ")");
+            log(logType.any, "Physical code size (0x" + physicalCodeSize.toString(16) + ") exceeds SizeOfCode (0x" + declaredCodeSize.toString(16) + ")");
         }
     }
 
