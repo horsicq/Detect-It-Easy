@@ -13050,7 +13050,11 @@ function scanForMaliciousCode_NET_and_Native() {
 
     var base64Version = String();
 
-    const maxBase64PeHeaderAnchorCandidates = 64;
+    const base64PeHeaderAnchorDensityWindowCandidates = 64;
+
+    const minBase64PeHeaderAverageAnchorDistance = 0x100;
+
+    const maxBase64PeHeaderAnchorCandidates = 4096;
 
     const base64PeHeaderPostfixSigns = [
         "oAAA", // ~[00 00 00 00 00]
@@ -13077,7 +13081,11 @@ function scanForMaliciousCode_NET_and_Native() {
             completePatternSize = isUnicode ? 12 : 6,
             currentOffset = areaOffset,
             remainingSize = areaSize,
-            candidateCount = 0;
+            candidateCount = 0,
+            densityWindowOffset = areaOffset;
+
+        var isDensityWindowComplete = false,
+            isAnchorDensityHigh = false;
 
         while (remainingSize >= completePatternSize) {
             var anchorOffset = isUnicode ?
@@ -13097,10 +13105,17 @@ function scanForMaliciousCode_NET_and_Native() {
             currentOffset += advanced;
             remainingSize -= advanced;
 
-            // Short anchors normally reduce four full scans to one. If an area is
-            // unusually rich in `TV`, stop enumerating candidates and let the native
-            // search routine look for the four complete, selective patterns instead.
-            if (++candidateCount === maxBase64PeHeaderAnchorCandidates) {
+            candidateCount++;
+
+            // Sparse anchors are cheaper to validate individually. If a local window
+            // becomes dense, let the native search routine scan the remaining area
+            // for the four complete, selective patterns instead.
+            isDensityWindowComplete = candidateCount % base64PeHeaderAnchorDensityWindowCandidates === 0;
+            isAnchorDensityHigh = isDensityWindowComplete &&
+                currentOffset - densityWindowOffset <
+                base64PeHeaderAnchorDensityWindowCandidates * minBase64PeHeaderAverageAnchorDistance;
+
+            if (isAnchorDensityHigh || candidateCount === maxBase64PeHeaderAnchorCandidates) {
                 for (var i = 0; i < base64PeHeaderPostfixSigns.length; i++) {
                     var completePattern = base64PeHeaderCompletePatterns[patternType][i];
 
@@ -13110,6 +13125,8 @@ function scanForMaliciousCode_NET_and_Native() {
 
                 break;
             }
+
+            if (isDensityWindowComplete) densityWindowOffset = currentOffset;
         }
 
         return false;
