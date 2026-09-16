@@ -649,7 +649,7 @@ function scanForObfuscations_NET() {
                 (opCodes.bne_un + opCodes.ldc_i4_2 + opCodes.stloc_s + opCodes.sizeof + opCodes.add)
             )
         ) {
-            log(logType.net, "Int confusion detected! Offset: " + lastOffsetDetected);
+            log(logType.net, "Int confusion detected at offset " + lastOffsetDetected);
 
             isIntConfusionPresent = true;
         }
@@ -759,7 +759,7 @@ function scanForObfuscations_NET() {
             opCodes.ldelem_i +
             opCodes.setStrict(opCodes.calli, "** 00 00 11")
         )) {
-        log(logType.net, "Calli invokes detected! Offset: " + lastOffsetDetected);
+        log(logType.net, "Calli invokes detected at offset " + lastOffsetDetected);
 
         isCalliInvokesPresent = true;
     }
@@ -783,7 +783,7 @@ function scanForObfuscations_NET() {
             opCodes.setStrict(opCodes.ldftn, "** 00 00 0A") +
             opCodes.setStrict(opCodes.calli, "** 00 00 11")
         )) {
-        log(logType.net, "Ldftn pointers method-obfuscation detected! Offset: " + lastOffsetDetected);
+        log(logType.net, "Ldftn pointers method-obfuscation detected at offset " + lastOffsetDetected);
 
         isLdftnPointersPresent = true;
     }
@@ -856,7 +856,7 @@ function scanForObfuscations_NET() {
             opCodes.setStrict(opCodes.ldc_i4, "?? ** ** **") + opCodes._unknown + opCodes.stloc_0 + opCodes.setStrict(opCodes.ldftn, "** ?? ?? ??")
         )
     ) {
-        log(logType.net, "Control flow obfuscation detected! Offset: " + lastOffsetDetected);
+        log(logType.net, "Control flow obfuscation detected at offset " + lastOffsetDetected);
 
         isCtrlFlowPresent = true;
     }
@@ -1016,7 +1016,7 @@ function scanForObfuscations_NET() {
             secondCtorNameOffset = secondCtorSearchSize > 0 ? PE.findSignature(secondCtorSearchOffset, secondCtorSearchSize, "'<Module>'") : -1;
 
         if (secondCtorNameOffset !== -1 && PE.readByte(secondCtorNameOffset + 8) !== 0x00) {
-            log(logType.net, "Fake <Module> detected! Offset: 0x" + Number(secondCtorNameOffset).toString(16));
+            log(logType.net, "Fake <Module> detected at offset 0x" + Number(secondCtorNameOffset).toString(16));
 
             isModuleCtorMultiple = true;
         }
@@ -1071,7 +1071,7 @@ function scanForObfuscations_NET() {
             const pattern = template.replaceAll("%s", mathOpCodes[e]);
 
             if (validateNetByteCode(pattern)) {
-                log(logType.net, "Math mutations detected! Offset: " + lastOffsetDetected);
+                log(logType.net, "Math mutations detected at offset " + lastOffsetDetected);
 
                 isMutationsPresent = true;
             }
@@ -1131,7 +1131,7 @@ function scanForObfuscations_NET() {
             opCodes.not + opCodes.neg
         )
     )) {
-        log(logType.net, "Math inversions detected, offset " + lastOffsetDetected);
+        log(logType.net, "Math inversions detected at offset " + lastOffsetDetected);
 
         isMathInversionsPresent = true;
     }
@@ -1153,7 +1153,7 @@ function scanForObfuscations_NET() {
             opCodes.setStrict(opCodes.calli, "FF FF FF FF") + opCodes.setStrict(opCodes.sizeof, "FF FF FF FF")
         )
     ) {
-        log(logType.net, "Invalid OpCodes detected, offset " + lastOffsetDetected);
+        log(logType.net, "Invalid OpCodes detected at offset " + lastOffsetDetected);
 
         invalidOpCodes = true;
     }
@@ -2818,7 +2818,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
             // Check if a valid last-section address was found and the entry point is at or after it
             if (lastSectionAddress !== -1 && entryPointAddress >= lastSectionAddress) {
-                log(logType.any, "EP address (0x" + entryPointAddress.toString(16) + ") more than last section address (0x" + lastSectionAddress.toString(16) + ")");
+                log(logType.any, "EP VA 0x" + entryPointAddress.toString(16) + " is at or beyond last-section VA 0x" + lastSectionAddress.toString(16));
 
                 isLastSectionEP = true;
             }
@@ -2840,8 +2840,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         if (PE_Cached.isEntryPointAnalysisAllowed) {
             if (isLastSectionEP && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
-                log(logType.emulation, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
-
                 isStrangeCallOrJmpPresent = true;
             }
         }
@@ -2852,8 +2850,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         if (PE_Cached.isEntryPointAnalysisAllowed) {
             // ARM uses B (branch) and BL (branch with link) for jumps and calls
             if (isLastSectionEP && (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BX" || firstOpCode === "BLX")) {
-                log(logType.emulation, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
-
                 isStrangeCallOrJmpPresent = true;
             }
         }
@@ -2862,10 +2858,16 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         if (PE_Cached.isEntryPointAnalysisAllowed && isLastSectionEP &&
             (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BR" || firstOpCode === "BLR")) {
-            log(logType.emulation, "Strange " + firstOpCode.toLowerCase() + " at EP to address: " + PE_Cached.firstEpAsmInstruction.split(" ")[1].toLowerCase());
-
             isStrangeCallOrJmpPresent = true;
         }
+    }
+
+    if (isStrangeCallOrJmpPresent) {
+        var strangeEpDirectTarget = PE_Cached.firstEpAsmInstruction.match(/^(?:CALL|JMP|B|BL|BX|BLX|BR|BLR) #?(0X[0-9A-F]+|\d+)$/i);
+
+        log(logType.emulation, strangeEpDirectTarget ?
+            "Strange " + firstOpCode.toLowerCase() + " at EP to VA " + strangeEpDirectTarget[1].toLowerCase() :
+            "Strange indirect " + firstOpCode.toLowerCase() + " at EP: " + PE_Cached.firstEpAsmInstruction);
     }
 
     if (isStrangeCallOrJmpPresent) options = addOption(options, "Strange " + firstOpCode.toLowerCase() + " at EP");
@@ -3442,9 +3444,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 wrongOffsetOrSizeDetails = (wrongOffset ? "offset" : String()) +
                     (wrongOffset && wrongSize ? "/" : String()) +
                     (wrongSize ? "size" : String());
-                wrongOffsetOrSizeLogDetails = (wrongOffset ? "offset (0x" + currentSection.FileOffset.toString(16) + ")" : String()) +
+                wrongOffsetOrSizeLogDetails = (wrongOffset ? "offset 0x" + currentSection.FileOffset.toString(16) : String()) +
                     (wrongOffset && wrongSize ? ", " : String()) +
-                    (wrongSize ? "size (0x" + currentSection.FileSize.toString(16) + ")" : String());
+                    (wrongSize ? "size 0x" + currentSection.FileSize.toString(16) : String());
 
                 log(logType.any, sectionWithWrongOffsetOrSizeLabel + " has wrong " + wrongOffsetOrSizeLogDetails);
             }
@@ -3502,7 +3504,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 if (typeof sectionOffsetsDict[currentSectionOffset] === "undefined") {
                     sectionOffsetsDict[currentSectionOffset] = [currentSectionIndex];
                 } else {
-                    log(logType.any, "Section #" + sectionOffsetsDict[currentSectionOffset][0] + " (\"" + cleanSectionName(PE.getSectionName(sectionOffsetsDict[currentSectionOffset][0])) + "\") and #" + currentSectionIndex + " (\"" + cleanSectionName(PE.getSectionName(currentSectionIndex)) + "\") have one offset: 0x" + currentSectionOffset.toString(16));
+                    log(logType.any, "Section #" + sectionOffsetsDict[currentSectionOffset][0] + " (\"" + cleanSectionName(PE.getSectionName(sectionOffsetsDict[currentSectionOffset][0])) + "\") and #" + currentSectionIndex + " (\"" + cleanSectionName(PE.getSectionName(currentSectionIndex)) + "\") share offset 0x" + currentSectionOffset.toString(16));
 
                     firstSectionIndex = sectionOffsetsDict[currentSectionOffset][0];
                     secondSectionIndex = currentSectionIndex;
@@ -4648,13 +4650,13 @@ function scanForBadFileFormat_NET_and_Native() {
                     // of corruption; positive ranges and every metadata pointer remain strict.
                     if (runtimeFunctionSize > 0 && !isRuntimeFunctionCodeRangeValid) {
                         log(logType.any, "AMD64 unwind function entry #" + runtimeFunctionIndex +
-                            " references a non-code range: RVA 0x" + runtimeFunctionBeginRva.toString(16) +
-                            "-0x" + runtimeFunctionEndRva.toString(16));
+                            " references a non-code range from VA 0x" + (PE_Cached.imageBase + runtimeFunctionBeginRva).toString(16) +
+                            " to VA 0x" + (PE_Cached.imageBase + runtimeFunctionEndRva).toString(16));
 
                         isInvalidUnwindMetadataPresent = true;
                     } else if (!isRuntimeFunctionUnwindPointerValid) {
                         log(logType.any, "AMD64 unwind function entry #" + runtimeFunctionIndex +
-                            " references invalid metadata: RVA 0x" + runtimeFunctionUnwindRva.toString(16));
+                            " references invalid metadata at VA 0x" + (PE_Cached.imageBase + runtimeFunctionUnwindRva).toString(16));
 
                         isInvalidUnwindMetadataPresent = true;
                     }
@@ -4946,12 +4948,12 @@ function scanForBadFileFormat_NET_and_Native() {
                                 // contradictory. Equal RVAs remain allowed for toolchain metadata.
                                 if (guardCfFunctionRva < previousGuardCfFunctionRva) {
                                     log(logType.any, "Guard CF function entry #" + guardCfFunctionIndex +
-                                        " is out of order: RVA 0x" + guardCfFunctionRva.toString(16));
+                                        " is out of order at VA 0x" + (PE_Cached.imageBase + guardCfFunctionRva).toString(16));
 
                                     isInvalidGuardCfMetadataPresent = true;
                                 } else if (!isVirtualAddressRangeFileBacked(PE_Cached.imageBase + guardCfFunctionRva, 1, SECTION_FLAGS_EXECUTE)) {
                                     log(logType.any, "Guard CF function entry #" + guardCfFunctionIndex +
-                                        " points outside executable code: RVA 0x" + guardCfFunctionRva.toString(16));
+                                        " points outside executable code at VA 0x" + (PE_Cached.imageBase + guardCfFunctionRva).toString(16));
 
                                     isInvalidGuardCfMetadataPresent = true;
                                 }
@@ -5134,7 +5136,7 @@ function scanForBadFileFormat_NET_and_Native() {
                         }
 
                         if (!isTlsCallbackExecutable) {
-                            log(logType.any, "TLS callback outside executable code: 0x" + tlsCallbackAddress.toString(16));
+                            log(logType.any, "TLS callback outside executable code at VA 0x" + tlsCallbackAddress.toString(16));
 
                             isTlsCallbackOutsideCodePresent = true;
                         }
@@ -6545,7 +6547,7 @@ function scanForObfuscations_Native() {
 
                     // Check if machine code matches E8 00 00 00 00 pattern
                     if (currentOffset !== -1 && PE.compare("E8 00 00 00 00", currentOffset)) {
-                        log(logType.emulation, "Stack-push address near EP found at offset: 0x" + currentOffset.toString(16));
+                        log(logType.emulation, "Stack-push address near EP found at offset 0x" + currentOffset.toString(16));
 
                         isAddrToStackTrickPresent = true;
                     }
@@ -6778,11 +6780,11 @@ function scanForObfuscations_Native() {
             } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetAddress) {
                 // RET at a process entry point is meaningful here only as a concealed transfer.
                 if (syntheticEpTargetType === "stack pivot") {
-                    log(logType.emulation, "Stack pivot redirects Ret near EP to executable code at 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
+                    log(logType.emulation, "Stack pivot redirects Ret near EP to executable code at VA 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
 
                     isStackPivotEpTransferPresent = true;
                 } else {
-                    log(logType.emulation, "Synthetic " + syntheticEpTargetType + "/Ret transfer near EP to 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
+                    log(logType.emulation, "Synthetic " + syntheticEpTargetType + "/Ret transfer near EP to VA 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
                 }
 
                 isSyntheticEpTransferPresent = true;
@@ -7762,7 +7764,7 @@ function scanForObfuscations_Native() {
             if (overlappingEpBranchTarget >= PE_Cached.addressOfUnmanagedEntryPoint &&
                 overlappingEpBranchTarget < overlappingEpScannedEndAddress &&
                 !overlappingEpInstructionStarts[overlappingEpBranchTarget.toString()]) {
-                log(logType.emulation, "Overlapping branch target near EP: 0x" + overlappingEpBranchTarget.toString(16));
+                log(logType.emulation, "Overlapping branch target near EP at VA 0x" + overlappingEpBranchTarget.toString(16));
 
                 isOverlappingEpCodePresent = true;
             }
@@ -7850,7 +7852,7 @@ function scanForObfuscations_Native() {
 
                 // A mapped target consumed through its proven register completes the proof.
                 if (indirectEpTargetAddress !== undefined && PE.VAToOffset(indirectEpTargetAddress) !== -1) {
-                    log(logType.emulation, "Indirect " + indirectTransfer[1].toUpperCase() + " transfer near EP to 0x" + indirectEpTargetAddress.toString(16));
+                    log(logType.emulation, "Indirect " + indirectTransfer[1].toUpperCase() + " transfer near EP to VA 0x" + indirectEpTargetAddress.toString(16));
 
                     isIndirectEpTransferPresent = true;
                 }
@@ -8979,8 +8981,8 @@ function scanForObfuscations_Native() {
 
     if (epInvalidBranchTargetAddress !== -1) {
         log(logType.emulation, "Invalid " + epInvalidBranchTargetOpCode[0] +
-            epInvalidBranchTargetOpCode.substring(1).toLowerCase() + " target near EP: 0x" +
-            epInvalidBranchSourceAddress.toString(16) + " -> 0x" +
+            epInvalidBranchTargetOpCode.substring(1).toLowerCase() + " target near EP: source VA 0x" +
+            epInvalidBranchSourceAddress.toString(16) + " -> target VA 0x" +
             epInvalidBranchTargetAddress.toString(16));
 
         isInvalidEpBranchTargetPresent = true;
@@ -9030,7 +9032,7 @@ function scanForObfuscations_Native() {
 
     if (epSelfModifyingCallStubAddress !== -1) {
         // Either one strict stub or three generic section-local stubs proved reconstruction.
-        log(logType.emulation, "Self-modifying call stub near EP: 0x" + epSelfModifyingCallStubAddress.toString(16));
+        log(logType.emulation, "Self-modifying call stub near EP at VA 0x" + epSelfModifyingCallStubAddress.toString(16));
 
         isSelfModifyingEpCallStubPresent = true;
     }
@@ -9430,7 +9432,7 @@ function scanForObfuscations_Native() {
         }
 
         if (!isBaseOfCodeMapped) {
-            log(logType.any, "BaseOfCode RVA 0x" + baseOfCodeRva.toString(16) + " is not file-backed");
+            log(logType.any, "BaseOfCode VA 0x" + (PE_Cached.imageBase + baseOfCodeRva).toString(16) + " is not file-backed");
 
             isBaseOfCodeMismatchPresent = true;
         }
@@ -9566,7 +9568,7 @@ function scanForObfuscations_Native() {
                             // A physically backed target inside the candidate section completes the proof.
                             isUnderreportedStartupCodePresent = true;
 
-                            log(logType.emulation, "EP control flow reaches underreported section #" + protectedStartupSectionIndex + " at 0x" + protectedStartupTargetAddress.toString(16));
+                            log(logType.emulation, "EP control flow reaches underreported section #" + protectedStartupSectionIndex + " at VA 0x" + protectedStartupTargetAddress.toString(16));
                         } else if (protectedStartupOpCode === "JMP" || protectedStartupOpCode === "JMPF") {
                             // Unconditional jumps retain only their explicit destination.
                             protectedStartupPendingAddresses.push(protectedStartupTargetAddress);
