@@ -4806,22 +4806,37 @@ function scanForBadFileFormat_NET_and_Native() {
 
                 isMalformedCertificateTablePresent = true;
             } else {
-                var certificateTableData = PE.readBytes(certificateTableOffset, certificateTableSize),
-                    certificateRecordOffset = 0,
-                    certificateRecordIndex = 0;
+                var certificateRecordOffset = 0,
+                    certificateRecordIndex = 0,
+                    certificateTableDataOffset = 0,
+                    certificateTableData;
 
-                while (certificateRecordOffset < certificateTableData.length &&
+                const maxStreamedCertificateRecords = 64;
+
+                while (certificateRecordOffset < certificateTableSize &&
                     !isMalformedCertificateTablePresent) {
                     // dwLength, wRevision and wCertificateType form the mandatory
                     // eight-byte header; checking the remainder prevents partial reads.
-                    if (certificateTableData.length - certificateRecordOffset < 8) {
+                    if (certificateTableSize - certificateRecordOffset < 8) {
                         log(logType.any, "Certificate entry #" + certificateRecordIndex + " has a truncated WIN_CERTIFICATE header");
 
                         isMalformedCertificateTablePresent = true;
                         break;
                     }
 
-                    var certificateRecordLength = readUnsignedDwordFromBuffer(certificateTableData, certificateRecordOffset),
+                    // Ordinary Authenticode contains only a few records, so payload bytes do
+                    // not need to enter JS. A dense adversarial table crosses over to one
+                    // bounded buffer instead of causing unbounded engine calls.
+                    if (certificateRecordIndex === maxStreamedCertificateRecords) {
+                        certificateTableDataOffset = certificateRecordOffset;
+                        certificateTableData = PE.readBytes(certificateTableOffset + certificateRecordOffset,
+                            certificateTableSize - certificateRecordOffset);
+                    }
+
+                    var certificateRecordLength = certificateTableData ?
+                        readUnsignedDwordFromBuffer(certificateTableData,
+                            certificateRecordOffset - certificateTableDataOffset) :
+                        PE.read_uint32(certificateTableOffset + certificateRecordOffset),
                         certificateNextRecordOffset = Math.ceil((certificateRecordOffset + certificateRecordLength) / 8) * 8;
 
                     // dwLength excludes alignment padding. Round the next record up without
@@ -4830,8 +4845,8 @@ function scanForBadFileFormat_NET_and_Native() {
                         log(logType.any, "Certificate entry #" + certificateRecordIndex + " is shorter than its WIN_CERTIFICATE header");
 
                         isMalformedCertificateTablePresent = true;
-                    } else if (certificateRecordOffset + certificateRecordLength > certificateTableData.length ||
-                        certificateNextRecordOffset > certificateTableData.length) {
+                    } else if (certificateRecordOffset + certificateRecordLength > certificateTableSize ||
+                        certificateNextRecordOffset > certificateTableSize) {
                         log(logType.any, "Certificate entry #" + certificateRecordIndex + " exceeds the declared certificate table");
 
                         isMalformedCertificateTablePresent = true;
@@ -4841,7 +4856,7 @@ function scanForBadFileFormat_NET_and_Native() {
                     }
                 }
 
-                if (!isMalformedCertificateTablePresent && certificateRecordOffset !== certificateTableData.length) {
+                if (!isMalformedCertificateTablePresent && certificateRecordOffset !== certificateTableSize) {
                     // Exact consumption rejects an orphan tail while permitting any number
                     // of independently aligned certificates in the declared directory.
                     log(logType.any, "Certificate entries do not consume the declared table size");
@@ -4849,7 +4864,6 @@ function scanForBadFileFormat_NET_and_Native() {
                     isMalformedCertificateTablePresent = true;
                 }
 
-                // Clean up: release the certificate-table buffer
                 certificateTableData = undefined;
             }
         }
