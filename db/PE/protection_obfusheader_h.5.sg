@@ -9,12 +9,21 @@
 meta("protection", "obfusheader.h");
 
 function detect() {
-    var rdataSection = PE.section[".rdata"];
+    const rdataSection = PE.section[".rdata"];
 
-    if (rdataSection && PE.isFunctionPresent("LoadLibraryA") && PE.isFunctionPresent("GetProcAddress") && PE.isSignaturePresent(
-        rdataSection.FileOffset, rdataSection.FileSize,
-        "00 'Stop reversing the ' ** ** ** **")) {
-        bDetected = true;
+    if (rdataSection) {
+        const decoyMessageOffset = PE.findSignature(rdataSection.FileOffset, rdataSection.FileSize, "'Stop reversing the binary'");
+
+        if (decoyMessageOffset !== -1) {
+            const decoyMessagesSearchOffset = Math.max(rdataSection.FileOffset, decoyMessageOffset - 0x80),
+                decoyMessagesSearchEnd = Math.min(rdataSection.FileOffset + rdataSection.FileSize, decoyMessageOffset + 0x100),
+                decoyMessagesSearchSize = decoyMessagesSearchEnd - decoyMessagesSearchOffset;
+
+            if (PE.isSignaturePresent(decoyMessagesSearchOffset, decoyMessagesSearchSize, "'Reconsider your life choices'") &&
+                PE.isSignaturePresent(decoyMessagesSearchOffset, decoyMessagesSearchSize, "'And go touch some grass'")) {
+                bDetected = true;
+            }
+        }
     }
 
     const dataSection = PE.section[".data"];
