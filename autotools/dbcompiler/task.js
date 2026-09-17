@@ -9,6 +9,9 @@ const outputDir = "dbs_min";
 const CACHE_FILE = path.join(outputDir, '.compiler_cache');
 const COMPILER_CACHE_KEY = '@compiler';
 const MAX_PARALLEL = 16;
+const PRESERVED_OUTPUT_FILES = [
+    path.join(outputDir, 'timestamp.log')
+];
 
 const stats = {
     total: 0,
@@ -225,9 +228,15 @@ async function processFilesInParallel(files) {
 function collectFiles(srcDir, relBase, dstBase, fileList = []) {
     const items = fs.readdirSync(srcDir);
     for (const item of items) {
-        const
-            srcPath = path.join(srcDir, item),
+        const srcPath = path.join(srcDir, item);
+        let stat;
+
+        try {
             stat = fs.statSync(srcPath);
+        } catch (e) {
+            if (e.code === 'ENOENT') continue;
+            throw e;
+        }
 
         if (stat.isDirectory()) {
             collectFiles(srcPath, relBase, dstBase, fileList);
@@ -244,11 +253,25 @@ function collectFiles(srcDir, relBase, dstBase, fileList = []) {
 function getAllFilesInDir(dir, fileList = []) {
     if (!fs.existsSync(dir)) return fileList;
 
-    const items = fs.readdirSync(dir);
+    let items;
+
+    try {
+        items = fs.readdirSync(dir);
+    } catch (e) {
+        if (e.code === 'ENOENT') return fileList;
+        throw e;
+    }
+
     for (const item of items) {
-        const
-            fullPath = path.join(dir, item),
+        const fullPath = path.join(dir, item);
+        let stat;
+
+        try {
             stat = fs.statSync(fullPath);
+        } catch (e) {
+            if (e.code === 'ENOENT') continue;
+            throw e;
+        }
 
         if (stat.isDirectory()) {
             getAllFilesInDir(fullPath, fileList);
@@ -263,6 +286,16 @@ function syncDeleteOldFiles(expectedFiles) {
     const
         expectedSet = new Set(expectedFiles.map(f => path.normalize(f.dst))),
         existingFiles = getAllFilesInDir(outputDir);
+
+    for (const filePath of PRESERVED_OUTPUT_FILES) {
+        expectedSet.add(path.normalize(filePath));
+    }
+
+    for (const dir of inputDirs) {
+        if (fs.existsSync(dir)) {
+            expectedSet.add(path.normalize(path.join(outputDir, path.basename(dir) + '.die-db')));
+        }
+    }
 
     let deletedCount = 0;
     for (const existingFile of existingFiles) {
@@ -298,6 +331,7 @@ function createDieDb(srcDir, archivePath) {
         });
 
         output.on('close', () => resolve(archive.pointer()));
+        output.on('error', reject);
         archive.on('error', reject);
 
         archive.pipe(output);
@@ -309,16 +343,37 @@ function createDieDb(srcDir, archivePath) {
 function deleteEmptyDirs(dir) {
     if (!fs.existsSync(dir)) return;
 
-    const items = fs.readdirSync(dir);
+    let items;
+
+    try {
+        items = fs.readdirSync(dir);
+    } catch (e) {
+        if (e.code === 'ENOENT') return;
+        throw e;
+    }
+
     for (const item of items) {
         const fullPath = path.join(dir, item);
-        if (fs.statSync(fullPath).isDirectory()) {
+        let stat;
+
+        try {
+            stat = fs.statSync(fullPath);
+        } catch (e) {
+            if (e.code === 'ENOENT') continue;
+            throw e;
+        }
+
+        if (stat.isDirectory()) {
             deleteEmptyDirs(fullPath);
         }
     }
 
-    if (fs.readdirSync(dir).length === 0 && dir !== outputDir) {
-        fs.rmdirSync(dir);
+    try {
+        if (fs.readdirSync(dir).length === 0 && dir !== outputDir) {
+            fs.rmdirSync(dir);
+        }
+    } catch (e) {
+        if (e.code !== 'ENOENT' && e.code !== 'ENOTEMPTY') throw e;
     }
 }
 
