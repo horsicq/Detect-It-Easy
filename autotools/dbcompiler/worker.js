@@ -3,6 +3,31 @@ const fs = require("fs");
 const path = require("path");
 const UglifyJS = require("uglify-js");
 
+const TRANSIENT_FILE_SYSTEM_ERRORS = new Set([
+    "EACCES",
+    "EBUSY",
+    "EMFILE",
+    "ENFILE",
+    "EPERM",
+    "UNKNOWN"
+]);
+
+function runFileSystemOperation(operation) {
+    const retryDelays = [10, 25, 50, 100, 200];
+
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return operation();
+        } catch (e) {
+            if (!TRANSIENT_FILE_SYSTEM_ERRORS.has(e.code) || attempt === retryDelays.length) {
+                throw e;
+            }
+
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, retryDelays[attempt]);
+        }
+    }
+}
+
 function writeIfChanged(filePath, newContent) {
     if (fs.existsSync(filePath)) {
         try {
@@ -12,8 +37,12 @@ function writeIfChanged(filePath, newContent) {
             }
         } catch (e) { }
     }
-    fs.writeFileSync(filePath, newContent, "utf8");
+    runFileSystemOperation(() => fs.writeFileSync(filePath, newContent, "utf8"));
     return true;
+}
+
+function createDirectory(directoryPath) {
+    runFileSystemOperation(() => fs.mkdirSync(directoryPath, { recursive: true }));
 }
 
 function shouldMinify(filePath) {
@@ -306,6 +335,130 @@ function replaceConstructorsSafe(text) {
     });
 }
 
+const fileApiMethodAliases = {
+    getSize: "Sz",
+    findSignature: "fSig",
+    findString: "fStr",
+    compare: "c",
+    readBytes: "BA",
+    read_uint8: "U8",
+    read_int8: "I8",
+    read_uint16: "U16",
+    read_int16: "I16",
+    read_float16: "F16",
+    read_uint24: "U24",
+    read_int24: "I24",
+    read_uint32: "U32",
+    read_int32: "I32",
+    read_float32: "F32",
+    read_uint64: "U64",
+    read_int64: "I64",
+    read_float64: "F64",
+    read_ansiString: "SA",
+    read_codePageString: "SC",
+    read_ucsdString: "UCSD",
+    read_utf8String: "SU8",
+    read_unicodeString: "SU16"
+};
+
+/**
+ * Get the global file-format API name from a database file path.
+ * @param {string} filePath - Source database file path.
+ * @returns {string|null}
+ */
+function getFileApiName(filePath) {
+    if (path.basename(filePath) === "_init") {
+        return null;
+    }
+
+    const relativePath = path.relative(process.cwd(), filePath),
+        pathParts = relativePath.split(path.sep),
+        databaseRoot = pathParts[0],
+        formatName = pathParts[1];
+
+    if ((databaseRoot !== "db" && databaseRoot !== "db_custom" && databaseRoot !== "db_extra") ||
+        !formatName) {
+        return null;
+    }
+
+    const initFilePath = path.join(process.cwd(), "db", formatName, "_init");
+
+    if (!fs.existsSync(initFilePath)) {
+        return null;
+    }
+
+    const initText = fs.readFileSync(initFilePath, "utf8"),
+        aliasMatch = initText.match(/\bvar\s+X\s*=\s*([a-zA-Z_$][\w$]*)\s*;/);
+
+    return aliasMatch ? aliasMatch[1] : null;
+}
+
+/**
+ * Replace the verbose format API name with the X alias initialized by the format `_init`.
+ * Base-file methods use the short aliases exposed through the same X object.
+ * @param {string} text - Minified JavaScript code.
+ * @param {string} filePath - Source database file path.
+ * @returns {string}
+ */
+function replaceFileApiCallsSafe(text, filePath) {
+    const fileApiName = getFileApiName(filePath);
+
+    if (!fileApiName) {
+        return text;
+    }
+
+    let ast = UglifyJS.parse(text, {
+        bare_returns: true
+    });
+
+    if (path.basename(filePath) === "_init") {
+        return text;
+    }
+
+    ast.figure_out_scope();
+
+    ast = ast.transform(new UglifyJS.TreeTransformer(function (node) {
+        if (node instanceof UglifyJS.AST_Dot &&
+            node.expression instanceof UglifyJS.AST_SymbolRef &&
+            node.expression.definition().undeclared) {
+            const objectName = node.expression.name;
+
+            if (objectName === fileApiName || objectName === "File" || objectName === "X") {
+                const parent = this.parent(),
+                    alias = fileApiMethodAliases[node.property];
+
+                if (alias && parent instanceof UglifyJS.AST_Call && parent.expression === node) {
+                    node.property = alias;
+                    node.expression = new UglifyJS.AST_SymbolRef({
+                        name: "X",
+                        start: node.expression.start,
+                        end: node.expression.end
+                    });
+
+                    return node;
+                }
+
+                if (objectName === fileApiName) {
+                    node.expression = new UglifyJS.AST_SymbolRef({
+                        name: "X",
+                        start: node.expression.start,
+                        end: node.expression.end
+                    });
+                }
+
+                return node;
+            }
+        }
+
+    }));
+
+    return ast.print_to_string({
+        beautify: false,
+        comments: false,
+        semicolons: false
+    });
+}
+
 // Main
 const { srcFile, dstFile } = workerData;
 
@@ -327,7 +480,9 @@ try {
             // Step 2: Minification
             const uglifyResult = UglifyJS.minify(fixedText, {
                 compress: true,
-                mangle: true,
+                mangle: {
+                    reserved: ["X"]
+                },
                 parse: {
                     bare_returns: true,
                 },
@@ -341,21 +496,24 @@ try {
             if (uglifyResult.error) throw uglifyResult.error;
 
             // Step 3: Post-processing for legacy compatibility
-            const legacyCompatibleCode = replaceConstructorsSafe(
-                replaceBDetectedSafe(
-                    replaceArrowFunctions(
-                        replaceLetWithVarSafe(uglifyResult.code.trim())
+            const legacyCompatibleCode = replaceFileApiCallsSafe(
+                replaceConstructorsSafe(
+                    replaceBDetectedSafe(
+                        replaceArrowFunctions(
+                            replaceLetWithVarSafe(uglifyResult.code.trim())
+                        )
                     )
-                )
+                ),
+                srcFile
             );
 
-            fs.mkdirSync(path.dirname(dstFile), { recursive: true });
+            createDirectory(path.dirname(dstFile));
             const wasWritten = writeIfChanged(dstFile, legacyCompatibleCode);
 
             result.success = true;
             result.type = wasWritten ? 'minified' : 'skipped';
         } catch (e) {
-            fs.mkdirSync(path.dirname(dstFile), { recursive: true });
+            createDirectory(path.dirname(dstFile));
             const wasWritten = writeIfChanged(dstFile, text);
 
             result.success = false;
@@ -365,13 +523,13 @@ try {
     } else if (isJson(srcFile)) {
         try {
             const minified = JSON.stringify(JSON.parse(text));
-            fs.mkdirSync(path.dirname(dstFile), { recursive: true });
+            createDirectory(path.dirname(dstFile));
             const wasWritten = writeIfChanged(dstFile, minified);
 
             result.success = true;
             result.type = wasWritten ? 'minified' : 'skipped';
         } catch (e) {
-            fs.mkdirSync(path.dirname(dstFile), { recursive: true });
+            createDirectory(path.dirname(dstFile));
             const wasWritten = writeIfChanged(dstFile, text);
 
             result.success = false;
@@ -379,7 +537,7 @@ try {
             result.error = e.message;
         }
     } else {
-        fs.mkdirSync(path.dirname(dstFile), { recursive: true });
+        createDirectory(path.dirname(dstFile));
         const wasWritten = writeIfChanged(dstFile, text);
 
         result.success = true;
