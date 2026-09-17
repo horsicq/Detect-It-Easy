@@ -7,6 +7,7 @@ const archiver = require('archiver');
 const inputDirs = ["db", "db_custom", "db_extra"];
 const outputDir = "dbs_min";
 const CACHE_FILE = path.join(outputDir, '.compiler_cache');
+const COMPILER_CACHE_KEY = '@compiler';
 const MAX_PARALLEL = 16;
 
 const stats = {
@@ -61,6 +62,20 @@ function computeKeyForPath(p) {
     return big.toString(16);
 }
 
+function computeCompilerFingerprint() {
+    const compilerFiles = [
+        path.join(__dirname, 'worker.js'),
+        path.join(__dirname, 'package-lock.json')
+    ];
+    let source = '';
+
+    for (const filePath of compilerFiles) {
+        source += fs.readFileSync(filePath, 'utf8');
+    }
+
+    return crc32(source).toString(16);
+}
+
 function loadCache() {
     const map = new Map();
     try {
@@ -79,17 +94,9 @@ function loadCache() {
         const parts = txt.split(';');
         for (const p of parts) {
             if (!p) continue;
-            const kv = p.split('=');
-            if (kv.length !== 2) continue;
-            // Decode hex to number
-            try {
-                const val = parseInt(kv[1], 16);
-                if (!isNaN(val)) {
-                    map.set(kv[0], val);
-                }
-            } catch (e) {
-                // skip invalid entry
-            }
+            const separator = p.indexOf('=');
+            if (separator === -1) continue;
+            map.set(p.substring(0, separator), p.substring(separator + 1));
         }
     } catch (e) {
         // ignore parsing errors
@@ -106,7 +113,7 @@ function saveCache(map) {
 
         const parts = [];
         for (const [k, v] of sorted) {
-            parts.push(`${k}=${v.toString(16)}`);
+            parts.push(`${k}=${v}`);
         }
         const txt = parts.join(';');
 
@@ -138,8 +145,6 @@ function processFile(srcFile, dstFile) {
         const once = (fn) => (...args) => { if (!settled) { settled = true; fn(...args); } };
 
         worker.on('message', once((result) => {
-            stats.total++;
-
             if (result.type === 'minified') {
                 stats.minified++;
                 console.log("[MINIFIED] " + result.srcFile);
@@ -329,6 +334,7 @@ function deleteEmptyDirs(dir) {
     }
 
     console.log(`[i] Found ${allFiles.length} files to process\n`);
+    stats.total = allFiles.length;
 
     // Delete obsolete files FIRST (before any other output)
     stats.deleted = syncDeleteOldFiles(allFiles);
@@ -342,19 +348,22 @@ function deleteEmptyDirs(dir) {
         newCache = new Map(),
         toProcess = [];
 
+    const compilerFingerprint = computeCompilerFingerprint();
+    const isCompilerCacheValid = cache.get(COMPILER_CACHE_KEY) === compilerFingerprint;
+
+    newCache.set(COMPILER_CACHE_KEY, compilerFingerprint);
+
     for (const f of allFiles) {
         try {
             const st = fs.statSync(f.src);
-            const mtime = Math.floor(st.mtimeMs);
+            const fingerprint = `${Math.floor(st.mtimeMs)}:${st.size}`;
             const key = computeKeyForPath(f.src);
 
-            // Always update cache with current mtime
-            newCache.set(key, mtime);
+            newCache.set(key, fingerprint);
 
             // Check if file unchanged
-            if (cache.has(key) && cache.get(key) === mtime) {
+            if (isCompilerCacheValid && cache.get(key) === fingerprint && fs.existsSync(f.dst)) {
                 stats.skipped++;
-                console.log("[SKIP] " + f.src);
                 continue;
             }
         } catch (e) {
@@ -369,8 +378,38 @@ function deleteEmptyDirs(dir) {
 
     await processFilesInParallel(toProcess);
 
-    // Update cache with current mtime values
-    saveCache(newCache);
+    for (const failedFile of failedFiles) {
+        newCache.delete(computeKeyForPath(failedFile.file));
+    }
+
+    // A complete cache hit already has exactly the cache state we need. Avoid the
+    // relatively expensive maximum-quality Brotli pass when nothing has changed.
+    if (toProcess.length > 0 || stats.deleted > 0 || !isCompilerCacheValid) {
+        saveCache(newCache);
+    }
+
+    // Create .die-db archives for each processed directory
+    console.log("[i] Creating .die-db archives...\n");
+    for (const dir of inputDirs) {
+        const srcDir = path.join(outputDir, path.basename(dir));
+        if (!fs.existsSync(srcDir)) continue;
+
+        const archivePath = path.join(outputDir, path.basename(dir) + '.die-db');
+
+        if (toProcess.length === 0 && stats.deleted === 0 && fs.existsSync(archivePath)) {
+            console.log(`[SKIP] ${archivePath}`);
+            continue;
+        }
+
+        try {
+            const bytes = await createDieDb(srcDir, archivePath);
+            console.log(`[PACKED] ${archivePath} (${(bytes / 1024).toFixed(1)} KB)`);
+        } catch (e) {
+            stats.failed++;
+            failedFiles.push({ file: archivePath, reason: e.message });
+            console.warn(`[PACK FAILED] ${archivePath} — ${e.message}`);
+        }
+    }
 
     let report = "\n[V] Done!\n" +
         `— Total:     ${stats.total}\n` +
@@ -385,24 +424,14 @@ function deleteEmptyDirs(dir) {
     }
 
     if (failedFiles.length > 0) {
-        report += "\n[X] Failed to minify:\n" + failedFiles.map((f) => ` • ${f.file} — ${f.reason}`).join("\n") + "\n";
+        report += "\n[X] Failed:\n" + failedFiles.map((f) => ` • ${f.file} — ${f.reason}`).join("\n") + "\n";
     }
 
     console.log(report);
 
-    // Create .die-db archives for each processed directory
-    console.log("[i] Creating .die-db archives...\n");
-    for (const dir of inputDirs) {
-        const srcDir = path.join(outputDir, path.basename(dir));
-        if (!fs.existsSync(srcDir)) continue;
-
-        const archivePath = path.join(outputDir, path.basename(dir) + '.die-db');
-        try {
-            const bytes = await createDieDb(srcDir, archivePath);
-            console.log(`[PACKED] ${archivePath} (${(bytes / 1024).toFixed(1)} KB)`);
-        } catch (e) {
-            console.warn(`[PACK FAILED] ${archivePath} — ${e.message}`);
-        }
+    if (stats.failed > 0) {
+        process.exitCode = 1;
     }
+
     console.log('');
 })();
