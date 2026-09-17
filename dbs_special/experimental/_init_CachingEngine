@@ -1,0 +1,99 @@
+// Detect It Easy: DiE-JS framework file
+// Don't change anything unless you're sure about what you're doing
+
+/**
+ * Cache every native method call made without arguments.
+ *
+ * Qt exposes native overloads as enumerable signatures, such as getSize() or readByte(qlonglong).
+ * Only methods with a single zero-argument signature are cached. Values are calculated on demand,
+ * so unused native methods add no analysis work. After the first call, the temporary wrapper is
+ * replaced with a function that consists of a single JavaScript return statement. Methods that
+ * also have argument-bearing overloads are left native to preserve their behavior.
+ *
+ * @param {Object} object - Current file-format API object.
+ * @param {String} profileName - Optional static API profile name.
+ */
+function initializeCachingEngine(object, profileName) {
+    var methodNames = CachingEngine_methodProfiles[profileName],
+        initializationScript = "";
+
+    if (methodNames === undefined) {
+        methodNames = getZeroArgumentMethodNames(object);
+    }
+
+    for (var i = 0; i < methodNames.length; i++) {
+        var methodName = methodNames[i];
+
+        initializationScript += "object." + methodName + "=function(){var value=object[\"" +
+            methodName + "()\"].call(object);object." + methodName +
+            "=function(){return value;};return value;};";
+    }
+
+    if (initializationScript !== "") {
+        // QJSEngine ignores assignment to a native method through object[name]. Install every
+        // direct member assignment in one parser invocation instead of one eval per method.
+        eval(initializationScript);
+    }
+}
+
+/**
+ * Enumerate zero-argument methods for APIs without a static profile.
+ * @param {Object} object - Current file-format API object.
+ * @returns {Array}
+ */
+function getZeroArgumentMethodNames(object) {
+    var prototype = object.prototype || object,
+        methodSignaturesMap = {},
+        methodNames = [];
+
+    for (var property in prototype) {
+        var signatureStart = property.indexOf("("),
+            methodName = property.substring(0, signatureStart);
+
+        if (signatureStart !== -1) {
+            if (methodSignaturesMap[methodName] === undefined) {
+                methodSignaturesMap[methodName] = 0;
+            }
+
+            methodSignaturesMap[methodName] |= property.length === signatureStart + 2 ? 1 : 2;
+        }
+    }
+
+    for (methodName in methodSignaturesMap) {
+        if (methodSignaturesMap[methodName] === 1 && methodName !== "destroyed" &&
+            methodName !== "deleteLater" && methodName !== "startTiming") {
+            methodNames.push(methodName);
+        }
+    }
+
+    return methodNames;
+}
+
+
+var CachingEngine_methodProfiles = {
+    PE: [
+        "getSize", "getEntryPointOffset", "getOverlayOffset", "getOverlaySize",
+        "getAddressOfEntryPoint", "isOverlayPresent", "getGeneralOptions", "getFileDirectory",
+        "getFileBaseName", "getFileCompleteSuffix", "getFileSuffix", "getImageBase", "isPlainText",
+        "isUTF8Text", "isUnicodeText", "isText", "getHeaderString", "is16", "is32", "is64",
+        "isDeepScan", "isHeuristicScan", "isAggressiveScan", "isRecursiveScan", "isOverlayScan",
+        "isVerbose", "isProfiling", "getScanID", "getStartOffset", "getOperationSystemName",
+        "getOperationSystemVersion", "getOperationSystemOptions", "getFileFormatName",
+        "getFileFormatVersion", "getFileFormatOptions", "isSigned", "isOverlay", "isResource",
+        "isDebugData", "isFilePart", "getListOfCompressionMethods", "isReleaseBuild", "isDebugBuild",
+        "getFormatMessages", "isChecksumCorrect", "isEntryPointCorrect", "isSectionAlignmentCorrect",
+        "isFileAlignmentCorrect", "isHeaderCorrect", "isRelocsTableCorrect", "isImportTableCorrect",
+        "isExportTableCorrect", "isResourcesTableCorrect", "isSectionsTableCorrect", "Sz", "isLE",
+        "isLX", "isNE", "isPE", "getDosStubOffset", "getDosStubSize", "isDosStubPresent",
+        "isRichSignaturePresent", "getNumberOfRichIDs", "getNumberOfSections", "getNumberOfResources",
+        "isNET", "isNet", "isPEPlus", "isNetGlobalCctorPresent", "getNetModuleName",
+        "getNetAssemblyName", "getNumberOfImports", "getImportSection", "getExportSection",
+        "getResourceSection", "getEntryPointSection", "getRelocsSection", "getTLSSection",
+        "getMajorLinkerVersion", "getMinorLinkerVersion", "getManifest", "getCompilerVersion",
+        "isConsole", "isSignedFile", "isDll", "isDriver", "getNETVersion", "getSizeOfCode",
+        "getSizeOfUninitializedData", "getFileVersion", "getFileVersionMS", "calculateSizeOfHeaders",
+        "getNumberOfExportFunctions", "getNumberOfExports", "isExportPresent", "isTLSPresent",
+        "isImportPresent", "isResourcesPresent", "getImportHash32", "getImportHash64",
+        "getNumberOfDebugDataRecords"
+    ]
+};
