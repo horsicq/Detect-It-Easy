@@ -29,6 +29,8 @@ function runFileSystemOperation(operation) {
 }
 
 function writeIfChanged(filePath, newContent) {
+    newContent = newContent.replace(/[\r\n]+$/, "");
+
     if (fs.existsSync(filePath)) {
         try {
             const existingContent = fs.readFileSync(filePath, "utf8");
