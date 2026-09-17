@@ -167,6 +167,7 @@ function processFile(srcFile, dstFile) {
             } else if (result.type === 'failed-skip') {
                 stats.failed++;
                 stats.skipped++;
+                failedFiles.push({ file: result.srcFile, reason: result.error });
                 console.log("[SKIP/FAIL] " + result.srcFile);
             } else {
                 stats.failed++;
@@ -185,14 +186,16 @@ function processFile(srcFile, dstFile) {
         }));
 
         worker.on('exit', (code) => {
-            if (code !== 0) {
-                once(() => {
-                    stats.failed++;
-                    failedFiles.push({ file: srcFile, reason: `Worker stopped with exit code ${code}` });
-                    console.warn("[ERROR] " + srcFile + " — Worker stopped with exit code " + code);
-                    resolve();
-                })();
-            }
+            once(() => {
+                const reason = code === 0 ?
+                    'Worker stopped without returning a result' :
+                    `Worker stopped with exit code ${code}`;
+
+                stats.failed++;
+                failedFiles.push({ file: srcFile, reason });
+                console.warn("[ERROR] " + srcFile + " — " + reason);
+                resolve();
+            })();
         });
     });
 }
