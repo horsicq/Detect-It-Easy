@@ -70,6 +70,144 @@ function getShortPropertyName(index) {
     return firstCharacters[index % firstCharacters.length] + Math.floor(index / firstCharacters.length);
 }
 
+function manglePrivateConstructorPropertiesSafe(ast) {
+    ast.figure_out_scope();
+
+    const constructors = [],
+        constructorsByDefinition = new Map(),
+        instancesByDefinition = new Map();
+
+    ast.walk(new UglifyJS.TreeWalker(function (node) {
+        if (node instanceof UglifyJS.AST_Defun) {
+            const candidate = {
+                definition: node.name.definition(),
+                functionNode: node,
+                instanceDefinitions: [],
+                propertyNames: new Set(),
+                isSafe: true
+            };
+
+            constructors.push(candidate);
+            constructorsByDefinition.set(candidate.definition, candidate);
+        }
+    }));
+
+    ast.walk(new UglifyJS.TreeWalker(function (node) {
+        if (!(node instanceof UglifyJS.AST_VarDef) ||
+            !(node.name instanceof UglifyJS.AST_SymbolDeclaration) ||
+            !(node.value instanceof UglifyJS.AST_New) ||
+            !(node.value.expression instanceof UglifyJS.AST_SymbolRef)) {
+            return;
+        }
+
+        const candidate = constructorsByDefinition.get(node.value.expression.definition());
+
+        if (!candidate) return;
+
+        const instanceDefinition = node.name.definition();
+        candidate.instanceDefinitions.push(instanceDefinition);
+        instancesByDefinition.set(instanceDefinition, candidate);
+    }));
+
+    for (const candidate of constructors) {
+        candidate.functionNode.walk(new UglifyJS.TreeWalker(function (node) {
+            if (node instanceof UglifyJS.AST_This &&
+                this.find_parent(UglifyJS.AST_Lambda) !== candidate.functionNode) {
+                candidate.isSafe = false;
+            }
+        }));
+    }
+
+    ast.walk(new UglifyJS.TreeWalker(function (node) {
+        if (node instanceof UglifyJS.AST_SymbolRef) {
+            const constructor = constructorsByDefinition.get(node.definition());
+
+            if (constructor) {
+                const parent = this.parent();
+
+                if (!(parent instanceof UglifyJS.AST_New) || parent.expression !== node) {
+                    constructor.isSafe = false;
+                }
+                return;
+            }
+
+            const instance = instancesByDefinition.get(node.definition());
+
+            if (!instance || !instance.isSafe) return;
+
+            const parent = this.parent();
+
+            if (parent instanceof UglifyJS.AST_Dot && parent.expression === node) {
+                instance.propertyNames.add(parent.property);
+            } else if (parent instanceof UglifyJS.AST_Sub && parent.expression === node &&
+                parent.property instanceof UglifyJS.AST_String) {
+                instance.propertyNames.add(parent.property.value);
+            } else {
+                instance.isSafe = false;
+            }
+        } else if (node instanceof UglifyJS.AST_This) {
+            const functionNode = this.find_parent(UglifyJS.AST_Lambda),
+                candidate = constructors.find(item => item.functionNode === functionNode);
+
+            if (!candidate || !candidate.isSafe) return;
+
+            const parent = this.parent();
+
+            if (parent instanceof UglifyJS.AST_Dot && parent.expression === node) {
+                candidate.propertyNames.add(parent.property);
+            } else if (parent instanceof UglifyJS.AST_Sub && parent.expression === node &&
+                parent.property instanceof UglifyJS.AST_String) {
+                candidate.propertyNames.add(parent.property.value);
+            } else {
+                candidate.isSafe = false;
+            }
+        }
+    }));
+
+    for (const candidate of constructors) {
+        if (!candidate.isSafe || !candidate.instanceDefinitions.length || !candidate.propertyNames.size) {
+            continue;
+        }
+
+        const propertyMap = {},
+            usedNames = new Set(candidate.propertyNames);
+        let aliasIndex = 0;
+
+        for (const propertyName of candidate.propertyNames) {
+            let alias;
+
+            do {
+                alias = getShortPropertyName(aliasIndex++);
+            } while (usedNames.has(alias));
+
+            propertyMap[propertyName] = alias;
+        }
+
+        const instanceDefinitions = new Set(candidate.instanceDefinitions);
+
+        ast = ast.transform(new UglifyJS.TreeTransformer(function (node) {
+            if (!(node instanceof UglifyJS.AST_Dot) && !(node instanceof UglifyJS.AST_Sub)) return;
+
+            const isConstructorProperty = node.expression instanceof UglifyJS.AST_This &&
+                this.find_parent(UglifyJS.AST_Lambda) === candidate.functionNode,
+                isInstanceProperty = node.expression instanceof UglifyJS.AST_SymbolRef &&
+                    instanceDefinitions.has(node.expression.definition());
+
+            if (!isConstructorProperty && !isInstanceProperty) return;
+
+            if (node instanceof UglifyJS.AST_Dot && propertyMap[node.property]) {
+                node.property = propertyMap[node.property];
+            } else if (node instanceof UglifyJS.AST_Sub &&
+                node.property instanceof UglifyJS.AST_String &&
+                propertyMap[node.property.value]) {
+                node.property.value = propertyMap[node.property.value];
+            }
+        }));
+    }
+
+    return ast;
+}
+
 /**
  * Mangle properties of private objects whose complete ownership can be proven
  * inside one signature. Native objects and ordinary JavaScript properties are
@@ -211,6 +349,8 @@ function manglePrivatePropertiesSafe(text, filePath) {
             }
         }));
     }
+
+    ast = manglePrivateConstructorPropertiesSafe(ast);
 
     return ast.print_to_string({
         beautify: false,
