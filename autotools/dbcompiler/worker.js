@@ -52,6 +52,10 @@ function shouldMinify(filePath) {
     return ext === ".sg" || ext === "";
 }
 
+function isSignature(filePath) {
+    return path.extname(filePath).toLowerCase() === ".sg";
+}
+
 function isJson(filePath) {
     return path.extname(filePath).toLowerCase() === ".json";
 }
@@ -483,7 +487,8 @@ try {
             const uglifyResult = UglifyJS.minify(fixedText, {
                 compress: true,
                 mangle: {
-                    reserved: ["X"]
+                    toplevel: isSignature(srcFile),
+                    reserved: ["detect", "main", "X"]
                 },
                 parse: {
                     bare_returns: true,
