@@ -60,6 +60,165 @@ function isJson(filePath) {
     return path.extname(filePath).toLowerCase() === ".json";
 }
 
+function getShortPropertyName(index) {
+    const firstCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_";
+
+    if (index < firstCharacters.length) {
+        return firstCharacters[index];
+    }
+
+    return firstCharacters[index % firstCharacters.length] + Math.floor(index / firstCharacters.length);
+}
+
+/**
+ * Mangle properties of private objects whose complete ownership can be proven
+ * inside one signature. Native objects and ordinary JavaScript properties are
+ * intentionally excluded.
+ * @param {string} text - Signature source code.
+ * @param {string} filePath - Signature file path.
+ * @returns {string} Source with private property names shortened.
+ */
+function manglePrivatePropertiesSafe(text, filePath) {
+    if (!isSignature(filePath) ||
+        (text.indexOf("logType") === -1 &&
+            (text.indexOf("PE_Cached") === -1 || text.indexOf("cacheMap") === -1))) {
+        return text;
+    }
+
+    let ast = UglifyJS.parse(text, {
+        bare_returns: true
+    });
+
+    ast.figure_out_scope();
+
+    const definitions = {},
+        objectLiterals = {},
+        privateObjectCandidates = [];
+
+    ast.walk(new UglifyJS.TreeWalker(function (node) {
+        if (!(node instanceof UglifyJS.AST_VarDef) ||
+            !(node.name instanceof UglifyJS.AST_SymbolDeclaration) ||
+            !(node.value instanceof UglifyJS.AST_Object)) {
+            return;
+        }
+
+        privateObjectCandidates.push({
+            definition: node.name.definition(),
+            object: node.value,
+            isSafe: true
+        });
+
+        if (node.name.name === "logType" || node.name.name === "cacheMap" || node.name.name === "PE_Cached") {
+            definitions[node.name.name] = node.name.definition();
+            objectLiterals[node.name.name] = node.value;
+        }
+    }));
+
+    const namespaces = [],
+        candidatesByDefinition = new Map();
+
+    for (const candidate of privateObjectCandidates) {
+        if (candidate.definition === definitions.PE_Cached || candidate.definition === definitions.cacheMap) {
+            continue;
+        }
+
+        const propertyNames = new Set();
+
+        for (const property of candidate.object.properties) {
+            if (!(property instanceof UglifyJS.AST_ObjectKeyVal) || propertyNames.has(property.key)) {
+                candidate.isSafe = false;
+                break;
+            }
+
+            propertyNames.add(property.key);
+
+            property.value.walk(new UglifyJS.TreeWalker(function (node) {
+                if (node instanceof UglifyJS.AST_This) candidate.isSafe = false;
+            }));
+        }
+
+        candidate.propertyNames = propertyNames;
+        candidatesByDefinition.set(candidate.definition, candidate);
+    }
+
+    // A private object must never escape and may only be accessed through its
+    // statically known own properties. Any ambiguous use disqualifies it.
+    ast.walk(new UglifyJS.TreeWalker(function (node) {
+        if (!(node instanceof UglifyJS.AST_SymbolRef)) return;
+
+        const candidate = candidatesByDefinition.get(node.definition());
+
+        if (!candidate || !candidate.isSafe) return;
+
+        const parent = this.parent();
+
+        if (parent instanceof UglifyJS.AST_Dot && parent.expression === node) {
+            if (!candidate.propertyNames.has(parent.property)) candidate.isSafe = false;
+        } else if (parent instanceof UglifyJS.AST_Sub && parent.expression === node &&
+            parent.property instanceof UglifyJS.AST_String) {
+            if (!candidate.propertyNames.has(parent.property.value)) candidate.isSafe = false;
+        } else {
+            candidate.isSafe = false;
+        }
+    }));
+
+    for (const candidate of privateObjectCandidates) {
+        if (candidate.isSafe && candidate.propertyNames && candidate.propertyNames.size) {
+            namespaces.push(candidate);
+        }
+    }
+
+    // cacheMap owns every PE_Cached slot and copies the slots by the same key.
+    // Require that exact structure before treating the names as private.
+    if (definitions.PE_Cached && definitions.cacheMap && objectLiterals.cacheMap &&
+        /for\s*\([^)]*\bin\s+cacheMap\s*\)/.test(text) &&
+        /cacheMap\s*\[\s*key\s*\]/.test(text) &&
+        /PE_Cached\s*\[\s*key\s*\]/.test(text)) {
+        namespaces.push({
+            definition: definitions.PE_Cached,
+            object: objectLiterals.cacheMap
+        });
+    }
+
+    for (const namespace of namespaces) {
+        const propertyMap = {},
+            usedNames = new Set(namespace.object.properties.map(property => property.key));
+        let aliasIndex = 0;
+
+        for (const property of namespace.object.properties) {
+            let alias;
+
+            do {
+                alias = getShortPropertyName(aliasIndex++);
+            } while (usedNames.has(alias));
+
+            propertyMap[property.key] = alias;
+            property.key = alias;
+        }
+
+        ast = ast.transform(new UglifyJS.TreeTransformer(function (node) {
+            if (node instanceof UglifyJS.AST_Dot &&
+                node.expression instanceof UglifyJS.AST_SymbolRef &&
+                node.expression.definition() === namespace.definition &&
+                propertyMap[node.property]) {
+                node.property = propertyMap[node.property];
+            } else if (node instanceof UglifyJS.AST_Sub &&
+                node.expression instanceof UglifyJS.AST_SymbolRef &&
+                node.expression.definition() === namespace.definition &&
+                node.property instanceof UglifyJS.AST_String &&
+                propertyMap[node.property.value]) {
+                node.property.value = propertyMap[node.property.value];
+            }
+        }));
+    }
+
+    return ast.print_to_string({
+        beautify: false,
+        comments: false,
+        semicolons: false
+    });
+}
+
 /**
  * Universal safe JavaScript parser
  * Skips strings, regular expressions and comments
@@ -481,7 +640,7 @@ try {
     if (shouldMinify(srcFile)) {
         try {
             // Step 1: fix delete statements BEFORE minification
-            const fixedText = fixDeleteStatements(text);
+            const fixedText = manglePrivatePropertiesSafe(fixDeleteStatements(text), srcFile);
 
             // Step 2: Minification
             const uglifyResult = UglifyJS.minify(fixedText, {
