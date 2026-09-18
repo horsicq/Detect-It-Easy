@@ -111,7 +111,7 @@ These are the main passes rather than a complete inventory of every check:
 
 -   Headers, entry points, alignment, relocations, `IAT/EAT`/resources, CLR metadata and version strings, and Authenticode placement are checked for damage or tampering.
 -   Deeper consistency checks cover overlapping sections and data-directory mappings, AMD64 unwind records, Guard CF metadata, and chained `WIN_CERTIFICATE` entries.
--   Instead of merely calling a file broken, DiE points to the affected structures—useful when deciding whether a sample is original, damaged, dumped from memory, or only partially reconstructed.
+-   Instead of merely calling a file broken, DiE points to the affected structures—useful when deciding whether a sample is original, damaged, dumped from memory, or only partially reconstructed. The `Corrupted data` verdict also states the impact: `Uncritical` covers damage limited to optional metadata, `Degraded` marks structural inconsistencies that may leave the image operational, and `Critical` identifies damage to structures required for reliable loading or execution.
 
 </details>
 
