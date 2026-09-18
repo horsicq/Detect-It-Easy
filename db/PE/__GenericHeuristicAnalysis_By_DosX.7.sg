@@ -4052,6 +4052,20 @@ function scanForBadFileFormat_NET_and_Native() {
 
     var isDetected = Boolean();
 
+    const corruptedDataLevel = {
+        uncritical: 0,
+        degraded: 1,
+        critical: 2
+    };
+
+    const corruptedDataLevelName = ["Uncritical", "Degraded", "Critical"];
+
+    var detectedCorruptedDataLevel = corruptedDataLevel.uncritical;
+
+    function raiseCorruptedDataLevel(level) {
+        detectedCorruptedDataLevel = Math.max(detectedCorruptedDataLevel, level);
+    }
+
 
 
 
@@ -5224,6 +5238,33 @@ function scanForBadFileFormat_NET_and_Native() {
 
     if (isWindowsAuthenticodeStripped) options = addOption(options, "Authenticode tampered");
 
+    if (
+        isEntryPointIncorrect ||
+        isSectionAlignmentIncorrect ||
+        isFileAlignmentIncorrect ||
+        isHeaderIncorrect ||
+        isInvalidSectionLayoutPresent ||
+        isImportTableIncorrect ||
+        isTlsCallbackOutsideCodePresent ||
+        isNetImportsCorrupted
+    ) {
+        raiseCorruptedDataLevel(corruptedDataLevel.critical);
+    } else if (
+        isRelocsTableIncorrect ||
+        isExportTableIncorrect ||
+        isResourcesTableIncorrect ||
+        isUnmappedDataDirectoryPresent ||
+        isCommitAboveReservePresent ||
+        isReservedPeDataPresent ||
+        isRelocationStateMismatchPresent ||
+        isInvalidUnwindMetadataPresent ||
+        isInvalidGuardCfMetadataPresent ||
+        isInvalidTlsMetadataPresent ||
+        isNetClrVersionCorrupted
+    ) {
+        raiseCorruptedDataLevel(corruptedDataLevel.degraded);
+    }
+
 
 
 
@@ -5231,7 +5272,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
     if (isDetected) {
-        _setResult("~corrupted data", "Generic", String(), PE_Cached.isVerbose ? options : String());
+        _setResult("~corrupted data", "Generic", corruptedDataLevelName[detectedCorruptedDataLevel], PE_Cached.isVerbose ? options : String());
     }
 }
 // #endregion
