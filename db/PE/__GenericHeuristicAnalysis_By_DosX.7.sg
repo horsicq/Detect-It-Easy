@@ -6431,6 +6431,114 @@ function traceEpWrittenCodeTransfer() {
 
 
 
+/**
+ * Tracks the destination register from the PE entry point to a scalar-copy instruction.
+ *
+ * The bounded control-flow walk follows direct branches through file-backed executable
+ * instructions. It propagates only statically known register values; unsupported
+ * instructions and unknown writes end a path or invalidate the affected register.
+ * A successful path proves that the copy destination points inside the same virtual
+ * code section as the unpacker's final transfer. It does not execute the copy loop
+ * or claim that every byte up to the transfer target has been written. Conditional
+ * branch feasibility is not solved; reachability here is structural CFG reachability.
+ *
+ * @param {number} copyAddress - Virtual address of the reachable byte-read instruction.
+ * @param {string} destinationRegister - Register used by its paired byte write.
+ * @param {number} sectionStart - Inclusive virtual address of the target code section.
+ * @param {number} sectionEnd - Exclusive virtual address of the target code section.
+ * @returns {boolean} True if a bounded reachable path preserves a known destination inside that section.
+ */
+function isEpCopyDestinationProven(copyAddress, destinationRegister, sectionStart, sectionEnd) {
+    const registerPattern = "(?:E(?:AX|BX|CX|DX|SI|DI|BP|SP)|R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])D?)",
+        numberPattern = "(?:-?0X[0-9A-F]+|-?[0-9]+)",
+        moveLiteralPattern = new RegExp("^MOV(?:ABS)? (" + registerPattern + "), (" + numberPattern + ")$", "i"),
+        moveRegisterPattern = new RegExp("^MOV (" + registerPattern + "), (" + registerPattern + ")$", "i"),
+        leaPattern = new RegExp("^LEA (" + registerPattern + "), \\[(" + registerPattern + ") ([+-]) (" + numberPattern + ")\\]$", "i"),
+        arithmeticPattern = new RegExp("^(ADD|SUB) (" + registerPattern + "), (" + numberPattern + ")$", "i"),
+        unaryPattern = new RegExp("^(INC|DEC) (" + registerPattern + ")$", "i"),
+        registerWritePattern = new RegExp("^(?:MOV|MOVABS|LEA|ADD|SUB|ADC|SBB|XOR|OR|AND|INC|DEC|NEG|NOT|SHL|SHR|SAR|ROL|ROR|POP) (" + registerPattern + ")(?:,|$)", "i"),
+        directBranchPattern = new RegExp("^(J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (" + numberPattern + ")$", "i");
+
+    function registerKey(name) {
+        return name.toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+    }
+
+    function setRegister(values, name, value) {
+        var key = registerKey(name);
+
+        if (value === undefined || !isFinite(value) || Math.abs(value) > 0x1FFFFFFFFFFFFF) {
+            delete values[key];
+        } else {
+            values[key] = PE_Cached.isI386 || /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(name) ? value >>> 0 : value;
+        }
+    }
+
+    if (registerKey(destinationRegister) === "RSP") return false;
+
+    var pending = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, Values: {} }],
+        visited = {};
+
+    for (var stateIndex = 0; stateIndex < pending.length && stateIndex < 96; stateIndex++) {
+        var state = pending[stateIndex],
+            address = state.Address,
+            stateKey = address + ":" + JSON.stringify(state.Values);
+
+        if (visited[stateKey] || !isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) continue;
+        visited[stateKey] = true;
+
+        if (address === copyAddress) {
+            var destination = state.Values[registerKey(destinationRegister)];
+            if (destination >= sectionStart && destination < sectionEnd) return true;
+            continue;
+        }
+
+        var instruction = PE.getDisasmString(address),
+            length = PE.getDisasmLength(address),
+            opCode = getAsmOpCode(instruction),
+            nextAddress = address + length,
+            match,
+            values = {};
+
+        if (!opCode || length <= 0 || !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
+        for (var key in state.Values) values[key] = state.Values[key];
+
+        if ((match = instruction.match(moveLiteralPattern))) {
+            setRegister(values, match[1], parseInt(match[2], 0));
+        } else if ((match = instruction.match(moveRegisterPattern))) {
+            setRegister(values, match[1], values[registerKey(match[2])]);
+        } else if ((match = instruction.match(leaPattern))) {
+            var base = values[registerKey(match[2])],
+                displacement = parseInt(match[4], 0) * (match[3] === "-" ? -1 : 1);
+            setRegister(values, match[1], base === undefined ? undefined : base + displacement);
+        } else if ((match = instruction.match(arithmeticPattern))) {
+            var oldValue = values[registerKey(match[2])],
+                immediate = parseInt(match[3], 0);
+            setRegister(values, match[2], oldValue === undefined ? undefined : oldValue + (match[1] === "ADD" ? immediate : -immediate));
+        } else if ((match = instruction.match(unaryPattern))) {
+            var oldValue = values[registerKey(match[2])];
+            setRegister(values, match[2], oldValue === undefined ? undefined : oldValue + (match[1] === "INC" ? 1 : -1));
+        } else if ((match = instruction.match(registerWritePattern))) {
+            delete values[registerKey(match[1])];
+            if (opCode === "POP") delete values.RSP;
+        } else if ((match = instruction.match(directBranchPattern))) {
+            var target = parseInt(match[2], 0);
+            if (/^LOOP/.test(opCode)) delete values.RCX;
+            pending.push({ Address: target, Values: values });
+            if (opCode === "JMP") continue;
+        } else if (/^(?:PUSH|PUSHAL)$/.test(opCode)) {
+            delete values.RSP;
+        } else if (!/^(?:CMP|TEST|NOP|FNOP|PAUSE|CLC|STC|CMC)$/.test(opCode)) {
+            continue;
+        }
+
+        pending.push({ Address: nextAddress, Values: values });
+    }
+
+    return false;
+}
+
+
+
 function scanForObfuscations_Native() {
     log(logType.nothing, "Scanning for obfuscation...");
 
