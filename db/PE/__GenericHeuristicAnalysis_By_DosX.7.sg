@@ -7709,6 +7709,7 @@ function scanForObfuscations_Native() {
     if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         var constantEpKnownRegisterValues = {},
             constantEpComparisonOrigin = String(),
+            constantEpComparisonEqual = false,
             constantEpNeutralInstructionCount = 0;
 
         // Values use canonical physical-register keys, but truncation is applied whenever
@@ -7742,17 +7743,21 @@ function scanForObfuscations_Native() {
 
                 // Restrict the proof to unambiguous non-negative signed 32-bit literals.
                 // This avoids JavaScript precision and x86-64 sign-extension ambiguities.
-                if (comparedLiteral <= 0x7FFFFFFF && knownComparedLiteral === comparedLiteral) {
+                if (comparedLiteral <= 0x7FFFFFFF && knownComparedLiteral !== undefined) {
                     constantEpComparisonOrigin = currentEpInstruction;
+                    constantEpComparisonEqual = knownComparedLiteral === comparedLiteral;
                     constantEpNeutralInstructionCount = 0;
                 } else {
                     constantEpComparisonOrigin = String();
                     constantEpNeutralInstructionCount = 0;
                 }
             } else if (conditionalBranch) {
-                if (constantEpComparisonOrigin && PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 &&
-                    (epZeroFlagsAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ||
-                        epZeroFlagsNeverTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1)) {
+                var constantEpBranchOpCode = conditionalBranch[1].toUpperCase(),
+                    constantEpEqualBranch = epZeroFlagsAlwaysTakenBranches.indexOf(constantEpBranchOpCode) !== -1 ||
+                        epZeroFlagsNeverTakenBranches.indexOf(constantEpBranchOpCode) !== -1,
+                    constantEpUnequalBranch = /^(?:JE|JZ|JNE|JNZ)$/.test(constantEpBranchOpCode) && isVirtualAddressRangeFileBacked(PE_Cached.addressOfUnmanagedEntryPoint, 1, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE);
+
+                if (constantEpComparisonOrigin && PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 && (constantEpComparisonEqual ? constantEpEqualBranch : constantEpUnequalBranch)) {
                     log(logType.emulation, "Constant opaque comparison near EP: " + constantEpComparisonOrigin + "; " + currentEpInstruction);
 
                     isConstantOpaqueEpComparisonPresent = true;
