@@ -4586,6 +4586,88 @@ function scanForBadFileFormat_NET_and_Native() {
                     return matchingRangeIndex >= 0 && ranges[matchingRangeIndex].MaximumEndRva >= endRva ? ranges[matchingRangeIndex].MaximumEndRangeIndex : -1;
                 }
 
+                /**
+                 * Validates the complete shape of a WORD-aligned AMD64 UNWIND_INFO record.
+                 *
+                 * The Microsoft x64 ABI specifies a DWORD-aligned UNWIND_INFO structure.
+                 * Current Microsoft-produced images also contain WORD-aligned records which
+                 * the Windows unwinder accepts. Such a compatibility record is admitted only
+                 * after its header, unwind-code slots and optional trailer are all file-backed
+                 * and structurally valid; alignment by itself never bypasses validation.
+                 *
+                 * @param {number} unwindRva - RVA of the candidate UNWIND_INFO record.
+                 * @returns {boolean} <code>true</code> for a complete supported record.
+                 *
+                 * @see {@link https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64?view=msvc-170} Microsoft x64 RUNTIME_FUNCTION, UNWIND_INFO and UNWIND_CODE specification
+                 */
+                function isValidWordAlignedUnwindInfo(unwindRva) {
+                    var unwindAddress = PE_Cached.imageBase + unwindRva;
+
+                    if (!isVirtualAddressRangeFileBacked(unwindAddress, 4, 0)) return false;
+
+                    var unwindOffset = PE.VAToOffset(unwindAddress),
+                        unwindHeader = PE.readBytes(unwindOffset, 4),
+                        versionAndFlags = unwindHeader[0],
+                        version = versionAndFlags & 0x07,
+                        flags = versionAndFlags >>> 3,
+                        prologSize = unwindHeader[1],
+                        unwindCodeCount = unwindHeader[2],
+                        frameRegister = unwindHeader[3] & 0x0F,
+                        frameOffset = unwindHeader[3] >>> 4;
+
+                    // The published x64 format defines version 1. Only the three published
+                    // UNW_FLAG bits are valid, and CHAININFO is mutually exclusive with
+                    // language-specific handler flags.
+                    if (version !== 1 || flags > 0x07 ||
+                        ((flags & 0x04) !== 0 && (flags & 0x03) !== 0) ||
+                        (frameRegister === 0 && frameOffset !== 0)) return false;
+
+                    var alignedUnwindCodeCount = unwindCodeCount + (unwindCodeCount % 2),
+                        unwindInfoSize = 4 + alignedUnwindCodeCount * 2;
+
+                    if ((flags & 0x04) !== 0) {
+                        unwindInfoSize += 12; // Chained RUNTIME_FUNCTION
+                    } else if ((flags & 0x03) !== 0) {
+                        unwindInfoSize += 4; // Exception-handler RVA
+                    }
+
+                    if (!isVirtualAddressRangeFileBacked(unwindAddress, unwindInfoSize, 0)) return false;
+
+                    var unwindInfo = PE.readBytes(unwindOffset, unwindInfoSize),
+                        unwindCodeIndex = 0;
+
+                    while (unwindCodeIndex < unwindCodeCount) {
+                        var unwindCodeOffset = 4 + unwindCodeIndex * 2,
+                            codeOffset = unwindInfo[unwindCodeOffset],
+                            operationAndInfo = unwindInfo[unwindCodeOffset + 1],
+                            unwindOperation = operationAndInfo & 0x0F,
+                            operationInfo = operationAndInfo >>> 4,
+                            occupiedSlots = 1;
+
+                        if (codeOffset > prologSize) return false;
+
+                        if (unwindOperation === 1) {
+                            if (operationInfo === 0) occupiedSlots = 2;
+                            else if (operationInfo === 1) occupiedSlots = 3;
+                            else return false;
+                        } else if (unwindOperation === 3) {
+                            if (operationInfo !== 0) return false;
+                        } else if (unwindOperation === 4 || unwindOperation === 8) {
+                            occupiedSlots = 2;
+                        } else if (unwindOperation === 5 || unwindOperation === 9) {
+                            occupiedSlots = 3;
+                        } else if (unwindOperation === 6 || unwindOperation === 7 || unwindOperation > 10 || (unwindOperation === 10 && operationInfo > 1)) {
+                            return false;
+                        }
+
+                        if (unwindCodeIndex + occupiedSlots > unwindCodeCount) return false;
+
+                        unwindCodeIndex += occupiedSlots;
+                    }
+
+                    return true;
+                }
+
                 // Snapshot and index the section table once; exception directories may
                 // contain hundreds of thousands of fixed-size records.
                 for (var d = 0; d < PE_Cached.numberOfSections; d++) {
