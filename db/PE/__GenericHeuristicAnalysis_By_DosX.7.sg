@@ -2401,6 +2401,7 @@ const
     IMAGE_DIRECTORY_ENTRY_GLOBALPTR = 8,
     IMAGE_DIRECTORY_ENTRY_TLS = 9,
     IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG = 10,
+    IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT = 13,
     IMAGE_DIRECTORY_ENTRY_RESERVED = 15;
 
 const
@@ -4408,6 +4409,74 @@ function scanForBadFileFormat_NET_and_Native() {
     dataDirectoryNames = undefined;
 
     if (isUnmappedDataDirectoryPresent) addCorruptedDataOption(corruptedDataLevel.degraded, "Unmapped data directory (" + unmappedDataDirectoryName + ")");
+
+
+
+
+    // Delay descriptors may store RVAs or legacy VAs. Validate explicit pointers
+    // using the declared mode; an unmapped name/table cannot be consumed by delayimp.
+
+    var isInvalidDelayImportDescriptorPresent = false;
+
+    if (declaredDataDirectoryCount > IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT &&
+        dataDirectoryTableOffset + (IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT + 1) * 8 <= dataDirectoryOptionalHeaderEnd) {
+        var delayImportDirectoryEntryOffset = dataDirectoryTableOffset + IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT * 8,
+            delayImportDirectoryRva = PE.read_uint32(delayImportDirectoryEntryOffset),
+            delayImportDirectorySize = PE.read_uint32(delayImportDirectoryEntryOffset + 4);
+
+        if (delayImportDirectoryRva !== 0 && delayImportDirectorySize !== 0) {
+            var delayImportDirectoryAddress = PE_Cached.imageBase + delayImportDirectoryRva,
+                delayImportDirectoryOffset = PE.VAToOffset(delayImportDirectoryAddress);
+
+            if (delayImportDirectorySize < 0x20 || delayImportDirectoryOffset < 0 ||
+                delayImportDirectoryOffset + delayImportDirectorySize > PE_Cached.fileSize ||
+                PE.VAToOffset(delayImportDirectoryAddress + delayImportDirectorySize - 1) !==
+                delayImportDirectoryOffset + delayImportDirectorySize - 1) {
+                isInvalidDelayImportDescriptorPresent = true;
+            } else {
+                var delayImportDescriptorCount = Math.min(Math.floor(delayImportDirectorySize / 0x20), 128);
+
+                for (var i = 0; i < delayImportDescriptorCount && !isInvalidDelayImportDescriptorPresent; i++) {
+                    var delayImportDescriptorOffset = delayImportDirectoryOffset + i * 0x20,
+                        delayImportDescriptorFields = [],
+                        isEmptyDelayImportDescriptor = true;
+
+                    for (var d = 0; d < 8; d++) {
+                        var delayImportDescriptorField = PE.read_uint32(delayImportDescriptorOffset + d * 4);
+
+                        delayImportDescriptorFields.push(delayImportDescriptorField);
+                        if (delayImportDescriptorField !== 0) isEmptyDelayImportDescriptor = false;
+                    }
+
+                    if (isEmptyDelayImportDescriptor) break;
+
+                    var isDelayImportRvaBased = (delayImportDescriptorFields[0] & 1) !== 0;
+
+                    // Name, IAT, INT and optional bound/unload tables require file bytes.
+                    // The module-handle slot may be virtual-only writable storage.
+                    for (var d = 1; d <= 6 && !isInvalidDelayImportDescriptorPresent; d++) {
+                        var delayImportPointer = delayImportDescriptorFields[d];
+
+                        if (delayImportPointer === 0) continue;
+
+                        var delayImportPointerAddress = delayImportPointer + (isDelayImportRvaBased ? PE_Cached.imageBase : 0);
+
+                        if (d === 2) {
+                            isInvalidDelayImportDescriptorPresent = !isVirtualAddressRangeMapped(delayImportPointerAddress, 1, 0);
+                        } else {
+                            var delayImportPointerOffset = PE.VAToOffset(delayImportPointerAddress);
+
+                            isInvalidDelayImportDescriptorPresent = delayImportPointerOffset < 0 || delayImportPointerOffset >= PE_Cached.fileSize;
+                        }
+                    }
+                }
+            }
+
+            if (isInvalidDelayImportDescriptorPresent) log(logType.any, "Delay-import directory is truncated or references unmapped data");
+        }
+    }
+
+    if (isInvalidDelayImportDescriptorPresent) addCorruptedDataOption(corruptedDataLevel.degraded, "Invalid delay imports");
 
 
 
