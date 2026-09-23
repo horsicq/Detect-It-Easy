@@ -4925,6 +4925,73 @@ function scanForBadFileFormat_NET_and_Native() {
 
                 isMalformedCertificateTablePresent = true;
             } else {
+                /**
+                 * Recognizes one complete DER OCTET STRING with a bounded alignment trailer.
+                 *
+                 * PE/COFF normally requires the Security directory to be consumed entirely
+                 * by quadword-aligned WIN_CERTIFICATE entries. Windows signature tooling also
+                 * accepts signed vendor images with an auxiliary DER object after at least one
+                 * valid entry. This compatibility form is accepted only when the DER identifier,
+                 * canonical definite length and alignment tail account for every remaining byte.
+                 * Besides zero padding, a four-byte vendor trailer is recognized only when it is
+                 * an exact absolute file-offset self-reference to the DER contents.
+                 *
+                 * @param {number} tailOffset - File offset of the candidate DER object.
+                 * @param {number} tailSize - Complete remaining Security-directory size.
+                 * @returns {boolean} <code>true</code> when one DER OCTET STRING consumes the tail.
+                 *
+                 * @see {@link https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#the-attribute-certificate-table-image-only} Microsoft PE/COFF attribute certificate table
+                 * @see {@link https://www.itu.int/rec/T-REC-X.690} ITU-T X.690 / ISO/IEC 8825-1 ASN.1 DER
+                 */
+                function isValidDerOctetStringCertificateTail(tailOffset, tailSize) {
+                    if (tailSize < 2 || PE.readByte(tailOffset) !== 0x04) return false;
+
+                    var firstLengthByte = PE.readByte(tailOffset + 1),
+                        lengthOctetCount = 0,
+                        contentLength = 0,
+                        headerSize = 2;
+
+                    if (firstLengthByte < 0x80) {
+                        contentLength = firstLengthByte;
+                    } else {
+                        lengthOctetCount = firstLengthByte & 0x7F;
+
+                        // DER forbids indefinite length and requires the shortest possible
+                        // definite form. Four length octets cover the complete PE32 range.
+                        if (lengthOctetCount === 0 || lengthOctetCount > 4 || headerSize + lengthOctetCount > tailSize || PE.readByte(tailOffset + headerSize) === 0) return false;
+
+                        for (var lengthIndex = 0; lengthIndex < lengthOctetCount; lengthIndex++) {
+                            contentLength = contentLength * 0x100 + PE.readByte(tailOffset + headerSize + lengthIndex);
+                        }
+
+                        if (contentLength < 0x80) return false;
+
+                        headerSize += lengthOctetCount;
+                    }
+
+                    var encodedSize = headerSize + contentLength,
+                        alignedEncodedSize = Math.ceil(encodedSize / 8) * 8;
+
+                    if (encodedSize < headerSize || alignedEncodedSize !== tailSize) return false;
+
+                    var paddingSize = tailSize - encodedSize,
+                        isZeroPadding = true;
+
+                    for (var paddingOffset = encodedSize; paddingOffset < tailSize; paddingOffset++) {
+                        if (PE.readByte(tailOffset + paddingOffset) !== 0) {
+                            isZeroPadding = false;
+                            break;
+                        }
+                    }
+
+                    if (isZeroPadding) return true;
+
+                    // A known Authenticode-compatible producer form terminates the aligned
+                    // object with a DWORD pointing back to its first contents octet. Requiring
+                    // the exact self-reference keeps arbitrary non-DER tails malformed.
+                    return paddingSize === 4 && PE.read_uint32(tailOffset + encodedSize) === tailOffset + headerSize;
+                }
+
                 var certificateRecordOffset = 0,
                     certificateRecordIndex = 0,
                     certificateTableDataOffset = 0,
