@@ -3615,26 +3615,13 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
-    // Check for 'MZ' signature in the overlay
-
-    var isPeAtOverlayDetected = false;
-
-    if (PE_Cached.isOverlayPresent &&
-        PE_Cached.overlaySize >= 100 &&
-        PE.compareOverlay("'MZ'")) {
-        log(logType.any, "PE signature at overlay detected");
-
-        isPeAtOverlayDetected = true;
-    }
-
-    if (isPeAtOverlayDetected) options = addOption(options, "PE at overlay");
-
-
-
-
     // Check for a strange overlay in the PE file
 
     var hasStrangeOverlay = false;
+
+    // A leading MZ belongs to the existing SFX/payload exclusion, not to a
+    // packer verdict by itself. The checks below verify complete PE headers.
+    var isPeAtOverlayDetected = PE_Cached.isOverlayPresent && PE_Cached.overlaySize >= 100 && PE.compareOverlay("'MZ'");
 
     // Cache the payload entropy so the dedicated rule below can reuse the measurement.
     var overlayEntropy = -1;
@@ -3663,21 +3650,48 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
-    // Checks if a PE file is embedded in the resources
+    // A complete nested PE is stronger evidence than a bare MZ prefix.
 
-    var isPeInResourcesPresent = false;
+    var isEmbeddedPeInResourcesPresent = false;
 
-    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && !isPeInResourcesPresent; i++) {
-        const resourceOffset = PE.getResourceOffsetByNumber(i);
+    var embeddedResourceSearchBudget = 0x800000;
 
-        if (resourceOffset !== -1 && PE.compare("'MZ'", resourceOffset)) {
-            log(logType.any, "PE signature in resources detected");
+    for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && embeddedResourceSearchBudget >= 0x80 && !isEmbeddedPeInResourcesPresent; i++) {
+        var embeddedResourceOffset = PE.getResourceOffsetByNumber(i),
+            embeddedResourceSize = PE.getResourceSizeByNumber(i),
+            embeddedResourceSearchSize = Math.min(embeddedResourceSize, embeddedResourceSearchBudget, 0x200000);
 
-            isPeInResourcesPresent = true;
+        if (embeddedResourceOffset < 0 || embeddedResourceSize < 0x80) continue;
+
+        if (findEmbeddedPeInRange(embeddedResourceOffset, embeddedResourceSize, embeddedResourceSearchSize) !== -1) {
+            log(logType.any, "Verified PE image in resources");
+
+            isEmbeddedPeInResourcesPresent = true;
+        }
+
+        embeddedResourceSearchBudget -= embeddedResourceSearchSize;
+    }
+
+    if (isEmbeddedPeInResourcesPresent) options = addOption(options, "Embedded PE in resources");
+
+
+
+
+    // Exclude the trailing Authenticode table from the overlay payload.
+
+    var isEmbeddedPeInOverlayPresent = false;
+
+    if (PE_Cached.isOverlayPresent) {
+        var embeddedOverlaySize = PE_Cached.overlaySize - getWinAuthCertificateSize();
+
+        if (findEmbeddedPeInRange(PE_Cached.overlayOffset, embeddedOverlaySize, Math.min(embeddedOverlaySize, 0x400000)) !== -1) {
+            log(logType.any, "Verified PE image in overlay");
+
+            isEmbeddedPeInOverlayPresent = true;
         }
     }
 
-    if (isPeInResourcesPresent) options = addOption(options, "PE in resources");
+    if (isEmbeddedPeInOverlayPresent) options = addOption(options, "Embedded PE in overlay");
 
 
 
