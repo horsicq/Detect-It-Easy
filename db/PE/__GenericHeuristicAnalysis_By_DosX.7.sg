@@ -4753,23 +4753,26 @@ function scanForBadFileFormat_NET_and_Native() {
                             indirectRuntimeFunctionOffset % 12 === 0;
                     }
 
-                    // Ordinary UNWIND_INFO is DWORD-aligned but may live in any mapped
-                    // section. Requiring executable or physically backed xdata here would
-                    // reject valid packed images and virtual-only metadata produced by linkers.
-                    if (!isRuntimeFunctionIndirect && runtimeFunctionUnwindRva % 4 === 0) {
+                    // The documented ABI requires DWORD alignment. A small number of current
+                    // Microsoft images use WORD-aligned records; those take the strict
+                    // structural compatibility path above instead of being accepted merely
+                    // because their first bytes fall inside a mapped section.
+                    if (!isRuntimeFunctionIndirect && runtimeFunctionUnwindRva % 2 === 0) {
                         var cachedRuntimeFunctionMappedRange = runtimeFunctionMappedRanges[cachedRuntimeFunctionMappedRangeIndex];
 
                         if (cachedRuntimeFunctionMappedRange &&
                             runtimeFunctionUnwindRva >= cachedRuntimeFunctionMappedRange.Rva &&
                             runtimeFunctionUnwindRva + 4 <= cachedRuntimeFunctionMappedRange.EndRva) {
-                            isRuntimeFunctionUnwindPointerValid = true;
+                            isRuntimeFunctionUnwindPointerValid = runtimeFunctionUnwindRva % 4 === 0 ||
+                                isValidWordAlignedUnwindInfo(runtimeFunctionUnwindRva);
                         } else {
                             var runtimeFunctionMappedRangeIndex = findRuntimeFunctionRangeIndex(runtimeFunctionMappedRanges,
                                 runtimeFunctionUnwindRva, runtimeFunctionUnwindRva + 4);
 
                             if (runtimeFunctionMappedRangeIndex !== -1) {
                                 cachedRuntimeFunctionMappedRangeIndex = runtimeFunctionMappedRangeIndex;
-                                isRuntimeFunctionUnwindPointerValid = true;
+                                isRuntimeFunctionUnwindPointerValid = runtimeFunctionUnwindRva % 4 === 0 ||
+                                    isValidWordAlignedUnwindInfo(runtimeFunctionUnwindRva);
                             }
                         }
                     }
