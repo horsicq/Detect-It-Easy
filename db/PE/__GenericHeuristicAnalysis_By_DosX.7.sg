@@ -2427,15 +2427,15 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         var isAssemblyInvokeFound = false;
 
-        if (!isFrameworkComponent() && PE_Cached.nameOfNetModuleName !== "System.dll" && isAllNetObjectsPresent( // TODO: update [!!!]
-            [
-                "System.Reflection", // System.Reflection.dll
-                "get_EntryPoint", // MSIL: '*.Assembly::get_EntryPoint()'
-                "Assembly", // MSIL: 'System.Reflection.Assembly' from System.Reflection.dll
-                "Invoke", // MSIL: '*.MethodBase::Invoke(object, object[])'
-                "Load" // MSIL: '*.Assembly::Load(uint8[])'
-            ]
-        )) {
+        // TODO: Verify method owners when the engine can do so safely; metadata-name co-occurrence does not prove a call.
+        // Check the selective names first to avoid broader engine searches on ordinary assemblies.
+        if (!isFrameworkComponent() && PE_Cached.nameOfNetModuleName !== "System.dll" && isAllNetObjectsPresent([
+            "get_EntryPoint",    // MSIL: '*.Assembly::get_EntryPoint()'
+            "Load",              // MSIL: '*.Assembly::Load(uint8[])'
+            "Invoke",            // MSIL: '*.MethodBase::Invoke(object, object[])'
+            "Assembly",          // MSIL: 'System.Reflection.Assembly' from System.Reflection.dll
+            "System.Reflection"  // System.Reflection.dll
+        ])) {
             log(logType.net, "Dynamic assembly invocation pattern detected");
 
             isAssemblyInvokeFound = true;
@@ -13758,14 +13758,10 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
     // https://malpedia.caad.fkie.fraunhofer.de/details/win.darkcomet
-    if (verdicts.length === 0 &&
-        // Todo fix
-        /* (PE.isImportPositionHashPresent(0, 0xcf603a7d) && PE.isImportPositionHashPresent(1, 0xe6aa7d45) && PE.isImportPositionHashPresent(2, 0xa26edfd0)) || */
-        // UPX packed
-        (PE.isImportPositionHashPresent(0, 0xf375ee03) && PE.isImportPositionHashPresent(1, 0x6043ad68) && PE.isImportPositionHashPresent(2, 0x49e8b6dd)) ||
-        // MPRESS packed
-        (PE.isImportPositionHashPresent(0, 0x174efb84) && PE.isImportPositionHashPresent(1, 0x4afe3a51) && PE.isImportPositionHashPresent(2, 0x3d9a43d0))
-    ) {
+    if (verdicts.length === 0 && (
+        (PE.isImportPositionHashPresent(0, 0xf375ee03) && PE.isImportPositionHashPresent(1, 0x6043ad68) && PE.isImportPositionHashPresent(2, 0x49e8b6dd)) ||  // UPX packed
+        (PE.isImportPositionHashPresent(0, 0x174efb84) && PE.isImportPositionHashPresent(1, 0x4afe3a51) && PE.isImportPositionHashPresent(2, 0x3d9a43d0))     // MPRESS packed
+    )) {
         verdicts.push({
             type: "DarkComet RAT",
             version: "5.3",
