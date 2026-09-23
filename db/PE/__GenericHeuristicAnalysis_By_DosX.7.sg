@@ -3661,18 +3661,22 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
-    // A complete nested PE is stronger evidence than a bare MZ prefix.
+    // Verified PE headers and section data are stronger evidence than a bare MZ prefix.
 
     var isEmbeddedPeInResourcesPresent = false;
 
     var embeddedResourceSearchBudget = 0x800000;
 
     for (var i = 0; i < PE_Cached.numberOfUnmanagedResources && embeddedResourceSearchBudget >= 0x80 && !isEmbeddedPeInResourcesPresent; i++) {
-        var embeddedResourceOffset = PE.getResourceOffsetByNumber(i),
-            embeddedResourceSize = PE.getResourceSizeByNumber(i),
+        var embeddedResource = PE.resource[i],
+            embeddedResourceSize = embeddedResource.FileSize;
+
+        if (embeddedResourceSize < 0x80) continue;
+
+        var embeddedResourceOffset = embeddedResource.FileOffset,
             embeddedResourceSearchSize = Math.min(embeddedResourceSize, embeddedResourceSearchBudget, 0x200000);
 
-        if (embeddedResourceOffset < 0 || embeddedResourceSize < 0x80) continue;
+        if (embeddedResourceOffset < 0) continue;
 
         if (findEmbeddedPeInRange(embeddedResourceOffset, embeddedResourceSize, embeddedResourceSearchSize) !== -1) {
             log(logType.any, "Verified PE image in resources");
@@ -14688,10 +14692,11 @@ function findEmbeddedPeInRange(rangeOffset, rangeSize, searchSize) {
             var numberOfSections = PE.readWord(ntHeaderOffset + 6),
                 optionalHeaderSize = PE.readWord(ntHeaderOffset + 20),
                 optionalHeaderOffset = ntHeaderOffset + 0x18,
-                sectionTableEnd = optionalHeaderOffset + optionalHeaderSize + numberOfSections * 0x28;
+                sectionTableEnd = optionalHeaderOffset + optionalHeaderSize + numberOfSections * 0x28,
+                isEmbeddedHeaderLayoutValid = numberOfSections > 0 && numberOfSections <= 96 && optionalHeaderSize >= 0x60 && sectionTableEnd <= rangeEnd,
+                optionalHeaderMagic = isEmbeddedHeaderLayoutValid ? PE.readWord(optionalHeaderOffset) : 0;
 
-            if (numberOfSections > 0 && numberOfSections <= 96 && optionalHeaderSize >= 0x60 && sectionTableEnd <= rangeEnd &&
-                (PE.readWord(optionalHeaderOffset) === 0x10B || PE.readWord(optionalHeaderOffset) === 0x20B)) {
+            if (isEmbeddedHeaderLayoutValid && (optionalHeaderMagic === 0x10B || optionalHeaderMagic === 0x20B)) {
                 var isEmbeddedSectionDataPresent = false,
                     isEmbeddedSectionLayoutValid = true;
 
