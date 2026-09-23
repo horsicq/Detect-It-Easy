@@ -8658,6 +8658,7 @@ function scanForObfuscations_Native() {
             epPopGeneralPurposeRegisterPattern = new RegExp("^POP (" + epGeneralPurposeRegister + ")$", "i"),
             epBitstreamGeneralPurposeRegister = "(?:[ABCD][HL]|BPL|SIL|DIL|R(?:8|9|1[0-5])B|" + epFlagsGeneralPurposeRegister + ")",
             epBitstreamAdcPattern = new RegExp("^ADC (" + epBitstreamGeneralPurposeRegister + "), \\1$", "i"),
+            epBitstreamScalarReadPattern = /^MOV ([ABCD][HL]), BYTE PTR \[([A-Z][A-Z0-9]*)\]$/i,
             epByteRegisterPattern = /^(?:[ABCD][HL]|SPL|BPL|SIL|DIL|R(?:8|9|1[0-5])B)$/i,
             epWordRegisterPattern = /^(?:AX|BX|CX|DX|SP|BP|SI|DI|R(?:8|9|1[0-5])W)$/i,
             epDwordRegisterPattern = /^(?:E(?:AX|BX|CX|DX|SP|BP|SI|DI)|R(?:8|9|1[0-5])D)$/i,
@@ -8714,7 +8715,9 @@ function scanForObfuscations_Native() {
             epDirectCallTargets = {},
             epPopRegisterByAddress = {},
             epInvalidBranchCandidates = [],
-            epRedundantPrefixCandidates = [];
+            epRedundantPrefixCandidates = [],
+            epBitstreamBackwardEdges = [],
+            epBitstreamScalarReadCandidates = [];
 
         // A statically proven synthetic Ret is an unconditional branch in disguise. Continue
         // from its image target so the shared CFG sees the real decoder behind the EP facade.
@@ -8904,6 +8907,20 @@ function scanForObfuscations_Native() {
             if (epBitstreamAdcPattern.test(epPolymorphismInstruction)) epBitstreamAdcCount++;
 
             if (/^REP MOVSB(?: |$)/i.test(epPolymorphismInstruction)) epBitstreamMovsbCount++;
+
+            if (epPolymorphismOpCode === "MOV" && epPolymorphismInstruction.indexOf("BYTE PTR") !== -1 &&
+                epBitstreamScalarReadCandidates.length < 32) {
+                var epBitstreamScalarRead = epPolymorphismInstruction.match(epBitstreamScalarReadPattern);
+
+                if (epBitstreamScalarRead) {
+                    epBitstreamScalarReadCandidates.push({
+                        Address: epPolymorphismCurrentAddress,
+                        Length: epPolymorphismInstructionLength,
+                        ValueRegister: epBitstreamScalarRead[1],
+                        SourceRegister: epBitstreamScalarRead[2]
+                    });
+                }
+            }
 
             var epShiftRotate = epPolymorphismInstruction.match(epShiftRotatePattern);
 
