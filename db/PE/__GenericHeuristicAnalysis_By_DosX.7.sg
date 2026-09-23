@@ -6545,6 +6545,97 @@ function isEpCopyDestinationProven(copyAddress, destinationRegister, sectionStar
 
 
 
+/**
+ * Proves that bitstream decoding, copying and the final transfer share one EP path.
+ *
+ * Walks only instructions already decoded by the bounded EP traversal. The state
+ * records the required copy and distinct ADC/REP MOVSB instructions. Reverse
+ * reachability excludes dead branches; loops may exit without inflating evidence.
+ * The state limit makes ambiguous large graphs fail closed.
+ *
+ * @param {number[]} startAddresses - Proven entry addresses, including a synthetic transfer target if present.
+ * @param {number} transferAddress - Address of the candidate final control transfer.
+ * @param {number} copyAddress - Required scalar byte-read address, or -1 for REP MOVSB copying.
+ * @param {Object} successors - Decoded CFG successors indexed by instruction address.
+ * @param {Object} facts - ADC and REP MOVSB facts indexed by instruction address.
+ * @returns {boolean} True if one reachable path contains the required chain.
+ */
+function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, successors, facts) {
+    var pending = [], nextIndex = 0, examined = 0, visited = {},
+        adcBits = {}, repBits = {}, adcBitCount = 0, repBitCount = 0,
+        // UPX-like scalar loops expose four distinct ADC sites on an exit path;
+        // additional decoder sites may lie on alternative paths in the same graph.
+        requiredAdc = copyAddress === -1 ? 8 : 4,
+        predecessors = {}, canReachTransfer = {};
+
+    for (var factAddress in facts) {
+        if (facts[factAddress].Adc) {
+            if (adcBitCount >= 30) return false;
+            adcBits[factAddress] = 1 << adcBitCount++;
+        }
+        if (copyAddress === -1 && facts[factAddress].RepMovsb) {
+            if (repBitCount >= 30) return false;
+            repBits[factAddress] = 1 << repBitCount++;
+        }
+    }
+
+    for (var source in successors) {
+        var next = successors[source];
+        for (var j = 0; j < next.length; j++) {
+            var target = next[j].toString();
+            if (!predecessors[target]) predecessors[target] = [];
+            predecessors[target].push(parseInt(source, 10));
+        }
+    }
+
+    var reverse = [transferAddress];
+    for (var reverseIndex = 0; reverseIndex < reverse.length; reverseIndex++) {
+        var reverseKey = reverse[reverseIndex].toString();
+        if (canReachTransfer[reverseKey]) continue;
+        canReachTransfer[reverseKey] = true;
+        var previous = predecessors[reverseKey] || [];
+        for (var p = 0; p < previous.length; p++) reverse.push(previous[p]);
+    }
+
+    for (var i = 0; i < startAddresses.length; i++) {
+        pending.push({ Address: startAddresses[i], AdcMask: 0, Adc: 0, RepMask: 0, Rep: 0, CopySeen: false });
+    }
+
+    while (nextIndex < pending.length && examined++ < 16384) {
+        var state = pending[nextIndex++], key = state.Address.toString();
+        if (!canReachTransfer[key] || !successors.hasOwnProperty(key)) continue;
+
+        var adcBit = adcBits[key] || 0, repBit = repBits[key] || 0,
+            newAdc = state.Adc < requiredAdc && adcBit && !(state.AdcMask & adcBit),
+            adc = state.Adc + (newAdc ? 1 : 0),
+            adcMask = adc >= requiredAdc ? 0 : state.AdcMask | adcBit,
+            repMask = state.RepMask | repBit,
+            rep = state.Rep + (repBit && !(state.RepMask & repBit) ? 1 : 0),
+            copySeen = state.CopySeen || state.Address === copyAddress,
+            stateKey = key + ":" + copySeen + ":" + adc + ":" + adcMask + ":" + repMask;
+        if (visited[stateKey]) continue;
+        visited[stateKey] = true;
+
+        if (state.Address === transferAddress) {
+            if (adc >= requiredAdc && (copyAddress === -1 ? rep >= 2 : copySeen)) return true;
+            continue;
+        }
+
+        next = successors[key];
+        for (var j = 0; j < next.length; j++) {
+            if (canReachTransfer[next[j].toString()]) {
+                pending.push({
+                    Address: next[j], AdcMask: adcMask, Adc: adc,
+                    RepMask: repMask, Rep: rep, CopySeen: copySeen
+                });
+            }
+        }
+    }
+
+    return false;
+}
+
+
 function scanForObfuscations_Native() {
     log(logType.nothing, "Scanning for obfuscation...");
 
@@ -8721,14 +8812,21 @@ function scanForObfuscations_Native() {
             epDirectCallTargets = {},
             epPopRegisterByAddress = {},
             epInvalidBranchCandidates = [],
+            epValidInvalidBranchCandidates = [],
             epRedundantPrefixCandidates = [],
             epBitstreamBackwardEdges = [],
-            epBitstreamScalarReadCandidates = [];
+            epBitstreamScalarReadCandidates = [],
+            epBitstreamIndirectTransferAddresses = [],
+            epBitstreamSuccessors = {},
+            epBitstreamFacts = {};
+
+        var epBitstreamStartAddresses = [PE_Cached.addressOfUnmanagedEntryPoint];
 
         // A statically proven synthetic Ret is an unconditional branch in disguise. Continue
         // from its image target so the shared CFG sees the real decoder behind the EP facade.
         if (isSyntheticEpTransferPresent && syntheticEpTargetAddress) {
             epPolymorphismPendingAddresses.push(parseInt(syntheticEpTargetAddress, 0));
+            epBitstreamStartAddresses.push(parseInt(syntheticEpTargetAddress, 0));
         }
 
         // Consume one reachable address at a time until the graph or global budget is exhausted.
@@ -8841,6 +8939,7 @@ function scanForObfuscations_Native() {
             if (!epPolymorphismOpCode || epPolymorphismInstructionLength <= 0) continue;
 
             epDecodedInstructionLengthByAddress[epPolymorphismAddressKey] = epPolymorphismInstructionLength;
+            epBitstreamSuccessors[epPolymorphismAddressKey] = [];
 
             if (!epStrangeOpCodeDetected && epStrangeOpCodes[epPolymorphismOpCode] &&
                 (Math.abs(epPolymorphismCurrentAddress - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x40 ||
@@ -8910,9 +9009,13 @@ function scanForObfuscations_Native() {
             }
 
             // Count the two independent primitives required by the bitstream-unpacker rule.
-            if (epBitstreamAdcPattern.test(epPolymorphismInstruction)) epBitstreamAdcCount++;
-
-            if (/^REP MOVSB(?: |$)/i.test(epPolymorphismInstruction)) epBitstreamMovsbCount++;
+            var epBitstreamIsAdc = epBitstreamAdcPattern.test(epPolymorphismInstruction),
+                epBitstreamIsRepMovsb = /^REP MOVSB(?: |$)/i.test(epPolymorphismInstruction);
+            if (epBitstreamIsAdc) epBitstreamAdcCount++;
+            if (epBitstreamIsRepMovsb) epBitstreamMovsbCount++;
+            if (epBitstreamIsAdc || epBitstreamIsRepMovsb) {
+                epBitstreamFacts[epPolymorphismAddressKey] = { Adc: epBitstreamIsAdc, RepMovsb: epBitstreamIsRepMovsb };
+            }
 
             if (epPolymorphismOpCode === "MOV" && epPolymorphismInstruction.indexOf("BYTE PTR") !== -1 &&
                 epBitstreamScalarReadCandidates.length < 32) {
@@ -9054,6 +9157,7 @@ function scanForObfuscations_Native() {
             if (!epPolymorphismDirectControlFlow &&
                 (epPolymorphismOpCode === "CALL" || epPolymorphismOpCode === "JMP" || epPolymorphismOpCode === "JMPF")) {
                 epBitstreamIndirectTransferPresent = true;
+                epBitstreamIndirectTransferAddresses.push(epPolymorphismCurrentAddress);
 
                 // An indirect transfer becomes resolver evidence only after export parsing
                 // and a credible name-hash loop have already been established.
@@ -9064,6 +9168,8 @@ function scanForObfuscations_Native() {
                     epHashedApiResolverIndirectTransferPresent = true;
                 }
             }
+
+            var epBitstreamQueueLength = epPolymorphismPendingAddresses.length;
 
             if (epPolymorphismDirectControlFlow) {
                 var epPolymorphismTargetAddress = parseInt(epPolymorphismDirectControlFlow[2], 0);
@@ -9153,6 +9259,8 @@ function scanForObfuscations_Native() {
             } else if (epScanStopOpCodes.indexOf(epPolymorphismOpCode) === -1) {
                 epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
             }
+
+            epBitstreamSuccessors[epPolymorphismAddressKey] = epPolymorphismPendingAddresses.slice(epBitstreamQueueLength);
         }
 
         // Resolve bad-target candidates after traversal so queue order cannot promote an
