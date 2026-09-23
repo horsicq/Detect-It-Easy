@@ -2809,7 +2809,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     // Check if the entry point is in the last section
 
-    var isLastSectionEP = false;
+    var isLastSectionEP = false,
+        isEpImportThunk = false;
 
     if (PE_Cached.isEntryPointAnalysisAllowed) {
         if (PE_Cached.numberOfSections > 1 && PE_Cached.isEntryPointCorrect) {
@@ -2828,11 +2829,27 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 log(logType.any, "EP VA 0x" + entryPointAddress.toString(16) + " is at or beyond last-section VA 0x" + lastSectionAddress.toString(16));
 
                 isLastSectionEP = true;
+
+                var epIndirectJump = PE_Cached.firstEpAsmInstruction.match(/^JMP (?:DWORD|QWORD) PTR \[(0X[0-9A-F]+|\d+)\]$/i);
+                if (PE_Cached.isArchX86 && epIndirectJump) {
+                    // A final-section jump through the declared IAT is an ordinary import thunk.
+                    var epOptionalHeaderOffset = getOptHeaderOffset(),
+                        epOptionalHeaderEnd = Math.min(epOptionalHeaderOffset + PE.readWord(epOptionalHeaderOffset - 4), PE_Cached.fileSize),
+                        epDirectoryCountOffset = epOptionalHeaderOffset + (PE_Cached.is64bit ? 0x6C : 0x5C),
+                        epIatDirectoryOffset = epOptionalHeaderOffset + (PE_Cached.is64bit ? 0x70 : 0x60) + 12 * 8;
+                    if (epDirectoryCountOffset + 4 <= epOptionalHeaderEnd && epIatDirectoryOffset + 8 <= epOptionalHeaderEnd && PE.read_uint32(epDirectoryCountOffset) > 12) {
+                        var epIatRva = PE.read_uint32(epIatDirectoryOffset),
+                            epIatSize = PE.read_uint32(epIatDirectoryOffset + 4),
+                            epThunkRva = parseInt(epIndirectJump[1], 0) - PE_Cached.imageBase,
+                            epPointerSize = PE_Cached.is64bit ? 8 : 4;
+                        isEpImportThunk = epIatRva !== 0 && epIatSize >= epPointerSize && epThunkRva >= epIatRva && epThunkRva + epPointerSize <= epIatRva + epIatSize;
+                    }
+                }
             }
         }
     }
 
-    if (isLastSectionEP) options = addOption(options, "Last section EP");
+    if (isLastSectionEP && !isEpImportThunk) options = addOption(options, "Last section EP");
 
 
 
@@ -2846,7 +2863,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
         firstOpCode = getAsmOpCode(PE_Cached.firstEpAsmInstruction);
 
         if (PE_Cached.isEntryPointAnalysisAllowed) {
-            if (isLastSectionEP && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
+            if (isLastSectionEP && !isEpImportThunk && !PE.compareEP("E8 00 00 00 00") && (firstOpCode === "CALL" || firstOpCode === "JMP")) {
                 isStrangeCallOrJmpPresent = true;
             }
         }
@@ -2863,8 +2880,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     } else if (PE_Cached.isARM64) {
         firstOpCode = getAsmOpCode(PE_Cached.firstEpAsmInstruction);
 
-        if (PE_Cached.isEntryPointAnalysisAllowed && isLastSectionEP &&
-            (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BR" || firstOpCode === "BLR")) {
+        if (PE_Cached.isEntryPointAnalysisAllowed && isLastSectionEP && (firstOpCode === "B" || firstOpCode === "BL" || firstOpCode === "BR" || firstOpCode === "BLR")) {
             isStrangeCallOrJmpPresent = true;
         }
     }
