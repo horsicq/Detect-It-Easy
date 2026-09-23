@@ -8288,7 +8288,19 @@ function scanForObfuscations_Native() {
         epBitstreamIndirectTransferPresent = false,
         epConflictingPrefixPresent = false;
 
-    var epInvalidBranchTargetOpCode = String();
+    var epInvalidBranchTargetOpCode = String(),
+        epStrangeOpCodeDetected = String();
+
+    // These instructions are valid CPU operations but remain unusual directly at startup.
+    // The shared CFG may also reach legitimate CRT feature dispatch, so deep occurrences are
+    // retained only inside writable executable code where ordinary compiler output cannot live.
+    const epStrangeOpCodes = {
+        "CPUID": true,
+        "RDTSC": true,
+        "RDTSCP": true,
+        "RDRAND": true,
+        "RDSEED": true
+    };
 
     var epExportResolverHeaderAccessPresent = false;
 
@@ -8510,6 +8522,12 @@ function scanForObfuscations_Native() {
             if (!epPolymorphismOpCode || epPolymorphismInstructionLength <= 0) continue;
 
             epDecodedInstructionLengthByAddress[epPolymorphismAddressKey] = epPolymorphismInstructionLength;
+
+            if (!epStrangeOpCodeDetected && epStrangeOpCodes[epPolymorphismOpCode] &&
+                (Math.abs(epPolymorphismCurrentAddress - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x40 ||
+                    (PE.section[epPolymorphismSectionIndex].Characteristics & SECTION_FLAGS_WRITE) !== 0)) {
+                epStrangeOpCodeDetected = epPolymorphismOpCode;
+            }
 
             // Count explicit stack traffic. Calls are kept separate because their implicit
             // return-address push has normal compiler semantics and must not inflate Push.
@@ -9407,42 +9425,13 @@ function scanForObfuscations_Native() {
 
     var isStrangeOpCodeNearEpPresent = false;
 
-    var strangeOpCodesNearEp = [
-        "CPUID",  // 0F A2
-        "RDTSC",  // 0F 31
-        "RDTSCP", // 0F 01 F9
-        "RDRAND", // 0F C7 /6
-        "RDSEED"  // 0F C7 /7
-    ], strangeOpCodeDetected = String();
+    if (epStrangeOpCodeDetected) {
+        log(logType.emulation, epStrangeOpCodeDetected + " in reachable code near EP");
 
-    // Report the exact observable opcode without inferring why the image executes it.
-    // CPU dispatch, timing, anti-analysis and protected startup remain distinguishable.
-    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
-        for (var x = 0; x < strangeOpCodesNearEp.length; x++) {
-            const opCodeToCheck = strangeOpCodesNearEp[x];
-
-            for (var i = 0; i < 15 && !isStrangeOpCodeNearEpPresent; i++) {
-                var asmInstruction = emulateAndGetAsmInstructionByIndex(i);
-
-                if (!asmInstruction) break; // Safety check
-
-                var currentEpOpCode = getAsmOpCode(asmInstruction);
-
-                // Check whether the instruction matches the requested opcode.
-                if (currentEpOpCode === opCodeToCheck) {
-                    log(logType.emulation, opCodeToCheck + " near EP found at instruction index: " + i);
-
-                    strangeOpCodeDetected = opCodeToCheck;
-
-                    isStrangeOpCodeNearEpPresent = true;
-                } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") {
-                    break;
-                }
-            }
-        }
+        isStrangeOpCodeNearEpPresent = true;
     }
 
-    if (isStrangeOpCodeNearEpPresent) options = addOption(options, strangeOpCodeDetected[0] + strangeOpCodeDetected.substring(1).toLowerCase() + " near EP");
+    if (isStrangeOpCodeNearEpPresent) options = addOption(options, epStrangeOpCodeDetected[0] + epStrangeOpCodeDetected.substring(1).toLowerCase() + " near EP");
 
 
 
