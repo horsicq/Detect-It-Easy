@@ -6454,6 +6454,8 @@ function isEpCopyDestinationProven(copyAddress, destinationRegister, sectionStar
         moveLiteralPattern = new RegExp("^MOV(?:ABS)? (" + registerPattern + "), (" + numberPattern + ")$", "i"),
         moveRegisterPattern = new RegExp("^MOV (" + registerPattern + "), (" + registerPattern + ")$", "i"),
         leaPattern = new RegExp("^LEA (" + registerPattern + "), \\[(" + registerPattern + ") ([+-]) (" + numberPattern + ")\\]$", "i"),
+        leaRipPattern = new RegExp("^LEA (" + registerPattern + "), \\[RIP ([+-]) (" + numberPattern + ")\\]$", "i"),
+        leaAbsolutePattern = new RegExp("^LEA (" + registerPattern + "), \\[(" + numberPattern + ")\\]$", "i"),
         arithmeticPattern = new RegExp("^(ADD|SUB) (" + registerPattern + "), (" + numberPattern + ")$", "i"),
         unaryPattern = new RegExp("^(INC|DEC) (" + registerPattern + ")$", "i"),
         registerWritePattern = new RegExp("^(?:MOV|MOVABS|LEA|ADD|SUB|ADC|SBB|XOR|OR|AND|INC|DEC|NEG|NOT|SHL|SHR|SAR|ROL|ROR|POP) (" + registerPattern + ")(?:,|$)", "i"),
@@ -6510,6 +6512,10 @@ function isEpCopyDestinationProven(copyAddress, destinationRegister, sectionStar
             var base = values[registerKey(match[2])],
                 displacement = parseInt(match[4], 0) * (match[3] === "-" ? -1 : 1);
             setRegister(values, match[1], base === undefined ? undefined : base + displacement);
+        } else if ((match = instruction.match(leaRipPattern))) {
+            setRegister(values, match[1], nextAddress + parseInt(match[3], 0) * (match[2] === "-" ? -1 : 1));
+        } else if ((match = instruction.match(leaAbsolutePattern))) {
+            setRegister(values, match[1], parseInt(match[2], 0));
         } else if ((match = instruction.match(arithmeticPattern))) {
             var oldValue = values[registerKey(match[2])],
                 immediate = parseInt(match[3], 0);
