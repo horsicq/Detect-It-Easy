@@ -6234,6 +6234,184 @@ const
 
 
 // #region "obfuscations (Native)"
+/**
+ * Proves a transfer into executable bytes rewritten by the reachable EP stub.
+ *
+ * Only a single statically resolved path is followed. Unknown branches, calls,
+ * memory reads and arithmetic stop the proof instead of supplying guessed values.
+ * The candidate write must change file-backed bytes in a writable code section.
+ *
+ * @returns {Object|undefined} Proven write and transfer virtual addresses.
+ */
+function traceEpWrittenCodeTransfer() {
+    if (!PE_Cached.isEntryPointAnalysisAllowed || !PE_Cached.isArchX86 || PE_Cached.isDriver) return undefined;
+
+    const registerPattern = "(?:E(?:AX|BX|CX|DX|SI|DI|BP|SP)|R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])D?)",
+        numericPattern = "(?:0X[0-9A-F]+|[0-9]+)",
+        writePattern = new RegExp("^MOV (BYTE|WORD|DWORD) PTR \\[(" + registerPattern + ")(?: ([+-]) (" + numericPattern + "))?\\], (" + numericPattern + ")$", "i"),
+        moveLiteralPattern = new RegExp("^MOV(?:ABS)? (" + registerPattern + "), (" + numericPattern + ")$", "i"),
+        moveRegisterPattern = new RegExp("^MOV (" + registerPattern + "), (" + registerPattern + ")$", "i"),
+        arithmeticPattern = new RegExp("^(ADD|SUB|XOR) (" + registerPattern + "), (" + numericPattern + ")$", "i"),
+        comparePattern = new RegExp("^CMP (" + registerPattern + "), (" + numericPattern + ")$", "i"),
+        testPattern = new RegExp("^TEST (" + registerPattern + "), \\1$", "i"),
+        directBranchPattern = new RegExp("^(?:JMP|JE|JNE|JZ|JNZ) (" + numericPattern + ")$", "i"),
+        indirectBranchPattern = new RegExp("^JMP (" + registerPattern + ")$", "i"),
+        stackPattern = new RegExp("^(PUSH|POP) (" + registerPattern + "|" + numericPattern + ")$", "i"),
+        maximumSafeAddress = 0x1FFFFFFFFFFFFF;
+
+    function registerKey(registerName) {
+        return registerName.toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+    }
+
+    function assignRegister(registers, registerName, value) {
+        var key = registerKey(registerName),
+            isDwordRegister = PE_Cached.isI386 || /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(registerName);
+
+        if (value === undefined || !isFinite(value) || value > maximumSafeAddress ||
+            (!isDwordRegister && value < 0)) {
+            delete registers[key];
+        } else {
+            registers[key] = isDwordRegister ? value >>> 0 : value;
+        }
+    }
+
+    var currentAddress = PE_Cached.addressOfUnmanagedEntryPoint,
+        registers = {},
+        stack = [],
+        visited = {},
+        zeroFlag,
+        writtenAddress = -1,
+        writtenSize = 0;
+
+    // A writable executable EP is a necessary condition for this narrow proof.
+    if (!isVirtualAddressRangeFileBacked(currentAddress, 1, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) return undefined;
+
+    for (var instructionIndex = 0; instructionIndex < 96; instructionIndex++) {
+        if (visited[currentAddress] || (writtenAddress !== -1 && currentAddress >= writtenAddress && currentAddress < writtenAddress + writtenSize) ||
+            !isVirtualAddressRangeFileBacked(currentAddress, 1, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) break;
+
+        visited[currentAddress] = true;
+
+        var instruction = PE.getDisasmString(currentAddress),
+            instructionLength = PE.getDisasmLength(currentAddress),
+            opCode = getAsmOpCode(instruction),
+            nextAddress = currentAddress + instructionLength,
+            match;
+
+        if (!opCode || instructionLength <= 0 ||
+            !isVirtualAddressRangeFileBacked(currentAddress, instructionLength, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) break;
+
+        match = instruction.match(writePattern);
+        if (match) {
+            var baseAddress = registers[registerKey(match[2])],
+                displacement = match[4] ? parseInt(match[4], 0) * (match[3] === "-" ? -1 : 1) : 0,
+                size = match[1].toUpperCase() === "BYTE" ? 1 : match[1].toUpperCase() === "WORD" ? 2 : 4,
+                writeAddress = baseAddress + displacement,
+                writeValue = parseInt(match[5], 0),
+                isChanged = false;
+
+            if (baseAddress === undefined || !isFinite(writeAddress) || writeAddress < nextAddress ||
+                !isFinite(writeValue) || writeValue < 0 || writeValue >= Math.pow(0x100, size) ||
+                !isVirtualAddressRangeFileBacked(writeAddress, size, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) break;
+
+            for (var byteIndex = 0; byteIndex < size; byteIndex++) {
+                if (PE.readByte(PE.VAToOffset(writeAddress) + byteIndex) !==
+                    (Math.floor(writeValue / Math.pow(0x100, byteIndex)) & 0xFF)) {
+                    isChanged = true;
+                    break;
+                }
+            }
+
+            if (!isChanged) break;
+
+            writtenAddress = writeAddress;
+            writtenSize = size;
+        } else if ((match = instruction.match(moveLiteralPattern))) {
+            assignRegister(registers, match[1], parseInt(match[2], 0));
+            if (registerKey(match[1]) === "RSP") stack = [];
+        } else if ((match = instruction.match(moveRegisterPattern))) {
+            assignRegister(registers, match[1], registers[registerKey(match[2])]);
+            if (registerKey(match[1]) === "RSP") stack = [];
+        } else if ((match = instruction.match(arithmeticPattern))) {
+            var oldValue = registers[registerKey(match[2])],
+                immediate = parseInt(match[3], 0),
+                newValue;
+
+            // x64 arithmetic encodes an imm32 sign-extended to 64 bits. Refuse
+            // ambiguous large immediates rather than choosing a wrong branch.
+            if (PE_Cached.is64bit && /^R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])$/i.test(match[2]) &&
+                immediate > 0x7FFFFFFF) break;
+
+            if (oldValue !== undefined) {
+                if (match[1] === "ADD") newValue = oldValue + immediate;
+                else if (match[1] === "SUB") newValue = oldValue - immediate;
+                else if (!PE_Cached.is64bit || /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(match[2])) {
+                    newValue = (oldValue ^ immediate) >>> 0;
+                }
+            }
+
+            assignRegister(registers, match[2], newValue);
+            if (registerKey(match[2]) === "RSP") stack = [];
+            zeroFlag = registers[registerKey(match[2])] === undefined ? undefined :
+                registers[registerKey(match[2])] === 0;
+        } else if ((match = instruction.match(comparePattern))) {
+            var comparedValue = registers[registerKey(match[1])];
+
+            if (PE_Cached.is64bit && /^R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])$/i.test(match[1]) &&
+                parseInt(match[2], 0) > 0x7FFFFFFF) break;
+
+            zeroFlag = comparedValue === undefined ? undefined : comparedValue === parseInt(match[2], 0);
+        } else if ((match = instruction.match(testPattern))) {
+            var testedValue = registers[registerKey(match[1])];
+            zeroFlag = testedValue === undefined ? undefined : testedValue === 0;
+        } else if ((match = instruction.match(stackPattern))) {
+            if (match[1] === "PUSH") {
+                if (stack.length >= 32) break;
+                if (PE_Cached.is64bit && /^(?:0X[0-9A-F]+|[0-9]+)$/i.test(match[2]) &&
+                    parseInt(match[2], 0) > 0x7FFFFFFF) break;
+                stack.push(/^(?:0X[0-9A-F]+|[0-9]+)$/i.test(match[2]) ?
+                    parseInt(match[2], 0) : registers[registerKey(match[2])]);
+            } else {
+                if (!stack.length) break;
+                assignRegister(registers, match[2], stack.pop());
+                if (registerKey(match[2]) === "RSP") stack = [];
+            }
+        } else if ((match = instruction.match(indirectBranchPattern))) {
+            var indirectTarget = registers[registerKey(match[1])];
+
+            if (writtenAddress !== -1 && indirectTarget >= writtenAddress &&
+                indirectTarget < writtenAddress + writtenSize) {
+                return { WriteAddress: writtenAddress, TargetAddress: indirectTarget };
+            }
+
+            if (indirectTarget === undefined) break;
+            nextAddress = indirectTarget;
+        } else if ((match = instruction.match(directBranchPattern))) {
+            var branchTarget = parseInt(match[1], 0);
+
+            if (opCode === "JMP") {
+                if (writtenAddress !== -1 && branchTarget >= writtenAddress &&
+                    branchTarget < writtenAddress + writtenSize) {
+                    return { WriteAddress: writtenAddress, TargetAddress: branchTarget };
+                }
+
+                nextAddress = branchTarget;
+            } else {
+                if (zeroFlag === undefined) break;
+                if ((opCode === "JE" || opCode === "JZ") === zeroFlag) nextAddress = branchTarget;
+            }
+        } else if (opCode !== "NOP" && opCode !== "FNOP") {
+            break;
+        }
+
+        currentAddress = nextAddress;
+    }
+
+    return undefined;
+}
+
+
+
 function scanForObfuscations_Native() {
     log(logType.nothing, "Scanning for obfuscation...");
 
