@@ -5033,9 +5033,17 @@ function scanForBadFileFormat_NET_and_Native() {
                         isMalformedCertificateTablePresent = true;
                     } else if (certificateRecordOffset + certificateRecordLength > certificateTableSize ||
                         certificateNextRecordOffset > certificateTableSize) {
-                        log(logType.any, "Certificate entry #" + certificateRecordIndex + " exceeds the declared certificate table");
+                        // Some valid vendor signatures append one bounded DER object after
+                        // their WIN_CERTIFICATE chain. Never apply this compatibility rule to
+                        // an empty/invalid chain or to an object which leaves unexplained data.
+                        if (certificateRecordIndex > 0 &&
+                            isValidDerOctetStringCertificateTail(certificateTableOffset + certificateRecordOffset, certificateTableSize - certificateRecordOffset)) {
+                            certificateRecordOffset = certificateTableSize;
+                        } else {
+                            log(logType.any, "Certificate entry #" + certificateRecordIndex + " exceeds the declared certificate table");
 
-                        isMalformedCertificateTablePresent = true;
+                            isMalformedCertificateTablePresent = true;
+                        }
                     } else {
                         certificateRecordOffset = certificateNextRecordOffset;
                         certificateRecordIndex++;
