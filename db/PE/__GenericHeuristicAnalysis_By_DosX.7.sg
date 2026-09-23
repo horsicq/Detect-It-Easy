@@ -9666,16 +9666,115 @@ function scanForObfuscations_Native() {
 
 
 
-    // Check for carry-fed bitstream decoding combined with repeated byte-string copying.
-    // Neither operation is distinctive alone; the indirect transfer makes the dense pair
-    // specific to a dispatcher-style unpacking loop while retaining register polymorphism.
+    // Check for carry-fed bitstream decoding with either repeated string copies and an
+    // indirect transfer, or a scalar byte-copy loop followed by a jump into virtual code.
 
     var isBitstreamEpUnpackerPresent = false;
 
-    if (PE_Cached.isEntryPointAnalysisAllowed &&
-        epBitstreamAdcCount >= 8 && epBitstreamMovsbCount >= 2 && epBitstreamIndirectTransferPresent) {
-        // Require all three independent components before reporting the compound behavior.
-        log(logType.emulation, "Bitstream unpacker near EP: Adc: " + epBitstreamAdcCount + ", Rep Movsb: " + epBitstreamMovsbCount);
+    var isScalarBitstreamCopyPresent = false;
+
+    if (PE_Cached.isEntryPointAnalysisAllowed && epBitstreamAdcCount >= 8 && epPolymorphismBackwardControlFlowCount !== 0 &&
+        epBitstreamScalarReadCandidates && epBitstreamScalarReadCandidates.length && epInvalidBranchTargetOpCode === "JMP") {
+        var bitstreamTargetRva = epInvalidBranchTargetAddress - PE_Cached.imageBase,
+            isBitstreamVirtualCodeTargetPresent = false,
+            bitstreamVirtualSectionStart = -1,
+            bitstreamVirtualSectionEnd = -1;
+
+        for (var d = 0; d < PE_Cached.numberOfSections && !isBitstreamVirtualCodeTargetPresent; d++) {
+            var bitstreamSectionRva = PE.getSectionVirtualAddress(d),
+                bitstreamSectionRawSize = PE.getSectionFileSize(d);
+
+            isBitstreamVirtualCodeTargetPresent = bitstreamTargetRva >= bitstreamSectionRva + bitstreamSectionRawSize &&
+                bitstreamTargetRva < bitstreamSectionRva + PE.getSectionVirtualSize(d) &&
+                (PE.section[d].Characteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE);
+
+            if (isBitstreamVirtualCodeTargetPresent) {
+                bitstreamVirtualSectionStart = PE_Cached.imageBase + bitstreamSectionRva;
+                bitstreamVirtualSectionEnd = bitstreamVirtualSectionStart + PE.getSectionVirtualSize(d);
+            }
+        }
+
+        if (isBitstreamVirtualCodeTargetPresent) {
+            const
+                scalarWritePattern = /^MOV BYTE PTR \[([A-Z][A-Z0-9]*)\], ([ABCD][HL])$/i,
+                scalarIncrementPattern = /^INC ([A-Z][A-Z0-9]*)$/i,
+                scalarAdcPattern = /^ADC ([A-Z][A-Z0-9]*), \1$/i;
+
+            for (var i = 0; i < epBitstreamScalarReadCandidates.length && !isScalarBitstreamCopyPresent; i++) {
+                var scalarRead = epBitstreamScalarReadCandidates[i],
+                    scalarNextAddress = scalarRead.Address + scalarRead.Length,
+                    scalarIncrements = {},
+                    scalarDestination = String(),
+                    scalarSequenceValid = scalarRead.Length > 0;
+
+                for (var j = 0; j < 3 && scalarSequenceValid; j++) {
+                    if (!isVirtualAddressRangeFileBacked(scalarNextAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                        scalarSequenceValid = false;
+                        break;
+                    }
+
+                    var scalarInstruction = PE.getDisasmString(scalarNextAddress),
+                        scalarLength = PE.getDisasmLength(scalarNextAddress),
+                        scalarWrite = scalarInstruction.match(scalarWritePattern),
+                        scalarIncrement = scalarInstruction.match(scalarIncrementPattern);
+
+                    if (scalarLength <= 0 || !isVirtualAddressRangeFileBacked(scalarNextAddress, scalarLength, SECTION_FLAGS_EXECUTE)) {
+                        scalarSequenceValid = false;
+                        break;
+                    }
+
+                    if (scalarWrite && scalarWrite[2] === scalarRead.ValueRegister && !scalarDestination) {
+                        scalarDestination = scalarWrite[1];
+                    } else if (scalarIncrement) {
+                        scalarIncrements[scalarIncrement[1]] = (scalarIncrements[scalarIncrement[1]] || 0) + 1;
+                    } else {
+                        scalarSequenceValid = false;
+                    }
+
+                    scalarNextAddress += scalarLength;
+                }
+
+                var scalarValueParent = "E" + scalarRead.ValueRegister[0] + "X";
+
+                var isScalarCopyLoopPresent = false;
+
+                for (var edgeIndex = 0; edgeIndex < epBitstreamBackwardEdges.length && !isScalarCopyLoopPresent; edgeIndex++) {
+                    var edge = epBitstreamBackwardEdges[edgeIndex];
+
+                    if (edge.Target !== scalarRead.Address || edge.Source < scalarNextAddress || edge.Source > scalarNextAddress + 32) continue;
+
+                    var bitstreamLoopAddress = scalarNextAddress,
+                        isAdcInsideCopyLoopPresent = false;
+
+                    while (bitstreamLoopAddress < edge.Source) {
+                        if (!isVirtualAddressRangeFileBacked(bitstreamLoopAddress, 1, SECTION_FLAGS_EXECUTE)) break;
+
+                        var bitstreamLoopInstruction = PE.getDisasmString(bitstreamLoopAddress),
+                            bitstreamLoopLength = PE.getDisasmLength(bitstreamLoopAddress);
+
+                        if (bitstreamLoopLength <= 0 || !isVirtualAddressRangeFileBacked(bitstreamLoopAddress, bitstreamLoopLength, SECTION_FLAGS_EXECUTE)) break;
+                        if (scalarAdcPattern.test(bitstreamLoopInstruction)) isAdcInsideCopyLoopPresent = true;
+                        bitstreamLoopAddress += bitstreamLoopLength;
+                    }
+
+                    isScalarCopyLoopPresent = bitstreamLoopAddress === edge.Source && isAdcInsideCopyLoopPresent;
+                }
+
+                if (scalarSequenceValid && isScalarCopyLoopPresent && scalarDestination && scalarDestination !== scalarRead.SourceRegister &&
+                    scalarIncrements[scalarRead.SourceRegister] === 1 && scalarIncrements[scalarDestination] === 1 &&
+                    scalarRead.SourceRegister !== scalarValueParent && scalarDestination !== scalarValueParent &&
+                    scalarRead.SourceRegister !== "R" + scalarValueParent.substring(1) &&
+                    scalarDestination !== "R" + scalarValueParent.substring(1) &&
+                    isEpCopyDestinationProven(scalarRead.Address, scalarDestination, bitstreamVirtualSectionStart, bitstreamVirtualSectionEnd)) {
+                    isScalarBitstreamCopyPresent = true;
+                }
+            }
+        }
+    }
+
+    if (PE_Cached.isEntryPointAnalysisAllowed && ((epBitstreamAdcCount >= 8 && epBitstreamMovsbCount >= 2 && epBitstreamIndirectTransferPresent) || isScalarBitstreamCopyPresent)) {
+        // Require the independent decoder, copy and transfer components together.
+        log(logType.emulation, "Bitstream unpacker near EP: Adc: " + epBitstreamAdcCount + (isScalarBitstreamCopyPresent ? ", scalar byte copy and jump into virtual code" : ", Rep Movsb: " + epBitstreamMovsbCount));
 
         isBitstreamEpUnpackerPresent = true;
     }
