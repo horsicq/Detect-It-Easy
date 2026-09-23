@@ -9791,27 +9791,31 @@ function scanForObfuscations_Native() {
     var isScalarBitstreamCopyPresent = false;
 
     if (PE_Cached.isEntryPointAnalysisAllowed && epBitstreamAdcCount >= 8 && epPolymorphismBackwardControlFlowCount !== 0 &&
-        epBitstreamScalarReadCandidates && epBitstreamScalarReadCandidates.length && epInvalidBranchTargetOpCode === "JMP") {
-        var bitstreamTargetRva = epInvalidBranchTargetAddress - PE_Cached.imageBase,
-            isBitstreamVirtualCodeTargetPresent = false,
-            bitstreamVirtualSectionStart = -1,
-            bitstreamVirtualSectionEnd = -1;
+        epBitstreamScalarReadCandidates && epBitstreamScalarReadCandidates.length && epValidInvalidBranchCandidates.length) {
+        var bitstreamVirtualTargets = [];
 
-        for (var d = 0; d < PE_Cached.numberOfSections && !isBitstreamVirtualCodeTargetPresent; d++) {
-            var bitstreamSectionRva = PE.getSectionVirtualAddress(d),
-                bitstreamSectionRawSize = PE.getSectionFileSize(d);
+        for (var candidateIndex = 0; candidateIndex < epValidInvalidBranchCandidates.length; candidateIndex++) {
+            var candidate = epValidInvalidBranchCandidates[candidateIndex];
+            if (candidate.OpCode !== "JMP") continue;
 
-            isBitstreamVirtualCodeTargetPresent = bitstreamTargetRva >= bitstreamSectionRva + bitstreamSectionRawSize &&
-                bitstreamTargetRva < bitstreamSectionRva + PE.getSectionVirtualSize(d) &&
-                (PE.section[d].Characteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE);
-
-            if (isBitstreamVirtualCodeTargetPresent) {
-                bitstreamVirtualSectionStart = PE_Cached.imageBase + bitstreamSectionRva;
-                bitstreamVirtualSectionEnd = bitstreamVirtualSectionStart + PE.getSectionVirtualSize(d);
+            var bitstreamTargetRva = candidate.TargetAddress - PE_Cached.imageBase;
+            for (var d = 0; d < PE_Cached.numberOfSections; d++) {
+                var bitstreamSectionRva = PE.getSectionVirtualAddress(d),
+                    bitstreamSectionRawSize = PE.getSectionFileSize(d);
+                if (bitstreamTargetRva >= bitstreamSectionRva + bitstreamSectionRawSize &&
+                    bitstreamTargetRva < bitstreamSectionRva + PE.getSectionVirtualSize(d) &&
+                    (PE.section[d].Characteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) {
+                    bitstreamVirtualTargets.push({
+                        SourceAddress: candidate.SourceAddress,
+                        Start: PE_Cached.imageBase + bitstreamSectionRva,
+                        End: PE_Cached.imageBase + bitstreamSectionRva + PE.getSectionVirtualSize(d)
+                    });
+                    break;
+                }
             }
         }
 
-        if (isBitstreamVirtualCodeTargetPresent) {
+        if (bitstreamVirtualTargets.length) {
             const
                 scalarWritePattern = /^MOV BYTE PTR \[([A-Z][A-Z0-9]*)\], ([ABCD][HL])$/i,
                 scalarIncrementPattern = /^INC ([A-Z][A-Z0-9]*)$/i,
@@ -9881,15 +9885,28 @@ function scanForObfuscations_Native() {
                     scalarIncrements[scalarRead.SourceRegister] === 1 && scalarIncrements[scalarDestination] === 1 &&
                     scalarRead.SourceRegister !== scalarValueParent && scalarDestination !== scalarValueParent &&
                     scalarRead.SourceRegister !== "R" + scalarValueParent.substring(1) &&
-                    scalarDestination !== "R" + scalarValueParent.substring(1) &&
-                    isEpCopyDestinationProven(scalarRead.Address, scalarDestination, bitstreamVirtualSectionStart, bitstreamVirtualSectionEnd)) {
-                    isScalarBitstreamCopyPresent = true;
+                    scalarDestination !== "R" + scalarValueParent.substring(1)) {
+                    for (var targetIndex = 0; targetIndex < bitstreamVirtualTargets.length && !isScalarBitstreamCopyPresent; targetIndex++) {
+                        var target = bitstreamVirtualTargets[targetIndex];
+                        if (isEpBitstreamPathProven(epBitstreamStartAddresses, target.SourceAddress, scalarRead.Address, epBitstreamSuccessors, epBitstreamFacts) &&
+                            isEpCopyDestinationProven(scalarRead.Address, scalarDestination, target.Start, target.End)) {
+                            isScalarBitstreamCopyPresent = true;
+                        }
+                    }
                 }
             }
         }
     }
 
-    if (PE_Cached.isEntryPointAnalysisAllowed && ((epBitstreamAdcCount >= 8 && epBitstreamMovsbCount >= 2 && epBitstreamIndirectTransferPresent) || isScalarBitstreamCopyPresent)) {
+    var isRepBitstreamCopyPresent = false;
+    if (PE_Cached.isEntryPointAnalysisAllowed && epBitstreamAdcCount >= 8 && epBitstreamMovsbCount >= 2 && epBitstreamIndirectTransferPresent) {
+        for (var i = 0; i < epBitstreamIndirectTransferAddresses.length && !isRepBitstreamCopyPresent; i++) {
+            isRepBitstreamCopyPresent = isEpBitstreamPathProven(epBitstreamStartAddresses,
+                epBitstreamIndirectTransferAddresses[i], -1, epBitstreamSuccessors, epBitstreamFacts);
+        }
+    }
+
+    if (isRepBitstreamCopyPresent || isScalarBitstreamCopyPresent) {
         // Require the independent decoder, copy and transfer components together.
         log(logType.emulation, "Bitstream unpacker near EP: Adc: " + epBitstreamAdcCount + (isScalarBitstreamCopyPresent ? ", scalar byte copy and jump into virtual code" : ", Rep Movsb: " + epBitstreamMovsbCount));
 
