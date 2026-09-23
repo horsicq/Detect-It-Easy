@@ -6249,6 +6249,8 @@ function traceEpWrittenCodeTransfer() {
     const registerPattern = "(?:E(?:AX|BX|CX|DX|SI|DI|BP|SP)|R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])D?)",
         numericPattern = "(?:0X[0-9A-F]+|[0-9]+)",
         writePattern = new RegExp("^MOV (BYTE|WORD|DWORD) PTR \\[(" + registerPattern + ")(?: ([+-]) (" + numericPattern + "))?\\], (" + numericPattern + ")$", "i"),
+        leaRipPattern = new RegExp("^LEA (" + registerPattern + "), \\[RIP ([+-]) (" + numericPattern + ")\\]$", "i"),
+        leaAbsolutePattern = new RegExp("^LEA (" + registerPattern + "), \\[(" + numericPattern + ")\\]$", "i"),
         moveLiteralPattern = new RegExp("^MOV(?:ABS)? (" + registerPattern + "), (" + numericPattern + ")$", "i"),
         moveRegisterPattern = new RegExp("^MOV (" + registerPattern + "), (" + registerPattern + ")$", "i"),
         arithmeticPattern = new RegExp("^(ADD|SUB|XOR) (" + registerPattern + "), (" + numericPattern + ")$", "i"),
@@ -6326,6 +6328,13 @@ function traceEpWrittenCodeTransfer() {
 
             writtenAddress = writeAddress;
             writtenSize = size;
+        } else if (PE_Cached.is64bit && (match = instruction.match(leaRipPattern))) {
+            var leaDisplacement = parseInt(match[3], 0) * (match[2] === "-" ? -1 : 1);
+            assignRegister(registers, match[1], nextAddress + leaDisplacement);
+            if (registerKey(match[1]) === "RSP") stack = [];
+        } else if (PE_Cached.is64bit && (match = instruction.match(leaAbsolutePattern))) {
+            assignRegister(registers, match[1], parseInt(match[2], 0));
+            if (registerKey(match[1]) === "RSP") stack = [];
         } else if ((match = instruction.match(moveLiteralPattern))) {
             assignRegister(registers, match[1], parseInt(match[2], 0));
             if (registerKey(match[1]) === "RSP") stack = [];
