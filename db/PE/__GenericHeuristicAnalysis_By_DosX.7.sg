@@ -14669,20 +14669,28 @@ function findEmbeddedPeInRange(rangeOffset, rangeSize, searchSize) {
             var numberOfSections = PE.readWord(ntHeaderOffset + 6),
                 optionalHeaderSize = PE.readWord(ntHeaderOffset + 20),
                 optionalHeaderOffset = ntHeaderOffset + 0x18,
-                sectionTableEnd = optionalHeaderOffset + optionalHeaderSize + numberOfSections * 0x28,
-                isEmbeddedHeaderLayoutValid = numberOfSections > 0 && numberOfSections <= 96 && optionalHeaderSize >= 0x60 && sectionTableEnd <= rangeEnd,
-                optionalHeaderMagic = isEmbeddedHeaderLayoutValid ? PE.readWord(optionalHeaderOffset) : 0;
+                sectionTableEnd = optionalHeaderOffset + optionalHeaderSize + numberOfSections * 0x28;
+
+            var isEmbeddedHeaderLayoutValid = numberOfSections > 0 && numberOfSections <= 96 && optionalHeaderSize >= 0x60 && sectionTableEnd <= rangeEnd;
+            var optionalHeaderMagic = isEmbeddedHeaderLayoutValid ? PE.readWord(optionalHeaderOffset) : 0;
 
             if (isEmbeddedHeaderLayoutValid && (optionalHeaderMagic === 0x10B || optionalHeaderMagic === 0x20B)) {
+                var embeddedSizeOfImage = PE.read_uint32(optionalHeaderOffset + 0x38),
+                    embeddedSizeOfHeaders = PE.read_uint32(optionalHeaderOffset + 0x3C);
                 var isEmbeddedSectionDataPresent = false,
-                    isEmbeddedSectionLayoutValid = true;
+                    isEmbeddedSectionLayoutValid = embeddedSizeOfHeaders >= sectionTableEnd - candidateOffset &&
+                        embeddedSizeOfHeaders <= rangeEnd - candidateOffset && embeddedSizeOfImage >= embeddedSizeOfHeaders;
 
                 for (var s = 0; s < numberOfSections && isEmbeddedSectionLayoutValid; s++) {
                     var sectionHeaderOffset = optionalHeaderOffset + optionalHeaderSize + s * 0x28,
+                        sectionVirtualSize = PE.read_uint32(sectionHeaderOffset + 0x08),
+                        sectionVirtualAddress = PE.read_uint32(sectionHeaderOffset + 0x0C),
                         sectionRawSize = PE.read_uint32(sectionHeaderOffset + 0x10),
                         sectionRawOffset = PE.read_uint32(sectionHeaderOffset + 0x14);
 
-                    if (sectionRawSize === 0) continue;
+                    isEmbeddedSectionLayoutValid = sectionVirtualAddress + Math.max(sectionVirtualSize, sectionRawSize) <= embeddedSizeOfImage;
+
+                    if (sectionRawSize === 0 || !isEmbeddedSectionLayoutValid) continue;
 
                     isEmbeddedSectionLayoutValid = sectionRawOffset >= sectionTableEnd - candidateOffset && candidateOffset + sectionRawOffset + sectionRawSize <= rangeEnd;
 
