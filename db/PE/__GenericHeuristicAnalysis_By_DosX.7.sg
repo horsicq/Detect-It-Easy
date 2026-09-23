@@ -4462,6 +4462,13 @@ function scanForBadFileFormat_NET_and_Native() {
 
                     var isDelayImportRvaBased = (delayImportDescriptorFields[0] & 1) !== 0;
 
+                    // A nonempty descriptor needs a DLL name and both thunk tables.
+                    if (delayImportDescriptorFields[1] === 0 || delayImportDescriptorFields[3] === 0 || delayImportDescriptorFields[4] === 0) {
+                        isInvalidDelayImportDescriptorPresent = true;
+
+                        break;
+                    }
+
                     // Name, IAT, INT and optional bound/unload tables require file bytes.
                     // The module-handle slot may be virtual-only writable storage.
                     for (var d = 1; d <= 6 && !isInvalidDelayImportDescriptorPresent; d++) {
@@ -4474,15 +4481,20 @@ function scanForBadFileFormat_NET_and_Native() {
                         if (d === 2) {
                             isInvalidDelayImportDescriptorPresent = !isVirtualAddressRangeMapped(delayImportPointerAddress, 1, 0);
                         } else {
-                            var delayImportPointerOffset = PE.VAToOffset(delayImportPointerAddress);
+                            var delayImportPointerOffset = PE.VAToOffset(delayImportPointerAddress),
+                                delayImportPointerSize = d === 1 ? 1 : (PE_Cached.is64bit ? 8 : 4);
 
-                            isInvalidDelayImportDescriptorPresent = delayImportPointerOffset < 0 || delayImportPointerOffset >= PE_Cached.fileSize;
+                            isInvalidDelayImportDescriptorPresent = delayImportPointerOffset < 0 ||
+                                delayImportPointerOffset + delayImportPointerSize > PE_Cached.fileSize ||
+                                PE.VAToOffset(delayImportPointerAddress + delayImportPointerSize - 1) !== delayImportPointerOffset + delayImportPointerSize - 1;
+
+                            if (d === 1 && !isInvalidDelayImportDescriptorPresent && PE.readByte(delayImportPointerOffset) === 0) isInvalidDelayImportDescriptorPresent = true;
                         }
                     }
                 }
             }
 
-            if (isInvalidDelayImportDescriptorPresent) log(logType.any, "Delay-import directory is truncated or references unmapped data");
+            if (isInvalidDelayImportDescriptorPresent) log(logType.any, "Delay-import descriptor is incomplete, truncated, or references unmapped data");
         }
     }
 
