@@ -110,6 +110,7 @@ var lastOffsetDetected = "0x00";
 
 
 
+/** Entry point used by DIE; rejects unsupported environments before scanning. */
 function detect() {
     if (stubForWrongEnvironment()) return null; // 'PE' is undefined
     if (stubForLegacyEngines()) return null; // old DIE version
@@ -119,6 +120,7 @@ function detect() {
 
 
 
+/** Initializes shared PE data, runs the enabled heuristic passes, and releases the cache. */
 function main() {
     initializeCache();
 
@@ -178,6 +180,7 @@ function main() {
 
 
 
+/** @returns {boolean} Whether the DIE engine lacks APIs required by this heuristic. */
 function stubForLegacyEngines() {
     if (typeof PE.getNetAssemblyName !== "function" || typeof PE.section[0].Offset !== "number") {
         stdout(">>> Update DIE Engine to 4.0 and higher for using Heuristic-analyzer by DosX <<<");
@@ -190,6 +193,7 @@ function stubForLegacyEngines() {
 
 
 
+/** @returns {boolean} Whether the PE scripting environment is unavailable. */
 function stubForWrongEnvironment() {
     if (typeof PE === "undefined") {
         stdout(">>> Wrong environment! 'PE' is undefined. Check DIE-engine for correct installation <<<");
@@ -384,6 +388,7 @@ function unloadCache() {
 
 
 // #region "obfuscations (.NET)"
+/** Detects managed-code obfuscation indicators and reports their combined evidence. */
 function scanForObfuscations_NET() {
     log(logType.nothing, "Scanning for obfuscation...");
 
@@ -1270,9 +1275,7 @@ function scanForObfuscations_NET() {
         }
     }
 
-    if (isFakeSignaturesPresent) {
-        options = addOption(options, "Fake signatures");
-    } else {
+    if (!isFakeSignaturesPresent) {
         // "Watermark" is only possible in the absence of fake signatures
 
         if (signaturesCounter === 1) {
@@ -1294,6 +1297,7 @@ function scanForObfuscations_NET() {
         }
     }
 
+    if (isFakeSignaturesPresent) options = addOption(options, "Fake signatures");
     if (isWatermarkPresent) options = addOption(options, "Watermark");
 
 
@@ -1389,6 +1393,7 @@ function scanForObfuscations_NET() {
 
 
 // #region "anti-analysis (.NET)"
+/** Detects anti-analysis behavior in managed PE files. */
 function scanForAntiAnalysis_NET() {
     log(logType.nothing, "Scanning for anti-analysis tricks...");
 
@@ -1722,6 +1727,7 @@ function scanForAntiAnalysis_NET() {
 
 
 // #region "anti-analysis (Native)"
+/** Detects native anti-analysis behavior near the entry point and in PE metadata. */
 function scanForAntiAnalysis_Native() {
     log(logType.nothing, "Scanning for anti-analysis tricks...");
 
@@ -2404,6 +2410,7 @@ const
 
 
 // #region "packers and cryptors (.NET and Native)"
+/** Detects generic packing and encryption indicators in managed and native PE files. */
 function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native apps
     log(logType.nothing, "Scanning for packers and cryptors...");
 
@@ -2431,9 +2438,9 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
             log(logType.net, "Dynamic assembly invocation pattern detected");
 
             isAssemblyInvokeFound = true;
-
-            options = "Assembly invoke";
         }
+
+        if (isAssemblyInvokeFound) options = "Assembly invoke";
 
 
 
@@ -3810,6 +3817,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 // #region "licensing systems (.NET and Native)"
+/** Detects licensing-system markers in managed and native PE files. */
 function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
     log(logType.nothing, "Scanning for licensing systems...");
 
@@ -4081,6 +4089,7 @@ function scanForLicensingSystems_NET_and_Native() { // For .NET and Native apps
 
 
 // #region "corrupted data (.NET and Native)"
+/** Checks PE structure and metadata for corruption and assigns a corruption severity. */
 function scanForBadFileFormat_NET_and_Native() {
     log(logType.nothing, "Scanning for corrupted data...");
 
@@ -5450,6 +5459,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
 
 // #region "debug data (.NET and Native)"
+/** Reports embedded debug information and recognizable build-tool artifacts. */
 function scanForDebugData_NET_and_Native() { // For .NET and Native apps
     log(logType.nothing, "Scanning for debug data...");
 
@@ -6653,6 +6663,7 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
 }
 
 
+/** Detects native-code obfuscation using PE structure and reachable entry-point code. */
 function scanForObfuscations_Native() {
     log(logType.nothing, "Scanning for obfuscation...");
 
@@ -6726,9 +6737,9 @@ function scanForObfuscations_Native() {
 
     if (isStrangeSectionsPresent) {
         log(logType.any, "Unusual section names detected");
-
-        options = addOption(options, "Strange sections");
     }
+
+    if (isStrangeSectionsPresent) options = addOption(options, "Strange sections");
 
 
 
@@ -7096,9 +7107,9 @@ function scanForObfuscations_Native() {
 
     if (isStartsWithNop) {
         log(logType.emulation, "Instruction with no effect at EP: " + PE_Cached.firstEpAsmInstruction);
-
-        options = addOption(options, "Nop at EP");
     }
+
+    if (isStartsWithNop) options = addOption(options, "Nop at EP");
 
 
 
@@ -10151,7 +10162,6 @@ function scanForObfuscations_Native() {
 
 
 
-
     // Check for write-execute sections without read permission
 
     var isWxWithoutReadSectionPresent = false;
@@ -11769,6 +11779,7 @@ function isLinkerDetected() {
 
 
 // #region "languages and compilers (.NET and Native)"
+/** Infers source languages and compilers from PE metadata and binary markers. */
 function scanForLanguagesAndCompilers_NET_and_Native() {
     log(logType.nothing, "Scanning for programming language...");
 
@@ -12407,6 +12418,7 @@ function scanBufferForEncryptedPe(dataBuffer, bufferSize) {
 
 
 // #region "malicious code (.NET and Native)"
+/** Correlates suspicious PE indicators into cautious malicious-code verdicts. */
 function scanForMaliciousCode_NET_and_Native() {
     log(logType.nothing, "Scanning for malicious code...");
 
@@ -14598,6 +14610,7 @@ function scanForMaliciousCode_NET_and_Native() {
 
 
 // #region "interesting markers (.NET and Native)"
+/** Reports notable PE header settings and other informational markers. */
 function scanForInterestingMarkers_NET_and_Native() {
     log(logType.nothing, "Scanning for interesting markers...");
 
@@ -14663,6 +14676,7 @@ function scanForInterestingMarkers_NET_and_Native() {
 
 
 // #region "extensions (.NET and Native)"
+/** Checks the file-system extension against the detected executable format. */
 function scanNameForAnomalies_FileSystem_NET_and_Native() {
     log(logType.nothing, "Checking file system executable extension...");
 
