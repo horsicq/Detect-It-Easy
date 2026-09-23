@@ -2446,9 +2446,10 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
         // Check if any class from System.Security.Cryptography namespace is used (non-full name) - for cryptors
-        if (findAndMark("System.Security.Cryptography", false) !== String()) {
 
-            // Specify cryptography classes to look for
+        var cryptoClassSign = String();
+
+        if (isAssemblyInvokeFound && validateNetObject("System.Security.Cryptography")) {
             const cryptoClasses = [
                 "TripleDESCryptoServiceProvider",
                 "RSACryptoServiceProvider",
@@ -2469,56 +2470,49 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
                 "RNGCryptoServiceProvider"
             ];
 
-            // Iterate through cryptography classes
-            for (var i = 0; i < cryptoClasses.length; i++) {
-                if (!isCryptor) {
-                    var cryptoClassSign = cryptoClasses[i],
-                        result = findAndMark(
-                            cryptoClassSign, true
-                        );
+            for (var i = 0; i < cryptoClasses.length && !isCryptor; i++) {
+                var currentCryptoClassSign = cryptoClasses[i],
+                    cryptoClassResult = validateNetObject(currentCryptoClassSign);
 
-                    // Check if assembly invoke is found and the cryptography class is present
-                    if (isAssemblyInvokeFound && result.length) {
-                        log(logType.net, "Crypto class present: " + cryptoClassSign);
+                if (cryptoClassResult) {
+                    log(logType.net, "Crypto class present: " + currentCryptoClassSign);
 
-                        isCryptor = true;
-
-                        // Add the cryptography class to options
-                        options = addOption(options, cryptoClassSign);
-                    }
+                    cryptoClassSign = currentCryptoClassSign;
+                    isCryptor = true;
                 }
             }
         }
+
+        if (isCryptor) options = addOption(options, cryptoClassSign);
 
 
 
 
         // Check if any class from System.IO.Compression namespace is used (non-full name)
-        if (findAndMark("System.IO.Compression", false).length) {
 
-            // Specify compression classes to look for
+        var compressionClassSign = String();
+
+        if (isAssemblyInvokeFound && validateNetObject("System.IO.Compression")) {
             const compressionClasses = [
                 "DeflateStream",
                 "GZipStream"
             ];
 
-            // Iterate through compression classes
             for (var i = 0; i < compressionClasses.length; i++) {
-                var compressionClassSign = compressionClasses[i],
-                    result = findAndMark(compressionClassSign, true);
+                var currentCompressionClassSign = compressionClasses[i],
+                    compressionClassResult = validateNetObject(currentCompressionClassSign);
 
-                // Check if assembly invoke is found and the compression class is present
-                if (isAssemblyInvokeFound && result.length) {
-                    log(logType.net, "Compression class present: " + compressionClassSign);
+                if (compressionClassResult) {
+                    log(logType.net, "Compression class present: " + currentCompressionClassSign);
 
-                    // If it's a cryptor, add the compression class to options
-                    if (isCryptor) options = addOption(options, compressionClassSign);
+                    compressionClassSign = currentCompressionClassSign;
 
-                    // Break the loop if a match is found
                     break;
                 }
             }
         }
+
+        if (compressionClassSign && isCryptor) options = addOption(options, compressionClassSign);
 
 
 
@@ -5888,26 +5882,6 @@ function isAllNetObjectsPresent(objects) {
 
     // If all .NET objects are present, return true
     return true;
-}
-
-
-
-/**
- * Searches for a null-prefixed string signature in the first PE section.
- *
- * @param {string} sign - The signature to search for.
- * @param {boolean} isFullName - A flag indicating whether to append '00' to the signature.
- * @returns {string} - The found signature if present, otherwise an empty string.
- * @example
- * findAndMark("UPX0", true); // "UPX0" when the full null-terminated name exists
- */
-function findAndMark(sign, isFullName) {
-    if (PE.isSignatureInSectionPresent(0,
-        ("00'" + sign + "'") + // 00'string
-        (isFullName ? "00" : String()))) { // ... '00
-        return sign;
-    }
-    return String();
 }
 
 
