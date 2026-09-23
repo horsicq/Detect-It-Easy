@@ -3615,20 +3615,31 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
 
 
+    // Verified PE headers and section data in the non-certificate overlay are packer evidence.
+
+    var isEmbeddedPeInOverlayPresent = false;
+
+    if (PE_Cached.isOverlayPresent && findEmbeddedPeInRange(PE_Cached.overlayOffset, overlayPayloadSize, Math.min(overlayPayloadSize, 0x400000)) !== -1) {
+        log(logType.any, "Verified PE image in overlay");
+
+        isEmbeddedPeInOverlayPresent = true;
+    }
+
+    if (isEmbeddedPeInOverlayPresent) options = addOption(options, "Embedded PE in overlay");
+
+
+
+
     // Check for a strange overlay in the PE file
 
     var hasStrangeOverlay = false;
-
-    // A leading MZ belongs to the existing SFX/payload exclusion, not to a
-    // packer verdict by itself. The checks below verify complete PE headers.
-    var isPeAtOverlayDetected = PE_Cached.isOverlayPresent && PE_Cached.overlaySize >= 100 && PE.compareOverlay("'MZ'");
 
     // Cache the payload entropy so the dedicated rule below can reuse the measurement.
     var overlayEntropy = -1;
 
     // A payload larger than the mapped image is independently anomalous, so entropy is
     // calculated only for smaller overlays where it can actually change the verdict.
-    if (!isPeAtOverlayDetected && !isSfx &&
+    if (!isEmbeddedPeInOverlayPresent && !isSfx &&
         (overlayPayloadSize > 150 || overlayPayloadSize > PE_Cached.imageBodySize) && !PE.isSigned()) {
         if (overlayPayloadSize > PE_Cached.imageBodySize) {
             log(logType.any, "Overlay payload exceeds the executable image: " + overlayPayloadSize + " bytes");
@@ -3673,25 +3684,6 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     }
 
     if (isEmbeddedPeInResourcesPresent) options = addOption(options, "Embedded PE in resources");
-
-
-
-
-    // Exclude the trailing Authenticode table from the overlay payload.
-
-    var isEmbeddedPeInOverlayPresent = false;
-
-    if (PE_Cached.isOverlayPresent) {
-        var embeddedOverlaySize = PE_Cached.overlaySize - getWinAuthCertificateSize();
-
-        if (findEmbeddedPeInRange(PE_Cached.overlayOffset, embeddedOverlaySize, Math.min(embeddedOverlaySize, 0x400000)) !== -1) {
-            log(logType.any, "Verified PE image in overlay");
-
-            isEmbeddedPeInOverlayPresent = true;
-        }
-    }
-
-    if (isEmbeddedPeInOverlayPresent) options = addOption(options, "Embedded PE in overlay");
 
 
 
