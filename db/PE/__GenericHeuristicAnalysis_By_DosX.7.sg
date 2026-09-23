@@ -7549,11 +7549,10 @@ function scanForObfuscations_Native() {
         const opaqueEpAllOnesFlagsAlwaysTakenBranches = [
             "JA", "JNBE", "JAE", "JNB", "JNC", "JNE", "JNZ", "JL",
             "JNGE", "JLE", "JNG", "JNO", "JS", "JP", "JPE"
+        ], opaqueEpAllOnesFlagsNeverTakenBranches = [
+            "JB", "JNAE", "JC", "JBE", "JNA", "JE", "JZ", "JG",
+            "JNLE", "JGE", "JNL", "JO", "JNS", "JNP", "JPO"
         ],
-            opaqueEpAllOnesFlagsNeverTakenBranches = [
-                "JB", "JNAE", "JC", "JBE", "JNA", "JE", "JZ", "JG",
-                "JNLE", "JGE", "JNL", "JO", "JNS", "JNP", "JPO"
-            ],
             opaqueEpCarryClearAlwaysTakenBranches = ["JAE", "JNB", "JNC"],
             opaqueEpCarryClearNeverTakenBranches = ["JB", "JNAE", "JC"],
             opaqueEpCarrySetAlwaysTakenBranches = ["JB", "JNAE", "JC"],
@@ -7676,8 +7675,7 @@ function scanForObfuscations_Native() {
                 opaqueEpAlwaysTakenBranches = epZeroFlagsAlwaysTakenBranches;
                 opaqueEpNeverTakenBranches = epZeroFlagsNeverTakenBranches;
                 opaqueEpNeutralInstructionCount = 0;
-            } else if (conditionalBranch && opaqueEpOriginInstruction &&
-                PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 &&
+            } else if (conditionalBranch && opaqueEpOriginInstruction && PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 &&
                 (opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ||
                     opaqueEpNeverTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1)) {
                 var opaqueEpBranchType = opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ? "always taken" : "never taken",
@@ -7788,8 +7786,7 @@ function scanForObfuscations_Native() {
                 directJump = currentEpInstruction.match(epDirectJumpPattern),
                 simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
                 simplePolymorphicRegister = simplePolymorphicInstruction ? (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]) : String(),
-                isSimplePolymorphicInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
-                    currentEpOpCode === "PAUSE" ||
+                isSimplePolymorphicInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" || currentEpOpCode === "PAUSE" ||
                     (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
 
             // One pending Jcc is retained to recognize three equivalent shapes: a branch
@@ -7816,16 +7813,14 @@ function scanForObfuscations_Native() {
                     degenerateEpNeutralInstructionCount = 0;
                 }
             } else if (directJump) {
-                if (degenerateEpBranchOpCode && degenerateEpBranchTarget === parseInt(directJump[1], 0) &&
-                    PE.VAToOffset(degenerateEpBranchTarget) !== -1) {
+                if (degenerateEpBranchOpCode && degenerateEpBranchTarget === parseInt(directJump[1], 0) && PE.VAToOffset(degenerateEpBranchTarget) !== -1) {
                     log(logType.emulation, "Degenerate conditional branch near EP: " + currentEpInstruction);
 
                     isDegenerateEpConditionalBranchPresent = true;
                 }
 
                 break;
-            } else if (isSimplePolymorphicInstruction && degenerateEpBranchOpCode &&
-                degenerateEpNeutralInstructionCount < epNeutralInstructionLimit) {
+            } else if (isSimplePolymorphicInstruction && degenerateEpBranchOpCode && degenerateEpNeutralInstructionCount < epNeutralInstructionLimit) {
                 // Preserve the pending branch only across instructions that cannot change
                 // its target or introduce a meaningful side effect for this structural check.
                 degenerateEpNeutralInstructionCount++;
@@ -7862,9 +7857,7 @@ function scanForObfuscations_Native() {
 
             var pushedRegister = currentEpInstruction.match(epStackRoundTripPushPattern),
                 poppedRegister = currentEpInstruction.match(epStackRoundTripPopPattern),
-                isSimplePolymorphicInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
-                    currentEpOpCode === "PAUSE" ||
-                    epSimplePolymorphicInstructionPattern.test(currentEpInstruction);
+                isSimplePolymorphicInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" || currentEpOpCode === "PAUSE" || epSimplePolymorphicInstructionPattern.test(currentEpInstruction);
 
             if (pushedRegister) {
                 // Keep the exact operand spelling: PUSH AX/POP AX is balanced, while mixing
@@ -7913,12 +7906,9 @@ function scanForObfuscations_Native() {
             var reversibleBinaryInstruction = currentEpInstruction.match(epReversibleBinaryPattern),
                 reversibleUnaryInstruction = currentEpInstruction.match(epReversibleUnaryPattern),
                 simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
-                simplePolymorphicRegister = simplePolymorphicInstruction ?
-                    (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]) : String(),
-                isSafeReversiblePadding = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
-                    currentEpOpCode === "PAUSE" ||
-                    (simplePolymorphicInstruction &&
-                        !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
+                simplePolymorphicRegister = simplePolymorphicInstruction ? (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]) : String(),
+                isSafeReversiblePadding = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" || currentEpOpCode === "PAUSE" ||
+                    (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
 
             // A candidate is valid only when the second operation has the same width,
             // register and literal. Safely representable literals are parsed so equivalent
@@ -7930,13 +7920,11 @@ function scanForObfuscations_Native() {
                     currentReversibleLiteralValue = parseInt(reversibleBinaryInstruction[3], 0),
                     // Preserve the exact spelling above Number's safe range. This may skip
                     // an equivalent decimal/hex pair, but cannot merge two different imm64s.
-                    currentReversibleLiteral = currentReversibleLiteralValue <= epMaximumSafeInteger ?
-                        currentReversibleLiteralValue.toString() : reversibleBinaryInstruction[3].toUpperCase(),
+                    currentReversibleLiteral = currentReversibleLiteralValue <= epMaximumSafeInteger ? currentReversibleLiteralValue.toString() : reversibleBinaryInstruction[3].toUpperCase(),
                     // A PE32+ r32 write clears the upper half, so the full register state
                     // is not restored even when the low 32-bit operation is reversed.
                     isInverseBinaryPair = !(PE_Cached.is64bit && epRegister32BitPattern.test(currentReversibleRegister)) &&
-                        reversibleEpRegister === currentReversibleRegister &&
-                        reversibleEpLiteral === currentReversibleLiteral &&
+                        reversibleEpRegister === currentReversibleRegister && reversibleEpLiteral === currentReversibleLiteral &&
                         ((reversibleEpOpCode === "XOR" && currentReversibleOpCode === "XOR") ||
                             (reversibleEpOpCode === "ADD" && currentReversibleOpCode === "SUB") ||
                             (reversibleEpOpCode === "SUB" && currentReversibleOpCode === "ADD"));
@@ -8039,8 +8027,7 @@ function scanForObfuscations_Native() {
                 }
             } else if (conditionalBranch) {
                 var constantEpBranchOpCode = conditionalBranch[1].toUpperCase(),
-                    constantEpEqualBranch = epZeroFlagsAlwaysTakenBranches.indexOf(constantEpBranchOpCode) !== -1 ||
-                        epZeroFlagsNeverTakenBranches.indexOf(constantEpBranchOpCode) !== -1,
+                    constantEpEqualBranch = epZeroFlagsAlwaysTakenBranches.indexOf(constantEpBranchOpCode) !== -1 || epZeroFlagsNeverTakenBranches.indexOf(constantEpBranchOpCode) !== -1,
                     constantEpUnequalBranch = /^(?:JE|JZ|JNE|JNZ)$/.test(constantEpBranchOpCode) && isVirtualAddressRangeFileBacked(PE_Cached.addressOfUnmanagedEntryPoint, 1, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE);
 
                 if (constantEpComparisonOrigin && PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 && (constantEpComparisonEqual ? constantEpEqualBranch : constantEpUnequalBranch)) {
@@ -8136,8 +8123,7 @@ function scanForObfuscations_Native() {
             pebModuleWalkSegment = PE_Cached.isI386 ? "FS" : "GS",
             pebModuleWalkPebAddress = PE_Cached.isI386 ? "(?:0X0*30|48)" : "(?:0X0*60|96)",
             pebModuleWalkLdrOffset = PE_Cached.isI386 ? "(?:0X0*C|12)" : "(?:0X0*18|24)",
-            pebModuleWalkListOffset = PE_Cached.isI386 ? "(?:0X0*(?:C|14|1C)|12|20|28)" :
-                "(?:0X0*(?:10|20|30)|16|32|48)",
+            pebModuleWalkListOffset = PE_Cached.isI386 ? "(?:0X0*(?:C|14|1C)|12|20|28)" : "(?:0X0*(?:10|20|30)|16|32|48)",
             pebModuleWalkPebLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?" + pebModuleWalkSegment + ":\\[" + pebModuleWalkPebAddress + "\\]$", "i"),
             pebModuleWalkLdrLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?\\[(" + pebModuleWalkNativeRegister + ") ?\\+ ?" + pebModuleWalkLdrOffset + "\\]$", "i"),
             pebModuleWalkListLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?\\[(" + pebModuleWalkNativeRegister + ") ?\\+ ?" + pebModuleWalkListOffset + "\\]$", "i");
@@ -8162,8 +8148,7 @@ function scanForObfuscations_Native() {
                 registerCopy = currentEpInstruction.match(epRegisterCopyPattern),
                 simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
                 valuePreservingInstruction = currentEpInstruction.match(epValuePreservingInstructionPattern),
-                registerWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern) ||
-                    currentEpInstruction.match(epTrackedRegisterWritePattern),
+                registerWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern) || currentEpInstruction.match(epTrackedRegisterWritePattern),
                 conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern);
 
             if (pebPointerLoad) {
@@ -8254,9 +8239,7 @@ function scanForObfuscations_Native() {
                 currentEpOffset = PE.VAToOffset(fpuEpCurrentAddress),
                 // Match the two exact encodings of FNSTENV [ESP-0xC] without depending on
                 // textual x87 decoding, then advance over the complete instruction atomically.
-                storesRawFpuEnvironmentAtStack = currentEpOffset !== -1 &&
-                    (PE.compare("D9 74 24 F4", currentEpOffset) ||
-                        PE.compare("D9 B4 24 F4 FF FF FF", currentEpOffset)),
+                storesRawFpuEnvironmentAtStack = currentEpOffset !== -1 && (PE.compare("D9 74 24 F4", currentEpOffset) || PE.compare("D9 B4 24 F4 FF FF FF", currentEpOffset)),
                 isRawFpuNop = currentEpOffset !== -1 && PE.compare("D9 D0", currentEpOffset);
 
             if (!currentEpOpCode || currentEpInstructionLength <= 0) break; // Safety check
@@ -8657,12 +8640,10 @@ function scanForObfuscations_Native() {
 
             var isTrapFlagStatePreservingInstruction = ((trapFlagState === 1 || trapFlagState === 4) &&
                 (isRegisterOnlyInstruction || /^(?:CMP|TEST)$/.test(currentEpOpCode))) ||
-                (trapFlagState === 2 && ((isRegisterOnlyInstruction && registerWriteKey !== trapFlagRegister) ||
-                    valuePreservingInstruction)) ||
+                (trapFlagState === 2 && ((isRegisterOnlyInstruction && registerWriteKey !== trapFlagRegister) || valuePreservingInstruction)) ||
                 (trapFlagState === 3 && flagsNeutralRegisterWrite);
 
-            var isStatePreservingInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
-                currentEpOpCode === "PAUSE" || simplePolymorphicInstruction ||
+            var isStatePreservingInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" || currentEpOpCode === "PAUSE" || simplePolymorphicInstruction ||
                 isTrapFlagStatePreservingInstruction;
 
             var isTrapFlagTestedRegister = trapFlagState === 2 && testedFlagsRegister &&
@@ -9090,8 +9071,11 @@ function scanForObfuscations_Native() {
             // Count the two independent primitives required by the bitstream-unpacker rule.
             var epBitstreamIsAdc = epBitstreamAdcPattern.test(epPolymorphismInstruction),
                 epBitstreamIsRepMovsb = /^REP MOVSB(?: |$)/i.test(epPolymorphismInstruction);
+
             if (epBitstreamIsAdc) epBitstreamAdcCount++;
+
             if (epBitstreamIsRepMovsb) epBitstreamMovsbCount++;
+
             if (epBitstreamIsAdc || epBitstreamIsRepMovsb) {
                 epBitstreamFacts[epPolymorphismAddressKey] = { Adc: epBitstreamIsAdc, RepMovsb: epBitstreamIsRepMovsb };
             }
@@ -9240,10 +9224,8 @@ function scanForObfuscations_Native() {
 
                 // An indirect transfer becomes resolver evidence only after export parsing
                 // and a credible name-hash loop have already been established.
-                if (isPebModuleWalkPresent && epExportResolverHeaderAccessPresent &&
-                    epExportResolverDirectoryAccessPresent && epExportResolverFieldCount >= 2 &&
-                    epApiHashByteReadPresent && epApiHashMaximumTransformCount >= 2 &&
-                    epApiHashMaximumTransformKindCount >= 2) {
+                if (isPebModuleWalkPresent && epExportResolverHeaderAccessPresent && epExportResolverDirectoryAccessPresent && epExportResolverFieldCount >= 2 &&
+                    epApiHashByteReadPresent && epApiHashMaximumTransformCount >= 2 && epApiHashMaximumTransformKindCount >= 2) {
                     epHashedApiResolverIndirectTransferPresent = true;
                 }
             }
@@ -9282,8 +9264,7 @@ function scanForObfuscations_Native() {
                     // An internal invalid target is loader-visible proof at any reachable depth.
                     // A target beyond the image additionally requires a spatially near startup
                     // branch, filtering distant false instruction boundaries in ordinary code.
-                    if (!isEpPolymorphismTargetExecutable &&
-                        (isEpPolymorphismTargetWithinImage || isEpPolymorphismBranchNearEntryPoint)) {
+                    if (!isEpPolymorphismTargetExecutable && (isEpPolymorphismTargetWithinImage || isEpPolymorphismBranchNearEntryPoint)) {
                         epInvalidBranchCandidates.push({
                             SourceAddress: epPolymorphismCurrentAddress,
                             TargetAddress: epPolymorphismTargetAddress,
@@ -9483,8 +9464,7 @@ function scanForObfuscations_Native() {
 
                                         if (epSelfModifyingCallStubWrite[1] === "-") epSelfModifyingCallStubDisplacement = -epSelfModifyingCallStubDisplacement;
 
-                                        epSelfModifyingCallStubWriteAddress = epSelfModifyingCallStubCurrentAddress +
-                                            epSelfModifyingCallStubInstructionLength + epSelfModifyingCallStubDisplacement;
+                                        epSelfModifyingCallStubWriteAddress = epSelfModifyingCallStubCurrentAddress + epSelfModifyingCallStubInstructionLength + epSelfModifyingCallStubDisplacement;
                                     }
                                 }
 
@@ -9496,8 +9476,7 @@ function scanForObfuscations_Native() {
                             case 6:
                                 // The bundled disassembler may canonicalize F3 90 to Nop even
                                 // though the prefix deliberately serializes the code rewrite.
-                                epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubOpCode === "PAUSE" ||
-                                    PE.compare("F3 90", PE.VAToOffset(epSelfModifyingCallStubCurrentAddress));
+                                epSelfModifyingCallStubStageMatched = epSelfModifyingCallStubOpCode === "PAUSE" || PE.compare("F3 90", PE.VAToOffset(epSelfModifyingCallStubCurrentAddress));
                                 break;
                         }
 
@@ -9568,13 +9547,11 @@ function scanForObfuscations_Native() {
                                 }
                             }
 
-                            if (epRepeatedSelfModifyingCallStubReturnReadPresent &&
-                                epRepeatedSelfModifyingCallStubTransformPresent) {
+                            if (epRepeatedSelfModifyingCallStubReturnReadPresent && epRepeatedSelfModifyingCallStubTransformPresent) {
                                 // A write is eligible only after both earlier semantic stages exist.
                                 epRepeatedSelfModifyingCallStubWrite = epRepeatedSelfModifyingCallStubInstruction.match(epRepeatedSelfModifyingCallStubWritePattern);
 
-                                if (epRepeatedSelfModifyingCallStubWrite &&
-                                    epRepeatedSelfModifyingCallStubWrite[4].toUpperCase() !== epRepeatedSelfModifyingCallStubTransformRegister) {
+                                if (epRepeatedSelfModifyingCallStubWrite && epRepeatedSelfModifyingCallStubWrite[4].toUpperCase() !== epRepeatedSelfModifyingCallStubTransformRegister) {
                                     // Reject a write sourced from a value unrelated to the transform.
                                     break;
                                 }
@@ -9604,8 +9581,7 @@ function scanForObfuscations_Native() {
                                 // section and close enough to reconstruct the current stub.
                                 if (epRepeatedSelfModifyingCallStubWriteAddress >= epRepeatedSelfModifyingCallStubSectionAddress &&
                                     epRepeatedSelfModifyingCallStubWriteAddress < epRepeatedSelfModifyingCallStubSectionAddress + epSelfModifyingCallStubSectionRawSize &&
-                                    Math.abs(epRepeatedSelfModifyingCallStubWriteAddress - epDirectCallTargetAddress) <=
-                                    epRepeatedSelfModifyingCallStubMaximumWriteDistance) {
+                                    Math.abs(epRepeatedSelfModifyingCallStubWriteAddress - epDirectCallTargetAddress) <= epRepeatedSelfModifyingCallStubMaximumWriteDistance) {
                                     var epRepeatedSelfModifyingCallStubSectionKey = epSelfModifyingCallStubSectionIndex.toString();
 
                                     // Initialize and increment the section-local evidence count.
@@ -9682,8 +9658,7 @@ function scanForObfuscations_Native() {
                     var epIpRecoverySectionRva = PE.getSectionVirtualAddress(d),
                         epIpRecoverySectionRawSize = PE.getSectionFileSize(d);
 
-                    if (epIpRecoveryCurrentRva >= epIpRecoverySectionRva &&
-                        epIpRecoveryCurrentRva < epIpRecoverySectionRva + epIpRecoverySectionRawSize &&
+                    if (epIpRecoveryCurrentRva >= epIpRecoverySectionRva && epIpRecoveryCurrentRva < epIpRecoverySectionRva + epIpRecoverySectionRawSize &&
                         (PE.section[d].Characteristics & SECTION_FLAGS_EXECUTE)) {
                         epIpRecoverySectionIndex = d;
                     }
@@ -9762,10 +9737,8 @@ function scanForObfuscations_Native() {
 
     // A complete resolver remains abnormal in either process or DLL startup. Ordinary DLL
     // initialization may inspect loader state, but does not satisfy the full export/hash chain.
-    if (PE_Cached.isEntryPointAnalysisAllowed && isPebModuleWalkPresent &&
-        epExportResolverHeaderAccessPresent && epExportResolverDirectoryAccessPresent &&
-        epExportResolverFieldCount >= 2 && epApiHashByteReadPresent &&
-        epApiHashMaximumTransformCount >= 2 && epApiHashMaximumTransformKindCount >= 2 &&
+    if (PE_Cached.isEntryPointAnalysisAllowed && isPebModuleWalkPresent && epExportResolverHeaderAccessPresent && epExportResolverDirectoryAccessPresent &&
+        epExportResolverFieldCount >= 2 && epApiHashByteReadPresent && epApiHashMaximumTransformCount >= 2 && epApiHashMaximumTransformKindCount >= 2 &&
         epApiHashBackwardControlFlowPresent && epHashedApiResolverIndirectTransferPresent) {
         log(logType.emulation, "Manual API resolver hashes export names before an indirect transfer near EP");
 
@@ -9799,9 +9772,7 @@ function scanForObfuscations_Native() {
 
     var isRedundantEpPrefixPresent = false;
 
-    if (epConflictingPrefixPresent ||
-        epRedundantPrefixInstructionCount >= epRedundantPrefixRequiredInstructionCount ||
-        epMaximumRedundantPrefixCount >= epRedundantPrefixImmediateCount) {
+    if (epConflictingPrefixPresent || epRedundantPrefixInstructionCount >= epRedundantPrefixRequiredInstructionCount || epMaximumRedundantPrefixCount >= epRedundantPrefixImmediateCount) {
         log(logType.emulation, "Redundant prefixes near EP: instructions/max: " + epRedundantPrefixInstructionCount + "/" + epMaximumRedundantPrefixCount);
 
         isRedundantEpPrefixPresent = true;
@@ -9881,6 +9852,7 @@ function scanForObfuscations_Native() {
             for (var d = 0; d < PE_Cached.numberOfSections; d++) {
                 var bitstreamSectionRva = PE.getSectionVirtualAddress(d),
                     bitstreamSectionRawSize = PE.getSectionFileSize(d);
+
                 if (bitstreamTargetRva >= bitstreamSectionRva + bitstreamSectionRawSize &&
                     bitstreamTargetRva < bitstreamSectionRva + PE.getSectionVirtualSize(d) &&
                     (PE.section[d].Characteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) {
@@ -9889,6 +9861,7 @@ function scanForObfuscations_Native() {
                         Start: PE_Cached.imageBase + bitstreamSectionRva,
                         End: PE_Cached.imageBase + bitstreamSectionRva + PE.getSectionVirtualSize(d)
                     });
+
                     break;
                 }
             }
@@ -9953,7 +9926,9 @@ function scanForObfuscations_Native() {
                             bitstreamLoopLength = PE.getDisasmLength(bitstreamLoopAddress);
 
                         if (bitstreamLoopLength <= 0 || !isVirtualAddressRangeFileBacked(bitstreamLoopAddress, bitstreamLoopLength, SECTION_FLAGS_EXECUTE)) break;
+
                         if (scalarAdcPattern.test(bitstreamLoopInstruction)) isAdcInsideCopyLoopPresent = true;
+
                         bitstreamLoopAddress += bitstreamLoopLength;
                     }
 
@@ -10119,8 +10094,7 @@ function scanForObfuscations_Native() {
                     tlsEntryPointSectionFileSize = PE.getSectionFileSize(i),
                     tlsEntryPointSectionMappedSize = Math.max(tlsEntryPointSectionVirtualSize, tlsEntryPointSectionFileSize);
 
-                if (tlsEntryPointRva >= tlsEntryPointSectionRva &&
-                    tlsEntryPointRva < tlsEntryPointSectionRva + tlsEntryPointSectionMappedSize &&
+                if (tlsEntryPointRva >= tlsEntryPointSectionRva && tlsEntryPointRva < tlsEntryPointSectionRva + tlsEntryPointSectionMappedSize &&
                     (PE.section[i].Characteristics & SECTION_FLAGS_EXECUTE)) {
                     var tlsEntryPointOffsetInSection = tlsEntryPointRva - tlsEntryPointSectionRva;
 
@@ -10254,9 +10228,9 @@ function scanForObfuscations_Native() {
             sectionVirtualSize = PE.getSectionVirtualSize(i);
 
         // Check if the entry point is within this section
-        if (entryPointRva >= sectionVirtualAddress &&
-            entryPointRva < sectionVirtualAddress + sectionVirtualSize) {
+        if (entryPointRva >= sectionVirtualAddress && entryPointRva < sectionVirtualAddress + sectionVirtualSize) {
             entryPointSectionIndex = i;
+
             if (!(PE.section[i].Characteristics & SECTION_FLAGS_EXECUTE)) {
                 log(logType.any, "Entry point is located in a non-executable section");
 
@@ -10282,12 +10256,9 @@ function scanForObfuscations_Native() {
 
     var isEpInNonCodeSection = false;
 
-    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
-        (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
-        entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect &&
-        PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
-        (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) &&
-        !(PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_CODE)) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
+        entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect && PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
+        (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) && !(PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_CODE)) {
         log(logType.any, "Executable EP section is not marked as code");
 
         isEpInNonCodeSection = true;
@@ -10302,10 +10273,8 @@ function scanForObfuscations_Native() {
 
     var isDiscardableEpSectionPresent = false;
 
-    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
-        (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
-        entryPointSectionIndex !== -1 &&
-        (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_DISCARDABLE)) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
+        entryPointSectionIndex !== -1 && (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_DISCARDABLE)) {
         log(logType.any, "Entry point section is marked discardable");
 
         isDiscardableEpSectionPresent = true;
@@ -10354,12 +10323,9 @@ function scanForObfuscations_Native() {
 
     const declaredCodeSize = PE.getSizeOfCode();
 
-    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
-        (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
-        entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect &&
-        PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
-        (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) &&
-        declaredCodeSize === 0) {
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
+        entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect && PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
+        (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) && declaredCodeSize === 0) {
         log(logType.any, "Executable code is present while SizeOfCode is zero");
 
         isUnreportedCodePresent = true;
@@ -10379,8 +10345,7 @@ function scanForObfuscations_Native() {
         isUnderreportedStartupCodePresent = false;
 
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver &&
-        (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
-        declaredCodeSize !== 0) {
+        (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) && declaredCodeSize !== 0) {
         var physicalCodeSize = 0,
             physicalCodeSectionCount = 0;
 
