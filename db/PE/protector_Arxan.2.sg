@@ -57,22 +57,41 @@ function detect() {
     return result();
 }
 
+/**
+ * Skips a bounded chain of direct entry-point jumps and NOPs.
+ *
+ * @param {number} offset Initial file offset.
+ * @returns {number} Resolved file offset, or -1 for a cyclic, invalid, or overlong chain.
+ */
 function skipJumpsAndNops(offset) {
     var rva = PE.OffsetToRVA(offset);
-    while (true) {
-        const byte = PE.readByte(PE.RVAToOffset(rva));
-        if (byte === 0xE9) {
-            rva += PE.readSDword(PE.RVAToOffset(rva + 1)) + 5;
-        } else if (byte === 0xEB) {
-            rva += PE.readSByte(PE.RVAToOffset(rva + 1)) + 2;
+    var visitedRvas = {};
+    const limit = 256;
+    const fileSize = PE.getSize();
+
+    for (var i = 0; i < limit; i++) {
+        if (rva < 0 || !isFinite(rva) || visitedRvas[rva]) return -1;
+        visitedRvas[rva] = true;
+
+        const currentOffset = PE.RVAToOffset(rva);
+        if (currentOffset < 0 || currentOffset >= fileSize) return -1;
+
+        const byte = PE.readByte(currentOffset);
+        if (byte === 0xE9 || byte === 0xEB) {
+            const displacementSize = byte === 0xE9 ? 4 : 1;
+            const displacementOffset = PE.RVAToOffset(rva + 1);
+            if (displacementOffset !== currentOffset + 1 || displacementOffset + displacementSize > fileSize ||
+                PE.RVAToOffset(rva + displacementSize) !== currentOffset + displacementSize) return -1;
+
+            rva += byte === 0xE9 ? PE.readSDword(displacementOffset) + 5 : PE.readSByte(displacementOffset) + 2;
         } else if (byte === 0x90) {
             rva++;
         } else {
-            break;
+            return currentOffset;
         }
     }
 
-    return PE.RVAToOffset(rva);
+    return -1;
 }
 
 function getExportFunctionOffsetByIndex(index) {
