@@ -9390,13 +9390,14 @@ function scanForObfuscations_Native() {
             if (!epPolymorphismOpCode || epPolymorphismOpCode === "DB" || epPolymorphismInstructionLength < 1 || epPolymorphismInstructionLength > 15 ||
                 !isVirtualAddressRangeFileBacked(epPolymorphismCurrentAddress, epPolymorphismInstructionLength, SECTION_FLAGS_EXECUTE)) continue;
 
-            // Inspect the encoded instruction prefix groups at the already proven physical
-            // boundary. A compiler may need one prefix from each group, but repeated members
-            // are ignored or overridden by the CPU and therefore expose generated padding.
+            // Inspect prefix groups at a proven physical instruction boundary. The AMD64
+            // APM, volume 3, section 1.2.1 allows one legacy prefix per group; multiple
+            // members of one group have undefined results, not guaranteed redundancy.
             var epPolymorphismInstructionOffset = PE.VAToOffset(epPolymorphismCurrentAddress),
                 epPolymorphismSectionFileEnd = PE.getSectionFileOffset(epPolymorphismSectionIndex) + PE.getSectionFileSize(epPolymorphismSectionIndex),
                 epCurrentPrefixCount = 0,
                 epCurrentPrefixGroupOneCount = 0,
+                epCurrentPrefixGroupTwoCount = 0,
                 epCurrentPrefixGroupThreeCount = 0,
                 epCurrentPrefixGroupFourCount = 0,
                 epCurrentRexPrefixCount = 0,
@@ -9424,8 +9425,9 @@ function scanForObfuscations_Native() {
                     epCurrentPrefixByte === 0x64 || epCurrentPrefixByte === 0x65) {
                     var epCurrentGroupTwoPrefixKey = epCurrentPrefixByte.toString();
 
-                    // Different segment overrides may be printable inline data after a Call.
-                    // Repeating the same override remains unambiguous redundant encoding.
+                    // Different segment overrides are evidence only when several prefixes
+                    // flood one proven instruction; one override alone can be ordinary code.
+                    epCurrentPrefixGroupTwoCount++;
                     if (epCurrentGroupTwoPrefixesFound[epCurrentGroupTwoPrefixKey]) {
                         epCurrentRedundantPrefixPresent = true;
                     } else {
@@ -9447,9 +9449,13 @@ function scanForObfuscations_Native() {
                 epCurrentPrefixCount++;
             }
 
+            if (epCurrentPrefixGroupTwoCount > 1 && epCurrentPrefixCount >= 4) epCurrentRedundantPrefixPresent = true;
+
             // Save raw candidates until every decoded boundary is known. Linkers deliberately
             // encode long Nop instructions with repeated 66 prefixes for alignment.
-            if (epCurrentRedundantPrefixPresent && epPolymorphismOpCode !== "NOP" &&
+            if (epCurrentRedundantPrefixPresent && epPolymorphismOpCode !== "NOP" && epPolymorphismOpCode !== "FNOP" &&
+                epPolymorphismOpCode !== "PAUSE" &&
+                !/^XCHG (AX|EAX|RAX), \1$/i.test(epPolymorphismInstruction) &&
                 Math.abs(epPolymorphismCurrentAddress - PE_Cached.addressOfUnmanagedEntryPoint) <=
                 epRedundantPrefixSourceMaximumDistance) {
                 epRedundantPrefixCandidates.push({
@@ -10321,17 +10327,17 @@ function scanForObfuscations_Native() {
 
 
 
-    // Check for repeated or conflicting x86 instruction-prefix groups in reachable EP code
+    // Check for noncanonical x86 instruction-prefix groups in reachable EP code.
 
     var isRedundantEpPrefixPresent = false;
 
     if (epConflictingPrefixPresent || epRedundantPrefixInstructionCount >= epRedundantPrefixRequiredInstructionCount || epMaximumRedundantPrefixCount >= epRedundantPrefixImmediateCount) {
-        log(logType.emulation, "Redundant prefixes near EP: instructions/max: " + epRedundantPrefixInstructionCount + "/" + epMaximumRedundantPrefixCount);
+        log(logType.emulation, "Noncanonical prefixes near EP: instructions/max: " + epRedundantPrefixInstructionCount + "/" + epMaximumRedundantPrefixCount);
 
         isRedundantEpPrefixPresent = true;
     }
 
-    if (isRedundantEpPrefixPresent) options = addOption(options, "Redundant prefixes near EP");
+    if (isRedundantEpPrefixPresent) options = addOption(options, "Noncanonical prefixes near EP");
 
 
 
