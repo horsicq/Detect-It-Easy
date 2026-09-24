@@ -6381,14 +6381,28 @@ function traceEpWrittenCodeTransfer() {
         stack = [],
         visited = {},
         zeroFlag,
-        writtenAddress = -1,
-        writtenSize = 0;
+        writtenRanges = [],
+        writtenBytes = {};
+
+    function getWrittenRange(target) {
+        // A write matters only while at least one byte in its target range still differs
+        // from the original file after every later, possibly restoring, write.
+        for (var i = 0; i < writtenRanges.length; i++) {
+            var range = writtenRanges[i];
+            if (target >= range.Address && target < range.Address + range.Size) {
+                for (var byteIndex = 0; byteIndex < range.Size; byteIndex++) {
+                    if (writtenBytes.hasOwnProperty((range.Address + byteIndex).toString())) return range;
+                }
+            }
+        }
+        return undefined;
+    }
 
     // A writable executable EP is a necessary condition for this narrow proof.
     if (!isVirtualAddressRangeFileBacked(currentAddress, 1, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) return undefined;
 
     for (var instructionIndex = 0; instructionIndex < 96; instructionIndex++) {
-        if (visited[currentAddress] || (writtenAddress !== -1 && currentAddress >= writtenAddress && currentAddress < writtenAddress + writtenSize) ||
+        if (visited[currentAddress] || getWrittenRange(currentAddress) ||
             !isVirtualAddressRangeFileBacked(currentAddress, 1, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) break;
 
         visited[currentAddress] = true;
@@ -6408,25 +6422,22 @@ function traceEpWrittenCodeTransfer() {
                 displacement = match[4] ? parseInt(match[4], 0) * (match[3] === "-" ? -1 : 1) : 0,
                 size = match[1].toUpperCase() === "BYTE" ? 1 : match[1].toUpperCase() === "WORD" ? 2 : 4,
                 writeAddress = baseAddress + displacement,
-                writeValue = parseInt(match[5], 0),
-                isChanged = false;
+                writeValue = parseInt(match[5], 0);
 
             if (baseAddress === undefined || !isFinite(writeAddress) || writeAddress < nextAddress ||
                 !isFinite(writeValue) || writeValue < 0 || writeValue >= Math.pow(0x100, size) ||
                 !isVirtualAddressRangeFileBacked(writeAddress, size, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) break;
 
+            if (writtenRanges.length >= 4) break;
+            writtenRanges.push({ Address: writeAddress, Size: size });
+
             for (var byteIndex = 0; byteIndex < size; byteIndex++) {
-                if (PE.readByte(PE.VAToOffset(writeAddress) + byteIndex) !==
-                    (Math.floor(writeValue / Math.pow(0x100, byteIndex)) & 0xFF)) {
-                    isChanged = true;
-                    break;
-                }
+                var byteAddress = writeAddress + byteIndex,
+                    byteValue = Math.floor(writeValue / Math.pow(0x100, byteIndex)) & 0xFF;
+
+                if (PE.readByte(PE.VAToOffset(byteAddress)) === byteValue) delete writtenBytes[byteAddress.toString()];
+                else writtenBytes[byteAddress.toString()] = byteValue;
             }
-
-            if (!isChanged) break;
-
-            writtenAddress = writeAddress;
-            writtenSize = size;
         } else if (PE_Cached.is64bit && (match = instruction.match(leaRipPattern))) {
             var leaDisplacement = parseInt(match[3], 0) * (match[2] === "-" ? -1 : 1);
             assignRegister(registers, match[1], nextAddress + leaDisplacement);
@@ -6488,19 +6499,16 @@ function traceEpWrittenCodeTransfer() {
             if (!/^(?:RET|RETN)$/.test(instruction) || !stack.length) break;
 
             var returnTarget = stack.pop();
+            var returnRange = getWrittenRange(returnTarget);
 
-            if (writtenAddress !== -1 && returnTarget >= writtenAddress && returnTarget < writtenAddress + writtenSize) {
-                return { WriteAddress: writtenAddress, TargetAddress: returnTarget };
-            }
+            if (returnRange) return { WriteAddress: returnRange.Address, TargetAddress: returnTarget };
 
             break;
         } else if ((match = instruction.match(indirectBranchPattern))) {
             var indirectTarget = registers[registerKey(match[1])];
+            var indirectRange = getWrittenRange(indirectTarget);
 
-            if (writtenAddress !== -1 && indirectTarget >= writtenAddress &&
-                indirectTarget < writtenAddress + writtenSize) {
-                return { WriteAddress: writtenAddress, TargetAddress: indirectTarget };
-            }
+            if (indirectRange) return { WriteAddress: indirectRange.Address, TargetAddress: indirectTarget };
 
             if (indirectTarget === undefined) break;
             nextAddress = indirectTarget;
@@ -6508,10 +6516,8 @@ function traceEpWrittenCodeTransfer() {
             var branchTarget = parseInt(match[1], 0);
 
             if (opCode === "JMP") {
-                if (writtenAddress !== -1 && branchTarget >= writtenAddress &&
-                    branchTarget < writtenAddress + writtenSize) {
-                    return { WriteAddress: writtenAddress, TargetAddress: branchTarget };
-                }
+                var branchRange = getWrittenRange(branchTarget);
+                if (branchRange) return { WriteAddress: branchRange.Address, TargetAddress: branchTarget };
 
                 nextAddress = branchTarget;
             } else {
