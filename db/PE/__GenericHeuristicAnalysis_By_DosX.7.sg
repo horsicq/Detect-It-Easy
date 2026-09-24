@@ -6385,13 +6385,22 @@ function traceEpWrittenCodeTransfer() {
         writtenBytes = {};
 
     function getWrittenRange(target) {
-        // A write matters only when a byte at or after the transfer target still
-        // differs from the original file after every later, possibly restoring, write.
+        // A write matters only when a reachable instruction still differs from the file.
         for (var i = 0; i < writtenRanges.length; i++) {
             var range = writtenRanges[i];
             if (target >= range.Address && target < range.Address + range.Size) {
-                for (var byteIndex = target - range.Address; byteIndex < range.Size; byteIndex++) {
-                    if (writtenBytes.hasOwnProperty((range.Address + byteIndex).toString())) return range;
+                for (var address = target; address < range.Address + range.Size;) {
+                    var length = PE.getDisasmLength(address), opCode = getAsmOpCode(PE.getDisasmString(address));
+
+                    if (!opCode || length <= 0) break;
+
+                    for (var byteIndex = address; byteIndex < address + length && byteIndex < range.Address + range.Size; byteIndex++) {
+                        if (writtenBytes.hasOwnProperty(byteIndex.toString())) return range;
+                    }
+
+                    if (/^(?:J[A-Z]*|LOOP[A-Z]*|CALLF?|RETF?N?|INT[A-Z0-9]*|IRET[A-Z]*|HLT|UD2|SYSCALL|SYSENTER|SYSRET|SYSEXIT)$/.test(opCode)) break;
+
+                    address += length;
                 }
             }
         }
