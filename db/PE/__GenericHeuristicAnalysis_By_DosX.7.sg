@@ -6731,6 +6731,7 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
         numberPattern = "(?:-?0X[0-9A-F]+|-?[0-9]+)",
         literalPattern = new RegExp("^MOV(?:ABS)? (" + registerPattern + "), (" + numberPattern + ")$", "i"),
         copyPattern = new RegExp("^MOV (" + registerPattern + "), (" + registerPattern + ")$", "i"),
+        exchangePattern = new RegExp("^XCHG (" + registerPattern + "), (" + registerPattern + ")$", "i"),
         leaPattern = new RegExp("^LEA (" + registerPattern + "), \\[(" + registerPattern + ") ([+-]) (" + numberPattern + ")\\]$", "i"),
         ripPattern = new RegExp("^LEA (" + registerPattern + "), \\[RIP ([+-]) (" + numberPattern + ")\\]$", "i"),
         absolutePattern = new RegExp("^LEA (" + registerPattern + "), \\[((?:0X[0-9A-F]+|[0-9]+))\\]$", "i"),
@@ -6755,7 +6756,11 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
 
         if ((match = instruction.match(literalPattern))) setRegister(next, match[1], parseInt(match[2], 0));
         else if ((match = instruction.match(copyPattern))) setRegister(next, match[1], next[registerKey(match[2])]);
-        else if ((match = instruction.match(leaPattern))) {
+        else if ((match = instruction.match(exchangePattern))) {
+            var left = next[registerKey(match[1])], right = next[registerKey(match[2])];
+            setRegister(next, match[1], right);
+            setRegister(next, match[2], left);
+        } else if ((match = instruction.match(leaPattern))) {
             var base = next[registerKey(match[2])];
             setRegister(next, match[1], base === undefined ? undefined : base + parseInt(match[4], 0) * (match[3] === "-" ? -1 : 1));
         } else if ((match = instruction.match(ripPattern))) {
