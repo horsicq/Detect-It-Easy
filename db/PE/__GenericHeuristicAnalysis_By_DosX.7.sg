@@ -7842,7 +7842,22 @@ function scanForObfuscations_Native() {
                     degenerateEpNeutralInstructionCount = 0;
                 }
             } else if (directJump) {
-                if (degenerateEpBranchOpCode && degenerateEpBranchTarget === parseInt(directJump[1], 0) && PE.VAToOffset(degenerateEpBranchTarget) !== -1) {
+                var degenerateEpJumpTarget = parseInt(directJump[1], 0);
+
+                // A short JMP-only chain still makes both Jcc paths equivalent.
+                for (var jumpIndex = 0; jumpIndex < 2 && degenerateEpBranchOpCode && degenerateEpJumpTarget !== degenerateEpBranchTarget &&
+                    Math.abs(degenerateEpJumpTarget - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x200 &&
+                    isVirtualAddressRangeFileBacked(degenerateEpJumpTarget, 1, SECTION_FLAGS_EXECUTE); jumpIndex++) {
+                    var chainedJump = PE.getDisasmString(degenerateEpJumpTarget).match(epDirectJumpPattern),
+                        chainedJumpLength = PE.getDisasmLength(degenerateEpJumpTarget);
+
+                    if (!chainedJump || chainedJumpLength <= 0 || !isVirtualAddressRangeFileBacked(degenerateEpJumpTarget, chainedJumpLength, SECTION_FLAGS_EXECUTE)) break;
+
+                    degenerateEpJumpTarget = parseInt(chainedJump[1], 0);
+                }
+
+                if (degenerateEpBranchOpCode && degenerateEpBranchTarget === degenerateEpJumpTarget &&
+                    PE.VAToOffset(degenerateEpBranchTarget) !== -1) {
                     log(logType.emulation, "Degenerate conditional branch near EP: " + currentEpInstruction);
 
                     isDegenerateEpConditionalBranchPresent = true;
