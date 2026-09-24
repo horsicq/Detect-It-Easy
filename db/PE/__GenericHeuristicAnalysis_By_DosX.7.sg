@@ -10819,15 +10819,45 @@ function scanForObfuscations_Native() {
 
     var proxyJumpsAtEpPresent = false;
 
-    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86 && (
-        PE.compareEP("EB $$ EB") ||
-        PE.compareEP("EB $$ E9") ||
-        PE.compareEP("E9 ## ## ## ## EB") ||
-        PE.compareEP("E9 ## ## ## ## E9")
-    )) {
-        log(logType.any, "Proxy jump chain detected at EP");
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.hasUnmanagedEntryPoint && PE_Cached.isEntryPointCorrect &&
+        PE_Cached.isArchX86 && isVirtualAddressRangeFileBacked(PE_Cached.addressOfUnmanagedEntryPoint, 1, SECTION_FLAGS_EXECUTE)) {
+        var proxyJumpAddress = PE_Cached.addressOfUnmanagedEntryPoint,
+            proxyJumpVisited = {},
+            proxyJumpInteriors = {},
+            proxyJumpCount = 0;
 
-        proxyJumpsAtEpPresent = true;
+        while (proxyJumpCount < 8 && Math.abs(proxyJumpAddress - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x200 &&
+            isVirtualAddressRangeFileBacked(proxyJumpAddress, 1, SECTION_FLAGS_EXECUTE) &&
+            !proxyJumpVisited[proxyJumpAddress.toString()] && !proxyJumpInteriors[proxyJumpAddress.toString()]) {
+            var proxyJumpInstruction = PE.getDisasmString(proxyJumpAddress),
+                proxyJumpLength = PE.getDisasmLength(proxyJumpAddress),
+                proxyJumpTarget = proxyJumpInstruction && proxyJumpInstruction.match(/^JMP (0X[0-9A-F]+|\d+)$/i);
+
+            if (!proxyJumpTarget || proxyJumpLength <= 0 ||
+                !isVirtualAddressRangeFileBacked(proxyJumpAddress, proxyJumpLength, SECTION_FLAGS_EXECUTE)) break;
+
+            for (var byteIndex = 1; byteIndex < proxyJumpLength; byteIndex++) proxyJumpInteriors[(proxyJumpAddress + byteIndex).toString()] = true;
+            proxyJumpVisited[proxyJumpAddress.toString()] = true;
+            proxyJumpAddress = parseInt(proxyJumpTarget[1], 0);
+            proxyJumpCount++;
+        }
+
+        if (proxyJumpCount >= 3 && proxyJumpCount < 8 && !proxyJumpVisited[proxyJumpAddress.toString()] &&
+            !proxyJumpInteriors[proxyJumpAddress.toString()] &&
+            Math.abs(proxyJumpAddress - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x200 &&
+            isVirtualAddressRangeFileBacked(proxyJumpAddress, 1, SECTION_FLAGS_EXECUTE)) {
+            var proxyJumpFinalInstruction = PE.getDisasmString(proxyJumpAddress),
+                proxyJumpFinalOpCode = getAsmOpCode(proxyJumpFinalInstruction),
+                proxyJumpFinalLength = PE.getDisasmLength(proxyJumpAddress);
+
+            if (proxyJumpFinalOpCode && proxyJumpFinalOpCode !== "DB" && proxyJumpFinalOpCode !== "JMP" &&
+                proxyJumpFinalLength >= 1 && proxyJumpFinalLength <= 15 &&
+                isVirtualAddressRangeFileBacked(proxyJumpAddress, proxyJumpFinalLength, SECTION_FLAGS_EXECUTE)) {
+                log(logType.emulation, "Resolved proxy jump chain at EP: " + proxyJumpCount + " hops");
+
+                proxyJumpsAtEpPresent = true;
+            }
+        }
     }
 
     if (proxyJumpsAtEpPresent) options = addOption(options, "Proxy jmp at EP");
