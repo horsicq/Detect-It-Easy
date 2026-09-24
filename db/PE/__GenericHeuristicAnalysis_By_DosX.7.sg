@@ -11557,6 +11557,26 @@ function isEpLinearScanStopped(opCode, address, stopOpCodes) {
 
 
 
+/**
+ * Propagates only directly proven x86 zero-flag facts through a bounded EP walk.
+ * Self-XOR, self-SUB and self-CMP set ZF; instructions known not to alter flags
+ * preserve the incoming state. Every other instruction makes it unknown, so an
+ * uncertain conditional branch retains both successors instead of being guessed.
+ *
+ * @param {string} instruction - Current decoded instruction.
+ * @param {string} opCode - Current instruction mnemonic.
+ * @param {number} zeroFlag - Incoming ZF: 1 set, 0 clear, -1 unknown.
+ * @returns {number} Outgoing ZF in the same three-valued domain.
+ */
+function advanceEpZeroFlag(instruction, opCode, zeroFlag) {
+    if (/^(?:XOR|SUB|CMP) ([A-Z][A-Z0-9]*), \1$/i.test(instruction)) return 1;
+    if (/^(?:MOV(?:ABS|SX|SXD|ZX)?|LEA|PUSH|POP|NOP|FNOP|PAUSE|XCHG|ENDBR32|ENDBR64|CLC|STC|CMC|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?)$/.test(opCode)) return zeroFlag;
+    return -1;
+}
+
+
+
+
 
 
 
