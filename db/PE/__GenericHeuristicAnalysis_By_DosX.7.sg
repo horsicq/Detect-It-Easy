@@ -9746,18 +9746,20 @@ function scanForObfuscations_Native() {
                     // An internal invalid target is loader-visible proof at any reachable depth.
                     // A target beyond the image additionally requires a spatially near startup
                     // branch, filtering distant false instruction boundaries in ordinary code.
-                    if (!isEpPolymorphismTargetExecutable && (isEpPolymorphismTargetWithinImage || isEpPolymorphismBranchNearEntryPoint)) {
+                    if (epPolymorphismBranchTaken !== 0 && !isEpPolymorphismTargetExecutable &&
+                        (isEpPolymorphismTargetWithinImage || isEpPolymorphismBranchNearEntryPoint)) {
                         epInvalidBranchCandidates.push({
                             SourceAddress: epPolymorphismCurrentAddress,
                             TargetAddress: epPolymorphismTargetAddress,
-                            OpCode: epPolymorphismOpCode
+                            OpCode: epPolymorphismOpCode,
+                            TakenProven: epPolymorphismOpCode === "JMP" || epPolymorphismOpCode === "JMPF" || epPolymorphismBranchTaken === 1
                         });
                     }
                 }
 
                 // Only an explicit backward branch proves a cycle. An ordinary Call to a
                 // function emitted earlier in the image is not iterative control flow.
-                if (epPolymorphismOpCode !== "CALL" &&
+                if (epPolymorphismOpCode !== "CALL" && epPolymorphismBranchTaken !== 0 &&
                     epPolymorphismTargetAddress < epPolymorphismCurrentAddress) {
                     epPolymorphismBackwardControlFlowCount++;
 
@@ -9859,7 +9861,7 @@ function scanForObfuscations_Native() {
             var invalidTargetRva = epInvalidBranchCandidate.TargetAddress - PE_Cached.imageBase;
             if ((invalidTargetRva < 0 || invalidTargetRva >= epPolymorphismImageSize) &&
                 !epInvalidBranchProvenReachable[epInvalidBranchCandidate.SourceAddress.toString()]) continue;
-            if (epInvalidBranchTargetAddress === -1) {
+            if (epInvalidBranchTargetAddress === -1 && epInvalidBranchCandidate.TakenProven) {
                 epInvalidBranchSourceAddress = epInvalidBranchCandidate.SourceAddress;
                 epInvalidBranchTargetAddress = epInvalidBranchCandidate.TargetAddress;
                 epInvalidBranchTargetOpCode = epInvalidBranchCandidate.OpCode;
