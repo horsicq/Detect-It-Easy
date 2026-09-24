@@ -11099,19 +11099,23 @@ function scanForObfuscations_Native() {
             } else if (PE_Cached.isArchX86) {
                 // Otherwise prove that reachable EP control flow enters the candidate section.
                 var protectedStartupPendingAddresses = [PE_Cached.addressOfUnmanagedEntryPoint],
+                    protectedStartupPendingZeroFlags = [-1],
+                    protectedStartupPendingCarryFlags = [-1],
                     protectedStartupPendingAddressIndex = 0,
                     protectedStartupVisitedAddresses = {},
                     protectedStartupVisitedInstructionCount = 0;
 
                 // Explore a small reachable control-flow graph instead of sweeping physical bytes.
-                // Direct calls and conditional branches keep both the target and fall-through;
-                // an unconditional jump keeps only its target. The visited set handles loops, and
+                // Conditional branches keep both paths; a direct Call keeps its fall-through
+                // only when the callee must return. The visited set handles loops, and
                 // the global instruction limit bounds deliberately dense polymorphic dispatchers.
                 while (protectedStartupPendingAddressIndex < protectedStartupPendingAddresses.length &&
                     protectedStartupVisitedInstructionCount < 256 &&
                     !isUnderreportedStartupCodePresent) {
                     // Process one queued address and canonicalize it for loop detection.
-                    var protectedStartupCurrentAddress = protectedStartupPendingAddresses[protectedStartupPendingAddressIndex++],
+                    var protectedStartupCurrentAddress = protectedStartupPendingAddresses[protectedStartupPendingAddressIndex],
+                        protectedStartupCurrentZeroFlag = protectedStartupPendingZeroFlags[protectedStartupPendingAddressIndex],
+                        protectedStartupCurrentCarryFlag = protectedStartupPendingCarryFlags[protectedStartupPendingAddressIndex++],
                         protectedStartupAddressKey = protectedStartupCurrentAddress.toString();
 
                     // Discard repeated and unmapped nodes before spending the instruction budget.
@@ -11126,16 +11130,22 @@ function scanForObfuscations_Native() {
                         protectedStartupOpCode = getAsmOpCode(protectedStartupInstruction),
                         protectedStartupInstructionLength = PE.getDisasmLength(protectedStartupCurrentAddress);
 
-                    if (!protectedStartupOpCode || protectedStartupInstructionLength <= 0) continue;
+                    if (!protectedStartupOpCode || protectedStartupInstructionLength <= 0 ||
+                        !isVirtualAddressRangeFileBacked(protectedStartupCurrentAddress, protectedStartupInstructionLength, SECTION_FLAGS_EXECUTE)) continue;
 
                     var protectedStartupNextAddress = protectedStartupCurrentAddress + protectedStartupInstructionLength,
-                        protectedStartupDirectControlFlow = protectedStartupInstruction.match(/^(CALL|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
+                        protectedStartupDirectControlFlow = protectedStartupInstruction.match(/^(CALL|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i),
+                        protectedStartupNextZeroFlag = advanceEpZeroFlag(protectedStartupInstruction, protectedStartupOpCode, protectedStartupCurrentZeroFlag),
+                        protectedStartupNextCarryFlag = advanceEpCarryFlag(protectedStartupInstruction, protectedStartupOpCode, protectedStartupCurrentCarryFlag),
+                        protectedStartupBranchTaken = getEpKnownBranchResult(protectedStartupOpCode, protectedStartupNextZeroFlag, protectedStartupNextCarryFlag);
 
                     if (protectedStartupDirectControlFlow) {
                         // Resolve direct control flow before deciding which successors remain reachable.
-                        var protectedStartupTargetAddress = parseInt(protectedStartupDirectControlFlow[2], 0);
+                        var protectedStartupTargetAddress = parseInt(protectedStartupDirectControlFlow[2], 0),
+                            isProtectedStartupTargetProven = protectedStartupOpCode === "CALL" || protectedStartupOpCode === "JMP" ||
+                                protectedStartupOpCode === "JMPF" || protectedStartupBranchTaken === 1;
 
-                        if (protectedStartupTargetAddress >= protectedStartupSectionStartAddress &&
+                        if (isProtectedStartupTargetProven && protectedStartupTargetAddress >= protectedStartupSectionStartAddress &&
                             protectedStartupTargetAddress < protectedStartupSectionEndAddress &&
                             PE.VAToOffset(protectedStartupTargetAddress) !== -1) {
                             // A physically backed target inside the candidate section completes the proof.
@@ -11145,22 +11155,44 @@ function scanForObfuscations_Native() {
                         } else if (protectedStartupOpCode === "JMP" || protectedStartupOpCode === "JMPF") {
                             // Unconditional jumps retain only their explicit destination.
                             protectedStartupPendingAddresses.push(protectedStartupTargetAddress);
-                        } else {
-                            // Calls and conditional branches may continue along both edges.
+                            protectedStartupPendingZeroFlags.push(protectedStartupNextZeroFlag);
+                            protectedStartupPendingCarryFlags.push(protectedStartupNextCarryFlag);
+                        } else if (protectedStartupOpCode === "CALL") {
+                            // The callee is reachable, but its fall-through requires a return proof.
                             protectedStartupPendingAddresses.push(protectedStartupTargetAddress);
-                            protectedStartupPendingAddresses.push(protectedStartupNextAddress);
+                            protectedStartupPendingZeroFlags.push(protectedStartupCurrentZeroFlag);
+                            protectedStartupPendingCarryFlags.push(protectedStartupCurrentCarryFlag);
+                            if (isEpDirectCallReturnProven(protectedStartupCurrentAddress)) {
+                                protectedStartupPendingAddresses.push(protectedStartupNextAddress);
+                                protectedStartupPendingZeroFlags.push(-1);
+                                protectedStartupPendingCarryFlags.push(-1);
+                            }
+                        } else {
+                            if (protectedStartupBranchTaken !== 0) {
+                                protectedStartupPendingAddresses.push(protectedStartupTargetAddress);
+                                protectedStartupPendingZeroFlags.push(protectedStartupNextZeroFlag);
+                                protectedStartupPendingCarryFlags.push(protectedStartupNextCarryFlag);
+                            }
+                            if (protectedStartupBranchTaken !== 1) {
+                                protectedStartupPendingAddresses.push(protectedStartupNextAddress);
+                                protectedStartupPendingZeroFlags.push(protectedStartupNextZeroFlag);
+                                protectedStartupPendingCarryFlags.push(protectedStartupNextCarryFlag);
+                            }
                         }
                     } else if (protectedStartupOpCode === "CALL") {
-                        // An unresolved indirect call may return, so its fall-through stays reachable.
-                        protectedStartupPendingAddresses.push(protectedStartupNextAddress);
+                        // An unresolved indirect call provides no proven fall-through.
                     } else if (epScanStopOpCodes.indexOf(protectedStartupOpCode) === -1) {
                         // Ordinary instructions advance linearly; terminal opcodes add no successor.
                         protectedStartupPendingAddresses.push(protectedStartupNextAddress);
+                        protectedStartupPendingZeroFlags.push(protectedStartupNextZeroFlag);
+                        protectedStartupPendingCarryFlags.push(protectedStartupNextCarryFlag);
                     }
                 }
 
                 // Clean up: release the control-flow worklist and visited-address set
                 protectedStartupPendingAddresses = undefined;
+                protectedStartupPendingZeroFlags = undefined;
+                protectedStartupPendingCarryFlags = undefined;
                 protectedStartupVisitedAddresses = undefined;
             }
         }
