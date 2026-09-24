@@ -10646,6 +10646,59 @@ function scanForObfuscations_Native() {
 
 
 
+    // Check for an explicit x86 SEH stub that redirects the exception context.
+
+    var isExceptionBasedEpTransferPresent = false;
+
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.hasUnmanagedEntryPoint && PE_Cached.isEntryPointCorrect &&
+        PE_Cached.isI386 && !PE_Cached.is64bit && !PE_Cached.isDynamicLinkLibrary && !PE_Cached.isDriver && !PE_Cached.isTlsPresent &&
+        (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
+        isVirtualAddressRangeFileBacked(PE_Cached.addressOfUnmanagedEntryPoint, 20, SECTION_FLAGS_EXECUTE)) {
+        const sehFileCharacteristics = PE.getImageFileHeader("Characteristics"),
+            sehDllCharacteristics = PE.getImageOptionalHeader("DllCharacteristics"),
+            sehOptionalHeaderOffset = getOptHeaderOffset(),
+            sehOptionalHeaderSize = sehOptionalHeaderOffset >= 4 && sehOptionalHeaderOffset <= PE_Cached.fileSize ? PE.readWord(sehOptionalHeaderOffset - 4) : 0,
+            sehOptionalHeaderEnd = sehOptionalHeaderOffset + sehOptionalHeaderSize,
+            sehRelocationDirectoryOffset = sehOptionalHeaderOffset + 0x88,
+            sehLoadConfigDirectoryOffset = sehOptionalHeaderOffset + 0xB0;
+
+        // Absolute handler and target VAs are unambiguous only in a fixed-base image.
+        // SafeSEH and pre-EP TLS code can alter whether this handler is usable.
+        if ((sehFileCharacteristics & IMAGE_FILE_RELOCS_STRIPPED) &&
+            !(sehDllCharacteristics & (IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE | IMAGE_DLLCHARACTERISTICS_NO_SEH)) &&
+            sehOptionalHeaderOffset > 4 && sehOptionalHeaderSize >= 0xB8 && sehOptionalHeaderEnd <= PE_Cached.fileSize &&
+            PE.read_uint32(sehOptionalHeaderOffset + 0x5C) > 10 &&
+            PE.read_uint32(sehRelocationDirectoryOffset) === 0 && PE.read_uint32(sehRelocationDirectoryOffset + 4) === 0 &&
+            PE.read_uint32(sehLoadConfigDirectoryOffset) === 0 && PE.read_uint32(sehLoadConfigDirectoryOffset + 4) === 0) {
+            var sehEntryPointOffset = PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint);
+
+            if (PE.compare("68........64FF350000000064892500000000CC", sehEntryPointOffset)) {
+                var sehHandlerAddress = PE.read_uint32(sehEntryPointOffset + 1);
+
+                if (isVirtualAddressRangeFileBacked(sehHandlerAddress, 22, SECTION_FLAGS_EXECUTE)) {
+                    var sehHandlerOffset = PE.VAToOffset(sehHandlerAddress),
+                        sehTargetAddress = PE.read_uint32(sehHandlerOffset + 10);
+
+                    // A raw SEH handler returns ExceptionContinueExecution = 0, not the
+                    // -1 used by a VEH handler or an __except filter.
+                    if (PE.compare("8B44240CC780B8000000........B800000000C21000", sehHandlerOffset) &&
+                        sehTargetAddress !== PE_Cached.addressOfUnmanagedEntryPoint + 20 &&
+                        isVirtualAddressRangeFileBacked(sehTargetAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                        log(logType.emulation, "Static SEH transfer stub near EP: handler VA 0x" + sehHandlerAddress.toString(16) +
+                            " rewrites CONTEXT.Eip to VA 0x" + sehTargetAddress.toString(16));
+
+                        isExceptionBasedEpTransferPresent = true;
+                    }
+                }
+            }
+        }
+    }
+
+    if (isExceptionBasedEpTransferPresent) options = addOption(options, "Exception-based transfer near EP");
+
+
+
+
     // Check for TLS initialization paired with an unusable formal entry point.
     // A trap or immediate return delegates startup to TLS callbacks explicitly. An EP in
     // the virtual-only tail of an executable section is stronger evidence: no instruction
