@@ -11443,6 +11443,80 @@ function getFileBackedTlsCallbackAddresses() {
 
 
 
+/**
+ * Proves a bounded direct native control-flow graph reaches the same terminal on every path.
+ * Direct conditional branches contribute both successors. Unknown calls or transfers,
+ * undecodable bytes, cycles and exhausted budgets remain unproven rather than guessed.
+ *
+ * @param {number} startAddress - File-backed executable virtual address to examine.
+ * @param {RegExp} terminalPattern - Exact terminal instruction required on every path.
+ * @returns {boolean} Whether all bounded reachable paths end at that terminal.
+ */
+function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
+    var pending = [startAddress], nextIndex = 0, nodes = {}, nodeCount = 0;
+
+    while (nextIndex < pending.length && nodeCount < 64) {
+        var address = pending[nextIndex++], key = address.toString();
+
+        if (nodes.hasOwnProperty(key)) continue;
+        if (!isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) break;
+
+        var instruction = PE.getDisasmString(address),
+            opCode = getAsmOpCode(instruction),
+            length = PE.getDisasmLength(address),
+            isTerminal = terminalPattern.test(instruction);
+
+        if (!opCode || opCode === "DB" || length < 1 || length > 15 ||
+            !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) break;
+
+        var successors = [], nextAddress = address + length,
+            directBranch = instruction && instruction.match(/^(J[A-Z]+) (0X[0-9A-F]+|\d+)$/i);
+
+        if (!isTerminal) {
+            if (directBranch) {
+                successors.push(parseInt(directBranch[2], 0));
+                if (opCode !== "JMP") successors.push(nextAddress);
+            } else if (/^(?:NOP|PAUSE|ENDBR32|ENDBR64)$/.test(instruction)) {
+                successors.push(nextAddress);
+            } else {
+                break;
+            }
+        }
+
+        nodes[key] = { Terminal: isTerminal, Successors: successors };
+        nodeCount++;
+
+        for (var i = 0; i < successors.length; i++) {
+            if (!isVirtualAddressRangeFileBacked(successors[i], 1, SECTION_FLAGS_EXECUTE)) break;
+            pending.push(successors[i]);
+        }
+
+        if (i !== successors.length) break;
+    }
+
+    var proven = {};
+
+    if (nextIndex === pending.length) {
+        for (var key in nodes) if (nodes[key].Terminal) proven[key] = true;
+
+        for (var iteration = 0; iteration < nodeCount; iteration++) {
+            for (var key in nodes) {
+                if (proven[key] || !nodes[key].Successors.length) continue;
+
+                var allTerminal = true;
+                for (var i = 0; i < nodes[key].Successors.length; i++) {
+                    if (!proven[nodes[key].Successors[i].toString()]) allTerminal = false;
+                }
+                if (allTerminal) proven[key] = true;
+            }
+        }
+    }
+
+    return proven[startAddress.toString()] === true;
+}
+
+
+
 
 /**
  * Retrieves the assembly instruction at the specified zero-based index from the PE entry point.
