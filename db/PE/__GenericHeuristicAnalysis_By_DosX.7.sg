@@ -8085,6 +8085,7 @@ function scanForObfuscations_Native() {
                 conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern),
                 flagsNeutralRegisterWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern),
                 registerWrite = currentEpInstruction.match(epTrackedRegisterWritePattern),
+                partialRegisterWrite = currentEpInstruction.match(epPartialRegisterWritePattern),
                 simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
                 valuePreservingInstruction = currentEpInstruction.match(epValuePreservingInstructionPattern),
                 isSimplePolymorphicInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
@@ -8120,8 +8121,7 @@ function scanForObfuscations_Native() {
                 }
 
                 break;
-            } else if (literalMove || registerCopy || flagsNeutralRegisterWrite ||
-                isSimplePolymorphicInstruction || valuePreservingInstruction) {
+            } else if (literalMove || registerCopy || flagsNeutralRegisterWrite || isSimplePolymorphicInstruction || valuePreservingInstruction) {
                 // Propagate only operations whose destination value is statically known.
                 // Other flags-neutral writes invalidate their destination without discarding
                 // unrelated register facts accumulated earlier in the linear block.
@@ -8180,6 +8180,10 @@ function scanForObfuscations_Native() {
                 delete constantEpKnownRegisterValues[registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
                 constantEpComparisonOrigin = String();
                 constantEpNeutralInstructionCount = 0;
+            } else if (partialRegisterWrite) {
+                delete constantEpKnownRegisterValues[getEpPartialRegisterKey(partialRegisterWrite[1])];
+                if (currentEpOpCode !== "MOV" && currentEpOpCode !== "NOT") constantEpComparisonOrigin = String();
+                if (constantEpComparisonOrigin && ++constantEpNeutralInstructionCount > epNeutralInstructionLimit) constantEpComparisonOrigin = String();
             } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1) {
                 break;
             } else {
@@ -8232,6 +8236,7 @@ function scanForObfuscations_Native() {
                 simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
                 valuePreservingInstruction = currentEpInstruction.match(epValuePreservingInstructionPattern),
                 registerWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern) || currentEpInstruction.match(epTrackedRegisterWritePattern),
+                partialRegisterWrite = currentEpInstruction.match(epPartialRegisterWritePattern),
                 conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern);
 
             if (pebPointerLoad) {
@@ -8286,6 +8291,8 @@ function scanForObfuscations_Native() {
             } else if (registerWrite) {
                 // A recognized write invalidates only the overwritten physical register.
                 delete pebModuleWalkRegisterStates[registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+            } else if (partialRegisterWrite) {
+                delete pebModuleWalkRegisterStates[getEpPartialRegisterKey(partialRegisterWrite[1])];
             } else {
                 // Unmodelled semantics may alter every tracked pointer; restart the chain.
                 pebModuleWalkRegisterStates = {};
@@ -8589,6 +8596,7 @@ function scanForObfuscations_Native() {
                 simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
                 simplePolymorphicRegister = simplePolymorphicInstruction ? (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]) : String(),
                 valuePreservingInstruction = currentEpInstruction.match(epValuePreservingInstructionPattern),
+                partialRegisterWrite = currentEpInstruction.match(epPartialRegisterWritePattern),
                 isNeutralInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
                     currentEpOpCode === "PAUSE" ||
                     (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
@@ -8686,6 +8694,8 @@ function scanForObfuscations_Native() {
                         delete indirectEpKnownAddresses[valuePreservingRegisterKey];
                     }
                 }
+            } else if (partialRegisterWrite) {
+                delete indirectEpKnownAddresses[getEpPartialRegisterKey(partialRegisterWrite[1])];
             } else if (registerWrite) {
                 // A modeled write invalidates only the destination and preserves other proofs.
                 delete indirectEpKnownAddresses[registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
