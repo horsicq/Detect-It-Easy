@@ -6537,112 +6537,153 @@ function traceEpWrittenCodeTransfer() {
 
 
 /**
- * Tracks the destination register from the PE entry point to a scalar-copy instruction.
- *
- * The bounded control-flow walk follows direct branches through file-backed executable
- * instructions. It propagates only statically known register values; unsupported
- * instructions and unknown writes end a path or invalidate the affected register.
- * A successful path proves that the copy destination points inside the same virtual
- * code section as the unpacker's final transfer. It does not execute the copy loop
- * or claim that every byte up to the transfer target has been written. Conditional
- * branch feasibility is not solved; reachability here is structural CFG reachability.
- *
- * @param {number} copyAddress - Virtual address of the reachable byte-read instruction.
- * @param {string} destinationRegister - Register used by its paired byte write.
- * @param {number} sectionStart - Inclusive virtual address of the target code section.
- * @param {number} sectionEnd - Exclusive virtual address of the target code section.
- * @returns {boolean} True if a bounded reachable path preserves a known destination inside that section.
+ * Verify export parsing, hashing and indirect transfer on one reachable EP path.
+ * Facts from alternative branches never merge. The bounded graph fails closed if
+ * too many states are needed, and revisiting one instruction adds no new evidence.
+ * @param {number[]} starts - EP and synthetic-transfer starting addresses.
+ * @param {Object} successors - Decoded executable CFG edges indexed by address.
+ * @param {Object} instructions - Decoded instructions indexed by address.
+ * @param {number[]} indirectAddresses - Candidate indirect transfer addresses.
+ * @param {Object} patterns - Architecture-specific resolver patterns.
+ * @returns {boolean} True when a single path contains the complete chain.
  */
-function isEpCopyDestinationProven(copyAddress, destinationRegister, sectionStart, sectionEnd) {
-    const registerPattern = "(?:E(?:AX|BX|CX|DX|SI|DI|BP|SP)|R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])D?)",
-        numberPattern = "(?:-?0X[0-9A-F]+|-?[0-9]+)",
-        moveLiteralPattern = new RegExp("^MOV(?:ABS)? (" + registerPattern + "), (" + numberPattern + ")$", "i"),
-        moveRegisterPattern = new RegExp("^MOV (" + registerPattern + "), (" + registerPattern + ")$", "i"),
-        leaPattern = new RegExp("^LEA (" + registerPattern + "), \\[(" + registerPattern + ") ([+-]) (" + numberPattern + ")\\]$", "i"),
-        leaRipPattern = new RegExp("^LEA (" + registerPattern + "), \\[RIP ([+-]) (" + numberPattern + ")\\]$", "i"),
-        leaAbsolutePattern = new RegExp("^LEA (" + registerPattern + "), \\[(" + numberPattern + ")\\]$", "i"),
-        arithmeticPattern = new RegExp("^(ADD|SUB) (" + registerPattern + "), (" + numberPattern + ")$", "i"),
-        unaryPattern = new RegExp("^(INC|DEC) (" + registerPattern + ")$", "i"),
-        registerWritePattern = new RegExp("^(?:MOV|MOVABS|LEA|ADD|SUB|ADC|SBB|XOR|OR|AND|INC|DEC|NEG|NOT|SHL|SHR|SAR|ROL|ROR|POP) (" + registerPattern + ")(?:,|$)", "i"),
-        directBranchPattern = new RegExp("^(J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (" + numberPattern + ")$", "i");
+function isEpResolverPathProven(starts, successors, instructions, indirectAddresses, patterns) {
+    var indirect = {}, pending = [], nextIndex = 0, visited = {};
 
     function registerKey(name) {
-        return name.toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+        var register = name.toUpperCase();
+        if (/^[ABCD][HL]$/.test(register)) return "R" + register[0] + "X";
+        if (/^(?:AX|BX|CX|DX|SI|DI|BP|SP)$/.test(register)) return "R" + register;
+        if (/^(?:SIL|DIL|BPL|SPL)$/.test(register)) return "R" + register.substring(0, 2);
+        return register.replace(/^E/, "R").replace(/(?:B|W|D)$/, String());
     }
 
-    function setRegister(values, name, value) {
-        var key = registerKey(name);
+    for (var i = 0; i < indirectAddresses.length; i++) indirect[indirectAddresses[i].toString()] = true;
+    for (var i = 0; i < starts.length; i++) {
+        pending.push({ Address: starts[i], PebState: {}, PebProven: false, Stage: 0, Fields: {}, ByteRead: false, ByteRegisters: {}, Linked: {}, Kinds: {}, Backward: false });
+    }
 
-        if (value === undefined || !isFinite(value) || Math.abs(value) > 0x1FFFFFFFFFFFFF) {
-            delete values[key];
-        } else {
-            values[key] = PE_Cached.isI386 || /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(name) ? value >>> 0 : value;
+    while (nextIndex < pending.length && nextIndex < 16384) {
+        var state = pending[nextIndex++], key = state.Address.toString(), instruction = instructions[key];
+        if (!instruction || !successors.hasOwnProperty(key)) continue;
+
+        var stage = state.Stage, fields = {}, kinds = {}, pebState = {}, byteRegisters = {}, linked = {}, pebProven = state.PebProven;
+        for (var field in state.Fields) fields[field] = true;
+        for (var pebRegister in state.PebState) pebState[pebRegister] = state.PebState[pebRegister];
+        for (var byteRegister in state.ByteRegisters) byteRegisters[byteRegister] = true;
+        for (var linkedRegister in state.Linked) linked[linkedRegister] = true;
+        for (var register in state.Kinds) {
+            kinds[register] = {};
+            for (var kind in state.Kinds[register]) kinds[register][kind] = true;
         }
-    }
 
-    if (registerKey(destinationRegister) === "RSP") return false;
+        var pebLoad = instruction.match(patterns.PebLoad), ldrLoad = instruction.match(patterns.LdrLoad),
+            listLoad = instruction.match(patterns.ListLoad), registerCopy = instruction.match(patterns.RegisterCopy),
+            registerWrite = instruction.match(patterns.RegisterWrite), partialWrite = instruction.match(patterns.PartialWrite);
 
-    var pending = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, Values: {} }],
-        visited = {};
+        if (pebLoad) {
+            pebState[pebLoad[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String())] = 1;
+        } else if (ldrLoad) {
+            var ldrSource = ldrLoad[2].toUpperCase().replace(/^E/, "R").replace(/D$/, String()),
+                ldrDestination = ldrLoad[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+            if (pebState[ldrSource] === 1) pebState[ldrDestination] = 2;
+            else delete pebState[ldrDestination];
+        } else if (listLoad && pebState[listLoad[2].toUpperCase().replace(/^E/, "R").replace(/D$/, String())] === 2) {
+            pebProven = true;
+        } else if (registerCopy) {
+            var copySource = registerCopy[2].toUpperCase().replace(/^E/, "R").replace(/D$/, String()),
+                copyDestination = registerCopy[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+            if (pebState[copySource]) pebState[copyDestination] = pebState[copySource];
+            else delete pebState[copyDestination];
+        } else if (registerWrite) {
+            delete pebState[registerWrite[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String())];
+        } else if (partialWrite) {
+            var partialRegister = partialWrite[1].toUpperCase(), partialKey = /^R(?:8|9|1[0-5])[BW]$/.test(partialRegister) ?
+                partialRegister.substring(0, partialRegister.length - 1) : /^[ABCD][HLX]$/.test(partialRegister) ?
+                    "R" + partialRegister[0] + "X" : "R" + partialRegister.replace(/L$/, String());
+            delete pebState[partialKey];
+        } else if (!/^(?:NOP|FNOP|PAUSE|CMP|TEST|J[A-Z]+)$/.test(instruction.split(" ")[0])) {
+            pebState = {};
+        }
 
-    for (var stateIndex = 0; stateIndex < pending.length && stateIndex < 96; stateIndex++) {
-        var state = pending[stateIndex],
-            address = state.Address,
-            stateKey = address + ":" + JSON.stringify(state.Values);
+        if (pebProven && stage === 0 && patterns.Header.test(instruction)) stage = 1;
+        else if (stage === 1 && patterns.Directory.test(instruction)) stage = 2;
 
-        if (visited[stateKey] || !isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) continue;
+        var byteRead = state.ByteRead, hashPresent = false;
+        if (stage === 2) {
+            var fieldMatch = instruction.match(patterns.Field), transform = instruction.match(patterns.Transform);
+            if (fieldMatch) fields[parseInt(fieldMatch[1], 0).toString()] = true;
+            if (patterns.ByteRead.test(instruction)) {
+                byteRead = true;
+                var byteLoad = instruction.match(/^MOV(?:ZX|SX)? ([A-Z][A-Z0-9]*), BYTE PTR /i);
+                byteRegisters[byteLoad ? registerKey(byteLoad[1]) : "RAX"] = true;
+            }
+
+            if (transform) {
+                var hashRegister = registerKey(transform[2]), hashOperand = instruction.substring(instruction.indexOf(", ") + 2),
+                    hashSource = /^[A-Z][A-Z0-9]*$/i.test(hashOperand) ? registerKey(hashOperand) : String(),
+                    isZeroing = /^(?:XOR|SUB) ([A-Z][A-Z0-9]*), \1$/i.test(instruction);
+                if (!kinds[hashRegister] || isZeroing) kinds[hashRegister] = {};
+                if (isZeroing) {
+                    delete byteRegisters[hashRegister];
+                    delete linked[hashRegister];
+                } else {
+                    if (byteRegisters[hashRegister] || byteRegisters[hashSource]) {
+                        byteRegisters[hashRegister] = true;
+                        linked[hashRegister] = true;
+                    }
+                    kinds[hashRegister][transform[1].toUpperCase()] = true;
+                }
+            } else {
+                if (registerCopy) {
+                    var hashSource = registerKey(registerCopy[2]), hashDestination = registerKey(registerCopy[1]);
+                    if (kinds[hashSource]) {
+                        kinds[hashDestination] = {};
+                        for (var kind in kinds[hashSource]) kinds[hashDestination][kind] = true;
+                    } else delete kinds[hashDestination];
+                    if (byteRegisters[hashSource]) byteRegisters[hashDestination] = true;
+                    else delete byteRegisters[hashDestination];
+                    if (linked[hashSource]) linked[hashDestination] = true;
+                    else delete linked[hashDestination];
+                } else if (registerWrite) {
+                    var overwrittenRegister = registerKey(registerWrite[1]);
+                    delete kinds[overwrittenRegister];
+                    delete linked[overwrittenRegister];
+                    if (!patterns.ByteRead.test(instruction)) delete byteRegisters[overwrittenRegister];
+                }
+                if (partialWrite) {
+                    var partialRegister = partialWrite[1].toUpperCase(), partialKey = /^R(?:8|9|1[0-5])[BW]$/.test(partialRegister) ?
+                        partialRegister.substring(0, partialRegister.length - 1) : /^[ABCD][HLX]$/.test(partialRegister) ?
+                            "R" + partialRegister[0] + "X" : "R" + partialRegister.replace(/L$/, String());
+                    delete kinds[partialKey];
+                    delete linked[partialKey];
+                    if (!patterns.ByteRead.test(instruction)) delete byteRegisters[partialKey];
+                }
+            }
+
+            for (var register in kinds) {
+                if (linked[register] && Object.keys(kinds[register]).length >= 2) {
+                    hashPresent = true;
+                    break;
+                }
+            }
+        }
+
+        var fieldKeys = Object.keys(fields).sort(), kindKeys = Object.keys(kinds).sort(), kindState = String();
+        for (var k = 0; k < kindKeys.length; k++) kindState += kindKeys[k] + "=" + Object.keys(kinds[kindKeys[k]]).sort().join(",") + ";";
+        var pebKeys = Object.keys(pebState).sort(), pebStateKey = String();
+        for (var k = 0; k < pebKeys.length; k++) pebStateKey += pebKeys[k] + pebState[pebKeys[k]];
+        var stateKey = key + ":" + pebProven + ":" + pebStateKey + ":" + stage + ":" + fieldKeys.join(",") + ":" + byteRead + ":" + kindState + ":" + Object.keys(byteRegisters).sort().join(",") + ":" + Object.keys(linked).sort().join(",") + ":" + state.Backward;
+        if (visited[stateKey]) continue;
         visited[stateKey] = true;
 
-        if (address === copyAddress) {
-            var destination = state.Values[registerKey(destinationRegister)];
-            if (destination >= sectionStart && destination < sectionEnd) return true;
-            continue;
+        if (indirect[key] && stage === 2 && fieldKeys.length >= 2 && byteRead && hashPresent && state.Backward) return true;
+
+        var next = successors[key];
+        for (var j = 0; j < next.length; j++) {
+            var backward = state.Backward || (next[j] < state.Address && stage === 2 && fieldKeys.length >= 2 && byteRead && hashPresent);
+            pending.push({ Address: next[j], PebState: pebState, PebProven: pebProven, Stage: stage, Fields: fields, ByteRead: byteRead, ByteRegisters: byteRegisters, Linked: linked, Kinds: kinds, Backward: backward });
         }
-
-        var instruction = PE.getDisasmString(address),
-            length = PE.getDisasmLength(address),
-            opCode = getAsmOpCode(instruction),
-            nextAddress = address + length,
-            match,
-            values = {};
-
-        if (!opCode || length <= 0 || !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
-        for (var key in state.Values) values[key] = state.Values[key];
-
-        if ((match = instruction.match(moveLiteralPattern))) {
-            setRegister(values, match[1], parseInt(match[2], 0));
-        } else if ((match = instruction.match(moveRegisterPattern))) {
-            setRegister(values, match[1], values[registerKey(match[2])]);
-        } else if ((match = instruction.match(leaPattern))) {
-            var base = values[registerKey(match[2])],
-                displacement = parseInt(match[4], 0) * (match[3] === "-" ? -1 : 1);
-            setRegister(values, match[1], base === undefined ? undefined : base + displacement);
-        } else if ((match = instruction.match(leaRipPattern))) {
-            setRegister(values, match[1], nextAddress + parseInt(match[3], 0) * (match[2] === "-" ? -1 : 1));
-        } else if ((match = instruction.match(leaAbsolutePattern))) {
-            setRegister(values, match[1], parseInt(match[2], 0));
-        } else if ((match = instruction.match(arithmeticPattern))) {
-            var oldValue = values[registerKey(match[2])],
-                immediate = parseInt(match[3], 0);
-            setRegister(values, match[2], oldValue === undefined ? undefined : oldValue + (match[1] === "ADD" ? immediate : -immediate));
-        } else if ((match = instruction.match(unaryPattern))) {
-            var oldValue = values[registerKey(match[2])];
-            setRegister(values, match[2], oldValue === undefined ? undefined : oldValue + (match[1] === "INC" ? 1 : -1));
-        } else if ((match = instruction.match(registerWritePattern))) {
-            delete values[registerKey(match[1])];
-            if (opCode === "POP") delete values.RSP;
-        } else if ((match = instruction.match(directBranchPattern))) {
-            var target = parseInt(match[2], 0);
-            if (/^LOOP/.test(opCode)) delete values.RCX;
-            pending.push({ Address: target, Values: values });
-            if (opCode === "JMP") continue;
-        } else if (/^(?:PUSH|PUSHAL)$/.test(opCode)) {
-            delete values.RSP;
-        } else if (!/^(?:CMP|TEST|NOP|FNOP|PAUSE|CLC|STC|CMC)$/.test(opCode)) {
-            continue;
-        }
-
-        pending.push({ Address: nextAddress, Values: values });
     }
 
     return false;
@@ -6650,12 +6691,15 @@ function isEpCopyDestinationProven(copyAddress, destinationRegister, sectionStar
 
 
 
+
 /**
  * Proves that bitstream decoding, copying and the final transfer share one EP path.
  *
  * Walks only instructions already decoded by the bounded EP traversal. The state
- * records the required copy and distinct ADC/REP MOVSB instructions. Reverse
- * reachability excludes dead branches; loops may exit without inflating evidence.
+ * records the required copy and distinct ADC/REP MOVSB instructions. Scalar-copy
+ * states also carry register values, so byte-copy and decoder evidence cannot
+ * be combined from mutually exclusive paths. Reverse reachability excludes dead
+ * branches; loops may exit without inflating evidence.
  * The state limit makes ambiguous large graphs fail closed.
  *
  * @param {number[]} startAddresses - Proven entry addresses, including a synthetic transfer target if present.
@@ -6663,15 +6707,72 @@ function isEpCopyDestinationProven(copyAddress, destinationRegister, sectionStar
  * @param {number} copyAddress - Required scalar byte-read address, or -1 for REP MOVSB copying.
  * @param {Object} successors - Decoded CFG successors indexed by instruction address.
  * @param {Object} facts - ADC and REP MOVSB facts indexed by instruction address.
+ * @param {Object} [destinationProof] - Scalar-copy register, virtual range and decoded instructions.
  * @returns {boolean} True if one reachable path contains the required chain.
  */
-function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, successors, facts) {
+function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, successors, facts, destinationProof) {
     var pending = [], nextIndex = 0, examined = 0, visited = {},
         adcBits = {}, repBits = {}, adcBitCount = 0, repBitCount = 0,
         // UPX-like scalar loops expose four distinct ADC sites on an exit path;
         // additional decoder sites may lie on alternative paths in the same graph.
         requiredAdc = copyAddress === -1 ? 8 : 4,
         predecessors = {}, canReachTransfer = {};
+
+    const registerPattern = "(?:E(?:AX|BX|CX|DX|SI|DI|BP|SP)|R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])D?)",
+        numberPattern = "(?:-?0X[0-9A-F]+|-?[0-9]+)",
+        literalPattern = new RegExp("^MOV(?:ABS)? (" + registerPattern + "), (" + numberPattern + ")$", "i"),
+        copyPattern = new RegExp("^MOV (" + registerPattern + "), (" + registerPattern + ")$", "i"),
+        leaPattern = new RegExp("^LEA (" + registerPattern + "), \\[(" + registerPattern + ") ([+-]) (" + numberPattern + ")\\]$", "i"),
+        ripPattern = new RegExp("^LEA (" + registerPattern + "), \\[RIP ([+-]) (" + numberPattern + ")\\]$", "i"),
+        absolutePattern = new RegExp("^LEA (" + registerPattern + "), \\[((?:0X[0-9A-F]+|[0-9]+))\\]$", "i"),
+        arithmeticPattern = new RegExp("^(ADD|SUB) (" + registerPattern + "), (" + numberPattern + ")$", "i"),
+        unaryPattern = new RegExp("^(INC|DEC) (" + registerPattern + ")$", "i"),
+        writePattern = new RegExp("^(?:MOV|MOVABS|LEA|ADD|SUB|ADC|SBB|XOR|OR|AND|INC|DEC|NEG|NOT|SHL|SHR|SAR|ROL|ROR|POP) (" + registerPattern + ")(?:,|$)", "i"),
+        partialPattern = /^(?:MOV|XOR|ADD|SUB|AND|OR|NOT|NEG|INC|DEC) ((?:[ABCD][HL]|[ABCD]X|SI|DI|BP|SIL|DIL|BPL|R(?:8|9|1[0-5])(?:B|W)))(?:,|$)/i;
+
+    function registerKey(name) {
+        return name.toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+    }
+
+    function setRegister(values, name, value) {
+        var key = registerKey(name);
+        if (value === undefined || !isFinite(value) || Math.abs(value) > 0x1FFFFFFFFFFFFF) delete values[key];
+        else values[key] = PE_Cached.isI386 || /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(name) ? value >>> 0 : value;
+    }
+
+    function advanceValues(values, instruction, address) {
+        var next = {}, match;
+        for (var register in values) next[register] = values[register];
+
+        if ((match = instruction.match(literalPattern))) setRegister(next, match[1], parseInt(match[2], 0));
+        else if ((match = instruction.match(copyPattern))) setRegister(next, match[1], next[registerKey(match[2])]);
+        else if ((match = instruction.match(leaPattern))) {
+            var base = next[registerKey(match[2])];
+            setRegister(next, match[1], base === undefined ? undefined : base + parseInt(match[4], 0) * (match[3] === "-" ? -1 : 1));
+        } else if ((match = instruction.match(ripPattern))) {
+            setRegister(next, match[1], address + PE.getDisasmLength(address) + parseInt(match[3], 0) * (match[2] === "-" ? -1 : 1));
+        } else if ((match = instruction.match(absolutePattern))) setRegister(next, match[1], parseInt(match[2], 0));
+        else if ((match = instruction.match(arithmeticPattern))) {
+            var oldValue = next[registerKey(match[2])];
+            setRegister(next, match[2], oldValue === undefined ? undefined : oldValue + parseInt(match[3], 0) * (match[1] === "SUB" ? -1 : 1));
+        } else if ((match = instruction.match(unaryPattern))) {
+            var oldValue = next[registerKey(match[2])];
+            setRegister(next, match[2], oldValue === undefined ? undefined : oldValue + (match[1] === "INC" ? 1 : -1));
+        } else if ((match = instruction.match(writePattern))) {
+            delete next[registerKey(match[1])];
+            if (instruction.indexOf("POP ") === 0) delete next.RSP;
+        } else if ((match = instruction.match(partialPattern))) {
+            var partial = match[1].toUpperCase(), key = /^R(?:8|9|1[0-5])[BW]$/.test(partial) ?
+                partial.substring(0, partial.length - 1) : /^[ABCD][HLX]$/.test(partial) ?
+                    "R" + partial[0] + "X" : "R" + partial.replace(/L$/, String());
+            delete next[key];
+        } else if (/^PUSH(?: |AL$)/.test(instruction)) delete next.RSP;
+        else if (!/^(?:CMP|TEST|NOP|FNOP|PAUSE|CLC|STC|CMC|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?)(?: |$)/.test(instruction)) next = {};
+
+        return next;
+    }
+
+    if (destinationProof && registerKey(destinationProof.Register) === "RSP") return false;
 
     for (var factAddress in facts) {
         if (facts[factAddress].Adc) {
@@ -6703,7 +6804,7 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
     }
 
     for (var i = 0; i < startAddresses.length; i++) {
-        pending.push({ Address: startAddresses[i], AdcMask: 0, Adc: 0, RepMask: 0, Rep: 0, CopySeen: false });
+        pending.push({ Address: startAddresses[i], AdcMask: 0, Adc: 0, RepMask: 0, Rep: 0, CopySeen: false, Values: {} });
     }
 
     while (nextIndex < pending.length && examined++ < 16384) {
@@ -6718,6 +6819,16 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
             rep = state.Rep + (repBit && !(state.RepMask & repBit) ? 1 : 0),
             copySeen = state.CopySeen || state.Address === copyAddress,
             stateKey = key + ":" + copySeen + ":" + adc + ":" + adcMask + ":" + repMask;
+
+        if (destinationProof && !state.CopySeen) {
+            var valueKeys = Object.keys(state.Values).sort();
+            for (var v = 0; v < valueKeys.length; v++) stateKey += ":" + valueKeys[v] + "=" + state.Values[valueKeys[v]];
+            if (state.Address === copyAddress) {
+                var destination = state.Values[registerKey(destinationProof.Register)];
+                if (!(destination >= destinationProof.Start && destination < destinationProof.End)) continue;
+            }
+        }
+
         if (visited[stateKey]) continue;
         visited[stateKey] = true;
 
@@ -6726,12 +6837,14 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
             continue;
         }
 
+        var values = destinationProof && !copySeen ?
+            advanceValues(state.Values, destinationProof.Instructions[key], state.Address) : {};
         next = successors[key];
         for (var j = 0; j < next.length; j++) {
             if (canReachTransfer[next[j].toString()]) {
                 pending.push({
                     Address: next[j], AdcMask: adcMask, Adc: adc,
-                    RepMask: repMask, Rep: rep, CopySeen: copySeen
+                    RepMask: repMask, Rep: rep, CopySeen: copySeen, Values: values
                 });
             }
         }
@@ -10115,8 +10228,11 @@ function scanForObfuscations_Native() {
                     scalarDestination !== "R" + scalarValueParent.substring(1)) {
                     for (var targetIndex = 0; targetIndex < bitstreamVirtualTargets.length && !isScalarBitstreamCopyPresent; targetIndex++) {
                         var target = bitstreamVirtualTargets[targetIndex];
-                        if (isEpBitstreamPathProven(epBitstreamStartAddresses, target.SourceAddress, scalarRead.Address, epBitstreamSuccessors, epBitstreamFacts) &&
-                            isEpCopyDestinationProven(scalarRead.Address, scalarDestination, target.Start, target.End)) {
+                        if (isEpBitstreamPathProven(epBitstreamStartAddresses, target.SourceAddress, scalarRead.Address,
+                            epBitstreamSuccessors, epBitstreamFacts, {
+                            Register: scalarDestination, Start: target.Start, End: target.End,
+                            Instructions: epBitstreamInstructions
+                        })) {
                             isScalarBitstreamCopyPresent = true;
                         }
                     }
