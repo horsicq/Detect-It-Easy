@@ -10699,6 +10699,26 @@ function scanForObfuscations_Native() {
 
 
 
+    // Check whether every proven direct path from the formal EP reaches a breakpoint.
+
+    var isBreakpointOnlyEpFlowPresent = false,
+        epTlsCallbackRoots = getFileBackedTlsCallbackAddresses();
+
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.hasUnmanagedEntryPoint && PE_Cached.isEntryPointCorrect &&
+        epTlsCallbackRoots && epTlsCallbackRoots.length === 0 && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
+        (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
+        isVirtualAddressRangeFileBacked(PE_Cached.addressOfUnmanagedEntryPoint, 1, SECTION_FLAGS_EXECUTE) &&
+        isEpBoundedDirectFlowProven(PE_Cached.addressOfUnmanagedEntryPoint, /^INT(?: ?3| 0X0*3)$/i)) {
+        log(logType.emulation, "Every proven direct EP path reaches a breakpoint");
+
+        isBreakpointOnlyEpFlowPresent = true;
+    }
+
+    if (isBreakpointOnlyEpFlowPresent) options = addOption(options, "Breakpoint-only EP flow");
+
+
+
+
     // Check for TLS initialization paired with an unusable formal entry point.
     // A trap or immediate return delegates startup to TLS callbacks explicitly. An EP in
     // the virtual-only tail of an executable section is stronger evidence: no instruction
