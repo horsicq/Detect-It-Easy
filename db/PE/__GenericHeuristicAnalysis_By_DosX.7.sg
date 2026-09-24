@@ -8734,7 +8734,7 @@ function scanForObfuscations_Native() {
         // native-width POP; state 3 waits for a condition compatible with the
         // TEST/AND or BT flags; state 4 tracks direct TF modification on the stack.
         var trapFlagState = 0,
-            trapFlagRegister = String(),
+            trapFlagRegisters = {},
             trapFlagTestOpCode = String(),
             trapFlagNeutralInstructionCount = 0;
 
@@ -8749,8 +8749,10 @@ function scanForObfuscations_Native() {
             var poppedFlagsRegister = currentEpInstruction.match(trapFlagPopRegisterPattern),
                 testedFlagsRegister = currentEpInstruction.match(trapFlagRegisterTestPattern),
                 conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern),
+                registerCopy = currentEpInstruction.match(epRegisterCopyPattern),
                 simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
                 valuePreservingInstruction = currentEpInstruction.match(epValuePreservingInstructionPattern),
+                partialRegisterWrite = currentEpInstruction.match(epPartialRegisterWritePattern),
                 flagsNeutralRegisterWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern),
                 registerWrite = flagsNeutralRegisterWrite || currentEpInstruction.match(epTrackedRegisterWritePattern),
                 registerWriteKey = registerWrite ? registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()) : String(),
@@ -8761,14 +8763,14 @@ function scanForObfuscations_Native() {
 
             var isTrapFlagStatePreservingInstruction = ((trapFlagState === 1 || trapFlagState === 4) &&
                 (isRegisterOnlyInstruction || /^(?:CMP|TEST)$/.test(currentEpOpCode))) ||
-                (trapFlagState === 2 && ((isRegisterOnlyInstruction && registerWriteKey !== trapFlagRegister) || valuePreservingInstruction)) ||
+                (trapFlagState === 2 && (isRegisterOnlyInstruction || partialRegisterWrite || valuePreservingInstruction)) ||
                 (trapFlagState === 3 && flagsNeutralRegisterWrite);
 
             var isStatePreservingInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" || currentEpOpCode === "PAUSE" || simplePolymorphicInstruction ||
                 isTrapFlagStatePreservingInstruction;
 
             var isTrapFlagTestedRegister = trapFlagState === 2 && testedFlagsRegister &&
-                trapFlagRegister === testedFlagsRegisterKey;
+                trapFlagRegisters[testedFlagsRegisterKey];
 
             var isTrapFlagBranchCompatible = trapFlagState === 3 && conditionalBranch && (
                 (trapFlagTestOpCode === "BT" && trapFlagBitTestBranchOpCodes.indexOf(currentEpOpCode) !== -1) ||
@@ -8778,7 +8780,7 @@ function scanForObfuscations_Native() {
             if (trapFlagPushPattern.test(currentEpOpCode)) {
                 // State 1: EFLAGS/RFLAGS has been copied to the current stack top.
                 trapFlagState = 1;
-                trapFlagRegister = String();
+                trapFlagRegisters = {};
                 trapFlagTestOpCode = String();
                 trapFlagNeutralInstructionCount = 0;
             } else if (trapFlagState === 1 && trapFlagStackSetPattern.test(currentEpInstruction)) {
@@ -8791,8 +8793,8 @@ function scanForObfuscations_Native() {
 
                 isEpTrapFlagCheckPresent = true;
             } else if (trapFlagState === 1 && poppedFlagsRegister) {
-                // State 2: preserve the complete flags value in a native-width register.
-                trapFlagRegister = poppedFlagsRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                // State 2: preserve the TF bit in the popped register and its exact copies.
+                trapFlagRegisters[poppedFlagsRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())] = true;
                 trapFlagState = 2;
                 trapFlagNeutralInstructionCount = 0;
             } else if (isTrapFlagTestedRegister) {
@@ -8809,11 +8811,27 @@ function scanForObfuscations_Native() {
                 trapFlagNeutralInstructionCount < epNeutralInstructionLimit) {
                 // Before the explicit TEST/BT, flag-changing junk on unrelated registers
                 // is harmless. Afterwards only instructions that preserve EFLAGS are safe.
+                if (trapFlagState === 2) {
+                    // A register copy keeps the source; a write invalidates only its destination.
+                    if (registerCopy) {
+                        var trapFlagCopyDestination = registerCopy[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                            trapFlagCopySource = registerCopy[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+
+                        if (trapFlagRegisters[trapFlagCopySource]) trapFlagRegisters[trapFlagCopyDestination] = true;
+                        else delete trapFlagRegisters[trapFlagCopyDestination];
+                    } else if (partialRegisterWrite) {
+                        delete trapFlagRegisters[getEpPartialRegisterKey(partialRegisterWrite[1])];
+                    } else if (registerWrite && !simplePolymorphicInstruction && !valuePreservingInstruction) {
+                        delete trapFlagRegisters[registerWriteKey];
+                    }
+                }
+
+                if (trapFlagState === 2 && !Object.keys(trapFlagRegisters).length) trapFlagState = 0;
                 trapFlagNeutralInstructionCount++;
             } else {
                 // Any incompatible instruction breaks the sequence but permits a later restart.
                 trapFlagState = 0;
-                trapFlagRegister = String();
+                trapFlagRegisters = {};
                 trapFlagTestOpCode = String();
                 trapFlagNeutralInstructionCount = 0;
 
