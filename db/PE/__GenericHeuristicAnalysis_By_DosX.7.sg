@@ -11577,6 +11577,29 @@ function advanceEpZeroFlag(instruction, opCode, zeroFlag) {
 
 
 
+/**
+ * Propagates only directly proven x86 carry-flag facts through an EP path.
+ * CLC/STC set CF explicitly, CMC inverts a known value, and self-XOR/SUB/CMP
+ * clear it. INC/DEC and ordinary data moves preserve CF; all other effects
+ * are treated as unknown rather than guessed.
+ *
+ * @param {string} instruction - Current decoded instruction.
+ * @param {string} opCode - Current instruction mnemonic.
+ * @param {number} carryFlag - Incoming CF: 1 set, 0 clear, -1 unknown.
+ * @returns {number} Outgoing CF in the same three-valued domain.
+ */
+function advanceEpCarryFlag(instruction, opCode, carryFlag) {
+    if (opCode === "CLC") return 0;
+    if (opCode === "STC") return 1;
+    if (opCode === "CMC") return carryFlag === -1 ? -1 : 1 - carryFlag;
+    if (/^(?:XOR|SUB|CMP) ([A-Z][A-Z0-9]*), \1$/i.test(instruction)) return 0;
+    if (/^(?:MOV(?:ABS|SX|SXD|ZX)?|LEA|PUSH|POP|NOP|FNOP|PAUSE|XCHG|ENDBR32|ENDBR64|INC|DEC|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?)$/.test(opCode)) return carryFlag;
+    return -1;
+}
+
+
+
+
 
 
 
