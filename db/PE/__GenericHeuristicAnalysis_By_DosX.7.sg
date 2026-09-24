@@ -1854,10 +1854,11 @@ function scanForAntiAnalysis_Native() {
                 // Unknown semantics may clobber any alias, so discard the whole proof set.
                 antiDebugPebRegisters = {};
 
-                // CALL retains a physical fall-through path but may clobber registers, so
-                // its proofs are discarded while the bounded scan may start a new match later.
-                if (antiDebugStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") break;
+                // A returning CALL may start a new match, but its previous register facts are gone.
+                if (isEpLinearScanStopped(currentEpOpCode, epAsmInstructionAddresses[i], antiDebugStopOpCodes)) break;
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
         }
     }
 
@@ -11538,6 +11539,21 @@ function isEpDirectCallReturnProven(callAddress) {
     epDirectCallReturnCache[targetKey] = isEpBoundedDirectFlowProven(target, /^RET(?:N)?(?: (?:0X[0-9A-F]+|\d+))?$/i);
     return epDirectCallReturnCache[targetKey];
 }
+
+
+
+/**
+ * Stops a linear EP rule at a terminal transfer or an unproven CALL fall-through.
+ *
+ * @param {string} opCode - Current instruction mnemonic.
+ * @param {number} address - Virtual address of the current instruction.
+ * @param {string[]} stopOpCodes - Terminal mnemonics for the calling rule.
+ * @returns {boolean} Whether subsequent physical bytes lack proven reachability.
+ */
+function isEpLinearScanStopped(opCode, address, stopOpCodes) {
+    return stopOpCodes.indexOf(opCode) !== -1 && (opCode !== "CALL" || !isEpDirectCallReturnProven(address));
+}
+
 
 
 
