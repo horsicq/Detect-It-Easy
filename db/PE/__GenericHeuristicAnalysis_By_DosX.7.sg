@@ -7521,189 +7521,232 @@ function scanForObfuscations_Native() {
         // Two related states are tracked independently: known register VAs and the value
         // currently proven to occupy the top stack slot. RET matches only the latter.
 
-        // Keep the stateful linear proof below the broader 256-instruction CFG budget.
-        // Register and stack provenance cannot safely cross arbitrary branch convergence;
-        // 128 instructions covers a substantial startup stub while bounding linear work.
-        for (var i = 0; i < 128 && !isSyntheticEpTransferPresent; i++) {
-            var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
-                currentEpOpCode = getAsmOpCode(currentEpInstruction);
+        // Branches fork independent register and stack proofs; no facts merge at a join.
+        // Direct jumps retain one state, while both Jcc successors consume the same budget.
+        var syntheticEpPendingPaths = [{ Address: -1, TargetAddress: String(), TargetType: String(), KnownAddresses: {}, NeutralCount: 0, Visited: {} }],
+            syntheticEpInstructionBudget = 0;
 
-            if (!currentEpOpCode) break; // Safety check
+        for (var pathIndex = 0; pathIndex < syntheticEpPendingPaths.length && pathIndex < 8 && !isSyntheticEpTransferPresent; pathIndex++) {
+            var syntheticEpPath = syntheticEpPendingPaths[pathIndex],
+                syntheticEpFollowAddress = syntheticEpPath.Address,
+                syntheticEpVisitedAddresses = syntheticEpPath.Visited;
+            syntheticEpTargetAddress = syntheticEpPath.TargetAddress;
+            syntheticEpTargetType = syntheticEpPath.TargetType;
+            syntheticEpKnownAddresses = syntheticEpPath.KnownAddresses;
+            syntheticEpNeutralInstructionCount = syntheticEpPath.NeutralCount;
 
-            // Extract only register forms whose value can be followed without emulation.
-            var registerLiteralAddress = currentEpInstruction.match(syntheticEpRegisterLiteralAddressPattern),
-                registerCopy = currentEpInstruction.match(epRegisterCopyPattern),
-                pushedRegister = currentEpInstruction.match(syntheticEpPushedRegisterPattern),
-                storedRegister = currentEpInstruction.match(syntheticEpStoredRegisterPattern),
-                poppedRegister = currentEpInstruction.match(syntheticEpPoppedRegisterPattern),
-                exchangedRegister = currentEpInstruction.match(syntheticEpExchangedRegisterPattern),
-                pushedAddress = currentEpInstruction.match(/^PUSH (0X[0-9A-F]+|\d+)$/i),
-                storedAddress = currentEpInstruction.match(syntheticEpStoredAddressPattern),
-                stackArithmetic = currentEpInstruction.match(syntheticEpStackArithmeticPattern),
-                stackPivotLiteral = currentEpInstruction.match(syntheticEpStackPivotLiteralPattern),
-                stackPivotRegister = currentEpInstruction.match(syntheticEpStackPivotRegisterPattern),
-                targetAddress = pushedAddress || storedAddress,
-                targetAddressValue = targetAddress ? parseInt(targetAddress[1], 0) : -1,
-                registerWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern) ||
-                    currentEpInstruction.match(epTrackedRegisterWritePattern),
-                conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern),
-                simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
-                simplePolymorphicRegister = simplePolymorphicInstruction ? (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]) : String(),
-                valuePreservingInstruction = currentEpInstruction.match(epValuePreservingInstructionPattern),
-                partialRegisterWrite = currentEpInstruction.match(epPartialRegisterWritePattern),
-                isNeutralInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
-                    currentEpOpCode === "PAUSE" || currentEpOpCode === "CLC" ||
-                    currentEpOpCode === "STC" || currentEpOpCode === "CMC" ||
-                    (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
+            for (var i = 0; i < 128 && syntheticEpInstructionBudget < 256 && !isSyntheticEpTransferPresent; i++) {
+                var currentEpInstruction = syntheticEpFollowAddress === -1 ? emulateAndGetAsmInstructionByIndex(i) :
+                    PE.getDisasmString(syntheticEpFollowAddress),
+                    currentEpAddress = syntheticEpFollowAddress === -1 ? epAsmInstructionAddresses[i] : syntheticEpFollowAddress,
+                    currentEpOpCode = getAsmOpCode(currentEpInstruction),
+                    currentEpLength = syntheticEpFollowAddress === -1 ? 0 : PE.getDisasmLength(currentEpAddress);
 
-            if (stackPivotLiteral || stackPivotRegister) {
-                // A literal or register-propagated pivot is accepted only when the new stack
-                // is writable, physically backed, and already contains an executable image VA.
-                // Normalize subregister spelling to the physical register key used by the
-                // existing address-provenance map; no value is inferred from an unknown key.
-                var stackPivotRegisterName = stackPivotRegister ? (stackPivotRegister[1] || stackPivotRegister[2]).toUpperCase() : String(),
-                    stackPivotRegisterKey = stackPivotRegisterName.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
-                    stackPivotAddress = stackPivotLiteral ? parseInt(stackPivotLiteral[1], 0) : parseInt(syntheticEpKnownAddresses[stackPivotRegisterKey], 0),
-                    stackPivotPointerSize = PE_Cached.isI386 ? 4 : 8,
-                    stackOffset = isVirtualAddressRangeFileBacked(stackPivotAddress, stackPivotPointerSize,
-                        SECTION_FLAGS_WRITE) ? PE.VAToOffset(stackPivotAddress) : -1,
-                    returnAddress = stackOffset === -1 ? -1 : (PE_Cached.isI386 ?
-                        PE.read_uint32(stackOffset) : readUnsignedQword(stackOffset));
+                if (!currentEpOpCode || syntheticEpVisitedAddresses[currentEpAddress] ||
+                    (syntheticEpFollowAddress !== -1 && (currentEpLength <= 0 ||
+                        !isVirtualAddressRangeFileBacked(currentEpAddress, currentEpLength, SECTION_FLAGS_EXECUTE)))) break;
 
-                // Replacing SP invalidates every earlier top-of-stack fact. The new RET target
-                // is trusted only when its full pointer is present in writable image storage.
-                syntheticEpTargetAddress = String();
-                syntheticEpTargetType = String();
+                syntheticEpVisitedAddresses[currentEpAddress] = true;
+                syntheticEpInstructionBudget++;
 
-                if (returnAddress !== -1 &&
-                    isVirtualAddressRangeFileBacked(returnAddress, 1, SECTION_FLAGS_EXECUTE)) {
-                    // Requiring a file-backed executable destination prevents ordinary stack
-                    // setup, heap stacks and unresolved runtime addresses from becoming hits.
-                    syntheticEpTargetAddress = returnAddress;
-                    syntheticEpTargetType = "stack pivot";
-                    syntheticEpNeutralInstructionCount = 0;
-                } else {
-                    // An unresolved stack replacement invalidates every later linear stack fact.
-                    break;
-                }
-            } else if (targetAddress && (PE_Cached.isI386 || targetAddressValue <= 0x7FFFFFFF) &&
-                PE.VAToOffset(targetAddressValue) !== -1) {
-                // A direct PUSH or a native-width [SP] write proves the next RET target.
-                // AMD64 encodes both forms with a sign-extended imm32, therefore literals
-                // above INT32_MAX cannot denote the unsigned address printed in the operand.
-                syntheticEpTargetAddress = targetAddressValue.toString();
-                syntheticEpTargetType = pushedAddress ? "push" : "stack write";
-                syntheticEpNeutralInstructionCount = 0;
-            } else if (stackArithmetic && syntheticEpTargetAddress) {
-                var stackDelta = parseInt(stackArithmetic[2], 0),
-                    stackTarget = parseInt(syntheticEpTargetAddress, 0);
+                // Extract only register forms whose value can be followed without emulation.
+                var registerLiteralAddress = currentEpInstruction.match(syntheticEpRegisterLiteralAddressPattern),
+                    registerCopy = currentEpInstruction.match(epRegisterCopyPattern),
+                    pushedRegister = currentEpInstruction.match(syntheticEpPushedRegisterPattern),
+                    storedRegister = currentEpInstruction.match(syntheticEpStoredRegisterPattern),
+                    poppedRegister = currentEpInstruction.match(syntheticEpPoppedRegisterPattern),
+                    exchangedRegister = currentEpInstruction.match(syntheticEpExchangedRegisterPattern),
+                    pushedAddress = currentEpInstruction.match(/^PUSH (0X[0-9A-F]+|\d+)$/i),
+                    storedAddress = currentEpInstruction.match(syntheticEpStoredAddressPattern),
+                    stackArithmetic = currentEpInstruction.match(syntheticEpStackArithmeticPattern),
+                    stackPivotLiteral = currentEpInstruction.match(syntheticEpStackPivotLiteralPattern),
+                    stackPivotRegister = currentEpInstruction.match(syntheticEpStackPivotRegisterPattern),
+                    targetAddress = pushedAddress || storedAddress,
+                    targetAddressValue = targetAddress ? parseInt(targetAddress[1], 0) : -1,
+                    registerWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern) ||
+                        currentEpInstruction.match(epTrackedRegisterWritePattern),
+                    conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern),
+                    simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
+                    simplePolymorphicRegister = simplePolymorphicInstruction ? (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]) : String(),
+                    valuePreservingInstruction = currentEpInstruction.match(epValuePreservingInstructionPattern),
+                    partialRegisterWrite = currentEpInstruction.match(epPartialRegisterWritePattern),
+                    isNeutralInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" ||
+                        currentEpOpCode === "PAUSE" || currentEpOpCode === "CLC" ||
+                        currentEpOpCode === "STC" || currentEpOpCode === "CMC" ||
+                        (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
 
-                if (stackDelta <= (PE_Cached.isI386 ? 0xFFFFFFFF : 0x7FFFFFFF)) {
-                    stackTarget += stackArithmetic[1] === "ADD" ? stackDelta : -stackDelta;
-                    if (PE_Cached.isI386) stackTarget >>>= 0;
-                } else {
-                    stackTarget = -1;
-                }
+                if (stackPivotLiteral || stackPivotRegister) {
+                    // A literal or register-propagated pivot is accepted only when the new stack
+                    // is writable, physically backed, and already contains an executable image VA.
+                    // Normalize subregister spelling to the physical register key used by the
+                    // existing address-provenance map; no value is inferred from an unknown key.
+                    var stackPivotRegisterName = stackPivotRegister ? (stackPivotRegister[1] || stackPivotRegister[2]).toUpperCase() : String(),
+                        stackPivotRegisterKey = stackPivotRegisterName.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                        stackPivotAddress = stackPivotLiteral ? parseInt(stackPivotLiteral[1], 0) : parseInt(syntheticEpKnownAddresses[stackPivotRegisterKey], 0),
+                        stackPivotPointerSize = PE_Cached.isI386 ? 4 : 8,
+                        stackOffset = isVirtualAddressRangeFileBacked(stackPivotAddress, stackPivotPointerSize,
+                            SECTION_FLAGS_WRITE) ? PE.VAToOffset(stackPivotAddress) : -1,
+                        returnAddress = stackOffset === -1 ? -1 : (PE_Cached.isI386 ?
+                            PE.read_uint32(stackOffset) : readUnsignedQword(stackOffset));
 
-                syntheticEpTargetAddress = stackTarget >= 0 && stackTarget <= epMaximumSafeInteger &&
-                    isVirtualAddressRangeFileBacked(stackTarget, 1, SECTION_FLAGS_EXECUTE) ? stackTarget.toString() : String();
-                syntheticEpTargetType = syntheticEpTargetAddress ? "stack arithmetic" : String();
-                syntheticEpNeutralInstructionCount = 0;
-            } else if (registerLiteralAddress && PE.VAToOffset(parseInt(registerLiteralAddress[2], 0)) !== -1) {
-                // MOV reg, <VA> establishes a proven target for a later PUSH/MOV/XCHG.
-                syntheticEpKnownAddresses[registerLiteralAddress[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())] = registerLiteralAddress[2];
-                syntheticEpNeutralInstructionCount = 0;
-            } else if (registerCopy && syntheticEpKnownAddresses[registerCopy[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
-                // Preserve provenance through a plain register-to-register copy. A 32-bit
-                // destination zero-extends the truncated value, so validate that VA again.
-                const registerCopyDestination = registerCopy[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
-                var registerCopySourceAddress = syntheticEpKnownAddresses[registerCopy[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                    // Replacing SP invalidates every earlier top-of-stack fact. The new RET target
+                    // is trusted only when its full pointer is present in writable image storage.
+                    syntheticEpTargetAddress = String();
+                    syntheticEpTargetType = String();
 
-                if (epRegister32BitPattern.test(registerCopy[1])) {
-                    registerCopySourceAddress = (parseInt(registerCopySourceAddress, 0) >>> 0).toString();
-                }
-
-                if (PE.VAToOffset(parseInt(registerCopySourceAddress, 0)) !== -1) {
-                    syntheticEpKnownAddresses[registerCopyDestination] = registerCopySourceAddress;
-                } else {
-                    delete syntheticEpKnownAddresses[registerCopyDestination];
-                }
-                syntheticEpNeutralInstructionCount = 0;
-            } else if (poppedRegister && syntheticEpTargetAddress) {
-                // PUSH <VA>; POP reg is a common polymorphic spelling of MOV reg, <VA>.
-                // Moving the proof into a register also clears the top-of-stack proof,
-                // because POP has consumed that slot.
-                syntheticEpKnownAddresses[poppedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())] = syntheticEpTargetAddress;
-                syntheticEpTargetAddress = String();
-                syntheticEpTargetType = String();
-                syntheticEpNeutralInstructionCount = 0;
-            } else if (pushedRegister && syntheticEpKnownAddresses[pushedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
-                syntheticEpTargetAddress = syntheticEpKnownAddresses[pushedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
-                syntheticEpTargetType = "register push";
-
-                syntheticEpNeutralInstructionCount = 0;
-            } else if (storedRegister && syntheticEpKnownAddresses[storedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
-                syntheticEpTargetAddress = syntheticEpKnownAddresses[storedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
-                syntheticEpTargetType = "register stack write";
-
-                syntheticEpNeutralInstructionCount = 0;
-            } else if (exchangedRegister && syntheticEpKnownAddresses[exchangedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
-                // XCHG [ESP/RSP], reg replaces the return address without a direct MOV.
-                syntheticEpTargetAddress = syntheticEpKnownAddresses[exchangedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
-                syntheticEpTargetType = "register stack exchange";
-
-                syntheticEpNeutralInstructionCount = 0;
-            } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetAddress) {
-                // RET at a process entry point is meaningful here only as a concealed transfer.
-                if (syntheticEpTargetType === "stack pivot") {
-                    log(logType.emulation, "Stack pivot redirects Ret near EP to executable code at VA 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
-
-                    isStackPivotEpTransferPresent = true;
-                } else {
-                    log(logType.emulation, "Synthetic " + syntheticEpTargetType + "/Ret transfer near EP to VA 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
-                }
-
-                isSyntheticEpTransferPresent = true;
-            } else if (isNeutralInstruction && syntheticEpNeutralInstructionCount < epNeutralInstructionLimit) {
-                // Permit limited stack-preserving junk commonly inserted by protectors.
-                syntheticEpNeutralInstructionCount++;
-            } else if (simplePolymorphicInstruction) {
-                // A PE32+ r32 self-operation zero-extends only its physical register.
-                // Preserve unrelated address proofs and any proven top-of-stack target.
-                var simplePolymorphicRegisterKey = (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]).toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
-
-                delete syntheticEpKnownAddresses[simplePolymorphicRegisterKey];
-            } else if (valuePreservingInstruction) {
-                var valuePreservingRegister = (valuePreservingInstruction[1] || valuePreservingInstruction[2]).toUpperCase(),
-                    valuePreservingRegisterKey = valuePreservingRegister.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
-                    valuePreservingAddress = syntheticEpKnownAddresses[valuePreservingRegisterKey];
-
-                if (valuePreservingAddress !== undefined && PE_Cached.is64bit && epRegister32BitPattern.test(valuePreservingRegister)) {
-                    valuePreservingAddress = (parseInt(valuePreservingAddress, 0) >>> 0).toString();
-
-                    if (PE.VAToOffset(parseInt(valuePreservingAddress, 0)) !== -1) {
-                        syntheticEpKnownAddresses[valuePreservingRegisterKey] = valuePreservingAddress;
+                    if (returnAddress !== -1 &&
+                        isVirtualAddressRangeFileBacked(returnAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                        // Requiring a file-backed executable destination prevents ordinary stack
+                        // setup, heap stacks and unresolved runtime addresses from becoming hits.
+                        syntheticEpTargetAddress = returnAddress;
+                        syntheticEpTargetType = "stack pivot";
+                        syntheticEpNeutralInstructionCount = 0;
                     } else {
-                        delete syntheticEpKnownAddresses[valuePreservingRegisterKey];
+                        // An unresolved stack replacement invalidates every later linear stack fact.
+                        break;
                     }
+                } else if (targetAddress && (PE_Cached.isI386 || targetAddressValue <= 0x7FFFFFFF) &&
+                    PE.VAToOffset(targetAddressValue) !== -1) {
+                    // A direct PUSH or a native-width [SP] write proves the next RET target.
+                    // AMD64 encodes both forms with a sign-extended imm32, therefore literals
+                    // above INT32_MAX cannot denote the unsigned address printed in the operand.
+                    syntheticEpTargetAddress = targetAddressValue.toString();
+                    syntheticEpTargetType = pushedAddress ? "push" : "stack write";
+                    syntheticEpNeutralInstructionCount = 0;
+                } else if (stackArithmetic && syntheticEpTargetAddress) {
+                    var stackDelta = parseInt(stackArithmetic[2], 0),
+                        stackTarget = parseInt(syntheticEpTargetAddress, 0);
+
+                    if (stackDelta <= (PE_Cached.isI386 ? 0xFFFFFFFF : 0x7FFFFFFF)) {
+                        stackTarget += stackArithmetic[1] === "ADD" ? stackDelta : -stackDelta;
+                        if (PE_Cached.isI386) stackTarget >>>= 0;
+                    } else {
+                        stackTarget = -1;
+                    }
+
+                    syntheticEpTargetAddress = stackTarget >= 0 && stackTarget <= epMaximumSafeInteger &&
+                        isVirtualAddressRangeFileBacked(stackTarget, 1, SECTION_FLAGS_EXECUTE) ? stackTarget.toString() : String();
+                    syntheticEpTargetType = syntheticEpTargetAddress ? "stack arithmetic" : String();
+                    syntheticEpNeutralInstructionCount = 0;
+                } else if (registerLiteralAddress && PE.VAToOffset(parseInt(registerLiteralAddress[2], 0)) !== -1) {
+                    // MOV reg, <VA> establishes a proven target for a later PUSH/MOV/XCHG.
+                    syntheticEpKnownAddresses[registerLiteralAddress[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())] = registerLiteralAddress[2];
+                    syntheticEpNeutralInstructionCount = 0;
+                } else if (registerCopy && syntheticEpKnownAddresses[registerCopy[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
+                    // Preserve provenance through a plain register-to-register copy. A 32-bit
+                    // destination zero-extends the truncated value, so validate that VA again.
+                    const registerCopyDestination = registerCopy[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                    var registerCopySourceAddress = syntheticEpKnownAddresses[registerCopy[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+
+                    if (epRegister32BitPattern.test(registerCopy[1])) {
+                        registerCopySourceAddress = (parseInt(registerCopySourceAddress, 0) >>> 0).toString();
+                    }
+
+                    if (PE.VAToOffset(parseInt(registerCopySourceAddress, 0)) !== -1) {
+                        syntheticEpKnownAddresses[registerCopyDestination] = registerCopySourceAddress;
+                    } else {
+                        delete syntheticEpKnownAddresses[registerCopyDestination];
+                    }
+                    syntheticEpNeutralInstructionCount = 0;
+                } else if (poppedRegister && syntheticEpTargetAddress) {
+                    // PUSH <VA>; POP reg is a common polymorphic spelling of MOV reg, <VA>.
+                    // Moving the proof into a register also clears the top-of-stack proof,
+                    // because POP has consumed that slot.
+                    syntheticEpKnownAddresses[poppedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())] = syntheticEpTargetAddress;
+                    syntheticEpTargetAddress = String();
+                    syntheticEpTargetType = String();
+                    syntheticEpNeutralInstructionCount = 0;
+                } else if (pushedRegister && syntheticEpKnownAddresses[pushedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
+                    syntheticEpTargetAddress = syntheticEpKnownAddresses[pushedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                    syntheticEpTargetType = "register push";
+
+                    syntheticEpNeutralInstructionCount = 0;
+                } else if (storedRegister && syntheticEpKnownAddresses[storedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
+                    syntheticEpTargetAddress = syntheticEpKnownAddresses[storedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                    syntheticEpTargetType = "register stack write";
+
+                    syntheticEpNeutralInstructionCount = 0;
+                } else if (exchangedRegister && syntheticEpKnownAddresses[exchangedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())]) {
+                    // XCHG [ESP/RSP], reg replaces the return address without a direct MOV.
+                    syntheticEpTargetAddress = syntheticEpKnownAddresses[exchangedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                    syntheticEpTargetType = "register stack exchange";
+
+                    syntheticEpNeutralInstructionCount = 0;
+                } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetAddress && isVirtualAddressRangeFileBacked(parseInt(syntheticEpTargetAddress, 0), 1, SECTION_FLAGS_EXECUTE)) {
+                    // RET at a process entry point is meaningful here only as a concealed transfer.
+                    if (syntheticEpTargetType === "stack pivot") {
+                        log(logType.emulation, "Stack pivot redirects Ret near EP to executable code at VA 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
+
+                        isStackPivotEpTransferPresent = true;
+                    } else {
+                        log(logType.emulation, "Synthetic " + syntheticEpTargetType + "/Ret transfer near EP to VA 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
+                    }
+
+                    isSyntheticEpTransferPresent = true;
+                } else if (isNeutralInstruction && syntheticEpNeutralInstructionCount < epNeutralInstructionLimit) {
+                    // Permit limited stack-preserving junk commonly inserted by protectors.
+                    syntheticEpNeutralInstructionCount++;
+                } else if (simplePolymorphicInstruction) {
+                    // A PE32+ r32 self-operation zero-extends only its physical register.
+                    // Preserve unrelated address proofs and any proven top-of-stack target.
+                    var simplePolymorphicRegisterKey = (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]).toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+
+                    delete syntheticEpKnownAddresses[simplePolymorphicRegisterKey];
+                } else if (valuePreservingInstruction) {
+                    var valuePreservingRegister = (valuePreservingInstruction[1] || valuePreservingInstruction[2]).toUpperCase(),
+                        valuePreservingRegisterKey = valuePreservingRegister.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                        valuePreservingAddress = syntheticEpKnownAddresses[valuePreservingRegisterKey];
+
+                    if (valuePreservingAddress !== undefined && PE_Cached.is64bit && epRegister32BitPattern.test(valuePreservingRegister)) {
+                        valuePreservingAddress = (parseInt(valuePreservingAddress, 0) >>> 0).toString();
+
+                        if (PE.VAToOffset(parseInt(valuePreservingAddress, 0)) !== -1) {
+                            syntheticEpKnownAddresses[valuePreservingRegisterKey] = valuePreservingAddress;
+                        } else {
+                            delete syntheticEpKnownAddresses[valuePreservingRegisterKey];
+                        }
+                    }
+                } else if (partialRegisterWrite) {
+                    delete syntheticEpKnownAddresses[getEpPartialRegisterKey(partialRegisterWrite[1])];
+                    syntheticEpNeutralInstructionCount = 0;
+                } else if (registerWrite) {
+                    // An unrelated register write cannot invalidate other proven addresses.
+                    // Remove only the overwritten register instead of discarding all provenance.
+                    delete syntheticEpKnownAddresses[registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                } else if (conditionalBranch) {
+                    var branchTarget = parseInt(conditionalBranch[2], 0);
+
+                    if (syntheticEpPendingPaths.length < 8 && !syntheticEpVisitedAddresses[branchTarget] &&
+                        isVirtualAddressRangeFileBacked(branchTarget, 1, SECTION_FLAGS_EXECUTE)) {
+                        var branchAddresses = {}, branchVisited = {};
+                        for (var register in syntheticEpKnownAddresses) branchAddresses[register] = syntheticEpKnownAddresses[register];
+                        for (var address in syntheticEpVisitedAddresses) branchVisited[address] = true;
+                        syntheticEpPendingPaths.push({
+                            Address: branchTarget, TargetAddress: syntheticEpTargetAddress,
+                            TargetType: syntheticEpTargetType, KnownAddresses: branchAddresses,
+                            NeutralCount: syntheticEpNeutralInstructionCount, Visited: branchVisited
+                        });
+                    }
+                } else if (/^(?:CMP|TEST)$/.test(currentEpOpCode)) {
+                    // Comparisons preserve all register and stack facts on this path.
+                } else if (currentEpOpCode === "JMP") {
+                    var directJump = currentEpInstruction.match(epDirectJumpPattern),
+                        directTarget = directJump ? parseInt(directJump[1], 0) : -1;
+
+                    if (!directJump || !isVirtualAddressRangeFileBacked(directTarget, 1, SECTION_FLAGS_EXECUTE)) break;
+                    syntheticEpFollowAddress = directTarget;
+                    continue;
+                } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1) {
+                    break;
+                } else {
+                    // Any other instruction can alter stack/register state, so discard provenance.
+                    syntheticEpTargetAddress = String();
+                    syntheticEpTargetType = String();
+                    syntheticEpNeutralInstructionCount = 0;
+                    syntheticEpKnownAddresses = {};
                 }
-            } else if (partialRegisterWrite) {
-                delete syntheticEpKnownAddresses[getEpPartialRegisterKey(partialRegisterWrite[1])];
-                syntheticEpNeutralInstructionCount = 0;
-            } else if (registerWrite) {
-                // An unrelated register write cannot invalidate other proven addresses.
-                // Remove only the overwritten register instead of discarding all provenance.
-                delete syntheticEpKnownAddresses[registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
-            } else if (conditionalBranch || /^(?:CMP|TEST)$/.test(currentEpOpCode)) {
-                // Register and stack provenance survives on the physical fall-through path.
-            } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1) {
-                break;
-            } else {
-                // Any other instruction can alter stack/register state, so discard provenance.
-                syntheticEpTargetAddress = String();
-                syntheticEpTargetType = String();
-                syntheticEpNeutralInstructionCount = 0;
-                syntheticEpKnownAddresses = {};
+
+                if (syntheticEpFollowAddress !== -1) syntheticEpFollowAddress += currentEpLength;
             }
         }
     }
