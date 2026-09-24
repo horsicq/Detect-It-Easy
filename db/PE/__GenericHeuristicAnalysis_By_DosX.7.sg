@@ -8833,6 +8833,8 @@ function scanForObfuscations_Native() {
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const indirectEpTransferPattern = new RegExp("^(JMP|CALL) (" + epGeneralPurposeRegister + ")$", "i"),
             indirectEpArithmeticPattern = new RegExp("^(ADD|SUB|XOR) (" + epGeneralPurposeRegister + "), (0X[0-9A-F]+|\\d+)$", "i"),
+            indirectEpLeaPattern = new RegExp("^LEA (" + epGeneralPurposeRegister + "), \\[(RIP|" + epGeneralPurposeRegister + ")(?: ([+-]) (0X[0-9A-F]+|\\d+))?\\]$", "i"),
+            indirectEpLeaAbsolutePattern = new RegExp("^LEA (" + epGeneralPurposeRegister + "), \\[(0X[0-9A-F]+|\\d+)\\]$", "i"),
             indirectEpRegisterWritePattern = new RegExp("^(?:MOV(?:ABS)?|MOVZX|MOVSX|MOVSXD|LEA|XOR|ADD|SUB|ADC|SBB|AND|OR|NOT|NEG|INC|DEC|POP) (" + epGeneralPurposeRegister + ")(?:,|$)", "i");
 
         // Multiple proven addresses are retained because polymorphic junk commonly writes
@@ -8852,6 +8854,8 @@ function scanForObfuscations_Native() {
             var registerLiteralAddress = currentEpInstruction.match(epLiteralMovePattern),
                 registerCopy = currentEpInstruction.match(epRegisterCopyPattern),
                 registerArithmetic = currentEpInstruction.match(indirectEpArithmeticPattern),
+                registerLea = currentEpInstruction.match(indirectEpLeaPattern),
+                registerLeaAbsolute = currentEpInstruction.match(indirectEpLeaAbsolutePattern),
                 indirectTransfer = currentEpInstruction.match(indirectEpTransferPattern),
                 registerWrite = currentEpInstruction.match(indirectEpRegisterWritePattern),
                 conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern),
@@ -8921,6 +8925,47 @@ function scanForObfuscations_Native() {
                 } else {
                     delete indirectEpKnownAddresses[arithmeticRegisterKey];
                 }
+            } else if (registerLeaAbsolute) {
+                var leaDestination = registerLeaAbsolute[1].toUpperCase(),
+                    leaDestinationKey = leaDestination.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    leaTargetAddress = parseInt(registerLeaAbsolute[2], 0);
+
+                if (epRegister32BitPattern.test(leaDestination)) leaTargetAddress >>>= 0;
+                if (leaTargetAddress >= 0 && leaTargetAddress <= epMaximumSafeInteger &&
+                    !(PE_Cached.is64bit && !epRegister32BitPattern.test(leaDestination) &&
+                        leaTargetAddress >= 0x80000000 && leaTargetAddress <= 0xFFFFFFFF) &&
+                    isVirtualAddressRangeFileBacked(leaTargetAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                    indirectEpKnownAddresses[leaDestinationKey] = leaTargetAddress;
+                } else {
+                    delete indirectEpKnownAddresses[leaDestinationKey];
+                }
+            } else if (registerLea) {
+                var leaDestination = registerLea[1].toUpperCase(),
+                    leaSource = registerLea[2].toUpperCase(),
+                    leaDestinationKey = leaDestination.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    leaSourceKey = leaSource.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    leaDisplacement = registerLea[4] ? parseInt(registerLea[4], 0) : 0,
+                    leaInstructionLength = leaSource === "RIP" ? PE.getDisasmLength(epAsmInstructionAddresses[i]) : 0,
+                    leaBaseAddress = leaSource === "RIP" && leaInstructionLength >= 1 && leaInstructionLength <= 15 ?
+                        epAsmInstructionAddresses[i] + leaInstructionLength : indirectEpKnownAddresses[leaSourceKey],
+                    leaWidthsMatch = leaSource === "RIP" ? PE_Cached.is64bit :
+                        PE_Cached.is64bit ? !epRegister32BitPattern.test(leaSource) :
+                            epRegister32BitPattern.test(leaDestination) && epRegister32BitPattern.test(leaSource);
+
+                if (leaWidthsMatch && leaBaseAddress !== undefined &&
+                    leaDisplacement <= (PE_Cached.is64bit && registerLea[3] === "+" ? 0x7FFFFFFF : 0x80000000)) {
+                    var leaTargetAddress = leaBaseAddress + (registerLea[3] === "+" ? leaDisplacement : -leaDisplacement);
+
+                    if (PE_Cached.isI386 || epRegister32BitPattern.test(leaDestination)) leaTargetAddress >>>= 0;
+                    if (leaTargetAddress >= 0 && leaTargetAddress <= epMaximumSafeInteger &&
+                        isVirtualAddressRangeFileBacked(leaTargetAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                        indirectEpKnownAddresses[leaDestinationKey] = leaTargetAddress;
+                    } else {
+                        delete indirectEpKnownAddresses[leaDestinationKey];
+                    }
+                } else {
+                    delete indirectEpKnownAddresses[leaDestinationKey];
+                }
             } else if (indirectTransfer) {
                 var indirectTransferRegister = indirectTransfer[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
                 var indirectEpTargetAddress = indirectEpKnownAddresses[indirectTransferRegister];
@@ -8965,8 +9010,10 @@ function scanForObfuscations_Native() {
                 // Unknown semantics may consume or transform any address, so restart tracking.
                 indirectEpKnownAddresses = {};
 
-                if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") break;
+                if (isEpLinearScanStopped(currentEpOpCode, epAsmInstructionAddresses[i], epScanStopOpCodes)) break;
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
         }
     }
 
