@@ -8082,7 +8082,8 @@ function scanForObfuscations_Native() {
         var degenerateEpBranchOpCode = String(),
             degenerateEpBranchTarget = -1,
             degenerateEpNeutralInstructionCount = 0,
-            degenerateEpCurrentAddress = PE_Cached.addressOfUnmanagedEntryPoint;
+            degenerateEpCurrentAddress = PE_Cached.addressOfUnmanagedEntryPoint,
+            degenerateEpInstructionInteriors = {};
 
         for (var i = 0; i < 64 && !isDegenerateEpConditionalBranchPresent; i++) {
             var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
@@ -8091,7 +8092,13 @@ function scanForObfuscations_Native() {
                 fallThroughEpInstructionAddress = degenerateEpCurrentAddress + currentEpInstructionLength,
                 nextEpInstructionAddress = PE.getDisasmNextAddress(degenerateEpCurrentAddress);
 
-            if (!currentEpOpCode || currentEpInstructionLength <= 0 || nextEpInstructionAddress === -1) break; // Safety check
+            if (!currentEpOpCode || currentEpInstructionLength <= 0 || nextEpInstructionAddress !== fallThroughEpInstructionAddress ||
+                epAsmInstructionAddresses[i] !== degenerateEpCurrentAddress ||
+                !isVirtualAddressRangeFileBacked(degenerateEpCurrentAddress, currentEpInstructionLength, SECTION_FLAGS_EXECUTE)) break;
+
+            for (var byteIndex = 1; byteIndex < currentEpInstructionLength; byteIndex++) {
+                degenerateEpInstructionInteriors[(degenerateEpCurrentAddress + byteIndex).toString()] = true;
+            }
 
             var conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern),
                 directJump = currentEpInstruction.match(epDirectJumpPattern),
@@ -8110,11 +8117,15 @@ function scanForObfuscations_Native() {
                     currentCanonicalBranchOpCode = epCanonicalBranchOpCodes[currentEpOpCode] || currentEpOpCode,
                     previousCanonicalBranchOpCode = epCanonicalBranchOpCodes[degenerateEpBranchOpCode] || degenerateEpBranchOpCode,
                     branchPair = previousCanonicalBranchOpCode + ":" + currentCanonicalBranchOpCode,
-                    reverseBranchPair = currentCanonicalBranchOpCode + ":" + previousCanonicalBranchOpCode;
+                    reverseBranchPair = currentCanonicalBranchOpCode + ":" + previousCanonicalBranchOpCode,
+                    branchTargetProof = traceEpDirectJumpChain(currentBranchTarget, 32);
 
-                if (currentBranchTarget === fallThroughEpInstructionAddress ||
-                    (currentBranchTarget === degenerateEpBranchTarget && PE.VAToOffset(currentBranchTarget) !== -1 &&
-                        (epComplementaryBranchPairs.indexOf(branchPair) !== -1 || epComplementaryBranchPairs.indexOf(reverseBranchPair) !== -1))) {
+                if (branchTargetProof && !degenerateEpInstructionInteriors[currentBranchTarget.toString()] &&
+                    ((currentBranchTarget === fallThroughEpInstructionAddress &&
+                        isVirtualAddressRangeFileBacked(currentBranchTarget, 1, SECTION_FLAGS_EXECUTE)) ||
+                        (currentBranchTarget === degenerateEpBranchTarget &&
+                            isVirtualAddressRangeFileBacked(currentBranchTarget, 1, SECTION_FLAGS_EXECUTE) &&
+                            (epComplementaryBranchPairs.indexOf(branchPair) !== -1 || epComplementaryBranchPairs.indexOf(reverseBranchPair) !== -1)))) {
                     log(logType.emulation, "Degenerate conditional branch near EP: " + currentEpInstruction);
 
                     isDegenerateEpConditionalBranchPresent = true;
@@ -8126,20 +8137,13 @@ function scanForObfuscations_Native() {
             } else if (directJump) {
                 var degenerateEpJumpTarget = parseInt(directJump[1], 0);
 
-                // A short JMP-only chain still makes both Jcc paths equivalent.
-                for (var jumpIndex = 0; jumpIndex < 2 && degenerateEpBranchOpCode && degenerateEpJumpTarget !== degenerateEpBranchTarget &&
-                    Math.abs(degenerateEpJumpTarget - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x200 &&
-                    isVirtualAddressRangeFileBacked(degenerateEpJumpTarget, 1, SECTION_FLAGS_EXECUTE); jumpIndex++) {
-                    var chainedJump = PE.getDisasmString(degenerateEpJumpTarget).match(epDirectJumpPattern),
-                        chainedJumpLength = PE.getDisasmLength(degenerateEpJumpTarget);
+                // Neither arm may have side effects before its direct-JMP chain converges.
+                var takenPath = degenerateEpBranchOpCode ? traceEpDirectJumpChain(degenerateEpBranchTarget, 32) : undefined,
+                    fallThroughPath = traceEpDirectJumpChain(degenerateEpJumpTarget, 32),
+                    branchIntoScannedInstruction = degenerateEpInstructionInteriors[degenerateEpBranchTarget.toString()] ||
+                        degenerateEpInstructionInteriors[degenerateEpJumpTarget.toString()];
 
-                    if (!chainedJump || chainedJumpLength <= 0 || !isVirtualAddressRangeFileBacked(degenerateEpJumpTarget, chainedJumpLength, SECTION_FLAGS_EXECUTE)) break;
-
-                    degenerateEpJumpTarget = parseInt(chainedJump[1], 0);
-                }
-
-                if (degenerateEpBranchOpCode && degenerateEpBranchTarget === degenerateEpJumpTarget &&
-                    PE.VAToOffset(degenerateEpBranchTarget) !== -1) {
+                if (!branchIntoScannedInstruction && takenPath && fallThroughPath && takenPath.Target === fallThroughPath.Target) {
                     log(logType.emulation, "Degenerate conditional branch near EP: " + currentEpInstruction);
 
                     isDegenerateEpConditionalBranchPresent = true;
