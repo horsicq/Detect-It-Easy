@@ -11518,6 +11518,9 @@ function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
 
     return proven[startAddress.toString()] === true;
 }
+
+
+
 /**
  * Proves that every bounded path through a directly called native routine returns.
  * Unknown calls, indirect branches, non-returning terminals, cycles and budget exhaustion
@@ -11628,6 +11631,27 @@ function getEpKnownBranchResult(opCode, zeroFlag, carryFlag) {
 
 
 
+/**
+ * Rejects a physical EP fall-through when a conditional branch may skip it.
+ * A branch to the next instruction cannot skip bytes. Otherwise only a directly
+ * preceding self-zeroing XOR/SUB or self-CMP proves the known-zero flags needed
+ * to establish that the branch is never taken. Unknown flag provenance fails closed.
+ *
+ * @param {string} instruction - Current decoded conditional branch, or another instruction.
+ * @param {string} previousInstruction - Immediately preceding physical instruction.
+ * @param {number} address - Virtual address of the current instruction.
+ * @returns {boolean} Whether subsequent physical bytes lack proven reachability.
+ */
+function isEpLinearFallthroughUnproven(instruction, previousInstruction, address) {
+    var branch = instruction && instruction.match(/^(J(?!MP)[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
+    if (!branch) return false;
+
+    var length = PE.getDisasmLength(address);
+    if (length > 0 && parseInt(branch[2], 0) === address + length) return false;
+    if (!previousInstruction || !/^(?:XOR|SUB|CMP) ([A-Z][A-Z0-9]*), \1$/i.test(previousInstruction)) return true;
+
+    return !/^(?:JA|JNBE|JB|JNAE|JC|JG|JNLE|JL|JNGE|JNE|JNZ|JO|JNP|JPO|JS)$/.test(branch[1].toUpperCase());
+}
 
 
 
