@@ -9675,10 +9675,13 @@ function scanForObfuscations_Native() {
 
                 if (epPolymorphismOpCode === "CALL") {
                     var epPolymorphismTargetKey = epPolymorphismTargetAddress.toString();
+                    // UD2 and HLT have no ordinary return edge to the following bytes.
+                    var isEpDirectCallTerminal = isVirtualAddressRangeFileBacked(epPolymorphismTargetAddress, 1, SECTION_FLAGS_EXECUTE) &&
+                        /^(?:UD2|HLT)$/.test(getAsmOpCode(PE.getDisasmString(epPolymorphismTargetAddress)));
 
                     // Preserve every reachable direct call target for secondary validation.
                     epDirectCallTargets[epPolymorphismTargetKey] = true;
-                    if (epPolymorphismTargetAddress !== epPolymorphismNextAddress) epCallFallthroughAddresses[epPolymorphismAddressKey] = epPolymorphismNextAddress;
+                    if (!isEpDirectCallTerminal && epPolymorphismTargetAddress !== epPolymorphismNextAddress) epCallFallthroughAddresses[epPolymorphismAddressKey] = epPolymorphismNextAddress;
                 }
 
                 if (epPolymorphismOpCode === "JMP" || epPolymorphismOpCode === "JMPF") {
@@ -9687,7 +9690,7 @@ function scanForObfuscations_Native() {
                 } else if (epPolymorphismOpCode === "CALL") {
                     // Continue through the caller before descending into a direct callee. This
                     // keeps the bounded walk focused on startup flow without losing the target.
-                    epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
+                    if (!isEpDirectCallTerminal) epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
                     epPolymorphismPendingAddresses.push(epPolymorphismTargetAddress);
                 } else {
                     // Conditional branches retain both target and fall-through paths.
