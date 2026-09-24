@@ -7419,19 +7419,13 @@ function scanForObfuscations_Native() {
         if (PE_Cached.isEntryPointAnalysisAllowed) {
             for (var i = 0; i < 32 && !isAddrToStackTrickPresent; i++) {
                 var currentInstruction = emulateAndGetAsmInstructionByIndex(i),
-                    addrToStackOpCode = getAsmOpCode(currentInstruction);
+                    addrToStackOpCode = getAsmOpCode(currentInstruction),
+                    disasmAddress = epAsmInstructionAddresses[i];
 
                 if (!currentInstruction) break; // Safety check
 
                 // Check if instruction is CALL
                 if (addrToStackOpCode === "CALL") {
-                    // Get address and offset for this instruction
-                    var disasmAddress = PE_Cached.addressOfUnmanagedEntryPoint;
-
-                    for (var j = 0; j < i; j++) {
-                        disasmAddress = PE.getDisasmNextAddress(disasmAddress);
-                    }
-
                     var currentOffset = PE.VAToOffset(disasmAddress);
 
                     // Check if machine code matches E8 00 00 00 00 pattern
@@ -7440,10 +7434,13 @@ function scanForObfuscations_Native() {
 
                         isAddrToStackTrickPresent = true;
                     }
+
+                    if (!isAddrToStackTrickPresent && !isEpDirectCallReturnProven(disasmAddress)) break;
                 }
 
                 // Do not inspect bytes which cannot execute after a hard control-flow transfer.
                 if (/^(?:HLT|INT(?:1|3|O)?|IRET(?:D|Q)?|JMPF?|LOOP(?:E|NE|NZ|Z)?|RET(?:F|N)?|SYS(?:CALL|ENTER|RET|EXIT)|UD2)$/.test(addrToStackOpCode)) break;
+                if (isEpLinearFallthroughUnproven(currentInstruction, epAsmInstructions[i - 1], disasmAddress)) break;
             }
         }
     }
