@@ -6559,6 +6559,14 @@ function traceEpWrittenCodeTransfer() {
 function isEpResolverPathProven(starts, successors, instructions, indirectAddresses, patterns) {
     var indirect = {}, pending = [], nextIndex = 0, visited = {};
 
+    function swapFacts(facts, left, right) {
+        var value = facts[left];
+        if (facts[right] === undefined) delete facts[left];
+        else facts[left] = facts[right];
+        if (value === undefined) delete facts[right];
+        else facts[right] = value;
+    }
+
     function registerKey(name) {
         var register = name.toUpperCase();
         if (/^[ABCD][HL]$/.test(register)) return "R" + register[0] + "X";
@@ -6569,25 +6577,26 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
 
     for (var i = 0; i < indirectAddresses.length; i++) indirect[indirectAddresses[i].toString()] = true;
     for (var i = 0; i < starts.length; i++) {
-        pending.push({ Address: starts[i], PebState: {}, PebProven: false, Stage: 0, Fields: {}, ByteRead: false, ByteRegisters: {}, Linked: {}, Kinds: {}, Backward: false });
+        pending.push({ Address: starts[i], PebState: {}, PebProven: false, Stage: 0, Fields: {}, ByteRead: false, ByteRegisters: {}, Linked: {}, Kinds: {}, UnsafeTargets: {}, Backward: false });
     }
 
     while (nextIndex < pending.length && nextIndex < 16384) {
         var state = pending[nextIndex++], key = state.Address.toString(), instruction = instructions[key];
         if (!instruction || !successors.hasOwnProperty(key)) continue;
 
-        var stage = state.Stage, fields = {}, kinds = {}, pebState = {}, byteRegisters = {}, linked = {}, pebProven = state.PebProven;
+        var stage = state.Stage, fields = {}, kinds = {}, pebState = {}, byteRegisters = {}, linked = {}, unsafeTargets = {}, pebProven = state.PebProven;
         for (var field in state.Fields) fields[field] = true;
         for (var pebRegister in state.PebState) pebState[pebRegister] = state.PebState[pebRegister];
         for (var byteRegister in state.ByteRegisters) byteRegisters[byteRegister] = true;
         for (var linkedRegister in state.Linked) linked[linkedRegister] = true;
+        for (var unsafeRegister in state.UnsafeTargets) unsafeTargets[unsafeRegister] = true;
         for (var register in state.Kinds) {
             kinds[register] = {};
             for (var kind in state.Kinds[register]) kinds[register][kind] = true;
         }
 
         var pebLoad = instruction.match(patterns.PebLoad), ldrLoad = instruction.match(patterns.LdrLoad),
-            listLoad = instruction.match(patterns.ListLoad), registerCopy = instruction.match(patterns.RegisterCopy),
+            listLoad = instruction.match(patterns.ListLoad), registerCopy = instruction.match(patterns.RegisterCopy), registerExchange = instruction.match(patterns.RegisterExchange),
             registerWrite = instruction.match(patterns.RegisterWrite), partialWrite = instruction.match(patterns.PartialWrite);
 
         if (pebLoad) {
@@ -6604,6 +6613,8 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
                 copyDestination = registerCopy[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String());
             if (pebState[copySource]) pebState[copyDestination] = pebState[copySource];
             else delete pebState[copyDestination];
+        } else if (registerExchange) {
+            swapFacts(pebState, registerKey(registerExchange[1]), registerKey(registerExchange[2]));
         } else if (registerWrite) {
             delete pebState[registerWrite[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String())];
         } else if (partialWrite) {
@@ -6654,8 +6665,21 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
                     else delete byteRegisters[hashDestination];
                     if (linked[hashSource]) linked[hashDestination] = true;
                     else delete linked[hashDestination];
+                    if (unsafeTargets[hashSource]) unsafeTargets[hashDestination] = true;
+                    else delete unsafeTargets[hashDestination];
+                } else if (registerExchange) {
+                    var left = registerKey(registerExchange[1]), right = registerKey(registerExchange[2]),
+                        leftLinked = !!linked[left], rightLinked = !!linked[right];
+                    // Preserve the hash on its new register but distrust the old indirect target.
+                    swapFacts(kinds, left, right);
+                    swapFacts(linked, left, right);
+                    swapFacts(byteRegisters, left, right);
+                    swapFacts(unsafeTargets, left, right);
+                    if (leftLinked && !rightLinked) unsafeTargets[left] = true;
+                    if (rightLinked && !leftLinked) unsafeTargets[right] = true;
                 } else if (registerWrite) {
                     var overwrittenRegister = registerKey(registerWrite[1]);
+                    if (linked[overwrittenRegister]) unsafeTargets[overwrittenRegister] = true;
                     delete kinds[overwrittenRegister];
                     delete linked[overwrittenRegister];
                     if (!patterns.ByteRead.test(instruction)) delete byteRegisters[overwrittenRegister];
@@ -6682,16 +6706,19 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
         for (var k = 0; k < kindKeys.length; k++) kindState += kindKeys[k] + "=" + Object.keys(kinds[kindKeys[k]]).sort().join(",") + ";";
         var pebKeys = Object.keys(pebState).sort(), pebStateKey = String();
         for (var k = 0; k < pebKeys.length; k++) pebStateKey += pebKeys[k] + pebState[pebKeys[k]];
-        var stateKey = key + ":" + pebProven + ":" + pebStateKey + ":" + stage + ":" + fieldKeys.join(",") + ":" + byteRead + ":" + kindState + ":" + Object.keys(byteRegisters).sort().join(",") + ":" + Object.keys(linked).sort().join(",") + ":" + state.Backward;
+        var stateKey = key + ":" + pebProven + ":" + pebStateKey + ":" + stage + ":" + fieldKeys.join(",") + ":" + byteRead + ":" + kindState + ":" + Object.keys(byteRegisters).sort().join(",") + ":" + Object.keys(linked).sort().join(",") + ":" + Object.keys(unsafeTargets).sort().join(",") + ":" + state.Backward;
         if (visited[stateKey]) continue;
         visited[stateKey] = true;
 
-        if (indirect[key] && stage === 2 && fieldKeys.length >= 2 && byteRead && hashPresent && state.Backward) return true;
+        var indirectRegister = instruction.match(/^(?:CALL|JMP) ([A-Z][A-Z0-9]*)$/i) ||
+            instruction.match(/^(?:CALL|JMP) (?:DWORD|QWORD) PTR (?:[A-Z]+:)?\[([A-Z][A-Z0-9]*)(?: [+-] (?:0X[0-9A-F]+|\d+))?\]$/i);
+        if (indirect[key] && stage === 2 && fieldKeys.length >= 2 && byteRead && hashPresent && state.Backward &&
+            !(indirectRegister && unsafeTargets[registerKey(indirectRegister[1])])) return true;
 
         var next = successors[key];
         for (var j = 0; j < next.length; j++) {
             var backward = state.Backward || (next[j] < state.Address && stage === 2 && fieldKeys.length >= 2 && byteRead && hashPresent);
-            pending.push({ Address: next[j], PebState: pebState, PebProven: pebProven, Stage: stage, Fields: fields, ByteRead: byteRead, ByteRegisters: byteRegisters, Linked: linked, Kinds: kinds, Backward: backward });
+            pending.push({ Address: next[j], PebState: pebState, PebProven: pebProven, Stage: stage, Fields: fields, ByteRead: byteRead, ByteRegisters: byteRegisters, Linked: linked, Kinds: kinds, UnsafeTargets: unsafeTargets, Backward: backward });
         }
     }
 
@@ -10156,6 +10183,7 @@ function scanForObfuscations_Native() {
                 LdrLoad: pebModuleWalkPatterns.LdrLoad,
                 ListLoad: pebModuleWalkPatterns.ListLoad,
                 RegisterCopy: epRegisterCopyPattern,
+                RegisterExchange: new RegExp("^XCHG (" + epGeneralPurposeRegister + "), (" + epGeneralPurposeRegister + ")$", "i"),
                 RegisterWrite: new RegExp("^(?:MOV(?:ABS)?|MOVZX|MOVSX|MOVSXD|LEA|XOR|ADD|SUB|ADC|SBB|AND|OR|NOT|NEG|INC|DEC|POP) (" + epGeneralPurposeRegister + ")(?:,|$)", "i"),
                 PartialWrite: epPartialRegisterWritePattern
             });
