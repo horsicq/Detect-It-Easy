@@ -9383,8 +9383,7 @@ function scanForObfuscations_Native() {
                 epPolymorphismOpCode = getAsmOpCode(epPolymorphismInstruction),
                 epPolymorphismInstructionLength = PE.getDisasmLength(epPolymorphismCurrentAddress);
 
-            if (!epPolymorphismOpCode || epPolymorphismOpCode === "DB" || epPolymorphismInstructionLength < 1 ||
-                epPolymorphismInstructionLength > 15 ||
+            if (!epPolymorphismOpCode || epPolymorphismOpCode === "DB" || epPolymorphismInstructionLength < 1 || epPolymorphismInstructionLength > 15 ||
                 !isVirtualAddressRangeFileBacked(epPolymorphismCurrentAddress, epPolymorphismInstructionLength, SECTION_FLAGS_EXECUTE)) continue;
 
             // Inspect the encoded instruction prefix groups at the already proven physical
@@ -10383,17 +10382,17 @@ function scanForObfuscations_Native() {
 
 
 
-    // Check for carry-fed bitstream decoding with either repeated string copies and an
-    // indirect transfer, or a scalar byte-copy loop followed by a jump into virtual code.
+    // Check for carry-fed bitstream decoding with repeated string copies, or a
+    // scalar byte-copy loop and transfer into generated code.
 
     var isBitstreamEpUnpackerPresent = false;
 
-    var isScalarBitstreamCopyPresent = false;
+    var isScalarBitstreamCopyPresent = false,
+        isScalarBitstreamVirtualWritePresent = false;
 
     if (PE_Cached.isEntryPointAnalysisAllowed && epBitstreamAdcCount >= 8 && epPolymorphismBackwardControlFlowCount !== 0 &&
-        epBitstreamScalarReadCandidates && epBitstreamScalarReadCandidates.length &&
-        epValidInvalidBranchCandidates.length) {
-        var bitstreamVirtualTargets = [];
+        epBitstreamScalarReadCandidates && epBitstreamScalarReadCandidates.length) {
+        var bitstreamVirtualTargets = [], bitstreamVirtualDestinations = [];
 
         for (var candidateIndex = 0; candidateIndex < epValidInvalidBranchCandidates.length; candidateIndex++) {
             var candidate = epValidInvalidBranchCandidates[candidateIndex];
@@ -10418,7 +10417,23 @@ function scanForObfuscations_Native() {
             }
         }
 
-        if (bitstreamVirtualTargets.length) {
+        // A decoder that provably copies bytes into a separate, zero-raw executable
+        // section is an unpacker even when later API calls obscure its final jump.
+        for (var d = 0; d < PE_Cached.numberOfSections; d++) {
+            var bitstreamDestinationRva = PE.getSectionVirtualAddress(d),
+                bitstreamDestinationSize = PE.getSectionVirtualSize(d);
+
+            if (d !== PE_Cached.indexOfEntryPointSection && PE.getSectionFileSize(d) === 0 && bitstreamDestinationSize >= 0x1000 &&
+                (PE.section[d].Characteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE) &&
+                bitstreamDestinationRva + bitstreamDestinationSize <= epPolymorphismImageSize) {
+                bitstreamVirtualDestinations.push({
+                    Start: PE_Cached.imageBase + bitstreamDestinationRva,
+                    End: PE_Cached.imageBase + bitstreamDestinationRva + bitstreamDestinationSize
+                });
+            }
+        }
+
+        if (bitstreamVirtualTargets.length || bitstreamVirtualDestinations.length) {
             const
                 scalarWritePattern = /^MOV BYTE PTR \[([A-Z][A-Z0-9]*)\], ([ABCD][HL])$/i,
                 scalarIncrementPattern = /^INC ([A-Z][A-Z0-9]*)$/i,
@@ -10503,6 +10518,20 @@ function scanForObfuscations_Native() {
                             isScalarBitstreamCopyPresent = true;
                         }
                     }
+
+                    for (var destinationIndex = 0; destinationIndex < bitstreamVirtualDestinations.length && !isScalarBitstreamCopyPresent; destinationIndex++) {
+                        var destination = bitstreamVirtualDestinations[destinationIndex];
+                        for (var transferIndex = 0; transferIndex < epBitstreamIndirectTransferAddresses.length && !isScalarBitstreamCopyPresent; transferIndex++) {
+                            if (isEpBitstreamPathProven(epBitstreamStartAddresses, epBitstreamIndirectTransferAddresses[transferIndex],
+                                scalarWriteAddress, epBitstreamSuccessors, epBitstreamFacts, {
+                                ReadAddress: scalarRead.Address, Register: scalarDestination, Start: destination.Start, End: destination.End,
+                                Instructions: epBitstreamInstructions
+                            })) {
+                                isScalarBitstreamCopyPresent = true;
+                                isScalarBitstreamVirtualWritePresent = true;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -10517,8 +10546,9 @@ function scanForObfuscations_Native() {
     }
 
     if (isRepBitstreamCopyPresent || isScalarBitstreamCopyPresent) {
-        // Require the independent decoder, copy and transfer components together.
-        log(logType.emulation, "Bitstream unpacker near EP: Adc: " + epBitstreamAdcCount + (isScalarBitstreamCopyPresent ? ", scalar byte copy and jump into virtual code" : ", Rep Movsb: " + epBitstreamMovsbCount));
+        // Require decoding, copying and transfer on one reachable path.
+        var bitstreamCopyDetail = isScalarBitstreamVirtualWritePresent ? ", scalar byte copy into virtual code and indirect transfer" : ", scalar byte copy and jump into virtual code";
+        log(logType.emulation, "Bitstream unpacker near EP: Adc: " + epBitstreamAdcCount + (isScalarBitstreamCopyPresent ? bitstreamCopyDetail : ", Rep Movsb: " + epBitstreamMovsbCount));
 
         isBitstreamEpUnpackerPresent = true;
     }
