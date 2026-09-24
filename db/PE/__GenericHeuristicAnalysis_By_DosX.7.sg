@@ -8363,7 +8363,8 @@ function scanForObfuscations_Native() {
 
     // Check for manual module enumeration through PEB->Ldr loader lists near the entry point.
 
-    var isPebModuleWalkPresent = false;
+    var isPebModuleWalkPresent = false,
+        pebModuleWalkPatterns = {};
 
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
@@ -8376,6 +8377,8 @@ function scanForObfuscations_Native() {
             pebModuleWalkPebLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?" + pebModuleWalkSegment + ":\\[" + pebModuleWalkPebAddress + "\\]$", "i"),
             pebModuleWalkLdrLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?\\[(" + pebModuleWalkNativeRegister + ") ?\\+ ?" + pebModuleWalkLdrOffset + "\\]$", "i"),
             pebModuleWalkListLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?\\[(" + pebModuleWalkNativeRegister + ") ?\\+ ?" + pebModuleWalkListOffset + "\\]$", "i");
+
+        pebModuleWalkPatterns = { PebLoad: pebModuleWalkPebLoadPattern, LdrLoad: pebModuleWalkLdrLoadPattern, ListLoad: pebModuleWalkListLoadPattern };
 
         // State 1 proves a PEB pointer and state 2 proves its PEB_LDR_DATA pointer.
         // Copies preserve the proof, while writes invalidate only their physical register.
@@ -9042,6 +9045,7 @@ function scanForObfuscations_Native() {
         epPolymorphismDominantTransformCount = 0,
         epBitstreamAdcCount = 0,
         epBitstreamMovsbCount = 0,
+        epResolverPathProven = false,
         epRedundantPrefixInstructionCount = 0,
         epMaximumRedundantPrefixCount = 0,
         epExportResolverFieldCount = 0,
@@ -9173,6 +9177,7 @@ function scanForObfuscations_Native() {
             epRareBitOpCodesFound = {},
             epDecodedInstructionLengthByAddress = {},
             epDirectCallTargets = {},
+            epCallFallthroughAddresses = {},
             epPopRegisterByAddress = {},
             epInvalidBranchCandidates = [],
             epValidInvalidBranchCandidates = [],
@@ -9181,7 +9186,9 @@ function scanForObfuscations_Native() {
             epBitstreamScalarReadCandidates = [],
             epBitstreamIndirectTransferAddresses = [],
             epBitstreamSuccessors = {},
-            epBitstreamFacts = {};
+            epBitstreamFacts = {},
+            epBitstreamInstructions = {},
+            epResolverInstructions = {};
 
         var epBitstreamStartAddresses = [PE_Cached.addressOfUnmanagedEntryPoint];
 
@@ -9300,6 +9307,9 @@ function scanForObfuscations_Native() {
             // valid instruction because of deliberately excessive encoding. Semantic analysis
             // below still requires a decoded opcode and a positive instruction length.
             if (!epPolymorphismOpCode || epPolymorphismInstructionLength <= 0) continue;
+
+            epBitstreamInstructions[epPolymorphismAddressKey] = epPolymorphismInstruction;
+            if (isPebModuleWalkPresent) epResolverInstructions[epPolymorphismAddressKey] = epPolymorphismInstruction;
 
             epDecodedInstructionLengthByAddress[epPolymorphismAddressKey] = epPolymorphismInstructionLength;
             epBitstreamSuccessors[epPolymorphismAddressKey] = [];
@@ -9478,6 +9488,19 @@ function scanForObfuscations_Native() {
 
                     var epApiHashTransform = epPolymorphismInstruction.match(epApiHashTransformPattern);
 
+                    var epApiHashCopy = epPolymorphismInstruction.match(epRegisterCopyPattern);
+
+                    if (epApiHashCopy) {
+                        var hashSource = epApiHashCopy[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                            hashDestination = epApiHashCopy[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+
+                        if (epApiHashTransformsByRegister[hashSource]) {
+                            var sourceHash = epApiHashTransformsByRegister[hashSource], copiedKinds = {};
+                            for (var kind in sourceHash.Kinds) copiedKinds[kind] = true;
+                            epApiHashTransformsByRegister[hashDestination] = { Count: sourceHash.Count, KindCount: sourceHash.KindCount, Kinds: copiedKinds };
+                        } else delete epApiHashTransformsByRegister[hashDestination];
+                    }
+
                     if (epApiHashTransform) {
                         var epApiHashRegisterName = epApiHashTransform[2].toUpperCase(),
                             epApiHashRegisterKey = epApiHashRegisterName.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
@@ -9599,6 +9622,7 @@ function scanForObfuscations_Native() {
 
                     // Preserve every reachable direct call target for secondary validation.
                     epDirectCallTargets[epPolymorphismTargetKey] = true;
+                    if (epPolymorphismTargetAddress !== epPolymorphismNextAddress) epCallFallthroughAddresses[epPolymorphismAddressKey] = epPolymorphismNextAddress;
                 }
 
                 if (epPolymorphismOpCode === "JMP" || epPolymorphismOpCode === "JMPF") {
@@ -9616,12 +9640,29 @@ function scanForObfuscations_Native() {
                 }
             } else if (epPolymorphismOpCode === "CALL") {
                 // An unresolved indirect call may return, so retain only its fall-through.
+                epCallFallthroughAddresses[epPolymorphismAddressKey] = epPolymorphismNextAddress;
                 epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
             } else if (epScanStopOpCodes.indexOf(epPolymorphismOpCode) === -1) {
                 epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
             }
 
             epBitstreamSuccessors[epPolymorphismAddressKey] = epPolymorphismPendingAddresses.slice(epBitstreamQueueLength);
+        }
+
+        // A CALL may never return (for example a runtime startup thunk). Its speculative
+        // fall-through is insufficient evidence that a later decoded branch is executed.
+        var epInvalidBranchProvenReachable = {};
+        if (epInvalidBranchCandidates.length) {
+            var epInvalidBranchPendingAddresses = epBitstreamStartAddresses.slice(), epInvalidBranchPendingIndex = 0;
+            while (epInvalidBranchPendingIndex < epInvalidBranchPendingAddresses.length) {
+                var reachableAddress = epInvalidBranchPendingAddresses[epInvalidBranchPendingIndex++], reachableKey = reachableAddress.toString();
+                if (epInvalidBranchProvenReachable[reachableKey] || !epBitstreamSuccessors.hasOwnProperty(reachableKey)) continue;
+                epInvalidBranchProvenReachable[reachableKey] = true;
+                var reachableSuccessors = epBitstreamSuccessors[reachableKey];
+                for (var p = 0; p < reachableSuccessors.length; p++) {
+                    if (reachableSuccessors[p] !== epCallFallthroughAddresses[reachableKey]) epInvalidBranchPendingAddresses.push(reachableSuccessors[p]);
+                }
+            }
         }
 
         // Resolve bad-target candidates after traversal so queue order cannot promote an
@@ -9643,6 +9684,9 @@ function scanForObfuscations_Native() {
             if (isEpInvalidBranchCandidateOverlapping) continue;
 
             epValidInvalidBranchCandidates.push(epInvalidBranchCandidate);
+            var invalidTargetRva = epInvalidBranchCandidate.TargetAddress - PE_Cached.imageBase;
+            if ((invalidTargetRva < 0 || invalidTargetRva >= epPolymorphismImageSize) &&
+                !epInvalidBranchProvenReachable[epInvalidBranchCandidate.SourceAddress.toString()]) continue;
             if (epInvalidBranchTargetAddress === -1) {
                 epInvalidBranchSourceAddress = epInvalidBranchCandidate.SourceAddress;
                 epInvalidBranchTargetAddress = epInvalidBranchCandidate.TargetAddress;
@@ -10039,6 +10083,25 @@ function scanForObfuscations_Native() {
             if (epCallPopIpRecoveryAddress !== -1) break;
         }
 
+        if (isPebModuleWalkPresent && epExportResolverHeaderAccessPresent && epExportResolverDirectoryAccessPresent &&
+            epExportResolverFieldCount >= 2 && epApiHashByteReadPresent && epApiHashMaximumTransformCount >= 2 &&
+            epApiHashMaximumTransformKindCount >= 2 && epApiHashBackwardControlFlowPresent && epHashedApiResolverIndirectTransferPresent) {
+            epResolverPathProven = isEpResolverPathProven(epBitstreamStartAddresses, epBitstreamSuccessors,
+                epResolverInstructions, epBitstreamIndirectTransferAddresses, {
+                Header: epExportResolverHeaderAccessPattern,
+                Directory: epExportResolverDirectoryAccessPattern,
+                Field: epExportResolverFieldAccessPattern,
+                ByteRead: epApiHashByteReadPattern,
+                Transform: epApiHashTransformPattern,
+                PebLoad: pebModuleWalkPatterns.PebLoad,
+                LdrLoad: pebModuleWalkPatterns.LdrLoad,
+                ListLoad: pebModuleWalkPatterns.ListLoad,
+                RegisterCopy: epRegisterCopyPattern,
+                RegisterWrite: new RegExp("^(?:MOV(?:ABS)?|MOVZX|MOVSX|MOVSXD|LEA|XOR|ADD|SUB|ADC|SBB|AND|OR|NOT|NEG|INC|DEC|POP) (" + epGeneralPurposeRegister + ")(?:,|$)", "i"),
+                PartialWrite: epPartialRegisterWritePattern
+            });
+        }
+
         // Clean up: release the control-flow worklist and its potentially dense visited set.
         epPolymorphismPendingAddresses = undefined;
         epPolymorphismVisitedAddresses = undefined;
@@ -10051,6 +10114,7 @@ function scanForObfuscations_Native() {
         epRedundantPrefixCandidates = undefined;
         epExportResolverFieldsFound = undefined;
         epApiHashTransformsByRegister = undefined;
+        epResolverInstructions = undefined;
     }
 
 
@@ -10068,7 +10132,7 @@ function scanForObfuscations_Native() {
     // initialization may inspect loader state, but does not satisfy the full export/hash chain.
     if (PE_Cached.isEntryPointAnalysisAllowed && isPebModuleWalkPresent && epExportResolverHeaderAccessPresent && epExportResolverDirectoryAccessPresent &&
         epExportResolverFieldCount >= 2 && epApiHashByteReadPresent && epApiHashMaximumTransformCount >= 2 && epApiHashMaximumTransformKindCount >= 2 &&
-        epApiHashBackwardControlFlowPresent && epHashedApiResolverIndirectTransferPresent) {
+        epApiHashBackwardControlFlowPresent && epHashedApiResolverIndirectTransferPresent && epResolverPathProven) {
         log(logType.emulation, "Manual API resolver hashes export names before an indirect transfer near EP");
 
         isHashedApiResolverPresent = true;
