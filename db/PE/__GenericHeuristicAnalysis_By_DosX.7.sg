@@ -8789,6 +8789,34 @@ function scanForObfuscations_Native() {
                     }
                 }
 
+                // A call fall-through is code only when this bounded callee has a proven return.
+                if (currentEpOpCode === "CALL") {
+                    var overlappingEpCallReturns = false;
+
+                    if (directControlFlow && isVirtualAddressRangeFileBacked(directControlFlowTarget, 1, SECTION_FLAGS_EXECUTE)) {
+                        var overlappingEpCalleeAddress = directControlFlowTarget;
+
+                        for (var callInstructionIndex = 0; callInstructionIndex < 32; callInstructionIndex++) {
+                            var overlappingEpCalleeInstruction = PE.getDisasmString(overlappingEpCalleeAddress),
+                                overlappingEpCalleeOpCode = getAsmOpCode(overlappingEpCalleeInstruction),
+                                overlappingEpCalleeLength = PE.getDisasmLength(overlappingEpCalleeAddress);
+
+                            if (!overlappingEpCalleeOpCode || overlappingEpCalleeLength <= 0 ||
+                                !isVirtualAddressRangeFileBacked(overlappingEpCalleeAddress, overlappingEpCalleeLength, SECTION_FLAGS_EXECUTE)) break;
+                            if (/^RET(?:F|N)?$/.test(overlappingEpCalleeOpCode)) {
+                                overlappingEpCallReturns = true;
+                                break;
+                            }
+                            if (epScanStopOpCodes.indexOf(overlappingEpCalleeOpCode) !== -1 || /^J[A-Z]+$/.test(overlappingEpCalleeOpCode) ||
+                                overlappingEpCalleeOpCode === "CALL") break;
+
+                            overlappingEpCalleeAddress += overlappingEpCalleeLength;
+                        }
+                    }
+
+                    if (!overlappingEpCallReturns) break;
+                }
+
                 if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") break;
                 overlappingEpCurrentAddress = overlappingEpScannedEndAddress;
             }
