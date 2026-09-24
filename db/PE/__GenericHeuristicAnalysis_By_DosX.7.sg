@@ -7600,6 +7600,14 @@ function scanForObfuscations_Native() {
                     else syntheticEpMemoryWrites.push({ Start: writeAddress, End: writeAddress + writeSize });
                 }
 
+                var implicitWrite = currentEpInstruction.match(/^(REP(?:E|NE)? )?(?:STOS|MOVS|INS)(B|W|D|Q)(?: |$)/i);
+                if (implicitWrite) {
+                    var implicitAddress = syntheticEpKnownAddresses.RDI,
+                        implicitSize = implicitWrite[2] === "B" ? 1 : implicitWrite[2] === "W" ? 2 : implicitWrite[2] === "D" ? 4 : 8;
+                    if (implicitWrite[1] || implicitAddress === undefined || syntheticEpMemoryWrites.length >= 16) syntheticEpUnknownMemoryWrite = true;
+                    else syntheticEpMemoryWrites.push({ Start: parseInt(implicitAddress, 0), End: parseInt(implicitAddress, 0) + implicitSize });
+                }
+
                 if (stackPivotLiteral || stackPivotRegister) {
                     // A literal or register-propagated pivot is accepted only when the new stack
                     // is writable, physically backed, and already contains an executable image VA.
