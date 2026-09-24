@@ -10843,48 +10843,18 @@ function scanForObfuscations_Native() {
 
 
 
-    // Check for multiple JMPs leading to each other
+    // Check for a resolved chain of at least three direct JMPs from the entry point.
 
     var proxyJumpsAtEpPresent = false;
 
     if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.hasUnmanagedEntryPoint && PE_Cached.isEntryPointCorrect &&
         PE_Cached.isArchX86 && isVirtualAddressRangeFileBacked(PE_Cached.addressOfUnmanagedEntryPoint, 1, SECTION_FLAGS_EXECUTE)) {
-        var proxyJumpAddress = PE_Cached.addressOfUnmanagedEntryPoint,
-            proxyJumpVisited = {},
-            proxyJumpInteriors = {},
-            proxyJumpCount = 0;
+        var proxyJumpChain = traceEpDirectJumpChain(PE_Cached.addressOfUnmanagedEntryPoint, 64);
 
-        while (proxyJumpCount < 8 && Math.abs(proxyJumpAddress - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x200 &&
-            isVirtualAddressRangeFileBacked(proxyJumpAddress, 1, SECTION_FLAGS_EXECUTE) &&
-            !proxyJumpVisited[proxyJumpAddress.toString()] && !proxyJumpInteriors[proxyJumpAddress.toString()]) {
-            var proxyJumpInstruction = PE.getDisasmString(proxyJumpAddress),
-                proxyJumpLength = PE.getDisasmLength(proxyJumpAddress),
-                proxyJumpTarget = proxyJumpInstruction && proxyJumpInstruction.match(/^JMP (0X[0-9A-F]+|\d+)$/i);
+        if (proxyJumpChain && proxyJumpChain.Hops >= 3) {
+            log(logType.emulation, "Resolved proxy jump chain at EP: " + proxyJumpChain.Hops + " hops");
 
-            if (!proxyJumpTarget || proxyJumpLength <= 0 ||
-                !isVirtualAddressRangeFileBacked(proxyJumpAddress, proxyJumpLength, SECTION_FLAGS_EXECUTE)) break;
-
-            for (var byteIndex = 1; byteIndex < proxyJumpLength; byteIndex++) proxyJumpInteriors[(proxyJumpAddress + byteIndex).toString()] = true;
-            proxyJumpVisited[proxyJumpAddress.toString()] = true;
-            proxyJumpAddress = parseInt(proxyJumpTarget[1], 0);
-            proxyJumpCount++;
-        }
-
-        if (proxyJumpCount >= 3 && proxyJumpCount < 8 && !proxyJumpVisited[proxyJumpAddress.toString()] &&
-            !proxyJumpInteriors[proxyJumpAddress.toString()] &&
-            Math.abs(proxyJumpAddress - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x200 &&
-            isVirtualAddressRangeFileBacked(proxyJumpAddress, 1, SECTION_FLAGS_EXECUTE)) {
-            var proxyJumpFinalInstruction = PE.getDisasmString(proxyJumpAddress),
-                proxyJumpFinalOpCode = getAsmOpCode(proxyJumpFinalInstruction),
-                proxyJumpFinalLength = PE.getDisasmLength(proxyJumpAddress);
-
-            if (proxyJumpFinalOpCode && proxyJumpFinalOpCode !== "DB" && proxyJumpFinalOpCode !== "JMP" &&
-                proxyJumpFinalLength >= 1 && proxyJumpFinalLength <= 15 &&
-                isVirtualAddressRangeFileBacked(proxyJumpAddress, proxyJumpFinalLength, SECTION_FLAGS_EXECUTE)) {
-                log(logType.emulation, "Resolved proxy jump chain at EP: " + proxyJumpCount + " hops");
-
-                proxyJumpsAtEpPresent = true;
-            }
+            proxyJumpsAtEpPresent = true;
         }
     }
 
@@ -11760,6 +11730,41 @@ function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
     }
 
     return proven[startAddress.toString()] === true;
+}
+
+
+
+/**
+ * Resolves a bounded chain of direct native JMP instructions to its first non-JMP.
+ * Every decoded byte must be file-backed executable code; cycles, interior targets,
+ * indirect transfers and exhausted budgets remain unproven.
+ *
+ * @param {number} startAddress - Virtual address of the first chain node.
+ * @param {number} maximumHops - Maximum number of direct JMPs to follow.
+ * @returns {Object|undefined} Final address and hop count, or no proof.
+ */
+function traceEpDirectJumpChain(startAddress, maximumHops) {
+    var address = startAddress, visited = {}, interiors = {}, hops = 0;
+
+    while (hops <= maximumHops && isFinite(address) && !visited[address.toString()] && !interiors[address.toString()] &&
+        isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) {
+        var instruction = PE.getDisasmString(address),
+            opCode = getAsmOpCode(instruction),
+            length = PE.getDisasmLength(address),
+            directJump = instruction && instruction.match(/^JMP (0X[0-9A-F]+|\d+)$/i);
+
+        if (!opCode || opCode === "DB" || length < 1 || length > 15 ||
+            !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) return undefined;
+        if (!directJump) return opCode === "JMP" ? undefined : { Target: address, Hops: hops };
+        if (hops === maximumHops) return undefined;
+
+        visited[address.toString()] = true;
+        for (var byteIndex = 1; byteIndex < length; byteIndex++) interiors[(address + byteIndex).toString()] = true;
+        address = parseInt(directJump[1], 0);
+        hops++;
+    }
+
+    return undefined;
 }
 
 
