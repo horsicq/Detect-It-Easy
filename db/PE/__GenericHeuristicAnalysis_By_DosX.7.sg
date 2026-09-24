@@ -7517,14 +7517,15 @@ function scanForObfuscations_Native() {
             syntheticEpStackPivotLiteralPattern = new RegExp("^MOV(?:ABS)? " + syntheticEpStackPointer + ", (0X[0-9A-F]+|\\d+)$", "i"),
             syntheticEpStackPivotRegisterPattern = new RegExp("^(?:MOV|XCHG) " + syntheticEpStackPointer +
                 ", (" + syntheticEpStackTransferRegister + ")$|^LEA " + syntheticEpStackPointer +
-                ", \\[(" + syntheticEpStackTransferRegister + ")\\]$", "i");
+                ", \\[(" + syntheticEpStackTransferRegister + ")\\]$", "i"),
+            syntheticEpMemoryWritePattern = /^(?:MOV|XCHG|ADD|SUB|ADC|SBB|AND|OR|XOR|INC|DEC|NEG|NOT|SHL|SHR|SAR|ROL|ROR|POP|CMPXCHG|XADD) (BYTE|WORD|DWORD|QWORD) PTR (?:[A-Z]+:)?\[([^\]]+)\]/i;
 
         // Two related states are tracked independently: known register VAs and the value
         // currently proven to occupy the top stack slot. RET matches only the latter.
 
         // Branches fork independent register and stack proofs; no facts merge at a join.
         // Direct jumps retain one state, while both Jcc successors consume the same budget.
-        var syntheticEpPendingPaths = [{ Address: -1, TargetAddress: String(), TargetType: String(), KnownAddresses: {}, NeutralCount: 0, Visited: {} }],
+        var syntheticEpPendingPaths = [{ Address: -1, TargetAddress: String(), TargetType: String(), KnownAddresses: {}, MemoryWrites: [], UnknownMemoryWrite: false, NeutralCount: 0, Visited: {} }],
             syntheticEpInstructionBudget = 0;
 
         for (var pathIndex = 0; pathIndex < syntheticEpPendingPaths.length && pathIndex < 8 && !isSyntheticEpTransferPresent; pathIndex++) {
@@ -7534,6 +7535,8 @@ function scanForObfuscations_Native() {
             syntheticEpTargetAddress = syntheticEpPath.TargetAddress;
             syntheticEpTargetType = syntheticEpPath.TargetType;
             syntheticEpKnownAddresses = syntheticEpPath.KnownAddresses;
+            var syntheticEpMemoryWrites = syntheticEpPath.MemoryWrites,
+                syntheticEpUnknownMemoryWrite = syntheticEpPath.UnknownMemoryWrite;
             syntheticEpNeutralInstructionCount = syntheticEpPath.NeutralCount;
 
             for (var i = 0; i < 128 && syntheticEpInstructionBudget < 256 && !isSyntheticEpTransferPresent; i++) {
@@ -7576,6 +7579,27 @@ function scanForObfuscations_Native() {
                         currentEpOpCode === "STC" || currentEpOpCode === "CMC" ||
                         (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
 
+                // Track writes which might alter a later pivot's on-disk return pointer.
+                // An unknown destination fails closed without discarding unrelated facts.
+                var memoryWrite = currentEpInstruction.match(syntheticEpMemoryWritePattern);
+                if (memoryWrite) {
+                    var writeOperand = memoryWrite[2], writeAddress = -1,
+                        writeSize = memoryWrite[1] === "BYTE" ? 1 : memoryWrite[1] === "WORD" ? 2 : memoryWrite[1] === "DWORD" ? 4 : 8,
+                        absoluteWrite = writeOperand.match(/^(0X[0-9A-F]+|\d+)$/i),
+                        ripWrite = writeOperand.match(/^RIP ([+-]) (0X[0-9A-F]+|\d+)$/i),
+                        registerWriteAddress = writeOperand.match(new RegExp("^(" + epGeneralPurposeRegister + ")(?: ([+-]) (0X[0-9A-F]+|\\d+))?$", "i"));
+                    if (absoluteWrite) writeAddress = parseInt(absoluteWrite[1], 0);
+                    else if (ripWrite) {
+                        var ripWriteLength = currentEpLength || PE.getDisasmLength(currentEpAddress);
+                        if (ripWriteLength > 0) writeAddress = currentEpAddress + ripWriteLength + parseInt(ripWrite[2], 0) * (ripWrite[1] === "-" ? -1 : 1);
+                    } else if (registerWriteAddress) {
+                        var writeBase = syntheticEpKnownAddresses[registerWriteAddress[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                        if (writeBase !== undefined) writeAddress = parseInt(writeBase, 0) + (registerWriteAddress[3] ? parseInt(registerWriteAddress[3], 0) * (registerWriteAddress[2] === "-" ? -1 : 1) : 0);
+                    }
+                    if (writeAddress < 0 || writeAddress > epMaximumSafeInteger || !isFinite(writeAddress) || syntheticEpMemoryWrites.length >= 16) syntheticEpUnknownMemoryWrite = true;
+                    else syntheticEpMemoryWrites.push({ Start: writeAddress, End: writeAddress + writeSize });
+                }
+
                 if (stackPivotLiteral || stackPivotRegister) {
                     // A literal or register-propagated pivot is accepted only when the new stack
                     // is writable, physically backed, and already contains an executable image VA.
@@ -7589,6 +7613,13 @@ function scanForObfuscations_Native() {
                             SECTION_FLAGS_WRITE) ? PE.VAToOffset(stackPivotAddress) : -1,
                         returnAddress = stackOffset === -1 ? -1 : (PE_Cached.isI386 ?
                             PE.read_uint32(stackOffset) : readUnsignedQword(stackOffset));
+
+                    if (syntheticEpUnknownMemoryWrite) break;
+                    for (var writeIndex = 0; writeIndex < syntheticEpMemoryWrites.length; writeIndex++) {
+                        var writtenRange = syntheticEpMemoryWrites[writeIndex];
+                        if (writtenRange.Start < stackPivotAddress + stackPivotPointerSize && writtenRange.End > stackPivotAddress) break;
+                    }
+                    if (writeIndex !== syntheticEpMemoryWrites.length) break;
 
                     // Replacing SP invalidates every earlier top-of-stack fact. The new RET target
                     // is trusted only when its full pointer is present in writable image storage.
@@ -7725,6 +7756,7 @@ function scanForObfuscations_Native() {
                         syntheticEpPendingPaths.push({
                             Address: branchTarget, TargetAddress: syntheticEpTargetAddress,
                             TargetType: syntheticEpTargetType, KnownAddresses: branchAddresses,
+                            MemoryWrites: syntheticEpMemoryWrites.slice(), UnknownMemoryWrite: syntheticEpUnknownMemoryWrite,
                             NeutralCount: syntheticEpNeutralInstructionCount, Visited: branchVisited
                         });
                     }
