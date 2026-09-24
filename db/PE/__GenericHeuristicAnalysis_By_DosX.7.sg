@@ -11379,6 +11379,72 @@ var epAsmInstructions = [],
     epAsmInstructionAddresses = [];
 
 /**
+ * Resolves a bounded, null-terminated PE TLS callback array from file-backed bytes.
+ * Unknown or malformed metadata stays inconclusive; no callback is inferred merely
+ * from the presence of a TLS data directory. Callback code is validated separately.
+ *
+ * @returns {number[]|undefined} Executable callback VAs, an empty array, or unknown.
+ */
+function getFileBackedTlsCallbackAddresses() {
+    if (!PE_Cached.isTlsPresent) return [];
+
+    var optionalHeaderOffset = getOptHeaderOffset();
+
+    if (optionalHeaderOffset < 4 || optionalHeaderOffset > PE_Cached.fileSize) return undefined;
+
+    var optionalHeaderSize = PE.readWord(optionalHeaderOffset - 4),
+        optionalHeaderEnd = optionalHeaderOffset + optionalHeaderSize,
+        directoryCountOffset = optionalHeaderOffset + (PE_Cached.is64bit ? 0x6C : 0x5C),
+        directoryTableOffset = optionalHeaderOffset + (PE_Cached.is64bit ? 0x70 : 0x60),
+        tlsEntryOffset = directoryTableOffset + IMAGE_DIRECTORY_ENTRY_TLS * 8,
+        tlsDirectoryMinimumSize = PE_Cached.is64bit ? 0x28 : 0x18;
+
+    if (optionalHeaderSize <= 0 || optionalHeaderEnd > PE_Cached.fileSize ||
+        directoryCountOffset + 4 > optionalHeaderEnd || tlsEntryOffset + 8 > optionalHeaderEnd ||
+        PE.read_uint32(directoryCountOffset) <= IMAGE_DIRECTORY_ENTRY_TLS) return undefined;
+
+    var tlsDirectoryRva = PE.read_uint32(tlsEntryOffset),
+        tlsDirectorySize = PE.read_uint32(tlsEntryOffset + 4),
+        tlsDirectoryAddress = PE_Cached.imageBase + tlsDirectoryRva;
+
+    if (tlsDirectoryRva === 0 || tlsDirectorySize < tlsDirectoryMinimumSize ||
+        !isVirtualAddressRangeFileBacked(tlsDirectoryAddress, tlsDirectoryMinimumSize, 0)) return undefined;
+
+    var tlsDirectoryOffset = PE.VAToOffset(tlsDirectoryAddress),
+        templateStartAddress = PE_Cached.is64bit ? readUnsignedQword(tlsDirectoryOffset) : PE.read_uint32(tlsDirectoryOffset),
+        templateEndAddress = PE_Cached.is64bit ? readUnsignedQword(tlsDirectoryOffset + 0x08) : PE.read_uint32(tlsDirectoryOffset + 0x04),
+        tlsIndexAddress = PE_Cached.is64bit ? readUnsignedQword(tlsDirectoryOffset + 0x10) : PE.read_uint32(tlsDirectoryOffset + 0x08),
+        callbackArrayAddress = PE_Cached.is64bit ? readUnsignedQword(tlsDirectoryOffset + 0x18) : PE.read_uint32(tlsDirectoryOffset + 0x0C),
+        pointerSize = PE_Cached.is64bit ? 8 : 4,
+        callbacks = [];
+
+    if (templateStartAddress === -1 || templateEndAddress === -1 || tlsIndexAddress === -1 ||
+        templateStartAddress > templateEndAddress || (templateStartAddress === 0) !== (templateEndAddress === 0) ||
+        (templateStartAddress !== 0 && templateStartAddress < templateEndAddress &&
+            !isVirtualAddressRangeMapped(templateStartAddress, templateEndAddress - templateStartAddress, 0)) ||
+        tlsIndexAddress === 0 || !isVirtualAddressRangeMapped(tlsIndexAddress, 4, 0) || callbackArrayAddress === -1) return undefined;
+    if (callbackArrayAddress === 0) return callbacks;
+
+    for (var i = 0; i < 16; i++) {
+        var pointerAddress = callbackArrayAddress + i * pointerSize;
+
+        if (!isVirtualAddressRangeFileBacked(pointerAddress, pointerSize, 0)) return undefined;
+
+        var pointerOffset = PE.VAToOffset(pointerAddress),
+            callbackAddress = PE_Cached.is64bit ? readUnsignedQword(pointerOffset) : PE.read_uint32(pointerOffset);
+
+        if (callbackAddress === 0) return callbacks;
+        if (callbackAddress === -1 || !isVirtualAddressRangeFileBacked(callbackAddress, 1, SECTION_FLAGS_EXECUTE)) return undefined;
+        callbacks.push(callbackAddress);
+    }
+
+    return undefined;
+}
+
+
+
+
+/**
  * Retrieves the assembly instruction at the specified zero-based index from the PE entry point.
  *
  * @param {number} index - The index of the assembly instruction to retrieve.
