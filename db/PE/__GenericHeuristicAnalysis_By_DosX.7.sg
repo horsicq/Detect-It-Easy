@@ -6704,7 +6704,7 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
  *
  * @param {number[]} startAddresses - Proven entry addresses, including a synthetic transfer target if present.
  * @param {number} transferAddress - Address of the candidate final control transfer.
- * @param {number} copyAddress - Required scalar byte-read address, or -1 for REP MOVSB copying.
+ * @param {number} copyAddress - Required scalar byte-write address, or -1 for REP MOVSB copying.
  * @param {Object} successors - Decoded CFG successors indexed by instruction address.
  * @param {Object} facts - ADC and REP MOVSB facts indexed by instruction address.
  * @param {Object} [destinationProof] - Scalar-copy register, virtual range and decoded instructions.
@@ -6804,7 +6804,7 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
     }
 
     for (var i = 0; i < startAddresses.length; i++) {
-        pending.push({ Address: startAddresses[i], AdcMask: 0, Adc: 0, RepMask: 0, Rep: 0, CopySeen: false, Values: {} });
+        pending.push({ Address: startAddresses[i], AdcMask: 0, Adc: 0, RepMask: 0, Rep: 0, ReadSeen: false, CopySeen: false, Values: {} });
     }
 
     while (nextIndex < pending.length && examined++ < 16384) {
@@ -6817,13 +6817,14 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
             adcMask = adc >= requiredAdc ? 0 : state.AdcMask | adcBit,
             repMask = state.RepMask | repBit,
             rep = state.Rep + (repBit && !(state.RepMask & repBit) ? 1 : 0),
-            copySeen = state.CopySeen || state.Address === copyAddress,
-            stateKey = key + ":" + copySeen + ":" + adc + ":" + adcMask + ":" + repMask;
+            readSeen = state.ReadSeen || (destinationProof !== undefined && state.Address === destinationProof.ReadAddress),
+            copySeen = state.CopySeen || (state.Address === copyAddress && (!destinationProof || readSeen)),
+            stateKey = key + ":" + readSeen + ":" + copySeen + ":" + adc + ":" + adcMask + ":" + repMask;
 
         if (destinationProof && !state.CopySeen) {
             var valueKeys = Object.keys(state.Values).sort();
             for (var v = 0; v < valueKeys.length; v++) stateKey += ":" + valueKeys[v] + "=" + state.Values[valueKeys[v]];
-            if (state.Address === copyAddress) {
+            if (state.Address === copyAddress && readSeen) {
                 var destination = state.Values[registerKey(destinationProof.Register)];
                 if (!(destination >= destinationProof.Start && destination < destinationProof.End)) continue;
             }
@@ -6844,7 +6845,7 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
             if (canReachTransfer[next[j].toString()]) {
                 pending.push({
                     Address: next[j], AdcMask: adcMask, Adc: adc,
-                    RepMask: repMask, Rep: rep, CopySeen: copySeen, Values: values
+                    RepMask: repMask, Rep: rep, ReadSeen: readSeen, CopySeen: copySeen, Values: values
                 });
             }
         }
@@ -10271,6 +10272,7 @@ function scanForObfuscations_Native() {
                     scalarNextAddress = scalarRead.Address + scalarRead.Length,
                     scalarIncrements = {},
                     scalarDestination = String(),
+                    scalarWriteAddress = -1,
                     scalarSequenceValid = scalarRead.Length > 0;
 
                 for (var j = 0; j < 3 && scalarSequenceValid; j++) {
@@ -10291,6 +10293,7 @@ function scanForObfuscations_Native() {
 
                     if (scalarWrite && scalarWrite[2] === scalarRead.ValueRegister && !scalarDestination) {
                         scalarDestination = scalarWrite[1];
+                        scalarWriteAddress = scalarNextAddress;
                     } else if (scalarIncrement) {
                         scalarIncrements[scalarIncrement[1]] = (scalarIncrements[scalarIncrement[1]] || 0) + 1;
                     } else {
@@ -10335,9 +10338,9 @@ function scanForObfuscations_Native() {
                     scalarDestination !== "R" + scalarValueParent.substring(1)) {
                     for (var targetIndex = 0; targetIndex < bitstreamVirtualTargets.length && !isScalarBitstreamCopyPresent; targetIndex++) {
                         var target = bitstreamVirtualTargets[targetIndex];
-                        if (isEpBitstreamPathProven(epBitstreamStartAddresses, target.SourceAddress, scalarRead.Address,
+                        if (isEpBitstreamPathProven(epBitstreamStartAddresses, target.SourceAddress, scalarWriteAddress,
                             epBitstreamSuccessors, epBitstreamFacts, {
-                            Register: scalarDestination, Start: target.Start, End: target.End,
+                            ReadAddress: scalarRead.Address, Register: scalarDestination, Start: target.Start, End: target.End,
                             Instructions: epBitstreamInstructions
                         })) {
                             isScalarBitstreamCopyPresent = true;
