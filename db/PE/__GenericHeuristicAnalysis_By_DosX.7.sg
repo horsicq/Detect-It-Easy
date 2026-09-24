@@ -8545,8 +8545,10 @@ function scanForObfuscations_Native() {
                 // Unmodelled semantics may alter every tracked pointer; restart the chain.
                 pebModuleWalkRegisterStates = {};
 
-                if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") break;
+                if (isEpLinearScanStopped(currentEpOpCode, epAsmInstructionAddresses[i], epScanStopOpCodes)) break;
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
         }
     }
 
@@ -8563,7 +8565,8 @@ function scanForObfuscations_Native() {
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         var isFpuEnvironmentStored = false,
             fpuEpNeutralInstructionCount = 0,
-            fpuEpCurrentAddress = PE_Cached.addressOfUnmanagedEntryPoint;
+            fpuEpCurrentAddress = PE_Cached.addressOfUnmanagedEntryPoint,
+            previousFpuEpInstruction = String();
 
         // In the 28-byte x87 environment, the saved instruction pointer begins at
         // offset 0xC. Writing the environment at ESP-0xC therefore places EIP at
@@ -8616,8 +8619,11 @@ function scanForObfuscations_Native() {
                 isFpuEnvironmentStored = false;
                 fpuEpNeutralInstructionCount = 0;
 
-                if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") break;
+                if (isEpLinearScanStopped(currentEpOpCode, fpuEpCurrentAddress, epScanStopOpCodes)) break;
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, previousFpuEpInstruction, fpuEpCurrentAddress)) break;
+            previousFpuEpInstruction = currentEpInstruction;
 
             // Continue the physical fall-through sweep using the validated instruction size.
             fpuEpCurrentAddress += currentEpInstructionLength;
@@ -8667,6 +8673,8 @@ function scanForObfuscations_Native() {
                 // A linear sweep cannot prove the return path of a Call or any later bytes.
                 break;
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
         }
     }
 
