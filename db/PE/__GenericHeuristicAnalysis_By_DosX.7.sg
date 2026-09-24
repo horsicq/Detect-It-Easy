@@ -8704,10 +8704,12 @@ function scanForObfuscations_Native() {
                 log(logType.emulation, "System-state probe near EP: " + currentEpInstruction);
 
                 isSystemEpProbePresent = true;
-            } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") {
-                // Calls may return to the fall-through path; other stop opcodes may not.
+            } else if (isEpLinearScanStopped(currentEpOpCode, epAsmInstructionAddresses[i], epScanStopOpCodes)) {
+                // An unproven call return cannot make later bytes reachable.
                 break;
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
         }
     }
 
@@ -8736,10 +8738,12 @@ function scanForObfuscations_Native() {
                 log(logType.emulation, "Direct system call near EP: " + currentEpInstruction);
 
                 isDirectEpSystemCallPresent = true;
-            } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") {
+            } else if (isEpLinearScanStopped(currentEpOpCode, epAsmInstructionAddresses[i], epScanStopOpCodes)) {
                 // A terminal transfer ends the startup stream before unrelated bytes.
                 break;
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
         }
     }
 
