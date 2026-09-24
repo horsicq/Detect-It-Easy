@@ -286,6 +286,7 @@ function initializeCache() {
     // linear-disassembly cache so instructions from a previous image cannot be returned.
     epAsmInstructions = [];
     epAsmInstructionAddresses = [];
+    epDirectCallReturnCache = {};
 
     // Preserve individual anchors while combining patterns for one test per group.
     for (var i = 0; i < obfuscationWhitelistPatterns.length; i++) {
@@ -383,6 +384,7 @@ function unloadCache() {
 
     epAsmInstructions = [];
     epAsmInstructionAddresses = [];
+    epDirectCallReturnCache = {};
 }
 
 
@@ -11376,7 +11378,8 @@ function emulateAndGetEpAsmPattern(onlyOpCodes, numberOf) {
 
 
 var epAsmInstructions = [],
-    epAsmInstructionAddresses = [];
+    epAsmInstructionAddresses = [],
+    epDirectCallReturnCache = {};
 
 /**
  * Resolves a bounded, null-terminated PE TLS callback array from file-backed bytes.
@@ -11514,6 +11517,30 @@ function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
 
     return proven[startAddress.toString()] === true;
 }
+/**
+ * Proves that every bounded path through a directly called native routine returns.
+ * Unknown calls, indirect branches, non-returning terminals, cycles and budget exhaustion
+ * remain unproven; their caller fall-through must not be treated as executable evidence.
+ *
+ * @param {number} callAddress - Virtual address of the direct CALL instruction.
+ * @returns {boolean} Whether all observed paths from its target end in a near RET.
+ */
+function isEpDirectCallReturnProven(callAddress) {
+    var callInstruction = PE.getDisasmString(callAddress),
+        directCall = callInstruction && callInstruction.match(/^CALL (0X[0-9A-F]+|\d+)$/i);
+
+    if (!directCall) return false;
+
+    var target = parseInt(directCall[1], 0),
+        targetKey = target.toString();
+
+    if (epDirectCallReturnCache.hasOwnProperty(targetKey)) return epDirectCallReturnCache[targetKey];
+    epDirectCallReturnCache[targetKey] = isEpBoundedDirectFlowProven(target, /^RET(?:N)?(?: (?:0X[0-9A-F]+|\d+))?$/i);
+    return epDirectCallReturnCache[targetKey];
+}
+
+
+
 
 
 
