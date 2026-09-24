@@ -9760,25 +9760,10 @@ function scanForObfuscations_Native() {
 
             var epIpRecoveryCurrentAddress = parseInt(epDirectCallTargetKey, 10),
                 epIpRecoveryPopLength = PE.getDisasmLength(epIpRecoveryCurrentAddress),
-                epIpRecoveryRegisterMentionPattern = new RegExp("\\b" + epIpRecoveryRegister + "\\b", "i"),
-                epIpRecoveryRegisterReadPattern = new RegExp("^(?:(?:ADD|ADC|SUB|SBB|AND|OR|XOR|IMUL|INC|DEC|NEG|NOT|SAL|SHL|SHR|SAR|ROL|ROR|RCL|RCR|XADD|XCHG|CMP|TEST|PUSH|CALL|JMP) " + epIpRecoveryRegister + "(?:,|$)|[^,]+,.*\\b" + epIpRecoveryRegister + "\\b|[^,]*\\[[^\\]]*\\b" + epIpRecoveryRegister + "\\b)", "i"),
-                epIpRecoveryRegisterClearPattern = new RegExp("^(?:(?:XOR|SUB) " + epIpRecoveryRegister + ", " + epIpRecoveryRegister + "|AND " + epIpRecoveryRegister + ", (?:0X0+|0+)|IMUL " + epIpRecoveryRegister + ", " + epIpRecoveryRegister + ", (?:0X0+|0+))$", "i"),
-                epIpRecoveryRegisterAlias;
+                epIpRecoveryKnownRegisters = {},
+                epIpRecoveryRegisterPatterns = {};
 
-            // A partial-register write also destroys a recovered native address. Build the
-            // complete physical-register family without weakening proof to a partial read.
-            if (/^R(?:8|9|1[0-5])$/.test(epIpRecoveryRegister)) {
-                epIpRecoveryRegisterAlias = epIpRecoveryRegister + "(?:D|W|B)?";
-            } else {
-                var epIpRecoveryRegisterSuffix = epIpRecoveryRegister.substring(1),
-                    epIpRecoveryByteRegister = /^(?:AX|BX|CX|DX)$/.test(epIpRecoveryRegisterSuffix) ?
-                        epIpRecoveryRegisterSuffix[0] + "(?:L|H)" : epIpRecoveryRegisterSuffix + "L";
-
-                epIpRecoveryRegisterAlias = "(?:" + (epIpRecoveryRegister[0] === "R" ? epIpRecoveryRegister + "|" : String()) +
-                    "E" + epIpRecoveryRegisterSuffix + "|" + epIpRecoveryRegisterSuffix + "|" + epIpRecoveryByteRegister + ")";
-            }
-
-            var epIpRecoveryRegisterAliasMentionPattern = new RegExp("\\b" + epIpRecoveryRegisterAlias + "\\b", "i");
+            epIpRecoveryKnownRegisters[epIpRecoveryRegister] = true;
 
             // Reject malformed POP decoding before moving to its first consumer.
             if (epIpRecoveryPopLength <= 0) continue;
@@ -9808,39 +9793,82 @@ function scanForObfuscations_Native() {
                 var epIpRecoveryInstruction = PE.getDisasmString(epIpRecoveryCurrentAddress),
                     epIpRecoveryOpCode = getAsmOpCode(epIpRecoveryInstruction),
                     epIpRecoveryInstructionLength = PE.getDisasmLength(epIpRecoveryCurrentAddress),
-                    epIpRecoveryRegisterMentioned = epIpRecoveryRegisterMentionPattern.test(epIpRecoveryInstruction),
-                    epIpRecoveryRegisterAliasMentioned = epIpRecoveryRegisterAliasMentionPattern.test(epIpRecoveryInstruction),
                     epIpRecoverySimplePolymorphism = epSimplePolymorphicInstructionPattern.test(epIpRecoveryInstruction),
                     epIpRecoveryValuePreserving = epValuePreservingInstructionPattern.test(epIpRecoveryInstruction);
 
-                if (!epIpRecoveryOpCode || epIpRecoveryInstructionLength <= 0) break;
+                if (!epIpRecoveryOpCode || epIpRecoveryInstructionLength <= 0 ||
+                    !isVirtualAddressRangeFileBacked(epIpRecoveryCurrentAddress, epIpRecoveryInstructionLength, SECTION_FLAGS_EXECUTE)) break;
 
-                // Any partial-register access changes or observes only part of the recovered VA.
-                if (epIpRecoveryRegisterAliasMentioned && !epIpRecoveryRegisterMentioned) break;
+                var epIpRecoveryCopy = epIpRecoveryInstruction.match(epRegisterCopyPattern);
 
-                if (epIpRecoveryRegisterMentioned &&
-                    !epIpRecoverySimplePolymorphism && !epIpRecoveryValuePreserving) {
-                    // Accept the first meaningful full-width read unless it first clears the value.
-                    if (!epIpRecoveryRegisterClearPattern.test(epIpRecoveryInstruction) &&
-                        epIpRecoveryRegisterReadPattern.test(epIpRecoveryInstruction)) {
-                        epCallPopIpRecoveryAddress = parseInt(epDirectCallTargetKey, 10);
+                if (epIpRecoveryCopy) {
+                    var epIpRecoveryCopyDestination = epIpRecoveryCopy[1].toUpperCase(),
+                        epIpRecoveryCopySource = epIpRecoveryCopy[2].toUpperCase(),
+                        epIpRecoveryIsNativeCopy = (PE_Cached.isI386 ? epDwordRegisterPattern : epQwordRegisterPattern).test(epIpRecoveryCopyDestination);
+
+                    // MOV preserves its source. Only an exact native-width copy proves the destination.
+                    if (epIpRecoveryIsNativeCopy && epIpRecoveryKnownRegisters[epIpRecoveryCopySource]) {
+                        epIpRecoveryKnownRegisters[epIpRecoveryCopyDestination] = true;
+                    } else {
+                        delete epIpRecoveryKnownRegisters[PE_Cached.is64bit ? epIpRecoveryCopyDestination.replace(/^E/, "R").replace(/D$/, String()) : epIpRecoveryCopyDestination];
                     }
 
-                    // An explicit mention either consumes the proof or overwrites its register.
-                    break;
+                    epIpRecoveryCurrentAddress += epIpRecoveryInstructionLength;
+                    continue;
                 }
 
                 var epIpRecoveryRegisterWrite = epIpRecoveryInstruction.match(epFlagsNeutralRegisterWritePattern) ||
                     epIpRecoveryInstruction.match(epTrackedRegisterWritePattern),
+                    epIpRecoveryPartialWrite = epIpRecoveryInstruction.match(epPartialRegisterWritePattern),
                     epIpRecoveryNeutralInstruction = epIpRecoveryOpCode === "NOP" || epIpRecoveryOpCode === "FNOP" ||
                         epIpRecoveryOpCode === "PAUSE" || epIpRecoveryOpCode === "CLC" ||
                         epIpRecoveryOpCode === "STC" || epIpRecoveryOpCode === "CMC" ||
                         epStackRoundTripPushPattern.test(epIpRecoveryInstruction) ||
                         epIpRecoverySimplePolymorphism || epIpRecoveryValuePreserving ||
-                        epIpRecoveryRegisterWrite || /^(?:CMP|TEST)$/.test(epIpRecoveryOpCode);
+                        epIpRecoveryRegisterWrite || epIpRecoveryPartialWrite || /^(?:CMP|TEST)$/.test(epIpRecoveryOpCode);
+
+                for (var epIpRecoveryKnownRegister in epIpRecoveryKnownRegisters) {
+                    var epIpRecoveryPatterns = epIpRecoveryRegisterPatterns[epIpRecoveryKnownRegister];
+
+                    if (!epIpRecoveryPatterns) {
+                        var epIpRecoveryRegisterSuffix = epIpRecoveryKnownRegister.substring(1),
+                            epIpRecoveryByteRegister = /^(?:AX|BX|CX|DX)$/.test(epIpRecoveryRegisterSuffix) ?
+                                epIpRecoveryRegisterSuffix[0] + "(?:L|H)" : epIpRecoveryRegisterSuffix + "L",
+                            epIpRecoveryAliases = /^R(?:8|9|1[0-5])$/.test(epIpRecoveryKnownRegister) ?
+                                epIpRecoveryKnownRegister + "(?:D|W|B)?" :
+                                "(?:" + (epIpRecoveryKnownRegister[0] === "R" ? epIpRecoveryKnownRegister + "|" : String()) +
+                                "E" + epIpRecoveryRegisterSuffix + "|" + epIpRecoveryRegisterSuffix + "|" + epIpRecoveryByteRegister + ")";
+
+                        epIpRecoveryPatterns = {
+                            Mention: new RegExp("\\b" + epIpRecoveryKnownRegister + "\\b", "i"),
+                            Alias: new RegExp("\\b" + epIpRecoveryAliases + "\\b", "i"),
+                            Read: new RegExp("^(?:(?:ADD|ADC|SUB|SBB|AND|OR|XOR|IMUL|INC|DEC|NEG|NOT|SAL|SHL|SHR|SAR|ROL|ROR|RCL|RCR|XADD|XCHG|CMP|TEST|PUSH|CALL|JMP) " + epIpRecoveryKnownRegister + "(?:,|$)|[^,]+,.*\\b" + epIpRecoveryKnownRegister + "\\b|[^,]*\\[[^\\]]*\\b" + epIpRecoveryKnownRegister + "\\b)", "i"),
+                            Clear: new RegExp("^(?:(?:XOR|SUB) " + epIpRecoveryKnownRegister + ", " + epIpRecoveryKnownRegister + "|AND " + epIpRecoveryKnownRegister + ", (?:0X0+|0+)|IMUL " + epIpRecoveryKnownRegister + ", " + epIpRecoveryKnownRegister + ", (?:0X0+|0+))$", "i")
+                        };
+                        epIpRecoveryRegisterPatterns[epIpRecoveryKnownRegister] = epIpRecoveryPatterns;
+                    }
+
+                    if (epIpRecoveryPatterns.Alias.test(epIpRecoveryInstruction) && !epIpRecoveryPatterns.Mention.test(epIpRecoveryInstruction)) {
+                        delete epIpRecoveryKnownRegisters[epIpRecoveryKnownRegister];
+                    } else if (epIpRecoveryPatterns.Mention.test(epIpRecoveryInstruction) &&
+                        !epIpRecoverySimplePolymorphism && !epIpRecoveryValuePreserving &&
+                        !epIpRecoveryPatterns.Clear.test(epIpRecoveryInstruction) && epIpRecoveryPatterns.Read.test(epIpRecoveryInstruction)) {
+                        epCallPopIpRecoveryAddress = parseInt(epDirectCallTargetKey, 10);
+                        break;
+                    }
+                }
+
+                if (epCallPopIpRecoveryAddress !== -1) break;
+
+                if (epIpRecoveryRegisterWrite) {
+                    var epIpRecoveryWrittenRegister = epIpRecoveryRegisterWrite[1].toUpperCase();
+                    if (PE_Cached.is64bit) epIpRecoveryWrittenRegister = epIpRecoveryWrittenRegister.replace(/^E/, "R").replace(/D$/, String());
+                    delete epIpRecoveryKnownRegisters[epIpRecoveryWrittenRegister];
+                }
 
                 // Stop when the instruction cannot safely preserve a pending recovered pointer.
-                if (!epIpRecoveryNeutralInstruction || epScanStopOpCodes.indexOf(epIpRecoveryOpCode) !== -1) break;
+                if (!epIpRecoveryNeutralInstruction || epScanStopOpCodes.indexOf(epIpRecoveryOpCode) !== -1 ||
+                    !Object.keys(epIpRecoveryKnownRegisters).length) break;
 
                 // Advance only after the current instruction has preserved the pending proof.
                 epIpRecoveryCurrentAddress += epIpRecoveryInstructionLength;
