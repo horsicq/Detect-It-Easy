@@ -8509,6 +8509,7 @@ function scanForObfuscations_Native() {
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const indirectEpTransferPattern = new RegExp("^(JMP|CALL) (" + epGeneralPurposeRegister + ")$", "i"),
+            indirectEpArithmeticPattern = new RegExp("^(ADD|SUB|XOR) (" + epGeneralPurposeRegister + "), (0X[0-9A-F]+|\\d+)$", "i"),
             indirectEpRegisterWritePattern = new RegExp("^(?:MOV(?:ABS)?|MOVZX|MOVSX|MOVSXD|LEA|XOR|ADD|SUB|ADC|SBB|AND|OR|NOT|NEG|INC|DEC|POP) (" + epGeneralPurposeRegister + ")(?:,|$)", "i");
 
         // Multiple proven addresses are retained because polymorphic junk commonly writes
@@ -8527,6 +8528,7 @@ function scanForObfuscations_Native() {
             // Classify producers, copies, consumers and invalidators before mutating provenance.
             var registerLiteralAddress = currentEpInstruction.match(epLiteralMovePattern),
                 registerCopy = currentEpInstruction.match(epRegisterCopyPattern),
+                registerArithmetic = currentEpInstruction.match(indirectEpArithmeticPattern),
                 indirectTransfer = currentEpInstruction.match(indirectEpTransferPattern),
                 registerWrite = currentEpInstruction.match(indirectEpRegisterWritePattern),
                 conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern),
@@ -8571,6 +8573,29 @@ function scanForObfuscations_Native() {
                     }
                 } else {
                     delete indirectEpKnownAddresses[indirectEpTargetRegister];
+                }
+            } else if (registerArithmetic) {
+                var arithmeticRegister = registerArithmetic[2],
+                    arithmeticRegisterKey = arithmeticRegister.toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    arithmeticAddress = indirectEpKnownAddresses[arithmeticRegisterKey],
+                    arithmeticImmediate = parseInt(registerArithmetic[3], 0);
+
+                var isDwordArithmetic = epRegister32BitPattern.test(arithmeticRegister);
+
+                if (arithmeticAddress !== undefined && arithmeticImmediate <= (PE_Cached.is64bit ? 0x7FFFFFFF : 0xFFFFFFFF)) {
+                    if (registerArithmetic[1] === "ADD") arithmeticAddress += arithmeticImmediate;
+                    else if (registerArithmetic[1] === "SUB") arithmeticAddress -= arithmeticImmediate;
+                    else arithmeticAddress = arithmeticImmediate === 0 ? arithmeticAddress : isDwordArithmetic ? (arithmeticAddress ^ arithmeticImmediate) >>> 0 : -1;
+
+                    if (isDwordArithmetic) arithmeticAddress >>>= 0;
+                    if (arithmeticAddress >= 0 && arithmeticAddress <= epMaximumSafeInteger &&
+                        isVirtualAddressRangeFileBacked(arithmeticAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                        indirectEpKnownAddresses[arithmeticRegisterKey] = arithmeticAddress;
+                    } else {
+                        delete indirectEpKnownAddresses[arithmeticRegisterKey];
+                    }
+                } else {
+                    delete indirectEpKnownAddresses[arithmeticRegisterKey];
                 }
             } else if (indirectTransfer) {
                 var indirectTransferRegister = indirectTransfer[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
