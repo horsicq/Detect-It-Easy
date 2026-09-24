@@ -2414,12 +2414,6 @@ const
     IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT = 13,
     IMAGE_DIRECTORY_ENTRY_RESERVED = 15;
 
-const
-    SECTION_FLAGS_RWX_MASK = SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ | SECTION_FLAGS_WRITE,
-    SECTION_FLAGS_RWX_CODE_MASK = SECTION_FLAGS_RWX_MASK | SECTION_FLAGS_CODE;
-
-
-
 // #region "packers and cryptors (.NET and Native)"
 /** Detects generic packing and encryption indicators in managed and native PE files. */
 function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native apps
@@ -2744,9 +2738,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     if (PE_Cached.numberOfSections === 3 &&
         PE.section[0].FileSize === 0 && PE.section[1].FileSize !== 0 && PE.section[2].FileSize !== 0 &&
-        (PE.section[0].Characteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK &&
-        (PE.section[1].Characteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK &&
-        (PE.section[2].Characteristics & SECTION_FLAGS_RWX_MASK) !== SECTION_FLAGS_RWX_MASK && (
+        PE.section[0].IsReadWriteExecute && PE.section[1].IsReadWriteExecute && !PE.section[2].IsReadWriteExecute && (
             (PE.section[2].Characteristics & SECTION_FLAGS_READ) === SECTION_FLAGS_READ ||
             (PE.section[2].Characteristics & (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)
         )
@@ -10879,10 +10871,7 @@ function scanForObfuscations_Native() {
     var rwxSectionIndex = -1;
 
     for (var i = 0; i < PE_Cached.numberOfSections && !isRwxSectionPresent; i++) {
-        var currentSectionCharacteristics = PE.section[i].Characteristics;
-
-        if ((currentSectionCharacteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK ||
-            (currentSectionCharacteristics & SECTION_FLAGS_RWX_CODE_MASK) === SECTION_FLAGS_RWX_CODE_MASK) {
+        if (PE.section[i].IsReadWriteExecute) {
             log(logType.any, "RWX permissions detected in section #" + i + " (\"" + File.cleanString(PE.getSectionName(i)) + "\")");
 
             isRwxSectionPresent = true;
@@ -12725,10 +12714,8 @@ function isVirtualAddressRangeMapped(address, size, requiredSectionFlags) {
             sectionMappedSize = Math.max(PE.getSectionVirtualSize(i), PE.getSectionFileSize(i)),
             rangeOffsetInSection = rangeRva - sectionRva;
 
-        // Unsigned comparison is required for IMAGE_SCN_MEM_WRITE (0x80000000), which
-        // JavaScript otherwise represents as a negative bitwise result.
         if (rangeOffsetInSection >= 0 && rangeOffsetInSection + size <= sectionMappedSize &&
-            ((PE.section[i].Characteristics & requiredSectionFlags) >>> 0) === (requiredSectionFlags >>> 0)) return true;
+            PE.section[i].hasCharacteristics(requiredSectionFlags)) return true;
     }
 
     return false;
@@ -12757,7 +12744,7 @@ function isVirtualAddressRangeFileBacked(address, size, requiredSectionFlags) {
             rangeOffsetInSection = rangeRva - sectionRva;
 
         if (rangeOffsetInSection >= 0 && rangeOffsetInSection + size <= sectionRawSize &&
-            ((PE.section[i].Characteristics & requiredSectionFlags) >>> 0) === (requiredSectionFlags >>> 0)) {
+            PE.section[i].hasCharacteristics(requiredSectionFlags)) {
             var rangeOffset = PE.getSectionFileOffset(i) + rangeOffsetInSection;
 
             // Validate both endpoints through the engine as well as local section math.
@@ -14642,7 +14629,7 @@ function scanForMaliciousCode_NET_and_Native() {
             if (PE.getSectionName(x) === String()) {
                 var currentSection = PE.section[x];
 
-                if ((currentSection.Characteristics & SECTION_FLAGS_RWX_MASK) === SECTION_FLAGS_RWX_MASK &&
+                if (currentSection.IsReadWriteExecute &&
                     PE_Cached.indexOfEntryPointSection !== x &&
                     PE_Cached.indexOfResourceSection !== x &&
                     PE_Cached.indexOfImportsSection !== x &&
