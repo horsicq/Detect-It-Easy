@@ -9158,8 +9158,8 @@ function scanForObfuscations_Native() {
 
     // Check for dense instruction-level polymorphism in the reachable entry-point code.
     // A single bounded CFG walk keeps instruction collection independent from individual
-    // verdicts. Direct calls and conditional branches retain both possible continuations;
-    // unconditional jumps retain only their target, and terminal instructions end the path.
+    // verdicts. Conditional branches retain both paths, while a Call fall-through needs
+    // a proven return. Unconditional jumps retain only their target.
 
     // Collect orthogonal behavioral facts during one CFG walk. Separate counters let the
     // verdict rules below combine only the evidence relevant to their own FP threshold.
@@ -9313,9 +9313,11 @@ function scanForObfuscations_Native() {
                 "SAR": true, "SHL": true, "SHR": true, "SUB": true, "XOR": true
             };
 
-        // The FIFO starts at EP. Visited addresses prevent loops, while the two call maps
-        // retain only facts needed later by Call/Pop and self-modifying-stub validation.
+        // The FIFO starts at EP. Known zero and carry flags exclude impossible
+        // conditional edges without guessing the outcome of other branches.
         var epPolymorphismPendingAddresses = [PE_Cached.addressOfUnmanagedEntryPoint],
+            epPolymorphismPendingZeroFlags = [-1],
+            epPolymorphismPendingCarryFlags = [-1],
             epPolymorphismPendingAddressIndex = 0,
             epPolymorphismVisitedAddresses = {},
             epPolymorphismVisitedInstructionCount = 0,
@@ -9323,7 +9325,6 @@ function scanForObfuscations_Native() {
             epRareBitOpCodesFound = {},
             epDecodedInstructionLengthByAddress = {},
             epDirectCallTargets = {},
-            epCallFallthroughAddresses = {},
             epPopRegisterByAddress = {},
             epInvalidBranchCandidates = [],
             epValidInvalidBranchCandidates = [],
@@ -9342,13 +9343,17 @@ function scanForObfuscations_Native() {
         // from its image target so the shared CFG sees the real decoder behind the EP facade.
         if (isSyntheticEpTransferPresent && syntheticEpTargetAddress) {
             epPolymorphismPendingAddresses.push(parseInt(syntheticEpTargetAddress, 0));
+            epPolymorphismPendingZeroFlags.push(-1);
+            epPolymorphismPendingCarryFlags.push(-1);
             epBitstreamStartAddresses.push(parseInt(syntheticEpTargetAddress, 0));
         }
 
         // Consume one reachable address at a time until the graph or global budget is exhausted.
         while (epPolymorphismPendingAddressIndex < epPolymorphismPendingAddresses.length &&
             epPolymorphismVisitedInstructionCount < epPolymorphismInstructionLimit) {
-            var epPolymorphismCurrentAddress = epPolymorphismPendingAddresses[epPolymorphismPendingAddressIndex++],
+            var epPolymorphismCurrentAddress = epPolymorphismPendingAddresses[epPolymorphismPendingAddressIndex],
+                epPolymorphismCurrentZeroFlag = epPolymorphismPendingZeroFlags[epPolymorphismPendingAddressIndex],
+                epPolymorphismCurrentCarryFlag = epPolymorphismPendingCarryFlags[epPolymorphismPendingAddressIndex++],
                 epPolymorphismAddressKey = epPolymorphismCurrentAddress.toString(),
                 epPolymorphismCurrentRva = epPolymorphismCurrentAddress - PE_Cached.imageBase,
                 epPolymorphismSectionIndex = -1;
@@ -9688,7 +9693,10 @@ function scanForObfuscations_Native() {
             }
 
             var epPolymorphismNextAddress = epPolymorphismCurrentAddress + epPolymorphismInstructionLength,
-                epPolymorphismDirectControlFlow = epPolymorphismInstruction.match(/^(CALL|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
+                epPolymorphismDirectControlFlow = epPolymorphismInstruction.match(/^(CALL|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i),
+                epPolymorphismNextZeroFlag = advanceEpZeroFlag(epPolymorphismInstruction, epPolymorphismOpCode, epPolymorphismCurrentZeroFlag),
+                epPolymorphismNextCarryFlag = advanceEpCarryFlag(epPolymorphismInstruction, epPolymorphismOpCode, epPolymorphismCurrentCarryFlag),
+                epPolymorphismBranchTaken = getEpKnownBranchResult(epPolymorphismOpCode, epPolymorphismNextZeroFlag, epPolymorphismNextCarryFlag);
 
             // An unresolved Call/Jmp supplies the final dispatcher fact for bitstream unpacking.
             if (!epPolymorphismDirectControlFlow &&
@@ -9769,41 +9777,52 @@ function scanForObfuscations_Native() {
 
                 if (epPolymorphismOpCode === "CALL") {
                     var epPolymorphismTargetKey = epPolymorphismTargetAddress.toString();
-                    // UD2 and HLT have no ordinary return edge to the following bytes.
-                    var isEpDirectCallTerminal = isVirtualAddressRangeFileBacked(epPolymorphismTargetAddress, 1, SECTION_FLAGS_EXECUTE) &&
-                        /^(?:UD2|HLT)$/.test(getAsmOpCode(PE.getDisasmString(epPolymorphismTargetAddress)));
+                    var isEpDirectCallReturning = isEpDirectCallReturnProven(epPolymorphismCurrentAddress);
 
                     // Preserve every reachable direct call target for secondary validation.
                     epDirectCallTargets[epPolymorphismTargetKey] = true;
-                    if (!isEpDirectCallTerminal && epPolymorphismTargetAddress !== epPolymorphismNextAddress) epCallFallthroughAddresses[epPolymorphismAddressKey] = epPolymorphismNextAddress;
                 }
 
                 if (epPolymorphismOpCode === "JMP" || epPolymorphismOpCode === "JMPF") {
                     // An unconditional jump has no reachable physical fall-through.
                     epPolymorphismPendingAddresses.push(epPolymorphismTargetAddress);
+                    epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
+                    epPolymorphismPendingCarryFlags.push(epPolymorphismNextCarryFlag);
                 } else if (epPolymorphismOpCode === "CALL") {
-                    // Continue through the caller before descending into a direct callee. This
-                    // keeps the bounded walk focused on startup flow without losing the target.
-                    if (!isEpDirectCallTerminal) epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
+                    // A physical fall-through exists only if every bounded callee path returns.
+                    if (isEpDirectCallReturning) {
+                        epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
+                        epPolymorphismPendingZeroFlags.push(-1);
+                        epPolymorphismPendingCarryFlags.push(-1);
+                    }
                     epPolymorphismPendingAddresses.push(epPolymorphismTargetAddress);
+                    epPolymorphismPendingZeroFlags.push(epPolymorphismCurrentZeroFlag);
+                    epPolymorphismPendingCarryFlags.push(epPolymorphismCurrentCarryFlag);
                 } else {
-                    // Conditional branches retain both target and fall-through paths.
-                    epPolymorphismPendingAddresses.push(epPolymorphismTargetAddress);
-                    epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
+                    // Known flags exclude only a proved-impossible conditional edge.
+                    if (epPolymorphismBranchTaken !== 0) {
+                        epPolymorphismPendingAddresses.push(epPolymorphismTargetAddress);
+                        epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
+                        epPolymorphismPendingCarryFlags.push(epPolymorphismNextCarryFlag);
+                    }
+                    if (epPolymorphismBranchTaken !== 1) {
+                        epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
+                        epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
+                        epPolymorphismPendingCarryFlags.push(epPolymorphismNextCarryFlag);
+                    }
                 }
             } else if (epPolymorphismOpCode === "CALL") {
-                // An unresolved indirect call may return, so retain only its fall-through.
-                epCallFallthroughAddresses[epPolymorphismAddressKey] = epPolymorphismNextAddress;
-                epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
+                // An unresolved indirect call cannot prove its physical fall-through.
             } else if (epScanStopOpCodes.indexOf(epPolymorphismOpCode) === -1) {
                 epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
+                epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
+                epPolymorphismPendingCarryFlags.push(epPolymorphismNextCarryFlag);
             }
 
             epBitstreamSuccessors[epPolymorphismAddressKey] = epPolymorphismPendingAddresses.slice(epBitstreamQueueLength);
         }
 
-        // A CALL may never return (for example a runtime startup thunk). Its speculative
-        // fall-through is insufficient evidence that a later decoded branch is executed.
+        // Every stored edge is proven; an unknown CALL fall-through never enters the graph.
         var epInvalidBranchProvenReachable = {};
         if (epInvalidBranchCandidates.length) {
             var epInvalidBranchPendingAddresses = epBitstreamStartAddresses.slice(), epInvalidBranchPendingIndex = 0;
@@ -9813,7 +9832,7 @@ function scanForObfuscations_Native() {
                 epInvalidBranchProvenReachable[reachableKey] = true;
                 var reachableSuccessors = epBitstreamSuccessors[reachableKey];
                 for (var p = 0; p < reachableSuccessors.length; p++) {
-                    if (reachableSuccessors[p] !== epCallFallthroughAddresses[reachableKey]) epInvalidBranchPendingAddresses.push(reachableSuccessors[p]);
+                    epInvalidBranchPendingAddresses.push(reachableSuccessors[p]);
                 }
             }
         }
@@ -10258,6 +10277,8 @@ function scanForObfuscations_Native() {
 
         // Clean up: release the control-flow worklist and its potentially dense visited set.
         epPolymorphismPendingAddresses = undefined;
+        epPolymorphismPendingZeroFlags = undefined;
+        epPolymorphismPendingCarryFlags = undefined;
         epPolymorphismVisitedAddresses = undefined;
         epPolymorphismTransformOpCodesFound = undefined;
         epRareBitOpCodesFound = undefined;
