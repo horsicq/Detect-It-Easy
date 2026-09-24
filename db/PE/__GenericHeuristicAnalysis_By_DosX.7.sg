@@ -11600,6 +11600,34 @@ function advanceEpCarryFlag(instruction, opCode, carryFlag) {
 
 
 
+/**
+ * Resolves only Jcc outcomes implied by known ZF/CF values.
+ * Signed comparisons needing SF/OF and branches depending on register counts
+ * remain unknown. A partially known JA/JBE can still be settled when either
+ * flag alone determines the result.
+ *
+ * @param {string} opCode - Current branch mnemonic.
+ * @param {number} zeroFlag - ZF: 1 set, 0 clear, -1 unknown.
+ * @param {number} carryFlag - CF: 1 set, 0 clear, -1 unknown.
+ * @returns {number} Branch result: 1 taken, 0 not taken, -1 unknown.
+ */
+function getEpKnownBranchResult(opCode, zeroFlag, carryFlag) {
+    if (/^(?:JE|JZ)$/.test(opCode)) return zeroFlag;
+    if (/^(?:JNE|JNZ)$/.test(opCode)) return zeroFlag === -1 ? -1 : 1 - zeroFlag;
+    if (/^(?:JB|JC|JNAE)$/.test(opCode)) return carryFlag;
+    if (/^(?:JAE|JNB|JNC)$/.test(opCode)) return carryFlag === -1 ? -1 : 1 - carryFlag;
+    if (/^(?:JA|JNBE)$/.test(opCode)) return zeroFlag === 1 || carryFlag === 1 ? 0 : zeroFlag === 0 && carryFlag === 0 ? 1 : -1;
+    if (/^(?:JBE|JNA)$/.test(opCode)) return zeroFlag === 1 || carryFlag === 1 ? 1 : zeroFlag === 0 && carryFlag === 0 ? 0 : -1;
+    if (/^(?:JG|JNLE)$/.test(opCode) && zeroFlag === 1) return 0;
+    if (/^(?:JLE|JNG)$/.test(opCode) && zeroFlag === 1) return 1;
+    if (/^(?:LOOPE|LOOPZ)$/.test(opCode) && zeroFlag === 0) return 0;
+    if (/^(?:LOOPNE|LOOPNZ)$/.test(opCode) && zeroFlag === 1) return 0;
+    return -1;
+}
+
+
+
+
 
 
 
