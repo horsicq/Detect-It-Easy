@@ -8869,18 +8869,30 @@ function scanForObfuscations_Native() {
             indirectEpLeaAbsolutePattern = new RegExp("^LEA (" + epGeneralPurposeRegister + "), \\[(0X[0-9A-F]+|\\d+)\\]$", "i"),
             indirectEpRegisterWritePattern = new RegExp("^(?:MOV(?:ABS)?|MOVZX|MOVSX|MOVSXD|LEA|XOR|ADD|SUB|ADC|SBB|AND|OR|NOT|NEG|INC|DEC|POP) (" + epGeneralPurposeRegister + ")(?:,|$)", "i");
 
-        // Multiple proven addresses are retained because polymorphic junk commonly writes
-        // unrelated registers between materialization and transfer. Every write invalidates
-        // only its physical destination; calls and unknown instructions discard all proofs.
-        var indirectEpKnownAddresses = {};
+        // Keep address facts per reachable path: an unrelated write on one branch must
+        // not erase a proof on another. Calls and unknown writes still fail closed.
+        var indirectEpPendingStates = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, KnownAddresses: {}, ZeroFlag: -1, CarryFlag: -1 }],
+            indirectEpVisitedStates = {};
 
-        // Follow address provenance through the bounded EP stream until an indirect Call/Jmp
-        // consumes it or a control-flow boundary makes the linear proof ambiguous.
-        for (var i = 0; i < 256 && !isIndirectEpTransferPresent; i++) {
-            var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
-                currentEpOpCode = getAsmOpCode(currentEpInstruction);
+        for (var i = 0; i < indirectEpPendingStates.length && i < 256 && !isIndirectEpTransferPresent; i++) {
+            var indirectEpState = indirectEpPendingStates[i],
+                currentEpAddress = indirectEpState.Address,
+                currentEpInstruction = PE.getDisasmString(currentEpAddress),
+                currentEpOpCode = getAsmOpCode(currentEpInstruction),
+                currentEpLength = PE.getDisasmLength(currentEpAddress),
+                indirectEpKnownAddresses = indirectEpState.KnownAddresses;
 
-            if (!currentEpOpCode) break; // Safety check
+            if (!currentEpOpCode || currentEpOpCode === "DB" || currentEpLength < 1 || currentEpLength > 15 ||
+                !isVirtualAddressRangeFileBacked(currentEpAddress, currentEpLength, SECTION_FLAGS_EXECUTE)) continue;
+
+            var indirectEpFactKeys = Object.keys(indirectEpKnownAddresses).sort(),
+                indirectEpStateKey = currentEpAddress + ":" + indirectEpState.ZeroFlag + ":" + indirectEpState.CarryFlag;
+
+            for (var factIndex = 0; factIndex < indirectEpFactKeys.length; factIndex++) {
+                indirectEpStateKey += ":" + indirectEpFactKeys[factIndex] + "=" + indirectEpKnownAddresses[indirectEpFactKeys[factIndex]];
+            }
+            if (indirectEpVisitedStates[indirectEpStateKey]) continue;
+            indirectEpVisitedStates[indirectEpStateKey] = true;
 
             // Classify producers, copies, consumers and invalidators before mutating provenance.
             var registerLiteralAddress = currentEpInstruction.match(epLiteralMovePattern),
@@ -8891,6 +8903,7 @@ function scanForObfuscations_Native() {
                 indirectTransfer = currentEpInstruction.match(indirectEpTransferPattern),
                 registerWrite = currentEpInstruction.match(indirectEpRegisterWritePattern),
                 conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern),
+                directJump = currentEpInstruction.match(epDirectJumpPattern),
                 simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
                 simplePolymorphicRegister = simplePolymorphicInstruction ? (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]) : String(),
                 valuePreservingInstruction = currentEpInstruction.match(epValuePreservingInstructionPattern),
@@ -8977,9 +8990,9 @@ function scanForObfuscations_Native() {
                     leaDestinationKey = getNativeRegisterKey(leaDestination),
                     leaSourceKey = getNativeRegisterKey(leaSource),
                     leaDisplacement = registerLea[4] ? parseInt(registerLea[4], 0) : 0,
-                    leaInstructionLength = leaSource === "RIP" ? PE.getDisasmLength(epAsmInstructionAddresses[i]) : 0,
+                    leaInstructionLength = leaSource === "RIP" ? currentEpLength : 0,
                     leaBaseAddress = leaSource === "RIP" && leaInstructionLength >= 1 && leaInstructionLength <= 15 ?
-                        epAsmInstructionAddresses[i] + leaInstructionLength : indirectEpKnownAddresses[leaSourceKey],
+                        currentEpAddress + leaInstructionLength : indirectEpKnownAddresses[leaSourceKey],
                     leaWidthsMatch = leaSource === "RIP" ? PE_Cached.is64bit :
                         PE_Cached.is64bit ? !epRegister32BitPattern.test(leaSource) :
                             epRegister32BitPattern.test(leaDestination) && epRegister32BitPattern.test(leaSource);
@@ -9010,10 +9023,9 @@ function scanForObfuscations_Native() {
                 }
 
                 // Any indirect transfer ends the physical path, even when its target is unknown.
-                break;
-            } else if (isNeutralInstruction || conditionalBranch || /^(?:CMP|TEST)$/.test(currentEpOpCode)) {
-                // These instructions preserve every general-purpose register on the
-                // physical fall-through path, so all proven image addresses remain valid.
+                continue;
+            } else if (isNeutralInstruction || conditionalBranch || directJump || /^(?:CMP|TEST)$/.test(currentEpOpCode)) {
+                // These instructions preserve general-purpose registers on each proven edge.
             } else if (simplePolymorphicInstruction) {
                 // Only PE32+ r32 self-operations reach this branch. They zero-extend one
                 // physical register but cannot invalidate addresses proven in other registers.
@@ -9042,10 +9054,35 @@ function scanForObfuscations_Native() {
                 // Unknown semantics may consume or transform any address, so restart tracking.
                 indirectEpKnownAddresses = {};
 
-                if (isEpLinearScanStopped(currentEpOpCode, epAsmInstructionAddresses[i], epScanStopOpCodes)) break;
+                if (isEpLinearScanStopped(currentEpOpCode, currentEpAddress, epScanStopOpCodes)) continue;
             }
 
-            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
+            var indirectEpNextZeroFlag = advanceEpZeroFlag(currentEpInstruction, currentEpOpCode, indirectEpState.ZeroFlag),
+                indirectEpNextCarryFlag = advanceEpCarryFlag(currentEpInstruction, currentEpOpCode, indirectEpState.CarryFlag),
+                indirectEpNextAddress = currentEpAddress + currentEpLength,
+                indirectEpSuccessors = [];
+
+            if (conditionalBranch) {
+                var indirectEpBranchResult = getEpKnownBranchResult(currentEpOpCode, indirectEpState.ZeroFlag, indirectEpState.CarryFlag);
+                if (indirectEpBranchResult !== 0) indirectEpSuccessors.push(parseInt(conditionalBranch[2], 0));
+                if (indirectEpBranchResult !== 1) indirectEpSuccessors.push(indirectEpNextAddress);
+            } else if (directJump) {
+                indirectEpSuccessors.push(parseInt(directJump[1], 0));
+            } else {
+                indirectEpSuccessors.push(indirectEpNextAddress);
+            }
+
+            for (var successorIndex = 0; successorIndex < indirectEpSuccessors.length; successorIndex++) {
+                var indirectEpSuccessorAddress = indirectEpSuccessors[successorIndex];
+                if (!isVirtualAddressRangeFileBacked(indirectEpSuccessorAddress, 1, SECTION_FLAGS_EXECUTE)) continue;
+
+                var indirectEpSuccessorFacts = {};
+                for (var factKey in indirectEpKnownAddresses) indirectEpSuccessorFacts[factKey] = indirectEpKnownAddresses[factKey];
+                indirectEpPendingStates.push({
+                    Address: indirectEpSuccessorAddress, KnownAddresses: indirectEpSuccessorFacts,
+                    ZeroFlag: indirectEpNextZeroFlag, CarryFlag: indirectEpNextCarryFlag
+                });
+            }
         }
     }
 
