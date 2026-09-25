@@ -8343,7 +8343,7 @@ function scanForObfuscations_Native() {
                     simplePolymorphicInstruction;
 
             if (literalCompare) {
-                var comparedRegister = literalCompare[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                var comparedRegister = getNativeRegisterKey(literalCompare[1]),
                     comparedLiteral = parseInt(literalCompare[2], 0),
                     knownComparedLiteral = constantEpKnownRegisterValues[comparedRegister];
 
@@ -8376,7 +8376,7 @@ function scanForObfuscations_Native() {
                 // Other flags-neutral writes invalidate their destination without discarding
                 // unrelated register facts accumulated earlier in the linear block.
                 if (literalMove) {
-                    var literalMoveRegister = literalMove[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    var literalMoveRegister = getNativeRegisterKey(literalMove[1]),
                         literalMoveValue = parseInt(literalMove[2], 0);
 
                     if (literalMoveValue <= epMaximumSafeInteger) {
@@ -8388,8 +8388,8 @@ function scanForObfuscations_Native() {
                         delete constantEpKnownRegisterValues[literalMoveRegister];
                     }
                 } else if (registerCopy) {
-                    var constantEpRegisterCopyDestination = registerCopy[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
-                        constantEpRegisterCopySource = registerCopy[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                    var constantEpRegisterCopyDestination = getNativeRegisterKey(registerCopy[1]),
+                        constantEpRegisterCopySource = getNativeRegisterKey(registerCopy[2]);
 
                     if (constantEpKnownRegisterValues[constantEpRegisterCopySource] !== undefined) {
                         var registerCopyValue = constantEpKnownRegisterValues[constantEpRegisterCopySource];
@@ -8401,20 +8401,20 @@ function scanForObfuscations_Native() {
                     }
                 } else if (simplePolymorphicInstruction) {
                     var simplePolymorphicRegister = (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]).toUpperCase(),
-                        simplePolymorphicRegisterKey = simplePolymorphicRegister.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                        simplePolymorphicRegisterKey = getNativeRegisterKey(simplePolymorphicRegister);
 
                     if (constantEpKnownRegisterValues[simplePolymorphicRegisterKey] !== undefined && epRegister32BitPattern.test(simplePolymorphicRegister)) {
                         constantEpKnownRegisterValues[simplePolymorphicRegisterKey] = constantEpKnownRegisterValues[simplePolymorphicRegisterKey] >>> 0;
                     }
                 } else if (valuePreservingInstruction) {
                     var valuePreservingRegister = (valuePreservingInstruction[1] || valuePreservingInstruction[2]).toUpperCase(),
-                        valuePreservingRegisterKey = valuePreservingRegister.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                        valuePreservingRegisterKey = getNativeRegisterKey(valuePreservingRegister);
 
                     if (constantEpKnownRegisterValues[valuePreservingRegisterKey] !== undefined && epRegister32BitPattern.test(valuePreservingRegister)) {
                         constantEpKnownRegisterValues[valuePreservingRegisterKey] = constantEpKnownRegisterValues[valuePreservingRegisterKey] >>> 0;
                     }
                 } else if (flagsNeutralRegisterWrite && !isSimplePolymorphicInstruction) {
-                    delete constantEpKnownRegisterValues[flagsNeutralRegisterWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                    delete constantEpKnownRegisterValues[getNativeRegisterKey(flagsNeutralRegisterWrite[1])];
                 }
 
                 if (valuePreservingInstruction) {
@@ -8427,7 +8427,7 @@ function scanForObfuscations_Native() {
                     constantEpNeutralInstructionCount = 0;
                 }
             } else if (registerWrite) {
-                delete constantEpKnownRegisterValues[registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                delete constantEpKnownRegisterValues[getNativeRegisterKey(registerWrite[1])];
                 constantEpComparisonOrigin = String();
                 constantEpNeutralInstructionCount = 0;
             } else if (partialRegisterWrite) {
@@ -8493,18 +8493,18 @@ function scanForObfuscations_Native() {
                 conditionalBranch = currentEpInstruction.match(epConditionalBranchPattern);
 
             if (pebPointerLoad) {
-                var pebRegister = pebPointerLoad[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                var pebRegister = getNativeRegisterKey(pebPointerLoad[1]);
 
                 // State 1 marks an architecture-width pointer read directly from FS/GS.
                 pebModuleWalkRegisterStates[pebRegister] = 1;
-            } else if (moduleListLoad && pebModuleWalkRegisterStates[moduleListLoad[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())] === 2) {
+            } else if (moduleListLoad && pebModuleWalkRegisterStates[getNativeRegisterKey(moduleListLoad[2])] === 2) {
                 // Reading a loader list through a proven Ldr pointer completes the proof.
                 log(logType.emulation, "PEB loader module-list walk near EP: " + currentEpInstruction);
 
                 isPebModuleWalkPresent = true;
             } else if (ldrPointerLoad) {
-                var ldrDestinationRegister = ldrPointerLoad[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
-                    ldrSourceRegister = ldrPointerLoad[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                var ldrDestinationRegister = getNativeRegisterKey(ldrPointerLoad[1]),
+                    ldrSourceRegister = getNativeRegisterKey(ldrPointerLoad[2]);
 
                 // Promote only a destination loaded through a proven PEB pointer to state 2.
                 if (pebModuleWalkRegisterStates[ldrSourceRegister] === 1) {
@@ -8514,10 +8514,10 @@ function scanForObfuscations_Native() {
                 }
             } else if (moduleListLoad) {
                 // An unproven list-shaped load overwrites its destination with unknown data.
-                delete pebModuleWalkRegisterStates[moduleListLoad[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                delete pebModuleWalkRegisterStates[getNativeRegisterKey(moduleListLoad[1])];
             } else if (registerCopy) {
-                var pebModuleWalkCopyDestination = registerCopy[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
-                    pebModuleWalkCopySource = registerCopy[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                var pebModuleWalkCopyDestination = getNativeRegisterKey(registerCopy[1]),
+                    pebModuleWalkCopySource = getNativeRegisterKey(registerCopy[2]);
 
                 // A PE32+ r32 destination destroys a 64-bit PEB/Ldr pointer by zero-extension.
                 if (PE_Cached.is64bit && epRegister32BitPattern.test(registerCopy[1])) {
@@ -8531,7 +8531,7 @@ function scanForObfuscations_Native() {
                 var pebModuleWalkPreservingRegister = (simplePolymorphicInstruction ?
                     (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]) :
                     (valuePreservingInstruction[1] || valuePreservingInstruction[2])).toUpperCase(),
-                    pebModuleWalkPreservingRegisterKey = pebModuleWalkPreservingRegister.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                    pebModuleWalkPreservingRegisterKey = getNativeRegisterKey(pebModuleWalkPreservingRegister);
 
                 if (PE_Cached.is64bit && epRegister32BitPattern.test(pebModuleWalkPreservingRegister)) {
                     delete pebModuleWalkRegisterStates[pebModuleWalkPreservingRegisterKey];
@@ -8543,7 +8543,7 @@ function scanForObfuscations_Native() {
                 // These instructions preserve every proven pointer on the fall-through path.
             } else if (registerWrite) {
                 // A recognized write invalidates only the overwritten physical register.
-                delete pebModuleWalkRegisterStates[registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                delete pebModuleWalkRegisterStates[getNativeRegisterKey(registerWrite[1])];
             } else if (partialRegisterWrite) {
                 delete pebModuleWalkRegisterStates[getEpPartialRegisterKey(partialRegisterWrite[1])];
             } else {
