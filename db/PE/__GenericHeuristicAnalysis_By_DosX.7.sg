@@ -11245,6 +11245,7 @@ function scanForObfuscations_Native() {
                     protectedStartupPendingCarryFlags = [-1],
                     protectedStartupPendingAddressIndex = 0,
                     protectedStartupVisitedAddresses = {},
+                    protectedStartupVisitedStates = {},
                     protectedStartupVisitedInstructionCount = 0;
 
                 // Explore a small reachable control-flow graph instead of sweeping physical bytes.
@@ -11253,20 +11254,25 @@ function scanForObfuscations_Native() {
                 // the global instruction limit bounds deliberately dense polymorphic dispatchers.
                 while (protectedStartupPendingAddressIndex < protectedStartupPendingAddresses.length &&
                     protectedStartupVisitedInstructionCount < 256 &&
+                    protectedStartupPendingAddressIndex < 1024 &&
                     !isUnderreportedStartupCodePresent) {
                     // Process one queued address and canonicalize it for loop detection.
                     var protectedStartupCurrentAddress = protectedStartupPendingAddresses[protectedStartupPendingAddressIndex],
                         protectedStartupCurrentZeroFlag = protectedStartupPendingZeroFlags[protectedStartupPendingAddressIndex],
                         protectedStartupCurrentCarryFlag = protectedStartupPendingCarryFlags[protectedStartupPendingAddressIndex++],
-                        protectedStartupAddressKey = protectedStartupCurrentAddress.toString();
+                        protectedStartupAddressKey = protectedStartupCurrentAddress.toString(),
+                        protectedStartupStateKey = protectedStartupAddressKey + ":" + protectedStartupCurrentZeroFlag + ":" + protectedStartupCurrentCarryFlag;
 
-                    // Discard repeated and unmapped nodes before spending the instruction budget.
-                    if (protectedStartupVisitedAddresses[protectedStartupAddressKey] ||
-                        PE.VAToOffset(protectedStartupCurrentAddress) === -1) continue;
+                    // The same instruction may have different reachable successors when
+                    // two paths arrive with different flags.
+                    if (protectedStartupVisitedStates[protectedStartupStateKey] || PE.VAToOffset(protectedStartupCurrentAddress) === -1) continue;
+                    protectedStartupVisitedStates[protectedStartupStateKey] = true;
 
-                    // Count each mapped address once, even when several branches converge on it.
-                    protectedStartupVisitedAddresses[protectedStartupAddressKey] = true;
-                    protectedStartupVisitedInstructionCount++;
+                    // Charge the instruction budget only once for each physical address.
+                    if (!protectedStartupVisitedAddresses[protectedStartupAddressKey]) {
+                        protectedStartupVisitedAddresses[protectedStartupAddressKey] = true;
+                        protectedStartupVisitedInstructionCount++;
+                    }
 
                     var protectedStartupInstruction = PE.getDisasmString(protectedStartupCurrentAddress),
                         protectedStartupOpCode = getAsmOpCode(protectedStartupInstruction),
@@ -11336,6 +11342,7 @@ function scanForObfuscations_Native() {
                 protectedStartupPendingZeroFlags = undefined;
                 protectedStartupPendingCarryFlags = undefined;
                 protectedStartupVisitedAddresses = undefined;
+                protectedStartupVisitedStates = undefined;
             }
         }
     }
