@@ -7819,7 +7819,15 @@ function scanForObfuscations_Native() {
         }
     }
 
-    if (isSyntheticEpTransferPresent) options = addOption(options, isStackPivotEpTransferPresent ? "Stack pivot near EP" : "Synthetic EP transfer");
+    var guardedEpEvidence = getEpGuardedFlowEvidence();
+
+    var isGuardedEpTransferPresent = guardedEpEvidence.ReturnTarget !== undefined;
+
+    if (!isSyntheticEpTransferPresent && isGuardedEpTransferPresent) {
+        log(logType.emulation, "Computed stack/Ret transfer near EP to VA 0x" + guardedEpEvidence.ReturnTarget.toString(16));
+    }
+
+    if (isSyntheticEpTransferPresent || isGuardedEpTransferPresent) options = addOption(options, isStackPivotEpTransferPresent ? "Stack pivot near EP" : "Synthetic EP transfer");
 
 
 
@@ -7827,7 +7835,11 @@ function scanForObfuscations_Native() {
     // Check for an opaque conditional branch near the entry point. XOR/SUB/CMP reg, reg
     // and AND reg, 0 always produce CF=OF=SF=0 and ZF=PF=1, making the following Jcc constant.
 
-    var isOpaqueEpBranchPresent = false;
+    var isOpaqueEpBranchPresent = guardedEpEvidence.OpaqueBranchAddress !== -1;
+
+    if (isOpaqueEpBranchPresent) {
+        log(logType.emulation, "Arithmetic opaque branch near EP at VA 0x" + guardedEpEvidence.OpaqueBranchAddress.toString(16));
+    }
 
     if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         const opaqueEpAllOnesFlagsAlwaysTakenBranches = [
@@ -11990,6 +12002,202 @@ function isEpDirectCallReturnProven(callAddress) {
     if (epDirectCallReturnCache.hasOwnProperty(targetKey)) return epDirectCallReturnCache[targetKey];
     epDirectCallReturnCache[targetKey] = isEpBoundedDirectFlowProven(target, /^RET(?:N)?(?: (?:0X[0-9A-F]+|\d+))?$/i);
     return epDirectCallReturnCache[targetKey];
+}
+
+
+
+/**
+ * Finds constant arithmetic branches and computed stack/RET transfers on a bounded
+ * entry-point graph. Direct jumps and conditional edges are decoded at their real
+ * targets. An indirect CALL contributes only a possible return edge: the result
+ * describes code reachable if that call returns, never a guaranteed runtime path.
+ * Register constants are discarded at calls and unknown register writes;
+ * ROL/ROR preserve PF, SF and ZF, so their following Jcc must use the preceding
+ * flag producer. The returned addresses are absent when a proof is unavailable.
+ *
+ * @returns {Object} OpaqueBranchAddress (-1 if absent) and ReturnTarget
+ * (undefined if absent) for the same bounded EP graph.
+ */
+function getEpGuardedFlowEvidence() {
+    var evidence = { OpaqueBranchAddress: -1, ReturnTarget: undefined };
+
+    if (!PE_Cached.isEntryPointAnalysisAllowed || !PE_Cached.isArchX86) return evidence;
+
+    const register32 = "(?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:8|9|1[0-5])D)",
+        register64 = "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
+        addressRegister = PE_Cached.isI386 ? register32 : register64,
+        literal = "(-?(?:0X[0-9A-F]+|[0-9]+))",
+        immediateMove = new RegExp("^MOV (" + register32 + "), " + literal + "$", "i"),
+        selfZero = new RegExp("^(?:SUB|XOR) (" + register32 + "), \\1$", "i"),
+        arithmetic = new RegExp("^(ADD|SUB|AND|OR|XOR|SHR|SHL|ROL|ROR) (" + register32 + "), " + literal + "$", "i"),
+        ripAddress = new RegExp("^LEA (" + register64 + "), \\[RIP ([+-]) (0X[0-9A-F]+|[0-9]+)\\]$", "i"),
+        absoluteLea = new RegExp("^LEA (" + register64 + "), \\[(0X[0-9A-F]+|[0-9]+)\\]$", "i"),
+        basedLea = new RegExp("^LEA (" + addressRegister + "), \\[(" + addressRegister + ")(?: ([+-]) (0X[0-9A-F]+|[0-9]+))?\\]$", "i"),
+        nativeMove = new RegExp("^MOV(?:ABS)? (" + register64 + "), " + literal + "$", "i"),
+        nativeArithmetic = new RegExp("^(ADD|SUB) (" + register64 + "), " + literal + "$", "i"),
+        registerCopy = new RegExp("^MOV (" + register32 + "|" + register64 + "), (" + register32 + "|" + register64 + ")$", "i"),
+        stackExchange = PE_Cached.isI386 ? /^XCHG DWORD PTR \[ESP\], (E(?:AX|BX|CX|DX|SI|DI|BP))$/i :
+            new RegExp("^XCHG QWORD PTR \\[RSP\\], (" + register64 + ")$", "i"),
+        stackStore = PE_Cached.isI386 ? /^MOV DWORD PTR \[ESP\], (E(?:AX|BX|CX|DX|SI|DI|BP))$/i :
+            new RegExp("^MOV QWORD PTR \\[RSP\\], (" + register64 + ")$", "i"),
+        pushedRegister = new RegExp("^PUSH (" + (PE_Cached.isI386 ? register32 : register64) + ")$", "i"),
+        stackArithmetic = PE_Cached.isI386 ? /^(ADD|SUB) DWORD PTR \[ESP\], (0X[0-9A-F]+|[0-9]+)$/i :
+            /^(ADD|SUB) QWORD PTR \[RSP\], (0X[0-9A-F]+|[0-9]+)$/i,
+        directBranch = /^(J[A-Z]+) (0X[0-9A-F]+|[0-9]+)$/i;
+
+    var pending = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, Known: {}, Flags: { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 }, StackTarget: undefined }],
+        visited = {}, processed = 0;
+
+    while (pending.length && processed < 1024 && (evidence.OpaqueBranchAddress === -1 || evidence.ReturnTarget === undefined)) {
+        var state = pending.shift(), address = state.Address;
+        if (!isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) continue;
+
+        var key = address + ":" + state.Flags.PF + ":" + state.Flags.SF + ":" + state.Flags.ZF + ":" +
+            state.Flags.Steps + ":" + state.Flags.Kinds + ":" + state.StackTarget + ":" + JSON.stringify(state.Known);
+        if (visited[key]) continue;
+        visited[key] = true;
+
+        var instruction = PE.getDisasmString(address), length = PE.getDisasmLength(address), opCode = getAsmOpCode(instruction);
+        if (!opCode || length < 1 || length > 15 || !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
+        processed++;
+
+        var next = {
+            Address: address + length, Known: {}, Flags: {
+                PF: state.Flags.PF, SF: state.Flags.SF, ZF: state.Flags.ZF,
+                Steps: state.Flags.Steps, Kinds: state.Flags.Kinds
+            }, StackTarget: state.StackTarget
+        };
+        for (var register in state.Known) next.Known[register] = state.Known[register];
+
+        var move = instruction.match(immediateMove), zero = instruction.match(selfZero), operation = instruction.match(arithmetic),
+            rip = instruction.match(ripAddress), absolute = instruction.match(absoluteLea), based = instruction.match(basedLea),
+            native = instruction.match(nativeMove), nativeOp = instruction.match(nativeArithmetic), copy = instruction.match(registerCopy),
+            exchange = instruction.match(stackExchange), store = instruction.match(stackStore), push = instruction.match(pushedRegister),
+            stackOp = instruction.match(stackArithmetic), branch = instruction.match(directBranch);
+
+        if (zero || move || operation) {
+            var destination = getNativeRegisterKey((zero || move || operation)[1 + (operation ? 1 : 0)]),
+                old = next.Known[destination], value, steps, kinds;
+
+            if (zero) {
+                value = 0;
+                steps = 1;
+                kinds = instruction.indexOf("XOR ") === 0 ? 4 : 1;
+            } else if (move) {
+                value = parseInt(move[2], 0) >>> 0;
+                steps = 0;
+                kinds = 0;
+            } else if (old && isFinite(old.Value)) {
+                var operand = parseInt(operation[3], 0) >>> 0, shift = operand & 31;
+                value = old.Value;
+                steps = old.Steps + 1;
+                kinds = old.Kinds | (/^(?:SHR|SHL|ROL|ROR)$/.test(operation[1]) ? 2 :
+                    /^(?:AND|OR|XOR)$/.test(operation[1]) ? 4 : 1);
+                if (operation[1] === "ADD") value = (value + operand) >>> 0;
+                else if (operation[1] === "SUB") value = (value - operand) >>> 0;
+                else if (operation[1] === "AND") value = (value & operand) >>> 0;
+                else if (operation[1] === "OR") value = (value | operand) >>> 0;
+                else if (operation[1] === "XOR") value = (value ^ operand) >>> 0;
+                else if (operation[1] === "SHR" && shift) value >>>= shift;
+                else if (operation[1] === "SHL" && shift) value = (value << shift) >>> 0;
+                else if (operation[1] === "ROL" && shift) value = ((value << shift) | (value >>> (32 - shift))) >>> 0;
+                else if (operation[1] === "ROR" && shift) value = ((value >>> shift) | (value << (32 - shift))) >>> 0;
+            }
+
+            if (value === undefined || !isFinite(value)) delete next.Known[destination];
+            else next.Known[destination] = { Value: value, Steps: steps, Kinds: kinds };
+
+            if (!move && (!operation || !/^(?:ROL|ROR)$/.test(operation[1]))) {
+                if (value === undefined || (operation && /^(?:SHR|SHL)$/.test(operation[1]) && !(parseInt(operation[3], 0) & 31))) {
+                    next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
+                } else {
+                    var parityByte = value & 0xFF, parityBits = 0;
+                    for (var bit = 0; bit < 8; bit++) parityBits += (parityByte >>> bit) & 1;
+                    next.Flags = { PF: 1 - (parityBits & 1), SF: value >>> 31, ZF: value === 0 ? 1 : 0, Steps: steps, Kinds: kinds };
+                }
+            }
+            next.StackTarget = undefined;
+        } else if (rip || absolute || based || native || nativeOp || copy) {
+            var targetRegister = getNativeRegisterKey((rip || absolute || based || native || nativeOp || copy)[1 + (nativeOp ? 1 : 0)]), target;
+            if (rip) target = address + length + (rip[2] === "-" ? -1 : 1) * parseInt(rip[3], 0);
+            else if (absolute) target = parseInt(absolute[2], 0);
+            else if (based && next.Known[getNativeRegisterKey(based[2])]) target = next.Known[getNativeRegisterKey(based[2])].Value +
+                (based[4] ? (based[3] === "-" ? -1 : 1) * parseInt(based[4], 0) : 0);
+            else if (native) target = parseInt(native[2], 0);
+            else if (nativeOp && next.Known[targetRegister] && parseInt(nativeOp[3], 0) <= 0x7FFFFFFF) target = next.Known[targetRegister].Value +
+                (nativeOp[1] === "SUB" ? -1 : 1) * parseInt(nativeOp[3], 0);
+            else if (copy && next.Known[getNativeRegisterKey(copy[2])]) target = next.Known[getNativeRegisterKey(copy[2])].Value;
+            if (copy && /^(?:E[A-Z]{2}|R(?:8|9|1[0-5])D)$/.test(copy[1]) && target !== undefined) target >>>= 0;
+            if (isFinite(target) && target >= 0 && target <= 0x1FFFFFFFFFFFFF) next.Known[targetRegister] = { Value: target, Steps: 0, Kinds: 0 };
+            else delete next.Known[targetRegister];
+            if (nativeOp) next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
+            next.StackTarget = undefined;
+        } else if (exchange || store || push) {
+            var exchangedRegister = getNativeRegisterKey((exchange || store || push)[1]), knownTarget = next.Known[exchangedRegister];
+            next.StackTarget = knownTarget ? knownTarget.Value : undefined;
+            if (exchange) delete next.Known[exchangedRegister];
+        } else if (stackOp) {
+            var stackDelta = parseInt(stackOp[2], 0);
+            if (PE_Cached.is64bit && stackDelta > 0x7FFFFFFF) next.StackTarget = undefined;
+            else if (next.StackTarget !== undefined) next.StackTarget += (stackOp[1] === "ADD" ? 1 : -1) * stackDelta;
+            if (next.StackTarget < 0 || next.StackTarget > 0x1FFFFFFFFFFFFF || !isFinite(next.StackTarget)) next.StackTarget = undefined;
+            next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
+        } else if (/^RET(?:N)?$/.test(opCode)) {
+            if (next.StackTarget !== undefined && isVirtualAddressRangeFileBacked(next.StackTarget, 1, SECTION_FLAGS_EXECUTE)) {
+                evidence.ReturnTarget = next.StackTarget;
+            }
+            continue;
+        } else if (opCode === "CALL") {
+            // An indirect call may return, but it cannot preserve our register or flag facts.
+            if (!/^CALL (?:0X[0-9A-F]+|[0-9]+)$/i.test(instruction) || isEpDirectCallReturnProven(address)) {
+                next.Known = {};
+                next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
+                next.StackTarget = undefined;
+                pending.push(next);
+            }
+            continue;
+        } else if (branch) {
+            var branchTarget = parseInt(branch[2], 0), outcome = -1;
+            if (opCode === "JP" || opCode === "JPE") outcome = next.Flags.PF;
+            else if (opCode === "JNP" || opCode === "JPO") outcome = next.Flags.PF === -1 ? -1 : 1 - next.Flags.PF;
+            else if (opCode === "JS") outcome = next.Flags.SF;
+            else if (opCode === "JNS") outcome = next.Flags.SF === -1 ? -1 : 1 - next.Flags.SF;
+            else if (opCode === "JE" || opCode === "JZ") outcome = next.Flags.ZF;
+            else if (opCode === "JNE" || opCode === "JNZ") outcome = next.Flags.ZF === -1 ? -1 : 1 - next.Flags.ZF;
+
+            if (opCode !== "JMP" && outcome !== -1 && next.Flags.Steps >= 3 &&
+                (next.Flags.Kinds & 2 || next.Flags.Kinds & 4) && evidence.OpaqueBranchAddress === -1 &&
+                isVirtualAddressRangeFileBacked(branchTarget, 1, SECTION_FLAGS_EXECUTE)) {
+                evidence.OpaqueBranchAddress = address;
+            }
+            if (opCode !== "JMP" && outcome !== 1) pending.push(next);
+            if (outcome !== 0 && isVirtualAddressRangeFileBacked(branchTarget, 1, SECTION_FLAGS_EXECUTE)) {
+                var taken = { Address: branchTarget, Known: next.Known, Flags: next.Flags, StackTarget: next.StackTarget };
+                pending.push(taken);
+            }
+            continue;
+        } else if (/^(?:MOV|MOVABS|MOVSX|MOVSXD|MOVZX|LEA|CMOV[A-Z]+|POP)(?: |$)/.test(instruction)) {
+            // These forms leave arithmetic flags untouched. A register destination
+            // loses its old constant, while any unmodeled memory write loses the
+            // proven top-of-stack target without inventing a replacement value.
+            var writtenRegister = instruction.match(/^(?:MOV|MOVABS|MOVSX|MOVSXD|MOVZX|LEA|CMOV[A-Z]+|POP) ([A-Z][A-Z0-9]*)(?:,|$)/);
+            if (writtenRegister) delete next.Known[getNativeRegisterKey(writtenRegister[1])];
+            if (opCode === "POP" || !writtenRegister || writtenRegister[1] === "ESP" || writtenRegister[1] === "RSP") next.StackTarget = undefined;
+        } else if (/^(?:NOP|FNOP|PAUSE)$/.test(opCode)) {
+            // Padding changes neither the proven pointer nor the modeled flags.
+        } else if (/^(?:PUSH|PUSHF|PUSHFD|PUSHFQ|XCHG)$/.test(opCode)) {
+            if (opCode === "XCHG") next.Known = {};
+            next.StackTarget = undefined;
+        } else {
+            next.Known = {};
+            next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
+            next.StackTarget = undefined;
+        }
+
+        if (!/^(?:HLT|INT|INT1|INT3|INTO|IRET|IRETD|IRETQ|JMPF|LOOP|LOOPE|LOOPNE|LOOPNZ|LOOPZ|RETF|RETN|SYSCALL|SYSENTER|SYSRET|SYSEXIT|UD2)$/.test(opCode)) pending.push(next);
+    }
+
+    return evidence;
 }
 
 
