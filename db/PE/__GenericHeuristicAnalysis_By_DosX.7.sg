@@ -1844,10 +1844,7 @@ function scanForAntiAnalysis_Native() {
 
                 delete antiDebugPebRegisters[registerWriteKey];
             } else if (partialRegisterWrite) {
-                var partialRegister = partialRegisterWrite[1].toUpperCase(),
-                    partialRegisterKey = /^R(?:8|9|1[0-5])[BW]$/.test(partialRegister) ? partialRegister.substring(0, partialRegister.length - 1) :
-                        /^[ABCD][HLX]$/.test(partialRegister) ? "R" + partialRegister[0] + "X" : "R" + partialRegister.replace(/L$/, String());
-                delete antiDebugPebRegisters[partialRegisterKey];
+                delete antiDebugPebRegisters[getEpPartialRegisterKey(partialRegisterWrite[1])];
             } else {
                 // Unknown semantics may clobber any alias, so discard the whole proof set.
                 antiDebugPebRegisters = {};
@@ -6617,10 +6614,7 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
         } else if (registerWrite) {
             delete pebState[getNativeRegisterKey(registerWrite[1])];
         } else if (partialWrite) {
-            var partialRegister = partialWrite[1].toUpperCase(), partialKey = /^R(?:8|9|1[0-5])[BW]$/.test(partialRegister) ?
-                partialRegister.substring(0, partialRegister.length - 1) : /^[ABCD][HLX]$/.test(partialRegister) ?
-                    "R" + partialRegister[0] + "X" : "R" + partialRegister.replace(/L$/, String());
-            delete pebState[partialKey];
+            delete pebState[getEpPartialRegisterKey(partialWrite[1])];
         } else if (!/^(?:NOP|FNOP|PAUSE|CMP|TEST|J[A-Z]+)$/.test(instruction.split(" ")[0])) {
             pebState = {};
         }
@@ -6685,9 +6679,7 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
                     if (!patterns.ByteRead.test(instruction)) delete byteRegisters[overwrittenRegister];
                 }
                 if (partialWrite) {
-                    var partialRegister = partialWrite[1].toUpperCase(), partialKey = /^R(?:8|9|1[0-5])[BW]$/.test(partialRegister) ?
-                        partialRegister.substring(0, partialRegister.length - 1) : /^[ABCD][HLX]$/.test(partialRegister) ?
-                            "R" + partialRegister[0] + "X" : "R" + partialRegister.replace(/L$/, String());
+                    var partialKey = getEpPartialRegisterKey(partialWrite[1]);
                     delete kinds[partialKey];
                     delete linked[partialKey];
                     if (!patterns.ByteRead.test(instruction)) delete byteRegisters[partialKey];
@@ -6802,10 +6794,7 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
             delete next[registerKey(match[1])];
             if (instruction.indexOf("POP ") === 0) delete next.RSP;
         } else if ((match = instruction.match(partialPattern))) {
-            var partial = match[1].toUpperCase(), key = /^R(?:8|9|1[0-5])[BW]$/.test(partial) ?
-                partial.substring(0, partial.length - 1) : /^[ABCD][HLX]$/.test(partial) ?
-                    "R" + partial[0] + "X" : "R" + partial.replace(/L$/, String());
-            delete next[key];
+            delete next[getEpPartialRegisterKey(match[1])];
         } else if (/^PUSH(?: |AL$)/.test(instruction)) delete next.RSP;
         else if (!/^(?:CMP|TEST|NOP|FNOP|PAUSE|CLC|STC|CMC|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?)(?: |$)/.test(instruction)) next = {};
 
@@ -7498,19 +7487,6 @@ function scanForObfuscations_Native() {
             "JMP", "JMPF", "LOOP", "LOOPE", "LOOPNE", "LOOPNZ", "LOOPZ", "RET",
             "RETF", "RETN", "SYSCALL", "SYSENTER", "SYSRET", "SYSEXIT", "UD2"
         ];
-
-    /**
-     * Map a recognized x86 byte/word destination to its physical register.
-     * Callers invalidate only that register and retain independent proofs.
-     * @param {string} name - Decoded partial-register operand.
-     * @returns {string} Canonical physical-register key.
-     */
-    function getEpPartialRegisterKey(name) {
-        var register = name.toUpperCase();
-        if (/^R(?:8|9|1[0-5])[BW]$/.test(register)) return register.substring(0, register.length - 1);
-        if (/^[ABCD][HLX]$/.test(register)) return "R" + register[0] + "X";
-        return "R" + register.replace(/L$/, String());
-    }
 
 
 
@@ -12245,6 +12221,25 @@ function getNativeRegisterKey(registerName) {
     var register = registerName;
     if (register[0] === "E") register = "R" + register.substring(1);
     return register[register.length - 1] === "D" ? register.substring(0, register.length - 1) : register;
+}
+
+
+
+/**
+ * Maps a decoded byte or word register write to the physical register it invalidates.
+ * Unlike getNativeRegisterKey, this accepts partial aliases such as AH, SIL and R8B;
+ * it must not be used to preserve a value across a width-changing write.
+ *
+ * @param {string} register - Uppercase decoded partial-register destination.
+ * @returns {string} Physical register key whose existing proof must be discarded.
+ * @example
+ * getEpPartialRegisterKey("AH"); // "RAX"
+ * getEpPartialRegisterKey("R8B"); // "R8"
+ */
+function getEpPartialRegisterKey(register) {
+    if (/^R(?:8|9|1[0-5])[BW]$/.test(register)) return register.substring(0, register.length - 1);
+    if (/^[ABCD][HLX]$/.test(register)) return "R" + register[0] + "X";
+    return "R" + register.replace(/L$/, String());
 }
 
 
