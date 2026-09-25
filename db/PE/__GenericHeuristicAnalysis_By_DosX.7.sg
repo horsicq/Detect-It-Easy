@@ -1771,7 +1771,7 @@ function scanForAntiAnalysis_Native() {
 
         // A PEB pointer may be copied through several registers. Track all proven aliases
         // and invalidate only registers that are explicitly overwritten by polymorphic junk.
-        var antiDebugPebRegisters = {};
+        var antiDebugPebRegisters = {}, antiDebugFallthrough = {};
 
         // Walk the bounded EP stream shared by native heuristics. Stop as soon as one
         // complete anti-debug proof is found because the verdict retains only its type.
@@ -1853,7 +1853,7 @@ function scanForAntiAnalysis_Native() {
                 if (isEpLinearScanStopped(currentEpOpCode, epAsmInstructionAddresses[i], antiDebugStopOpCodes)) break;
             }
 
-            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructionAddresses[i], antiDebugFallthrough)) break;
         }
     }
 
@@ -7402,6 +7402,8 @@ function scanForObfuscations_Native() {
         // Check first 30 instructions for "Stack-push address near EP"
         // This trick uses "CALL $+5" (E8 00 00 00 00) to push next instruction address on stack
         if (PE_Cached.isEntryPointAnalysisAllowed) {
+            var addrToStackFallthrough = {};
+
             for (var i = 0; i < 32 && !isAddrToStackTrickPresent; i++) {
                 var currentInstruction = emulateAndGetAsmInstructionByIndex(i),
                     addrToStackOpCode = getAsmOpCode(currentInstruction),
@@ -7425,7 +7427,7 @@ function scanForObfuscations_Native() {
 
                 // Do not inspect bytes which cannot execute after a hard control-flow transfer.
                 if (/^(?:HLT|INT(?:1|3|O)?|IRET(?:D|Q)?|JMPF?|LOOP(?:E|NE|NZ|Z)?|RET(?:F|N)?|SYS(?:CALL|ENTER|RET|EXIT)|UD2)$/.test(addrToStackOpCode)) break;
-                if (isEpLinearFallthroughUnproven(currentInstruction, epAsmInstructions[i - 1], disasmAddress)) break;
+                if (isEpLinearFallthroughUnproven(currentInstruction, disasmAddress, addrToStackFallthrough)) break;
             }
         }
     }
@@ -8452,7 +8454,7 @@ function scanForObfuscations_Native() {
         // State 1 proves a PEB pointer and state 2 proves its PEB_LDR_DATA pointer.
         // Copies preserve the proof, while writes invalidate only their physical register.
         // Unknown instructions discard all proofs but may begin a new chain later.
-        var pebModuleWalkRegisterStates = {};
+        var pebModuleWalkRegisterStates = {}, pebModuleWalkFallthrough = {};
 
         // Search the bounded EP stream for the ordered PEB -> Ldr -> module-list chain.
         // Per-register states allow the chain to survive register substitution and copies.
@@ -8534,7 +8536,7 @@ function scanForObfuscations_Native() {
                 if (isEpLinearScanStopped(currentEpOpCode, epAsmInstructionAddresses[i], epScanStopOpCodes)) break;
             }
 
-            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructionAddresses[i], pebModuleWalkFallthrough)) break;
         }
     }
 
@@ -8551,14 +8553,15 @@ function scanForObfuscations_Native() {
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         var isFpuEnvironmentStored = false,
             fpuEpNeutralInstructionCount = 0,
-            fpuEpCurrentAddress = PE_Cached.addressOfUnmanagedEntryPoint,
-            previousFpuEpInstruction = String();
+            fpuEpCurrentAddress = PE_Cached.addressOfUnmanagedEntryPoint;
 
         // In the 28-byte x87 environment, the saved instruction pointer begins at
         // offset 0xC. Writing the environment at ESP-0xC therefore places EIP at
         // the current stack top, where a following POP can recover it.
         // Advance by physical instruction length because raw x87 encodings may be
         // rendered inconsistently by the disassembler used by different DiE builds.
+        var fpuEpFallthrough = {};
+
         for (var i = 0; i < 256 && !isFpuEpRecoveryPresent; i++) {
             var currentEpInstruction = PE.getDisasmString(fpuEpCurrentAddress),
                 currentEpOpCode = getAsmOpCode(currentEpInstruction),
@@ -8608,8 +8611,7 @@ function scanForObfuscations_Native() {
                 if (isEpLinearScanStopped(currentEpOpCode, fpuEpCurrentAddress, epScanStopOpCodes)) break;
             }
 
-            if (isEpLinearFallthroughUnproven(currentEpInstruction, previousFpuEpInstruction, fpuEpCurrentAddress)) break;
-            previousFpuEpInstruction = currentEpInstruction;
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, fpuEpCurrentAddress, fpuEpFallthrough)) break;
 
             // Continue the physical fall-through sweep using the validated instruction size.
             fpuEpCurrentAddress += currentEpInstructionLength;
@@ -8640,6 +8642,8 @@ function scanForObfuscations_Native() {
 
         // Sweep only the bounded user-mode startup path; the first privileged operation
         // is sufficient because its concrete opcode is preserved in the verdict.
+        var privilegedEpFallthrough = {};
+
         for (var i = 0; i < 256 && !isPrivilegedEpOpCodePresent; i++) {
             var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
                 currentEpOpCode = getAsmOpCode(currentEpInstruction);
@@ -8660,7 +8664,7 @@ function scanForObfuscations_Native() {
                 break;
             }
 
-            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructionAddresses[i], privilegedEpFallthrough)) break;
         }
     }
 
@@ -8679,6 +8683,8 @@ function scanForObfuscations_Native() {
 
         // These non-privileged probes are distinctive only while they remain close to the
         // process entry path, so stop the bounded sweep at a terminal transfer.
+        var systemEpProbeFallthrough = {};
+
         for (var i = 0; i < 256 && !isSystemEpProbePresent; i++) {
             var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
                 currentEpOpCode = getAsmOpCode(currentEpInstruction);
@@ -8695,7 +8701,7 @@ function scanForObfuscations_Native() {
                 break;
             }
 
-            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructionAddresses[i], systemEpProbeFallthrough)) break;
         }
     }
 
@@ -8712,6 +8718,8 @@ function scanForObfuscations_Native() {
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         // Scan the bounded startup stream for kernel-entry instructions emitted directly
         // by the image rather than reached through an imported operating-system wrapper.
+        var directEpSystemCallFallthrough = {};
+
         for (var i = 0; i < 256 && !isDirectEpSystemCallPresent; i++) {
             var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
                 currentEpOpCode = getAsmOpCode(currentEpInstruction);
@@ -8729,7 +8737,7 @@ function scanForObfuscations_Native() {
                 break;
             }
 
-            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructionAddresses[i], directEpSystemCallFallthrough)) break;
         }
     }
 
@@ -9093,7 +9101,8 @@ function scanForObfuscations_Native() {
         var trapFlagState = 0,
             trapFlagRegisters = {},
             trapFlagTestOpCode = String(),
-            trapFlagNeutralInstructionCount = 0;
+            trapFlagNeutralInstructionCount = 0,
+            trapFlagFallthrough = {};
 
         // Walk the bounded startup path and accept only one complete flags-save sequence.
         for (var i = 0; i < 256 && !isEpTrapFlagCheckPresent; i++) {
@@ -9195,7 +9204,7 @@ function scanForObfuscations_Native() {
                 if (isEpLinearScanStopped(currentEpOpCode, epAsmInstructionAddresses[i], epScanStopOpCodes)) break;
             }
 
-            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructions[i - 1], epAsmInstructionAddresses[i])) break;
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructionAddresses[i], trapFlagFallthrough)) break;
         }
     }
 
@@ -12069,24 +12078,43 @@ function getEpKnownBranchResult(opCode, zeroFlag, carryFlag) {
 
 /**
  * Rejects a physical EP fall-through when a conditional branch may skip it.
- * A branch to the next instruction cannot skip bytes. Otherwise only a directly
- * preceding self-zeroing XOR/SUB or self-CMP proves the known-zero flags needed
- * to establish that the branch is never taken. Unknown flag provenance fails closed.
+ * The caller owns a separate flag state for each physical instruction sweep.
+ * The EP cache and the manual x87 sweep supply consecutive decoded instructions;
+ * only branches need another engine length lookup. An unknown branch ends the
+ * sweep rather than allowing facts from an unrelated path to cross it.
  *
- * @param {string} instruction - Current decoded conditional branch, or another instruction.
- * @param {string} previousInstruction - Immediately preceding physical instruction.
+ * @param {string} instruction - Current decoded instruction.
  * @param {number} address - Virtual address of the current instruction.
+ * @param {Object} state - Caller-owned ZF/CF facts for one physical sweep.
  * @returns {boolean} Whether subsequent physical bytes lack proven reachability.
  */
-function isEpLinearFallthroughUnproven(instruction, previousInstruction, address) {
-    var branch = instruction && instruction.match(/^(J(?!MP)[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
-    if (!branch) return false;
+function isEpLinearFallthroughUnproven(instruction, address, state) {
+    if (!isFinite(address)) return true;
 
-    var length = PE.getDisasmLength(address);
-    if (length > 0 && parseInt(branch[2], 0) === address + length) return false;
-    if (!previousInstruction || !/^(?:XOR|SUB|CMP) ([A-Z][A-Z0-9]*), \1$/i.test(previousInstruction)) return true;
+    if (state.PreviousAddress === undefined || address <= state.PreviousAddress) {
+        state.ZeroFlag = -1;
+        state.CarryFlag = -1;
+        state.PreviousInstruction = String();
+    }
 
-    return !/^(?:JA|JNBE|JB|JNAE|JC|JG|JNLE|JL|JNGE|JNE|JNZ|JO|JNP|JPO|JS)$/.test(branch[1].toUpperCase());
+    var opCode = getAsmOpCode(instruction),
+        branch = instruction && instruction.match(/^(J(?!MP)[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
+
+    if (branch) {
+        var length = PE.getDisasmLength(address);
+        if (!isFinite(length) || length < 1 || length > 15 || length % 1 !== 0) return true;
+
+        if (parseInt(branch[2], 0) !== address + length &&
+            getEpKnownBranchResult(opCode, state.ZeroFlag, state.CarryFlag) !== 0 &&
+            !(/^(?:XOR|SUB|CMP) ([A-Z][A-Z0-9]*), \1$/i.test(state.PreviousInstruction) &&
+                /^(?:JA|JNBE|JB|JNAE|JC|JG|JNLE|JL|JNGE|JNE|JNZ|JO|JNP|JPO|JS)$/.test(opCode))) return true;
+    }
+
+    state.ZeroFlag = advanceEpZeroFlag(instruction, opCode, state.ZeroFlag);
+    state.CarryFlag = advanceEpCarryFlag(instruction, opCode, state.CarryFlag);
+    state.PreviousInstruction = instruction;
+    state.PreviousAddress = address;
+    return false;
 }
 
 
