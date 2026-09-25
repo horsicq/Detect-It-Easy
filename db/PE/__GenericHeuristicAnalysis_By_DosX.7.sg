@@ -8811,7 +8811,7 @@ function scanForObfuscations_Native() {
                 // A proven null dereference transfers control to an exception handler;
                 // physical bytes after it are not a reachable fall-through stream.
                 var nullMemoryOperand = currentEpInstruction.match(/\[([A-Z][A-Z0-9]*)\]/i),
-                    nullMemoryRegister = nullMemoryOperand && nullMemoryOperand[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                    nullMemoryRegister = nullMemoryOperand && getNativeRegisterKey(nullMemoryOperand[1]);
 
                 if (nullMemoryRegister && overlappingEpKnownZeroRegisters[nullMemoryRegister] &&
                     !/^(?:LEA|PREFETCH|PREFETCHNTA|PREFETCHT[012])$/.test(currentEpOpCode)) break;
@@ -8822,7 +8822,7 @@ function scanForObfuscations_Native() {
                         /^R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])$/i.test(zeroedRegister[1]));
 
                 if (isFullZeroRegister) {
-                    var zeroRegisterKey = zeroedRegister[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                    var zeroRegisterKey = getNativeRegisterKey(zeroedRegister[1]);
                     overlappingEpKnownZeroRegisters[zeroRegisterKey] = true;
                 } else if (!/^(?:NOP|FNOP|PAUSE|CMP|TEST|J[A-Z]+)$/.test(currentEpOpCode)) {
                     overlappingEpKnownZeroRegisters = {};
@@ -8898,7 +8898,7 @@ function scanForObfuscations_Native() {
                     (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
 
             if (registerLiteralAddress) {
-                var indirectEpTargetRegister = registerLiteralAddress[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                var indirectEpTargetRegister = getNativeRegisterKey(registerLiteralAddress[1]),
                     indirectEpTargetAddress = parseInt(registerLiteralAddress[2], 0);
 
                 // Reject imprecise JavaScript integers before applying architectural truncation.
@@ -8917,8 +8917,8 @@ function scanForObfuscations_Native() {
             } else if (registerCopy) {
                 // Follow one exact copy of the materialized VA. A PE32+ r32 destination
                 // truncates and zero-extends the address, so validate the transformed VA.
-                var indirectEpTargetRegister = registerCopy[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
-                    indirectEpSourceRegister = registerCopy[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                var indirectEpTargetRegister = getNativeRegisterKey(registerCopy[1]),
+                    indirectEpSourceRegister = getNativeRegisterKey(registerCopy[2]),
                     indirectEpTargetAddress = indirectEpKnownAddresses[indirectEpSourceRegister];
 
                 if (indirectEpTargetAddress !== undefined) {
@@ -8934,7 +8934,7 @@ function scanForObfuscations_Native() {
                 }
             } else if (registerArithmetic) {
                 var arithmeticRegister = registerArithmetic[2],
-                    arithmeticRegisterKey = arithmeticRegister.toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    arithmeticRegisterKey = getNativeRegisterKey(arithmeticRegister),
                     arithmeticAddress = indirectEpKnownAddresses[arithmeticRegisterKey],
                     arithmeticImmediate = parseInt(registerArithmetic[3], 0);
 
@@ -8957,7 +8957,7 @@ function scanForObfuscations_Native() {
                 }
             } else if (registerLeaAbsolute) {
                 var leaDestination = registerLeaAbsolute[1].toUpperCase(),
-                    leaDestinationKey = leaDestination.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    leaDestinationKey = getNativeRegisterKey(leaDestination),
                     leaTargetAddress = parseInt(registerLeaAbsolute[2], 0);
 
                 if (epRegister32BitPattern.test(leaDestination)) leaTargetAddress >>>= 0;
@@ -8972,8 +8972,8 @@ function scanForObfuscations_Native() {
             } else if (registerLea) {
                 var leaDestination = registerLea[1].toUpperCase(),
                     leaSource = registerLea[2].toUpperCase(),
-                    leaDestinationKey = leaDestination.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
-                    leaSourceKey = leaSource.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    leaDestinationKey = getNativeRegisterKey(leaDestination),
+                    leaSourceKey = getNativeRegisterKey(leaSource),
                     leaDisplacement = registerLea[4] ? parseInt(registerLea[4], 0) : 0,
                     leaInstructionLength = leaSource === "RIP" ? PE.getDisasmLength(epAsmInstructionAddresses[i]) : 0,
                     leaBaseAddress = leaSource === "RIP" && leaInstructionLength >= 1 && leaInstructionLength <= 15 ?
@@ -8997,7 +8997,7 @@ function scanForObfuscations_Native() {
                     delete indirectEpKnownAddresses[leaDestinationKey];
                 }
             } else if (indirectTransfer) {
-                var indirectTransferRegister = indirectTransfer[2].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String());
+                var indirectTransferRegister = getNativeRegisterKey(indirectTransfer[2]);
                 var indirectEpTargetAddress = indirectEpKnownAddresses[indirectTransferRegister];
 
                 // A mapped target consumed through its proven register completes the proof.
@@ -9015,10 +9015,10 @@ function scanForObfuscations_Native() {
             } else if (simplePolymorphicInstruction) {
                 // Only PE32+ r32 self-operations reach this branch. They zero-extend one
                 // physical register but cannot invalidate addresses proven in other registers.
-                delete indirectEpKnownAddresses[simplePolymorphicRegister.toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                delete indirectEpKnownAddresses[getNativeRegisterKey(simplePolymorphicRegister)];
             } else if (valuePreservingInstruction) {
                 var valuePreservingRegister = (valuePreservingInstruction[1] || valuePreservingInstruction[2]).toUpperCase(),
-                    valuePreservingRegisterKey = valuePreservingRegister.replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String()),
+                    valuePreservingRegisterKey = getNativeRegisterKey(valuePreservingRegister),
                     valuePreservingAddress = indirectEpKnownAddresses[valuePreservingRegisterKey];
 
                 if (valuePreservingAddress !== undefined && PE_Cached.is64bit && epRegister32BitPattern.test(valuePreservingRegister)) {
@@ -9035,7 +9035,7 @@ function scanForObfuscations_Native() {
                 delete indirectEpKnownAddresses[getEpPartialRegisterKey(partialRegisterWrite[1])];
             } else if (registerWrite) {
                 // A modeled write invalidates only the destination and preserves other proofs.
-                delete indirectEpKnownAddresses[registerWrite[1].toUpperCase().replace(epRegister32BitPrefixPattern, "R").replace(epRegister32BitSuffixPattern, String())];
+                delete indirectEpKnownAddresses[getNativeRegisterKey(registerWrite[1])];
             } else {
                 // Unknown semantics may consume or transform any address, so restart tracking.
                 indirectEpKnownAddresses = {};
