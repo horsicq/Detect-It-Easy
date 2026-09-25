@@ -23,7 +23,7 @@
 
 //       ┌────────────────────────┤ ≡ ABOUT ≡ ├───────────────[–][▫][×]┐
 //       │                                                             │
-//       │     This heuristic analysis helps detect the presence of    │
+//       │     This heuristic engine helps detect the presence of      │
 //       │     obfuscation, packers, licensing systems, debugging      │
 //       │     information, file integrity issues, or even potential   │
 //       │     malicious code using advanced and complex checks. It    │
@@ -7669,8 +7669,7 @@ function scanForObfuscations_Native() {
                     syntheticEpTargetAddress = String();
                     syntheticEpTargetType = String();
 
-                    if (returnAddress !== -1 &&
-                        isVirtualAddressRangeFileBacked(returnAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                    if (returnAddress !== -1 && isVirtualAddressRangeFileBacked(returnAddress, 1, SECTION_FLAGS_EXECUTE)) {
                         // Requiring a file-backed executable destination prevents ordinary stack
                         // setup, heap stacks and unresolved runtime addresses from becoming hits.
                         syntheticEpTargetAddress = returnAddress;
@@ -7680,8 +7679,7 @@ function scanForObfuscations_Native() {
                         // An unresolved stack replacement invalidates every later linear stack fact.
                         break;
                     }
-                } else if (targetAddress && (PE_Cached.isI386 || targetAddressValue <= 0x7FFFFFFF) &&
-                    PE.VAToOffset(targetAddressValue) !== -1) {
+                } else if (targetAddress && (PE_Cached.isI386 || targetAddressValue <= 0x7FFFFFFF) && PE.VAToOffset(targetAddressValue) !== -1) {
                     // A direct PUSH or a native-width [SP] write proves the next RET target.
                     // AMD64 encodes both forms with a sign-extended imm32, therefore literals
                     // above INT32_MAX cannot denote the unsigned address printed in the operand.
@@ -7701,6 +7699,7 @@ function scanForObfuscations_Native() {
 
                     syntheticEpTargetAddress = stackTarget >= 0 && stackTarget <= epMaximumSafeInteger &&
                         isVirtualAddressRangeFileBacked(stackTarget, 1, SECTION_FLAGS_EXECUTE) ? stackTarget.toString() : String();
+
                     syntheticEpTargetType = syntheticEpTargetAddress ? "stack arithmetic" : String();
                     syntheticEpNeutralInstructionCount = 0;
                 } else if (registerLiteralAddress && PE.VAToOffset(parseInt(registerLiteralAddress[2], 0)) !== -1) {
@@ -7722,14 +7721,17 @@ function scanForObfuscations_Native() {
                     } else {
                         delete syntheticEpKnownAddresses[registerCopyDestination];
                     }
+
                     syntheticEpNeutralInstructionCount = 0;
                 } else if (poppedRegister && syntheticEpTargetAddress) {
                     // PUSH <VA>; POP reg is a common polymorphic spelling of MOV reg, <VA>.
                     // Moving the proof into a register also clears the top-of-stack proof,
                     // because POP has consumed that slot.
                     syntheticEpKnownAddresses[getNativeRegisterKey(poppedRegister[1])] = syntheticEpTargetAddress;
+
                     syntheticEpTargetAddress = String();
                     syntheticEpTargetType = String();
+
                     syntheticEpNeutralInstructionCount = 0;
                 } else if (pushedRegister && syntheticEpKnownAddresses[getNativeRegisterKey(pushedRegister[1])]) {
                     syntheticEpTargetAddress = syntheticEpKnownAddresses[getNativeRegisterKey(pushedRegister[1])];
@@ -7821,6 +7823,7 @@ function scanForObfuscations_Native() {
                         directTarget = directJump ? parseInt(directJump[1], 0) : -1;
 
                     if (!directJump || !isVirtualAddressRangeFileBacked(directTarget, 1, SECTION_FLAGS_EXECUTE)) break;
+
                     syntheticEpFollowAddress = directTarget;
                     continue;
                 } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1) {
