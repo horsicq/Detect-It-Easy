@@ -10825,21 +10825,38 @@ function scanForObfuscations_Native() {
             PE.read_uint32(sehRelocationDirectoryOffset) === 0 && PE.read_uint32(sehRelocationDirectoryOffset + 4) === 0 &&
             PE.read_uint32(sehLoadConfigDirectoryOffset) === 0 && PE.read_uint32(sehLoadConfigDirectoryOffset + 4) === 0) {
             var sehEntryPointOffset = PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint),
-                sehTrapAddress = PE_Cached.addressOfUnmanagedEntryPoint + 19,
-                sehTrapOffset = sehEntryPointOffset + 19,
-                sehTrapLength = PE.compare("CC", sehTrapOffset) ? 1 : PE.compare("0F0B", sehTrapOffset) ? 2 : 0;
+                sehStubLength = PE.compare("68........64FF350000000064892500000000", sehEntryPointOffset) ||
+                    PE.compare("68........64A1000000005064892500000000", sehEntryPointOffset) ? 19 : 0;
 
-            if (sehTrapLength && PE.compare("68........64FF350000000064892500000000", sehEntryPointOffset) &&
-                isVirtualAddressRangeFileBacked(sehTrapAddress, sehTrapLength, SECTION_FLAGS_EXECUTE)) {
+            // MOV r32, FS:[0]; PUSH r32 also preserves the previous SEH head. Reject
+            // ESP as the temporary register because that would change the stack itself.
+            if (!sehStubLength && isVirtualAddressRangeFileBacked(PE_Cached.addressOfUnmanagedEntryPoint, 20, SECTION_FLAGS_EXECUTE) &&
+                PE.compare("68........648B..00000000..64892500000000", sehEntryPointOffset)) {
+                var sehReadModRm = PE.readByte(sehEntryPointOffset + 7),
+                    sehReadRegister = (sehReadModRm >> 3) & 7;
+                if ((sehReadModRm & 0xC7) === 0x05 && sehReadRegister !== 4 &&
+                    PE.readByte(sehEntryPointOffset + 12) === 0x50 + sehReadRegister) sehStubLength = 20;
+            }
+
+            var sehTrapAddress = PE_Cached.addressOfUnmanagedEntryPoint + sehStubLength,
+                sehTrapOffset = sehEntryPointOffset + sehStubLength,
+                sehTrapLength = sehStubLength && PE.compare("CC", sehTrapOffset) ? 1 :
+                    sehStubLength && PE.compare("0F0B", sehTrapOffset) ? 2 : 0;
+
+            if (sehTrapLength && isVirtualAddressRangeFileBacked(sehTrapAddress, sehTrapLength, SECTION_FLAGS_EXECUTE)) {
                 var sehHandlerAddress = PE.read_uint32(sehEntryPointOffset + 1);
 
-                if (isVirtualAddressRangeFileBacked(sehHandlerAddress, 22, SECTION_FLAGS_EXECUTE)) {
+                if (isVirtualAddressRangeFileBacked(sehHandlerAddress, 19, SECTION_FLAGS_EXECUTE)) {
                     var sehHandlerOffset = PE.VAToOffset(sehHandlerAddress),
-                        sehTargetAddress = PE.read_uint32(sehHandlerOffset + 10);
+                        sehTargetAddress = PE.read_uint32(sehHandlerOffset + 10),
+                        sehHandlerLength = isVirtualAddressRangeFileBacked(sehHandlerAddress, 22, SECTION_FLAGS_EXECUTE) &&
+                            PE.compare("8B44240CC780B8000000........B800000000C21000", sehHandlerOffset) ? 22 :
+                            PE.compare("8B44240CC780B8000000........31C0C21000", sehHandlerOffset) ||
+                                PE.compare("8B44240CC780B8000000........33C0C21000", sehHandlerOffset) ? 19 : 0;
 
                     // A raw SEH handler returns ExceptionContinueExecution = 0, not the
                     // -1 used by a VEH handler or an __except filter.
-                    if (PE.compare("8B44240CC780B8000000........B800000000C21000", sehHandlerOffset) &&
+                    if (sehHandlerLength && isVirtualAddressRangeFileBacked(sehHandlerAddress, sehHandlerLength, SECTION_FLAGS_EXECUTE) &&
                         sehTargetAddress !== sehTrapAddress + sehTrapLength &&
                         isVirtualAddressRangeFileBacked(sehTargetAddress, 1, SECTION_FLAGS_EXECUTE)) {
                         log(logType.emulation, "Static SEH transfer stub near EP: handler VA 0x" + sehHandlerAddress.toString(16) +
