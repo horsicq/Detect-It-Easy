@@ -8722,6 +8722,22 @@ function scanForObfuscations_Native() {
 
 
 
+    // Check for a reachable loop that reads successive pages of the mapped image.
+
+    var isImagePageSweepEpPresent = false;
+
+    if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 && PE_Cached.is64bit &&
+        (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
+        isImagePageSweepEpPresent = isEpImagePageSweepProven(epScanStopOpCodes);
+
+        if (isImagePageSweepEpPresent) log(logType.emulation, "Image page walk near EP");
+    }
+
+    if (isImagePageSweepEpPresent) options = addOption(options, "Image page walk near EP");
+
+
+
+
     // Check for a direct transition from a regular user-mode entry stub into the kernel.
 
     var isDirectEpSystemCallPresent = false;
@@ -11807,6 +11823,146 @@ function getFileBackedTlsCallbackAddresses() {
     }
 
     return undefined;
+}
+
+
+
+/**
+ * Proves that reachable EP code walks pages of its own mapped image.
+ * The proof requires a RIP-derived image base and upper bound, a read through the
+ * iterator, a page-sized advance, and a backward comparison branch to that read.
+ * Direct branches fork independently; unknown instructions discard address facts.
+ * Calls, malformed bytes and exhausted bounds remain inconclusive.
+ *
+ * @param {string[]} stopOpCodes - Terminal opcodes from the native EP scanner.
+ * @returns {boolean} Whether a bounded reachable path contains the complete loop.
+ */
+function isEpImagePageSweepProven(stopOpCodes) {
+    const register = "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
+        ripAddress = new RegExp("^LEA (" + register + "), \\[RIP ([+-]) (0X[0-9A-F]+|\\d+)\\]$"),
+        absoluteAddress = new RegExp("^LEA (" + register + "), \\[(0X[0-9A-F]+|\\d+)\\]$"),
+        pageRead = new RegExp("^MOV (" + register + "), (?:BYTE|WORD|DWORD|QWORD) PTR \\[(" + register + ")\\]$"),
+        pageAdvance = new RegExp("^ADD (" + register + "), (0X[0-9A-F]+|\\d+)$"),
+        iteratorCompare = new RegExp("^CMP (" + register + "), (" + register + ")$"),
+        branch = /^J[A-Z]+ (0X[0-9A-F]+|\d+)$/,
+        directJump = /^JMP (0X[0-9A-F]+|\d+)$/,
+        backwardLoopOpCodes = /^(?:JB|JC|JNAE|JL|JNGE)$/,
+        entryPoint = PE_Cached.addressOfUnmanagedEntryPoint;
+
+    if (entryPoint < 0 || entryPoint > 0x1FFFFFFFFFFFFF) return false;
+
+    var pending = [{
+        Address: entryPoint, KnownAddresses: {}, ZeroFlag: -1, CarryFlag: -1,
+        ReadAddress: -1, ReadRegister: String(),
+        StepAddress: -1, StepRegister: String(), StepStart: -1, CompareAddress: -1,
+        CompareLimit: -1, Visited: {}
+    }];
+
+    for (var index = 0; index < pending.length && index < 128; index++) {
+        var state = pending[index], address = state.Address;
+
+        if (address < 0 || address > 0x1FFFFFFFFFFFFF || state.Visited[address] ||
+            Math.abs(address - entryPoint) > 0x200 ||
+            !isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) continue;
+
+        var instruction = PE.getDisasmString(address),
+            opCode = getAsmOpCode(instruction),
+            length = PE.getDisasmLength(address);
+
+        if (!opCode || opCode === "DB" || length < 1 || length > 15 ||
+            !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
+
+        state.Visited[address] = true;
+
+        var lea = instruction.match(ripAddress),
+            absoluteLea = instruction.match(absoluteAddress),
+            read = instruction.match(pageRead),
+            advance = instruction.match(pageAdvance),
+            compare = instruction.match(iteratorCompare),
+            controlBranch = instruction.match(branch),
+            jump = instruction.match(directJump),
+            nextAddress = address + length;
+
+        if (lea || absoluteLea) {
+            var displacement = lea ? parseInt(lea[3], 0) : 0,
+                derivedAddress = absoluteLea ? parseInt(absoluteLea[2], 0) :
+                    nextAddress + (lea[2] === "+" ? displacement : -displacement);
+
+            if (derivedAddress >= 0 && derivedAddress <= 0x1FFFFFFFFFFFFF) {
+                state.KnownAddresses[(lea || absoluteLea)[1]] = derivedAddress;
+            } else {
+                delete state.KnownAddresses[(lea || absoluteLea)[1]];
+            }
+            state.ReadAddress = -1;
+            state.StepAddress = -1;
+            state.CompareAddress = -1;
+        } else if (read) {
+            delete state.KnownAddresses[read[1]];
+            state.ReadRegister = read[2];
+            state.ReadAddress = state.KnownAddresses[read[2]] !== undefined ? address : -1;
+            state.StepAddress = -1;
+            state.CompareAddress = -1;
+        } else if (advance && parseInt(advance[2], 0) === 0x1000 &&
+            state.ReadAddress >= 0 && state.ReadRegister === advance[1] &&
+            state.KnownAddresses[advance[1]] !== undefined) {
+            state.StepRegister = advance[1];
+            state.StepStart = state.KnownAddresses[advance[1]];
+            state.StepAddress = address;
+            state.KnownAddresses[advance[1]] += 0x1000;
+            state.CompareAddress = -1;
+        } else if (compare && state.StepAddress >= 0 && address - state.StepAddress <= 16 &&
+            compare[1] === state.StepRegister && state.KnownAddresses[compare[2]] !== undefined) {
+            state.CompareAddress = address;
+            state.CompareLimit = state.KnownAddresses[compare[2]];
+        } else if (controlBranch) {
+            var target = parseInt(controlBranch[1], 0);
+
+            if (backwardLoopOpCodes.test(opCode) && state.CompareAddress >= 0 &&
+                address - state.CompareAddress <= 16 && target === state.ReadAddress &&
+                state.StepStart >= PE_Cached.imageBase &&
+                state.StepStart < PE_Cached.imageBase + 0x10000 &&
+                state.CompareLimit - state.StepStart >= 0x10000 &&
+                PE.VAToOffset(state.StepStart) !== -1 &&
+                isVirtualAddressRangeMapped(state.CompareLimit - 1, 1, 0)) return true;
+
+            state.ReadAddress = -1;
+            state.StepAddress = -1;
+            state.CompareAddress = -1;
+        } else if (!/^(?:NOP|FNOP|PAUSE)$/.test(opCode)) {
+            state.KnownAddresses = {};
+            state.ReadAddress = -1;
+            state.StepAddress = -1;
+            state.CompareAddress = -1;
+        }
+
+        if (!jump && stopOpCodes.indexOf(opCode) !== -1) continue;
+
+        var branchResult = controlBranch ? getEpKnownBranchResult(opCode, state.ZeroFlag, state.CarryFlag) : -1,
+            successors = jump ? [parseInt(jump[1], 0)] : controlBranch ?
+                branchResult === 1 ? [parseInt(controlBranch[1], 0)] :
+                    branchResult === 0 ? [nextAddress] : [parseInt(controlBranch[1], 0), nextAddress] :
+                [nextAddress];
+
+        state.ZeroFlag = advanceEpZeroFlag(instruction, opCode, state.ZeroFlag);
+        state.CarryFlag = advanceEpCarryFlag(instruction, opCode, state.CarryFlag);
+
+        for (var successorIndex = 0; successorIndex < successors.length; successorIndex++) {
+            var knownAddresses = {}, visited = {};
+            for (var key in state.KnownAddresses) knownAddresses[key] = state.KnownAddresses[key];
+            for (var seen in state.Visited) visited[seen] = true;
+
+            pending.push({
+                Address: successors[successorIndex], KnownAddresses: knownAddresses,
+                ZeroFlag: state.ZeroFlag, CarryFlag: state.CarryFlag,
+                ReadAddress: state.ReadAddress, ReadRegister: state.ReadRegister,
+                StepAddress: state.StepAddress, StepRegister: state.StepRegister,
+                StepStart: state.StepStart, CompareAddress: state.CompareAddress,
+                CompareLimit: state.CompareLimit, Visited: visited
+            });
+        }
+    }
+
+    return false;
 }
 
 
