@@ -2737,8 +2737,8 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
     if (PE_Cached.numberOfSections === 3 &&
         PE.section[0].FileSize === 0 && PE.section[1].FileSize !== 0 && PE.section[2].FileSize !== 0 &&
         PE.section[0].IsReadWriteExecute && PE.section[1].IsReadWriteExecute && !PE.section[2].IsReadWriteExecute && (
-            (PE.section[2].Characteristics & SECTION_FLAGS_READ) === SECTION_FLAGS_READ ||
-            (PE.section[2].Characteristics & (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)
+            (PE.section[2].Flags & SECTION_FLAGS_READ) === SECTION_FLAGS_READ ||
+            (PE.section[2].Flags & (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_READ | SECTION_FLAGS_WRITE)
         )
     ) {
         log(logType.any, "UPX-like section layout detected");
@@ -3518,7 +3518,7 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
         if (standardSectionsWithUnusualValuesDict.indexOf(PE.getSectionName(t)) !== -1 &&
             currentSection.FileSize === 0x00 &&
-            (currentSection.Characteristics & SECTION_FLAGS_EXECUTE)) {
+            (currentSection.Flags & SECTION_FLAGS_EXECUTE)) {
             log(logType.any, "Executable zero-filled section detected: #" + t + " (\"" + cleanSectionName(PE.getSectionName(t)) + "\")");
 
             isExecutableZeroFilledSectionPresent = true;
@@ -4148,7 +4148,7 @@ function scanForBadFileFormat_NET_and_Native() {
                 if (corruptedDataEntryPointOffset >= corruptedDataSectionFileSize &&
                     corruptedDataEntryPointOffset >= 0 &&
                     corruptedDataEntryPointOffset < corruptedDataSectionMappedSize &&
-                    (PE.section[i].Characteristics & SECTION_FLAGS_EXECUTE)) {
+                    (PE.section[i].Flags & SECTION_FLAGS_EXECUTE)) {
                     isTlsVirtualEntryPoint = true;
                 }
             }
@@ -4799,7 +4799,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
                     // Accept both code and execute flags: current Windows kernels describe
                     // discardable initialization code without the execute characteristic.
-                    if ((PE.section[d].Characteristics & (SECTION_FLAGS_CODE | SECTION_FLAGS_EXECUTE)) !== 0) {
+                    if ((PE.section[d].Flags & (SECTION_FLAGS_CODE | SECTION_FLAGS_EXECUTE)) !== 0) {
                         runtimeFunctionCodeRanges.push({
                             Rva: runtimeFunctionSectionRva,
                             EndRva: runtimeFunctionSectionEndRva
@@ -5467,7 +5467,7 @@ function scanForBadFileFormat_NET_and_Native() {
 
                             if (tlsCallbackRva >= tlsCallbackSectionRva &&
                                 tlsCallbackRva < tlsCallbackSectionRva + tlsCallbackSectionRawSize &&
-                                (PE.section[d].Characteristics & SECTION_FLAGS_EXECUTE) &&
+                                (PE.section[d].Flags & SECTION_FLAGS_EXECUTE) &&
                                 PE.VAToOffset(tlsCallbackAddress) !== -1) {
                                 isTlsCallbackExecutable = true;
                             }
@@ -9401,7 +9401,7 @@ function scanForObfuscations_Native() {
 
                 if (epPolymorphismCurrentRva >= epPolymorphismSectionRva &&
                     epPolymorphismCurrentRva < epPolymorphismSectionRva + epPolymorphismSectionRawSize &&
-                    (PE.section[d].Characteristics & SECTION_FLAGS_EXECUTE)) {
+                    (PE.section[d].Flags & SECTION_FLAGS_EXECUTE)) {
                     epPolymorphismSectionIndex = d;
                 }
             }
@@ -9505,7 +9505,7 @@ function scanForObfuscations_Native() {
             epDecodedInstructionLengthByAddress[epPolymorphismAddressKey] = epPolymorphismInstructionLength;
             epBitstreamSuccessors[epPolymorphismAddressKey] = [];
 
-            if (!epStrangeOpCodeDetected && epStrangeOpCodes[epPolymorphismOpCode] && ((PE.section[epPolymorphismSectionIndex].Characteristics & SECTION_FLAGS_WRITE) !== 0 || (epPolymorphismOpCode !== "CPUID" && Math.abs(epPolymorphismCurrentAddress - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x40))) {
+            if (!epStrangeOpCodeDetected && epStrangeOpCodes[epPolymorphismOpCode] && ((PE.section[epPolymorphismSectionIndex].Flags & SECTION_FLAGS_WRITE) !== 0 || (epPolymorphismOpCode !== "CPUID" && Math.abs(epPolymorphismCurrentAddress - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x40))) {
                 epStrangeOpCodeDetected = epPolymorphismOpCode;
             }
 
@@ -9766,7 +9766,7 @@ function scanForObfuscations_Native() {
 
                         if (epPolymorphismTargetRva >= epPolymorphismTargetSectionRva &&
                             epPolymorphismTargetRva < epPolymorphismTargetSectionRva + epPolymorphismTargetSectionRawSize &&
-                            (PE.section[d].Characteristics & SECTION_FLAGS_EXECUTE) &&
+                            (PE.section[d].Flags & SECTION_FLAGS_EXECUTE) &&
                             PE.VAToOffset(epPolymorphismTargetAddress) !== -1) {
                             isEpPolymorphismTargetExecutable = true;
                         }
@@ -9946,11 +9946,11 @@ function scanForObfuscations_Native() {
                 for (var d = 0; d < PE_Cached.numberOfSections && epSelfModifyingCallStubSectionIndex === -1; d++) {
                     var epSelfModifyingCallStubSectionRva = PE.getSectionVirtualAddress(d),
                         epSelfModifyingCallStubSectionRawSize = PE.getSectionFileSize(d),
-                        epSelfModifyingCallStubSectionCharacteristics = PE.section[d].Characteristics;
+                        epSelfModifyingCallStubSectionFlags = PE.section[d].Flags;
 
                     if (epSelfModifyingCallStubTargetRva >= epSelfModifyingCallStubSectionRva &&
                         epSelfModifyingCallStubTargetRva < epSelfModifyingCallStubSectionRva + epSelfModifyingCallStubSectionRawSize &&
-                        (epSelfModifyingCallStubSectionCharacteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) ===
+                        (epSelfModifyingCallStubSectionFlags & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) ===
                         (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) {
                         epSelfModifyingCallStubSectionIndex = d;
                     }
@@ -10199,7 +10199,7 @@ function scanForObfuscations_Native() {
                         epIpRecoverySectionRawSize = PE.getSectionFileSize(d);
 
                     if (epIpRecoveryCurrentRva >= epIpRecoverySectionRva && epIpRecoveryCurrentRva < epIpRecoverySectionRva + epIpRecoverySectionRawSize &&
-                        (PE.section[d].Characteristics & SECTION_FLAGS_EXECUTE)) {
+                        (PE.section[d].Flags & SECTION_FLAGS_EXECUTE)) {
                         epIpRecoverySectionIndex = d;
                     }
                 }
@@ -10444,7 +10444,7 @@ function scanForObfuscations_Native() {
 
                 if (bitstreamTargetRva >= bitstreamSectionRva + bitstreamSectionRawSize &&
                     bitstreamTargetRva < bitstreamSectionRva + PE.getSectionVirtualSize(d) &&
-                    (PE.section[d].Characteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) {
+                    (PE.section[d].Flags & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) {
                     bitstreamVirtualTargets.push({
                         SourceAddress: candidate.SourceAddress,
                         Start: PE_Cached.imageBase + bitstreamSectionRva,
@@ -10463,7 +10463,7 @@ function scanForObfuscations_Native() {
                 bitstreamDestinationSize = PE.getSectionVirtualSize(d);
 
             if (d !== PE_Cached.indexOfEntryPointSection && PE.getSectionFileSize(d) === 0 && bitstreamDestinationSize >= 0x1000 &&
-                (PE.section[d].Characteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE) &&
+                (PE.section[d].Flags & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE) &&
                 bitstreamDestinationRva + bitstreamDestinationSize <= epPolymorphismImageSize) {
                 bitstreamVirtualDestinations.push({
                     Start: PE_Cached.imageBase + bitstreamDestinationRva,
@@ -10835,7 +10835,7 @@ function scanForObfuscations_Native() {
                     tlsEntryPointSectionMappedSize = Math.max(tlsEntryPointSectionVirtualSize, tlsEntryPointSectionFileSize);
 
                 if (tlsEntryPointRva >= tlsEntryPointSectionRva && tlsEntryPointRva < tlsEntryPointSectionRva + tlsEntryPointSectionMappedSize &&
-                    (PE.section[i].Characteristics & SECTION_FLAGS_EXECUTE)) {
+                    (PE.section[i].Flags & SECTION_FLAGS_EXECUTE)) {
                     var tlsEntryPointOffsetInSection = tlsEntryPointRva - tlsEntryPointSectionRva;
 
                     isTlsEntryPointInExecutableVirtualSection = true;
@@ -10933,10 +10933,10 @@ function scanForObfuscations_Native() {
     var wxWithoutReadSectionIndex = -1;
 
     for (var i = 0; i < PE_Cached.numberOfSections && !isWxWithoutReadSectionPresent; i++) {
-        var currentSectionCharacteristics = PE.section[i].Characteristics;
+        var currentSectionFlags = PE.section[i].Flags;
 
-        if ((currentSectionCharacteristics & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE) &&
-            !(currentSectionCharacteristics & SECTION_FLAGS_READ)) {
+        if ((currentSectionFlags & (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) === (SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE) &&
+            !(currentSectionFlags & SECTION_FLAGS_READ)) {
             log(logType.any, "Write-execute section without read access detected: #" + i + " (\"" + File.cleanString(PE.getSectionName(i)) + "\")");
 
             isWxWithoutReadSectionPresent = true;
@@ -10968,7 +10968,7 @@ function scanForObfuscations_Native() {
         if (entryPointRva >= sectionVirtualAddress && entryPointRva < sectionVirtualAddress + sectionVirtualSize) {
             entryPointSectionIndex = i;
 
-            if (!(PE.section[i].Characteristics & SECTION_FLAGS_EXECUTE)) {
+            if (!(PE.section[i].Flags & SECTION_FLAGS_EXECUTE)) {
                 log(logType.any, "Entry point is located in a non-executable section");
 
                 isEpInNonExecutableSection = true;
@@ -10995,7 +10995,7 @@ function scanForObfuscations_Native() {
 
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
         entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect && PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
-        (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) && !(PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_CODE)) {
+        (PE.section[entryPointSectionIndex].Flags & SECTION_FLAGS_EXECUTE) && !(PE.section[entryPointSectionIndex].Flags & SECTION_FLAGS_CODE)) {
         log(logType.any, "Executable EP section is not marked as code");
 
         isEpInNonCodeSection = true;
@@ -11011,7 +11011,7 @@ function scanForObfuscations_Native() {
     var isDiscardableEpSectionPresent = false;
 
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
-        entryPointSectionIndex !== -1 && (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_DISCARDABLE)) {
+        entryPointSectionIndex !== -1 && (PE.section[entryPointSectionIndex].Flags & SECTION_FLAGS_DISCARDABLE)) {
         log(logType.any, "Entry point section is marked discardable");
 
         isDiscardableEpSectionPresent = true;
@@ -11062,7 +11062,7 @@ function scanForObfuscations_Native() {
 
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3) &&
         entryPointSectionIndex !== -1 && PE_Cached.isEntryPointCorrect && PE.getSectionFileSize(entryPointSectionIndex) !== 0 &&
-        (PE.section[entryPointSectionIndex].Characteristics & SECTION_FLAGS_EXECUTE) && declaredCodeSize === 0) {
+        (PE.section[entryPointSectionIndex].Flags & SECTION_FLAGS_EXECUTE) && declaredCodeSize === 0) {
         log(logType.any, "Executable code is present while SizeOfCode is zero");
 
         isUnreportedCodePresent = true;
@@ -11088,7 +11088,7 @@ function scanForObfuscations_Native() {
 
         // Reconstruct the physical code total from non-empty sections explicitly marked as code.
         for (var i = 0; i < PE_Cached.numberOfSections; i++) {
-            if ((PE.section[i].Characteristics & SECTION_FLAGS_CODE) &&
+            if ((PE.section[i].Flags & SECTION_FLAGS_CODE) &&
                 PE.getSectionFileSize(i) !== 0) {
                 physicalCodeSize += PE.getSectionFileSize(i);
                 physicalCodeSectionCount++;
@@ -11116,7 +11116,7 @@ function scanForObfuscations_Native() {
         const
             protectedStartupSectionIndex = PE_Cached.numberOfSections - 1,
             protectedStartupSection = PE.section[protectedStartupSectionIndex],
-            protectedStartupSectionCharacteristics = protectedStartupSection.Characteristics,
+            protectedStartupSectionFlags = protectedStartupSection.Flags,
             protectedStartupSectionRequiredFlags = SECTION_FLAGS_CODE | SECTION_FLAGS_EXECUTE | SECTION_FLAGS_READ,
             protectedStartupSectionFileSize = PE.getSectionFileSize(protectedStartupSectionIndex),
             protectedStartupSectionStartAddress = PE_Cached.imageBase + PE.getSectionVirtualAddress(protectedStartupSectionIndex),
@@ -11128,8 +11128,8 @@ function scanForObfuscations_Native() {
         // Require a substantial, high-entropy, readable executable code section. Excluding
         // writable sections avoids conflating this rule with self-modifying startup code.
         if (protectedStartupSectionFileSize >= 0x1000 &&
-            (protectedStartupSectionCharacteristics & protectedStartupSectionRequiredFlags) === protectedStartupSectionRequiredFlags &&
-            !(protectedStartupSectionCharacteristics & SECTION_FLAGS_WRITE) &&
+            (protectedStartupSectionFlags & protectedStartupSectionRequiredFlags) === protectedStartupSectionRequiredFlags &&
+            !(protectedStartupSectionFlags & SECTION_FLAGS_WRITE) &&
             PE.calculateEntropy(PE.getSectionFileOffset(protectedStartupSectionIndex), protectedStartupSectionFileSize) > 6.6) {
             if (entryPointSectionIndex === protectedStartupSectionIndex) {
                 // EP residing directly in the candidate section is a complete startup proof.
@@ -12836,7 +12836,7 @@ function isVirtualAddressRangeMapped(address, size, requiredSectionFlags) {
             rangeOffsetInSection = rangeRva - sectionRva;
 
         if (rangeOffsetInSection >= 0 && rangeOffsetInSection + size <= sectionMappedSize &&
-            PE.section[i].hasCharacteristics(requiredSectionFlags)) return true;
+            PE.section[i].hasFlags(requiredSectionFlags)) return true;
     }
 
     return false;
@@ -12865,7 +12865,7 @@ function isVirtualAddressRangeFileBacked(address, size, requiredSectionFlags) {
             rangeOffsetInSection = rangeRva - sectionRva;
 
         if (rangeOffsetInSection >= 0 && rangeOffsetInSection + size <= sectionRawSize &&
-            PE.section[i].hasCharacteristics(requiredSectionFlags)) {
+            PE.section[i].hasFlags(requiredSectionFlags)) {
             var rangeOffset = PE.getSectionFileOffset(i) + rangeOffsetInSection;
 
             // Validate both endpoints through the engine as well as local section math.
