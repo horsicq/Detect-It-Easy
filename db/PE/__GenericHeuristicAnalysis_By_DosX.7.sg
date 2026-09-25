@@ -7917,7 +7917,7 @@ function scanForObfuscations_Native() {
             } else if (allOnesFlagsInstruction) {
                 // OR reg,-1 fixes the same five flags for an all-one result and destroys
                 // any earlier proof that the affected physical register contains zero.
-                var allOnesFlagsRegister = (allOnesFlagsInstruction[1] || allOnesFlagsInstruction[2] || allOnesFlagsInstruction[3]).toUpperCase();
+                var allOnesFlagsRegister = allOnesFlagsInstruction[1] || allOnesFlagsInstruction[2] || allOnesFlagsInstruction[3];
 
                 if (/^(?:AX|BX|CX|DX|SI|DI|BP)$/.test(allOnesFlagsRegister)) {
                     allOnesFlagsRegister = "R" + allOnesFlagsRegister;
@@ -7973,9 +7973,9 @@ function scanForObfuscations_Native() {
                 opaqueEpNeverTakenBranches = epZeroFlagsNeverTakenBranches;
                 opaqueEpNeutralInstructionCount = 0;
             } else if (conditionalBranch && opaqueEpOriginInstruction && PE.VAToOffset(parseInt(conditionalBranch[2], 0)) !== -1 &&
-                (opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ||
-                    opaqueEpNeverTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1)) {
-                var opaqueEpBranchType = opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1].toUpperCase()) !== -1 ? "always taken" : "never taken",
+                (opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1]) !== -1 ||
+                    opaqueEpNeverTakenBranches.indexOf(conditionalBranch[1]) !== -1)) {
+                var opaqueEpBranchType = opaqueEpAlwaysTakenBranches.indexOf(conditionalBranch[1]) !== -1 ? "always taken" : "never taken",
                     opaqueEpBranchAddress = epAsmInstructionAddresses[i],
                     opaqueEpOriginOffset = PE.VAToOffset(opaqueEpOriginAddress),
                     opaqueEpBranchOffset = PE.VAToOffset(opaqueEpBranchAddress);
@@ -8191,9 +8191,9 @@ function scanForObfuscations_Native() {
             if (pushedRegister) {
                 // Keep the exact operand spelling: PUSH AX/POP AX is balanced, while mixing
                 // register widths changes both the stack delta and the restored value.
-                redundantEpPushedRegister = pushedRegister[1].toUpperCase();
+                redundantEpPushedRegister = pushedRegister[1];
                 redundantEpStackNeutralInstructionCount = 0;
-            } else if (poppedRegister && redundantEpPushedRegister === poppedRegister[1].toUpperCase()) {
+            } else if (poppedRegister && redundantEpPushedRegister === poppedRegister[1]) {
                 log(logType.emulation, "Redundant stack round-trip near EP: PUSH/POP " + redundantEpPushedRegister);
 
                 isRedundantEpStackRoundTripPresent = true;
@@ -8243,12 +8243,12 @@ function scanForObfuscations_Native() {
             // hexadecimal and decimal spellings pair; larger values retain their exact text.
 
             if (reversibleBinaryInstruction) {
-                var currentReversibleOpCode = reversibleBinaryInstruction[1].toUpperCase(),
-                    currentReversibleRegister = reversibleBinaryInstruction[2].toUpperCase(),
+                var currentReversibleOpCode = reversibleBinaryInstruction[1],
+                    currentReversibleRegister = reversibleBinaryInstruction[2],
                     currentReversibleLiteralValue = parseInt(reversibleBinaryInstruction[3], 0),
                     // Preserve the exact spelling above Number's safe range. This may skip
                     // an equivalent decimal/hex pair, but cannot merge two different imm64s.
-                    currentReversibleLiteral = currentReversibleLiteralValue <= epMaximumSafeInteger ? currentReversibleLiteralValue.toString() : reversibleBinaryInstruction[3].toUpperCase(),
+                    currentReversibleLiteral = currentReversibleLiteralValue <= epMaximumSafeInteger ? currentReversibleLiteralValue.toString() : reversibleBinaryInstruction[3],
                     // A PE32+ r32 write clears the upper half, so the full register state
                     // is not restored even when the low 32-bit operation is reversed.
                     isInverseBinaryPair = !(PE_Cached.is64bit && epRegister32BitPattern.test(currentReversibleRegister)) &&
@@ -8268,8 +8268,8 @@ function scanForObfuscations_Native() {
                     reversibleEpNeutralInstructionCount = 0;
                 }
             } else if (reversibleUnaryInstruction) {
-                var currentReversibleOpCode = reversibleUnaryInstruction[1].toUpperCase(),
-                    currentReversibleRegister = reversibleUnaryInstruction[2].toUpperCase();
+                var currentReversibleOpCode = reversibleUnaryInstruction[1],
+                    currentReversibleRegister = reversibleUnaryInstruction[2];
 
                 if (!(PE_Cached.is64bit && epRegister32BitPattern.test(currentReversibleRegister)) &&
                     reversibleEpOpCode === currentReversibleOpCode && reversibleEpRegister === currentReversibleRegister) {
@@ -8355,7 +8355,7 @@ function scanForObfuscations_Native() {
                     constantEpNeutralInstructionCount = 0;
                 }
             } else if (conditionalBranch) {
-                var constantEpBranchOpCode = conditionalBranch[1].toUpperCase(),
+                var constantEpBranchOpCode = conditionalBranch[1],
                     constantEpEqualBranch = epZeroFlagsAlwaysTakenBranches.indexOf(constantEpBranchOpCode) !== -1 || epZeroFlagsNeverTakenBranches.indexOf(constantEpBranchOpCode) !== -1,
                     constantEpUnequalBranch = /^(?:JE|JZ|JNE|JNZ)$/.test(constantEpBranchOpCode) && isVirtualAddressRangeFileBacked(PE_Cached.addressOfUnmanagedEntryPoint, 1, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE);
 
@@ -8395,14 +8395,14 @@ function scanForObfuscations_Native() {
                         delete constantEpKnownRegisterValues[constantEpRegisterCopyDestination];
                     }
                 } else if (simplePolymorphicInstruction) {
-                    var simplePolymorphicRegister = (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]).toUpperCase(),
+                    var simplePolymorphicRegister = simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2],
                         simplePolymorphicRegisterKey = getNativeRegisterKey(simplePolymorphicRegister);
 
                     if (constantEpKnownRegisterValues[simplePolymorphicRegisterKey] !== undefined && epRegister32BitPattern.test(simplePolymorphicRegister)) {
                         constantEpKnownRegisterValues[simplePolymorphicRegisterKey] = constantEpKnownRegisterValues[simplePolymorphicRegisterKey] >>> 0;
                     }
                 } else if (valuePreservingInstruction) {
-                    var valuePreservingRegister = (valuePreservingInstruction[1] || valuePreservingInstruction[2]).toUpperCase(),
+                    var valuePreservingRegister = valuePreservingInstruction[1] || valuePreservingInstruction[2],
                         valuePreservingRegisterKey = getNativeRegisterKey(valuePreservingRegister);
 
                     if (constantEpKnownRegisterValues[valuePreservingRegisterKey] !== undefined && epRegister32BitPattern.test(valuePreservingRegister)) {
@@ -8525,7 +8525,7 @@ function scanForObfuscations_Native() {
             } else if (simplePolymorphicInstruction || valuePreservingInstruction) {
                 var pebModuleWalkPreservingRegister = (simplePolymorphicInstruction ?
                     (simplePolymorphicInstruction[1] || simplePolymorphicInstruction[2]) :
-                    (valuePreservingInstruction[1] || valuePreservingInstruction[2])).toUpperCase(),
+                    (valuePreservingInstruction[1] || valuePreservingInstruction[2])),
                     pebModuleWalkPreservingRegisterKey = getNativeRegisterKey(pebModuleWalkPreservingRegister);
 
                 if (PE_Cached.is64bit && epRegister32BitPattern.test(pebModuleWalkPreservingRegister)) {
@@ -8986,7 +8986,7 @@ function scanForObfuscations_Native() {
                     delete indirectEpKnownAddresses[arithmeticRegisterKey];
                 }
             } else if (registerLeaAbsolute) {
-                var leaDestination = registerLeaAbsolute[1].toUpperCase(),
+                var leaDestination = registerLeaAbsolute[1],
                     leaDestinationKey = getNativeRegisterKey(leaDestination),
                     leaTargetAddress = parseInt(registerLeaAbsolute[2], 0);
 
@@ -9000,8 +9000,8 @@ function scanForObfuscations_Native() {
                     delete indirectEpKnownAddresses[leaDestinationKey];
                 }
             } else if (registerLea) {
-                var leaDestination = registerLea[1].toUpperCase(),
-                    leaSource = registerLea[2].toUpperCase(),
+                var leaDestination = registerLea[1],
+                    leaSource = registerLea[2],
                     leaDestinationKey = getNativeRegisterKey(leaDestination),
                     leaSourceKey = getNativeRegisterKey(leaSource),
                     leaDisplacement = registerLea[4] ? parseInt(registerLea[4], 0) : 0,
@@ -9032,7 +9032,7 @@ function scanForObfuscations_Native() {
 
                 // A mapped target consumed through its proven register completes the proof.
                 if (indirectEpTargetAddress !== undefined && isVirtualAddressRangeFileBacked(indirectEpTargetAddress, 1, SECTION_FLAGS_EXECUTE)) {
-                    log(logType.emulation, "Indirect " + indirectTransfer[1].toUpperCase() + " transfer near EP to VA 0x" + indirectEpTargetAddress.toString(16));
+                    log(logType.emulation, "Indirect " + indirectTransfer[1] + " transfer near EP to VA 0x" + indirectEpTargetAddress.toString(16));
 
                     isIndirectEpTransferPresent = true;
                 }
@@ -9046,7 +9046,7 @@ function scanForObfuscations_Native() {
                 // physical register but cannot invalidate addresses proven in other registers.
                 delete indirectEpKnownAddresses[getNativeRegisterKey(simplePolymorphicRegister)];
             } else if (valuePreservingInstruction) {
-                var valuePreservingRegister = (valuePreservingInstruction[1] || valuePreservingInstruction[2]).toUpperCase(),
+                var valuePreservingRegister = valuePreservingInstruction[1] || valuePreservingInstruction[2],
                     valuePreservingRegisterKey = getNativeRegisterKey(valuePreservingRegister),
                     valuePreservingAddress = indirectEpKnownAddresses[valuePreservingRegisterKey];
 
