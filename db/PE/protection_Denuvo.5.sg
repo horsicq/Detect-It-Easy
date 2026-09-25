@@ -11,9 +11,9 @@ meta("protection", "Denuvo");
 function detect() {
     if (PE.isNet()) return; // Native code only
 
-    if (PE.getNumberOfSections() > 10 &&
-        PE.isSectionNamePresentExp(/^\.[ex](text|code)$/) &&
-        PE.isSectionNamePresentExp(/^\.([eu]|my|s[xr]|x[pd])data$/) || PE.isSectionNamePresent(".arch") || PE.isSectionNamePresent(".xtls")) {
+    const isSectionsLikeDenuvo = PE.isSectionNamePresentExp(/^\.[ex](text|code)$/) || PE.isSectionNamePresentExp(/^\.([eu]|my|s[xr]|x[pd])data$/) || PE.isSectionNamePresent(".arch") || PE.isSectionNamePresent(".xtls");
+
+    if (PE.getNumberOfSections() > 10) {
         if (PE.is64()) {
             var firstSectionOffset = PE.section[0].FileOffset,
                 imageEndOffset = PE.getSize() - PE.getOverlaySize(),
@@ -91,18 +91,18 @@ function detect() {
             - Trials of Mana
             - Total War: Warhammer 2
             */
-            else if (imageSearchSize > 0 && PE.isSignaturePresent(firstSectionOffset, imageSearchSize, "64 65 6E 75 76 6F 5F 61 74 64 00 00 00 00 00 00")) {
+            else if (isSectionsLikeDenuvo && imageSearchSize > 0 && PE.isSignaturePresent(firstSectionOffset, imageSearchSize, "64 65 6E 75 76 6F 5F 61 74 64 00 00 00 00 00 00")) {
                 bDetected = true;
             }
 
             // Check if steam_api64.dll present
-            if (PE.isLibraryPresent("steam_api64.dll")) {
+            if (isSectionsLikeDenuvo && PE.isLibraryPresent("steam_api64.dll")) {
                 sOptions = "Steam";
                 bDetected = true;
             }
 
             // Check if eossdk-win32-shipping.dll present
-            if (PE.isLibraryPresent("eossdk-win64-shipping.dll")) {
+            if (isSectionsLikeDenuvo && PE.isLibraryPresent("eossdk-win64-shipping.dll")) {
                 sOptions = "Epic Games";
                 bDetected = true;
             }
@@ -129,13 +129,13 @@ function detect() {
             }
 
             // Check if eossdk-win64-shipping.dll present
-            if (PE.isLibraryPresent("eossdk-win32-shipping.dll")) {
+            if (isSectionsLikeDenuvo && PE.isLibraryPresent("eossdk-win32-shipping.dll")) {
                 sOptions = "Epic Game Store";
                 bDetected = true;
             }
 
             // Check if uplay_r1_loader.dll present
-            if (PE.isLibraryPresent("uplay_r1_loader.dll")) {
+            if (isSectionsLikeDenuvo && PE.isLibraryPresent("uplay_r1_loader.dll")) {
                 sOptions = "uPlay";
                 bDetected = true;
             }
@@ -144,14 +144,14 @@ function detect() {
     }
 
     if (!bDetected) {
-        if (PE.isLibraryPresent("dbdata.dll")) {
+        if (isSectionsLikeDenuvo && PE.isLibraryPresent("dbdata.dll")) {
             // Override additional info
             sOptions = "FIFA23 series";
             bDetected = true;
         }
 
         // Check if uplay_r1_loader64.dll present
-        if (PE.isLibraryPresent("uplay_r1_loader64.dll")) {
+        if (isSectionsLikeDenuvo && PE.isLibraryPresent("uplay_r1_loader64.dll")) {
             sOptions = "uPlay";
             bDetected = true;
         }
