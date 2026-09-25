@@ -8110,7 +8110,7 @@ function scanForObfuscations_Native() {
                     previousCanonicalBranchOpCode = epCanonicalBranchOpCodes[degenerateEpBranchOpCode] || degenerateEpBranchOpCode,
                     branchPair = previousCanonicalBranchOpCode + ":" + currentCanonicalBranchOpCode,
                     reverseBranchPair = currentCanonicalBranchOpCode + ":" + previousCanonicalBranchOpCode,
-                    branchTargetProof = traceEpDirectJumpChain(currentBranchTarget, 32);
+                    branchTargetProof = traceEpDirectJumpChain(currentBranchTarget, 32, true);
 
                 if (branchTargetProof && !degenerateEpInstructionInteriors[currentBranchTarget.toString()] &&
                     ((currentBranchTarget === fallThroughEpInstructionAddress &&
@@ -8130,8 +8130,8 @@ function scanForObfuscations_Native() {
                 var degenerateEpJumpTarget = parseInt(directJump[1], 0);
 
                 // Neither arm may have side effects before its direct-JMP chain converges.
-                var takenPath = degenerateEpBranchOpCode ? traceEpDirectJumpChain(degenerateEpBranchTarget, 32) : undefined,
-                    fallThroughPath = traceEpDirectJumpChain(degenerateEpJumpTarget, 32),
+                var takenPath = degenerateEpBranchOpCode ? traceEpDirectJumpChain(degenerateEpBranchTarget, 32, true) : undefined,
+                    fallThroughPath = traceEpDirectJumpChain(degenerateEpJumpTarget, 32, true),
                     branchIntoScannedInstruction = degenerateEpInstructionInteriors[degenerateEpBranchTarget.toString()] ||
                         degenerateEpInstructionInteriors[degenerateEpJumpTarget.toString()];
 
@@ -11734,17 +11734,19 @@ function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
 
 /**
  * Resolves a bounded chain of direct native JMP instructions to its first non-JMP.
+ * Conditional-branch proofs may also cross side-effect-free NOP instructions.
  * Every decoded byte must be file-backed executable code; cycles, interior targets,
  * indirect transfers and exhausted budgets remain unproven.
  *
  * @param {number} startAddress - Virtual address of the first chain node.
- * @param {number} maximumHops - Maximum number of direct JMPs to follow.
+ * @param {number} maximumSteps - Maximum number of instructions to follow.
+ * @param {boolean} allowNeutral - Whether to cross NOP, FNOP and PAUSE instructions.
  * @returns {Object|undefined} Final address and hop count, or no proof.
  */
-function traceEpDirectJumpChain(startAddress, maximumHops) {
-    var address = startAddress, visited = {}, interiors = {}, hops = 0;
+function traceEpDirectJumpChain(startAddress, maximumSteps, allowNeutral) {
+    var address = startAddress, visited = {}, interiors = {}, hops = 0, steps = 0;
 
-    while (hops <= maximumHops && isFinite(address) && !visited[address.toString()] && !interiors[address.toString()] &&
+    while (steps <= maximumSteps && isFinite(address) && !visited[address.toString()] && !interiors[address.toString()] &&
         isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) {
         var instruction = PE.getDisasmString(address),
             opCode = getAsmOpCode(instruction),
@@ -11753,13 +11755,15 @@ function traceEpDirectJumpChain(startAddress, maximumHops) {
 
         if (!opCode || opCode === "DB" || length < 1 || length > 15 ||
             !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) return undefined;
-        if (!directJump) return opCode === "JMP" ? undefined : { Target: address, Hops: hops };
-        if (hops === maximumHops) return undefined;
+        var isNeutral = allowNeutral && /^(?:NOP|FNOP|PAUSE)$/.test(opCode);
+        if (!directJump && !isNeutral) return opCode === "JMP" ? undefined : { Target: address, Hops: hops };
+        if (steps === maximumSteps) return undefined;
 
         visited[address.toString()] = true;
         for (var byteIndex = 1; byteIndex < length; byteIndex++) interiors[(address + byteIndex).toString()] = true;
-        address = parseInt(directJump[1], 0);
-        hops++;
+        address = directJump ? parseInt(directJump[1], 0) : address + length;
+        if (directJump) hops++;
+        steps++;
     }
 
     return undefined;
