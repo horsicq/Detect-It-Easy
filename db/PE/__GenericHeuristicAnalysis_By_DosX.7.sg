@@ -12144,6 +12144,15 @@ function emulateAndGetAsmInstructionByIndex(index) {
     for (var i = firstUncachedIndex; i <= index; i++) {
         if (i !== firstUncachedIndex) disasmAddress = PE.getDisasmNextAddress(disasmAddress);
 
+        // A failed or non-advancing decode must not seed later rules with the same
+        // instruction, an unmapped VA, or a synthetic address returned by the engine.
+        if (!isFinite(disasmAddress) || disasmAddress < PE_Cached.imageBase ||
+            (i > 0 && disasmAddress <= epAsmInstructionAddresses[i - 1]) || PE.VAToOffset(disasmAddress) === -1) {
+            epAsmInstructionAddresses[i] = disasmAddress;
+            epAsmInstructions[i] = String();
+            break;
+        }
+
         epAsmInstructionAddresses[i] = disasmAddress;
         epAsmInstructions[i] = PE.getDisasmString(disasmAddress);
 
