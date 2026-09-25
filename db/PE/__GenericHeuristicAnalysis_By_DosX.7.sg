@@ -7755,6 +7755,16 @@ function scanForObfuscations_Native() {
                     }
 
                     isSyntheticEpTransferPresent = true;
+                } else if (currentEpOpCode === "CALL") {
+                    var mutatedReturnTarget = getEpCallReturnMutationTarget(currentEpAddress);
+
+                    if (mutatedReturnTarget !== undefined) {
+                        log(logType.emulation, "Call return address redirects Ret near EP to executable code at VA 0x" + mutatedReturnTarget.toString(16));
+
+                        isSyntheticEpTransferPresent = true;
+                    } else {
+                        break;
+                    }
                 } else if (isNeutralInstruction && syntheticEpNeutralInstructionCount < epNeutralInstructionLimit) {
                     // Permit limited stack-preserving junk commonly inserted by protectors.
                     syntheticEpNeutralInstructionCount++;
@@ -11767,6 +11777,61 @@ function traceEpDirectJumpChain(startAddress, maximumSteps, allowNeutral) {
     }
 
     return undefined;
+}
+
+
+
+/**
+ * Proves a direct x86 CALL enters an immediate stack-address mutation and RET.
+ * The only modified return value must resolve to file-backed executable code.
+ *
+ * @param {number} callAddress - Virtual address of the direct CALL.
+ * @returns {number|undefined} Proven redirected return address, or no proof.
+ */
+function getEpCallReturnMutationTarget(callAddress) {
+    if (!PE_Cached.isI386) return undefined;
+
+    var callInstruction = PE.getDisasmString(callAddress),
+        directCall = callInstruction && callInstruction.match(/^CALL (0X[0-9A-F]+|\d+)$/i),
+        callLength = PE.getDisasmLength(callAddress);
+
+    if (!directCall || callLength <= 0 || !isVirtualAddressRangeFileBacked(callAddress, callLength, SECTION_FLAGS_EXECUTE)) return undefined;
+
+    var calleeAddress = parseInt(directCall[1], 0),
+        fallThroughAddress = callAddress + callLength;
+
+    if (Math.abs(calleeAddress - callAddress) > 0x200 || !isVirtualAddressRangeFileBacked(calleeAddress, 1, SECTION_FLAGS_EXECUTE)) return undefined;
+
+    var mutationInstruction = PE.getDisasmString(calleeAddress),
+        mutation = mutationInstruction && mutationInstruction.match(/^(ADD|SUB) DWORD PTR \[ESP\], -?(?:0X[0-9A-F]+|\d+)$/i),
+        mutationLength = PE.getDisasmLength(calleeAddress);
+
+    if (!mutation || mutationLength <= 0 || !isVirtualAddressRangeFileBacked(calleeAddress, mutationLength, SECTION_FLAGS_EXECUTE)) return undefined;
+
+    var mutationOffset = PE.VAToOffset(calleeAddress),
+        mutationOpcode = PE.readByte(mutationOffset),
+        mutationModRm = PE.readByte(mutationOffset + 1),
+        mutationDirection = mutation[1] === "ADD" ? 0x04 : 0x2C,
+        mutationValue;
+
+    if (mutationModRm !== mutationDirection || PE.readByte(mutationOffset + 2) !== 0x24) return undefined;
+    if (mutationOpcode === 0x81 && mutationLength === 7) mutationValue = PE.read_uint32(mutationOffset + 3);
+    else if (mutationOpcode === 0x83 && mutationLength === 4) {
+        mutationValue = PE.readByte(mutationOffset + 3);
+        if (mutationValue >= 0x80) mutationValue -= 0x100;
+    } else return undefined;
+
+    var returnInstructionAddress = calleeAddress + mutationLength,
+        returnInstruction = PE.getDisasmString(returnInstructionAddress),
+        returnLength = PE.getDisasmLength(returnInstructionAddress),
+        returnTarget = (fallThroughAddress + (mutation[1] === "ADD" ? 1 : -1) * mutationValue) >>> 0;
+
+    if (!/^RET(?:N)?$/.test(returnInstruction) || returnTarget === fallThroughAddress ||
+        !isVirtualAddressRangeFileBacked(returnInstructionAddress, returnLength, SECTION_FLAGS_EXECUTE) ||
+        (returnTarget >= calleeAddress && returnTarget < returnInstructionAddress + returnLength) ||
+        !isVirtualAddressRangeFileBacked(returnTarget, 1, SECTION_FLAGS_EXECUTE)) return undefined;
+
+    return returnTarget;
 }
 
 
