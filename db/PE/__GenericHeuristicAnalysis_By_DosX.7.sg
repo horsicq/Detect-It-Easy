@@ -9389,6 +9389,7 @@ function scanForObfuscations_Native() {
             epPolymorphismPendingCarryFlags = [-1],
             epPolymorphismPendingAddressIndex = 0,
             epPolymorphismVisitedAddresses = {},
+            epPolymorphismVisitedStates = {},
             epPolymorphismVisitedInstructionCount = 0,
             epPolymorphismTransformOpCodesFound = {},
             epRareBitOpCodesFound = {},
@@ -9419,17 +9420,19 @@ function scanForObfuscations_Native() {
 
         // Consume one reachable address at a time until the graph or global budget is exhausted.
         while (epPolymorphismPendingAddressIndex < epPolymorphismPendingAddresses.length &&
-            epPolymorphismVisitedInstructionCount < epPolymorphismInstructionLimit) {
+            epPolymorphismVisitedInstructionCount < epPolymorphismInstructionLimit &&
+            epPolymorphismPendingAddressIndex < epPolymorphismInstructionLimit * 4) {
             var epPolymorphismCurrentAddress = epPolymorphismPendingAddresses[epPolymorphismPendingAddressIndex],
                 epPolymorphismCurrentZeroFlag = epPolymorphismPendingZeroFlags[epPolymorphismPendingAddressIndex],
                 epPolymorphismCurrentCarryFlag = epPolymorphismPendingCarryFlags[epPolymorphismPendingAddressIndex++],
                 epPolymorphismAddressKey = epPolymorphismCurrentAddress.toString(),
+                epPolymorphismStateKey = epPolymorphismAddressKey + ":" + epPolymorphismCurrentZeroFlag + ":" + epPolymorphismCurrentCarryFlag,
                 epPolymorphismCurrentRva = epPolymorphismCurrentAddress - PE_Cached.imageBase,
                 epPolymorphismSectionIndex = -1;
 
             // Skip loops and addresses which have no file-backed VA mapping.
-            if (epPolymorphismVisitedAddresses[epPolymorphismAddressKey] ||
-                PE.VAToOffset(epPolymorphismCurrentAddress) === -1) continue;
+            if (epPolymorphismVisitedStates[epPolymorphismStateKey] || PE.VAToOffset(epPolymorphismCurrentAddress) === -1) continue;
+            epPolymorphismVisitedStates[epPolymorphismStateKey] = true;
 
             // VAToOffset alone does not prove that the address contains executable physical
             // bytes. Resolve the section explicitly to avoid decoding data or virtual padding.
@@ -9446,9 +9449,13 @@ function scanForObfuscations_Native() {
 
             if (epPolymorphismSectionIndex === -1) continue;
 
-            // Mark an address only after its executable physical section has been proven.
-            epPolymorphismVisitedAddresses[epPolymorphismAddressKey] = true;
-            epPolymorphismVisitedInstructionCount++;
+            // Count instruction evidence once per address. A later arrival with different
+            // proven flags can still expose another reachable path through that address.
+            var epPolymorphismIsRevisit = !!epPolymorphismVisitedAddresses[epPolymorphismAddressKey];
+            if (!epPolymorphismIsRevisit) {
+                epPolymorphismVisitedAddresses[epPolymorphismAddressKey] = true;
+                epPolymorphismVisitedInstructionCount++;
+            }
 
             var epPolymorphismInstruction = PE.getDisasmString(epPolymorphismCurrentAddress),
                 epPolymorphismOpCode = getAsmOpCode(epPolymorphismInstruction),
@@ -9456,6 +9463,47 @@ function scanForObfuscations_Native() {
 
             if (!epPolymorphismOpCode || epPolymorphismOpCode === "DB" || epPolymorphismInstructionLength < 1 || epPolymorphismInstructionLength > 15 ||
                 !isVirtualAddressRangeFileBacked(epPolymorphismCurrentAddress, epPolymorphismInstructionLength, SECTION_FLAGS_EXECUTE)) continue;
+
+            if (epPolymorphismIsRevisit) {
+                // Revisit only the control flow. Re-counting opcode evidence would inflate
+                // heuristics, while merging flag-dependent edges into the shared CFG could
+                // make unrelated paths appear to be one executable path.
+                var revisitNextAddress = epPolymorphismCurrentAddress + epPolymorphismInstructionLength,
+                    revisitZeroFlag = advanceEpZeroFlag(epPolymorphismInstruction, epPolymorphismOpCode, epPolymorphismCurrentZeroFlag),
+                    revisitCarryFlag = advanceEpCarryFlag(epPolymorphismInstruction, epPolymorphismOpCode, epPolymorphismCurrentCarryFlag),
+                    revisitBranch = epPolymorphismInstruction.match(/^(CALL|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
+
+                if (revisitBranch) {
+                    var revisitTargetAddress = parseInt(revisitBranch[2], 0);
+                    if (epPolymorphismOpCode === "CALL") {
+                        if (isEpDirectCallReturnProven(epPolymorphismCurrentAddress)) {
+                            epPolymorphismPendingAddresses.push(revisitNextAddress);
+                            epPolymorphismPendingZeroFlags.push(-1);
+                            epPolymorphismPendingCarryFlags.push(-1);
+                        }
+                        epPolymorphismPendingAddresses.push(revisitTargetAddress);
+                        epPolymorphismPendingZeroFlags.push(epPolymorphismCurrentZeroFlag);
+                        epPolymorphismPendingCarryFlags.push(epPolymorphismCurrentCarryFlag);
+                    } else {
+                        var revisitBranchResult = getEpKnownBranchResult(epPolymorphismOpCode, revisitZeroFlag, revisitCarryFlag);
+                        if (revisitBranchResult !== 0) {
+                            epPolymorphismPendingAddresses.push(revisitTargetAddress);
+                            epPolymorphismPendingZeroFlags.push(revisitZeroFlag);
+                            epPolymorphismPendingCarryFlags.push(revisitCarryFlag);
+                        }
+                        if (epPolymorphismOpCode !== "JMP" && epPolymorphismOpCode !== "JMPF" && revisitBranchResult !== 1) {
+                            epPolymorphismPendingAddresses.push(revisitNextAddress);
+                            epPolymorphismPendingZeroFlags.push(revisitZeroFlag);
+                            epPolymorphismPendingCarryFlags.push(revisitCarryFlag);
+                        }
+                    }
+                } else if (epScanStopOpCodes.indexOf(epPolymorphismOpCode) === -1) {
+                    epPolymorphismPendingAddresses.push(revisitNextAddress);
+                    epPolymorphismPendingZeroFlags.push(revisitZeroFlag);
+                    epPolymorphismPendingCarryFlags.push(revisitCarryFlag);
+                }
+                continue;
+            }
 
             // Inspect prefix groups at a proven physical instruction boundary. The AMD64
             // APM, volume 3, section 1.2.1 allows one legacy prefix per group; multiple
@@ -10356,6 +10404,7 @@ function scanForObfuscations_Native() {
         epPolymorphismPendingZeroFlags = undefined;
         epPolymorphismPendingCarryFlags = undefined;
         epPolymorphismVisitedAddresses = undefined;
+        epPolymorphismVisitedStates = undefined;
         epPolymorphismTransformOpCodesFound = undefined;
         epRareBitOpCodesFound = undefined;
         epDecodedInstructionLengthByAddress = undefined;
