@@ -1751,8 +1751,6 @@ function scanForAntiAnalysis_Native() {
         const antiDebugNativeRegister = PE_Cached.isI386 ? "E(?:AX|BX|CX|DX|SI|DI|BP)" :
             "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
             antiDebugGeneralPurposeRegister = "(?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:AX|BX|CX|DX|SI|DI|BP|8D?|9D?|1[0-5]D?))",
-            antiDebugRegister32BitPrefixPattern = /^E/,
-            antiDebugRegister32BitSuffixPattern = /D$/,
             antiDebugRegister32BitPattern = /^(?:E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:8|9|1[0-5])D)$/i,
             antiDebugPebSegment = PE_Cached.isI386 ? "FS" : "GS",
             antiDebugPebAddress = PE_Cached.isI386 ? "(?:0X0*30|48)" : "(?:0X0*60|96)",
@@ -1792,7 +1790,7 @@ function scanForAntiAnalysis_Native() {
                 selfMove = currentEpInstruction.match(antiDebugSelfMovePattern),
                 valuePreservingInstruction = currentEpInstruction.match(antiDebugValuePreservingInstructionPattern),
                 isPebDebugFieldAccess = pebDebugFieldAccess &&
-                    antiDebugPebRegisters[pebDebugFieldAccess[1].toUpperCase().replace(antiDebugRegister32BitPrefixPattern, "R").replace(antiDebugRegister32BitSuffixPattern, String())] &&
+                    antiDebugPebRegisters[getNativeRegisterKey(pebDebugFieldAccess[1])] &&
                     /^(?:MOV|MOVZX|MOVSX|CMP|TEST|AND)$/.test(currentEpOpCode);
 
             if (currentEpOpCode === "MOV" && antiDebugRegisterAccessPattern.test(currentEpInstruction)) {
@@ -1809,10 +1807,10 @@ function scanForAntiAnalysis_Native() {
                 isNativeAntiDebugPresent = true;
             } else if (pebLoad) {
                 // Seed pointer provenance from the architecture-specific FS/GS PEB slot.
-                antiDebugPebRegisters[pebLoad[1].toUpperCase().replace(antiDebugRegister32BitPrefixPattern, "R").replace(antiDebugRegister32BitSuffixPattern, String())] = true;
+                antiDebugPebRegisters[getNativeRegisterKey(pebLoad[1])] = true;
             } else if (registerCopy) {
-                var registerCopyDestination = registerCopy[1].toUpperCase().replace(antiDebugRegister32BitPrefixPattern, "R").replace(antiDebugRegister32BitSuffixPattern, String()),
-                    registerCopySource = registerCopy[2].toUpperCase().replace(antiDebugRegister32BitPrefixPattern, "R").replace(antiDebugRegister32BitSuffixPattern, String());
+                var registerCopyDestination = getNativeRegisterKey(registerCopy[1]),
+                    registerCopySource = getNativeRegisterKey(registerCopy[2]);
 
                 // Copy or clear only the destination proof according to the source provenance.
                 if (antiDebugPebRegisters[registerCopySource]) {
@@ -1822,7 +1820,7 @@ function scanForAntiAnalysis_Native() {
                 }
             } else if (selfMove) {
                 var selfMoveRegister = (selfMove[1] || selfMove[2]).toUpperCase(),
-                    selfMoveRegisterKey = selfMoveRegister.replace(antiDebugRegister32BitPrefixPattern, "R").replace(antiDebugRegister32BitSuffixPattern, String());
+                    selfMoveRegisterKey = getNativeRegisterKey(selfMoveRegister);
 
                 // A PE32+ r32 self-move zero-extends its destination. It cannot retain
                 // a 64-bit PEB pointer, but aliases held in other registers remain valid.
@@ -1831,7 +1829,7 @@ function scanForAntiAnalysis_Native() {
                 }
             } else if (valuePreservingInstruction) {
                 var valuePreservingRegister = (valuePreservingInstruction[1] || valuePreservingInstruction[2]).toUpperCase(),
-                    valuePreservingRegisterKey = valuePreservingRegister.replace(antiDebugRegister32BitPrefixPattern, "R").replace(antiDebugRegister32BitSuffixPattern, String());
+                    valuePreservingRegisterKey = getNativeRegisterKey(valuePreservingRegister);
 
                 // Full-width neutral arithmetic preserves a pointer; an r32 form truncates it.
                 if (PE_Cached.is64bit && antiDebugRegister32BitPattern.test(valuePreservingRegister)) {
@@ -1842,7 +1840,7 @@ function scanForAntiAnalysis_Native() {
                 /^J(?!MP)[A-Z]+$/.test(currentEpOpCode)) {
                 // General-purpose registers survive these operations on the fall-through path.
             } else if (registerWrite) {
-                var registerWriteKey = registerWrite[1].toUpperCase().replace(antiDebugRegister32BitPrefixPattern, "R").replace(antiDebugRegister32BitSuffixPattern, String());
+                var registerWriteKey = getNativeRegisterKey(registerWrite[1]);
 
                 delete antiDebugPebRegisters[registerWriteKey];
             } else if (partialRegisterWrite) {
@@ -6361,7 +6359,7 @@ function traceEpWrittenCodeTransfer() {
         maximumSafeAddress = 0x1FFFFFFFFFFFFF;
 
     function registerKey(registerName) {
-        return registerName.toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+        return getNativeRegisterKey(registerName);
     }
 
     function assignRegister(registers, registerName, value) {
@@ -6600,23 +6598,23 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
             registerWrite = instruction.match(patterns.RegisterWrite), partialWrite = instruction.match(patterns.PartialWrite);
 
         if (pebLoad) {
-            pebState[pebLoad[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String())] = 1;
+            pebState[getNativeRegisterKey(pebLoad[1])] = 1;
         } else if (ldrLoad) {
-            var ldrSource = ldrLoad[2].toUpperCase().replace(/^E/, "R").replace(/D$/, String()),
-                ldrDestination = ldrLoad[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+            var ldrSource = getNativeRegisterKey(ldrLoad[2]),
+                ldrDestination = getNativeRegisterKey(ldrLoad[1]);
             if (pebState[ldrSource] === 1) pebState[ldrDestination] = 2;
             else delete pebState[ldrDestination];
-        } else if (listLoad && pebState[listLoad[2].toUpperCase().replace(/^E/, "R").replace(/D$/, String())] === 2) {
+        } else if (listLoad && pebState[getNativeRegisterKey(listLoad[2])] === 2) {
             pebProven = true;
         } else if (registerCopy) {
-            var copySource = registerCopy[2].toUpperCase().replace(/^E/, "R").replace(/D$/, String()),
-                copyDestination = registerCopy[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+            var copySource = getNativeRegisterKey(registerCopy[2]),
+                copyDestination = getNativeRegisterKey(registerCopy[1]);
             if (pebState[copySource]) pebState[copyDestination] = pebState[copySource];
             else delete pebState[copyDestination];
         } else if (registerExchange) {
             swapFacts(pebState, registerKey(registerExchange[1]), registerKey(registerExchange[2]));
         } else if (registerWrite) {
-            delete pebState[registerWrite[1].toUpperCase().replace(/^E/, "R").replace(/D$/, String())];
+            delete pebState[getNativeRegisterKey(registerWrite[1])];
         } else if (partialWrite) {
             var partialRegister = partialWrite[1].toUpperCase(), partialKey = /^R(?:8|9|1[0-5])[BW]$/.test(partialRegister) ?
                 partialRegister.substring(0, partialRegister.length - 1) : /^[ABCD][HLX]$/.test(partialRegister) ?
@@ -6767,7 +6765,7 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
         partialPattern = /^(?:MOV|XOR|ADD|SUB|AND|OR|NOT|NEG|INC|DEC) ((?:[ABCD][HL]|[ABCD]X|SI|DI|BP|SIL|DIL|BPL|R(?:8|9|1[0-5])(?:B|W)))(?:,|$)/i;
 
     function registerKey(name) {
-        return name.toUpperCase().replace(/^E/, "R").replace(/D$/, String());
+        return getNativeRegisterKey(name);
     }
 
     function setRegister(values, name, value) {
@@ -12103,6 +12101,26 @@ function getAsmOpCode(instruction) {
 
     return separatorIndex === -1 ? instruction : instruction.substring(0, separatorIndex);
 }
+
+
+/**
+ * Canonicalizes a decoded x86/x64 register for physical-register provenance maps.
+ * Expects uppercase operands from DiE disassembly. E-prefixed 32-bit registers and
+ * D-suffixed x64 registers share a key with their 64-bit aliases; byte/word
+ * writes use a separate width-aware mapping and must not pass through this helper.
+ *
+ * @param {string} registerName - Uppercase decoded register operand.
+ * @returns {string} Physical register key with the E prefix and D suffix normalized.
+ * @example
+ * getNativeRegisterKey("EAX"); // "RAX"
+ * getNativeRegisterKey("R8D"); // "R8"
+ */
+function getNativeRegisterKey(registerName) {
+    var register = registerName;
+    if (register[0] === "E") register = "R" + register.substring(1);
+    return register[register.length - 1] === "D" ? register.substring(0, register.length - 1) : register;
+}
+
 
 
 
