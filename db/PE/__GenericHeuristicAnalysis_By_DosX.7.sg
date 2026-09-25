@@ -8116,10 +8116,9 @@ function scanForObfuscations_Native() {
                 isSimplePolymorphicInstruction = currentEpOpCode === "NOP" || currentEpOpCode === "FNOP" || currentEpOpCode === "PAUSE" ||
                     (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
 
-            // One pending Jcc is retained to recognize three equivalent shapes: a branch
-            // to its own fall-through, complementary Jcc instructions with one target,
-            // or a later direct JMP to the pending target. Only bounded neutral junk may
-            // occur between the two encodings, so unrelated control flow is not joined.
+            // A pending Jcc may lead to its own fall-through, share a resolved target
+            // with a complementary Jcc, or converge with a later direct JMP. Only
+            // bounded neutral instructions may separate the branch encodings.
 
             if (conditionalBranch && currentEpOpCode !== "JMP") {
                 var currentBranchTarget = parseInt(conditionalBranch[2], 0),
@@ -8127,14 +8126,15 @@ function scanForObfuscations_Native() {
                     previousCanonicalBranchOpCode = epCanonicalBranchOpCodes[degenerateEpBranchOpCode] || degenerateEpBranchOpCode,
                     branchPair = previousCanonicalBranchOpCode + ":" + currentCanonicalBranchOpCode,
                     reverseBranchPair = currentCanonicalBranchOpCode + ":" + previousCanonicalBranchOpCode,
-                    branchTargetProof = traceEpDirectJumpChain(currentBranchTarget, 32, true);
+                    branchTargetProof = traceEpDirectJumpChain(currentBranchTarget, 32, true, degenerateEpInstructionInteriors),
+                    complementaryBranches = epComplementaryBranchPairs.indexOf(branchPair) !== -1 ||
+                        epComplementaryBranchPairs.indexOf(reverseBranchPair) !== -1,
+                    previousBranchProof = complementaryBranches && degenerateEpBranchTarget !== -1 ?
+                        traceEpDirectJumpChain(degenerateEpBranchTarget, 32, true, degenerateEpInstructionInteriors) : undefined;
 
-                if (branchTargetProof && !degenerateEpInstructionInteriors[currentBranchTarget.toString()] &&
-                    ((currentBranchTarget === fallThroughEpInstructionAddress &&
-                        isVirtualAddressRangeFileBacked(currentBranchTarget, 1, SECTION_FLAGS_EXECUTE)) ||
-                        (currentBranchTarget === degenerateEpBranchTarget &&
-                            isVirtualAddressRangeFileBacked(currentBranchTarget, 1, SECTION_FLAGS_EXECUTE) &&
-                            (epComplementaryBranchPairs.indexOf(branchPair) !== -1 || epComplementaryBranchPairs.indexOf(reverseBranchPair) !== -1)))) {
+                if (branchTargetProof && (currentBranchTarget === fallThroughEpInstructionAddress ||
+                    (previousBranchProof && previousBranchProof.Target === branchTargetProof.Target &&
+                        branchTargetProof.Target >= fallThroughEpInstructionAddress))) {
                     log(logType.emulation, "Degenerate conditional branch near EP: " + currentEpInstruction);
 
                     isDegenerateEpConditionalBranchPresent = true;
@@ -11897,13 +11897,16 @@ function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
  * @param {number} startAddress - Virtual address of the first chain node.
  * @param {number} maximumSteps - Maximum number of instructions to follow.
  * @param {boolean} allowNeutral - Whether to cross NOP, FNOP and PAUSE instructions.
+ * @param {Object} [forbiddenInteriors] - Previously decoded instruction interiors to reject.
  * @returns {Object|undefined} Final address and hop count, or no proof.
  */
-function traceEpDirectJumpChain(startAddress, maximumSteps, allowNeutral) {
+function traceEpDirectJumpChain(startAddress, maximumSteps, allowNeutral, forbiddenInteriors) {
     var address = startAddress, visited = {}, interiors = {}, hops = 0, steps = 0;
 
     while (steps <= maximumSteps && isFinite(address) && !visited[address.toString()] && !interiors[address.toString()] &&
         isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) {
+        if (forbiddenInteriors && forbiddenInteriors[address.toString()]) return undefined;
+
         var instruction = PE.getDisasmString(address),
             opCode = getAsmOpCode(instruction),
             length = PE.getDisasmLength(address),
