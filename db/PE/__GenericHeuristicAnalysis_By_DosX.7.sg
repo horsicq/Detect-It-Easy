@@ -10607,6 +10607,252 @@ function scanForObfuscations_Native() {
 
 
 
+    // Check whether startup saves its stack pointer before transferring control.
+
+    var isEpStackSavePresent = false,
+        isEpStackHandoffPresent = false;
+
+    if (PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
+        const entryPoint = PE_Cached.addressOfUnmanagedEntryPoint,
+            is64bit = PE_Cached.is64bit,
+            pointerSize = is64bit ? 8 : 4,
+            stackPointer = is64bit ? "RSP" : "ESP",
+            pointerWidth = is64bit ? "QWORD" : "DWORD",
+            nativeRegister = is64bit ? "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])" : "E(?:AX|BX|CX|DX|SI|DI|BP)",
+            nativePush = new RegExp("^PUSH (?:(?:" + nativeRegister + ")|-?(?:0X[0-9A-F]+|[0-9]+))$"),
+            nativePop = new RegExp("^POP (?:" + nativeRegister + ")$"),
+            stackAdjustment = new RegExp("^(ADD|SUB) " + stackPointer + ", (0X[0-9A-F]+|[0-9]+)$"),
+            ripStackStore = new RegExp("^MOV " + pointerWidth + " PTR \\[RIP ([+-]) (0X[0-9A-F]+|[0-9]+)\\], (" + stackPointer + "|" + nativeRegister + ")$"),
+            absoluteStackStore = new RegExp("^MOV " + pointerWidth + " PTR \\[(0X[0-9A-F]+|[0-9]+)\\], (" + stackPointer + "|" + nativeRegister + ")$"),
+            stackRegisterCopy = new RegExp("^MOV (" + nativeRegister + "), (" + stackPointer + "|" + nativeRegister + ")$"),
+            stackRegisterLea = new RegExp("^LEA (" + nativeRegister + "), \\[" + stackPointer + "\\]$"),
+            stackRegisterWrite = new RegExp("^(?!(?:CMP|TEST) )[A-Z][A-Z0-9]* (" + epGeneralPurposeRegister + ")(?:,|$)"),
+            ripStackLoad = new RegExp("^MOV (" + stackPointer + "|" + nativeRegister + "), " + pointerWidth + " PTR \\[RIP ([+-]) (0X[0-9A-F]+|[0-9]+)\\]$"),
+            absoluteStackLoad = new RegExp("^MOV (" + stackPointer + "|" + nativeRegister + "), " + pointerWidth + " PTR \\[(0X[0-9A-F]+|[0-9]+)\\]$"),
+            stackRestore = new RegExp("^MOV " + stackPointer + ", (" + nativeRegister + ")$"),
+            unknownStackWrite = new RegExp("^(?!(?:CMP|TEST) )\\S+ " + stackPointer + "(?:,|$)|^XCHG .*\\b" + stackPointer + "$"),
+            directJump = /^JMP (0X[0-9A-F]+|[0-9]+)$/,
+            materializedJump = new RegExp("^JMP (" + nativeRegister + ")$"),
+            materializedMove = new RegExp("^MOV(?:ABS)? (" + nativeRegister + "), (0X[0-9A-F]+|[0-9]+)$"),
+            materializedLea = new RegExp("^LEA (" + nativeRegister + "), \\[RIP ([+-]) (0X[0-9A-F]+|[0-9]+)\\]$"),
+            materializedLeaAbsolute = new RegExp("^LEA (" + nativeRegister + "), \\[(0X[0-9A-F]+|[0-9]+)\\]$"),
+            conditionalBranch = /^(J(?!MP)[A-Z]+) (0X[0-9A-F]+|[0-9]+)$/;
+
+        var hasWritableSection = false;
+
+        for (var sectionIndex = 0; sectionIndex < PE_Cached.numberOfSections && !hasWritableSection; sectionIndex++) {
+            var section = PE.section[sectionIndex];
+            if (section) hasWritableSection = section.hasFlags(SECTION_FLAGS_WRITE);
+        }
+
+        if (hasWritableSection) {
+            var pending = [{ Address: entryPoint, Depth: 0, ZeroFlag: -1, CarryFlag: -1, StackRegisters: {}, ReachabilityProven: true }],
+                visited = {};
+
+            // Keep stack depth and branch facts separate for each reachable path.
+            for (var index = 0; index < pending.length && index < 96 && !isEpStackHandoffPresent; index++) {
+                var state = pending[index], address = state.Address;
+
+                if (Math.abs(address - entryPoint) > 0x200 || state.Depth < 0 || state.Depth > 0x200 ||
+                    !isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) continue;
+
+                var key = address + ":" + state.Depth + ":" + state.ZeroFlag + ":" + state.CarryFlag +
+                    ":" + state.ReachabilityProven + ":" + Object.keys(state.StackRegisters).sort().join(",");
+                if (visited[key]) continue;
+                visited[key] = true;
+
+                var instruction = PE.getDisasmString(address), length = PE.getDisasmLength(address),
+                    opCode = getAsmOpCode(instruction), nextAddress = address + length;
+
+                if (!opCode || opCode === "DB" || length < 1 || length > 15 ||
+                    !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
+
+                var ripStore = is64bit && instruction.match(ripStackStore),
+                    absoluteStore = instruction.match(absoluteStackStore), jump = instruction.match(directJump),
+                    branch = instruction.match(conditionalBranch), adjustment = instruction.match(stackAdjustment),
+                    depth = state.Depth;
+
+                var storeSource = ripStore ? ripStore[3] : absoluteStore ? absoluteStore[2] : String(),
+                    isOriginalStackPointer = storeSource === stackPointer ? depth === 0 : state.StackRegisters[storeSource] === true;
+
+                if (isOriginalStackPointer) {
+                    var displacement = ripStore ? parseInt(ripStore[2], 0) : 0,
+                        storageAddress = absoluteStore ? parseInt(absoluteStore[1], 0) :
+                            nextAddress + (ripStore[1] === "+" ? displacement : -displacement);
+
+                    if (isVirtualAddressRangeFileBacked(storageAddress, pointerSize, SECTION_FLAGS_WRITE) &&
+                        isVirtualAddressRangeFileBacked(nextAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                        var transferInstruction = PE.getDisasmString(nextAddress),
+                            transferLength = PE.getDisasmLength(nextAddress),
+                            transfer = transferInstruction && transferInstruction.match(directJump),
+                            target = transfer ? parseInt(transfer[1], 0) : -1,
+                            transferEnd = nextAddress + transferLength;
+
+                        if (!transfer && transferInstruction && transferLength > 0 && transferLength <= 15 &&
+                            isVirtualAddressRangeFileBacked(nextAddress, transferLength, SECTION_FLAGS_EXECUTE)) {
+                            var moveTarget = transferInstruction.match(materializedMove),
+                                leaTarget = is64bit && transferInstruction.match(materializedLea),
+                                absoluteLeaTarget = transferInstruction.match(materializedLeaAbsolute);
+
+                            if ((moveTarget || leaTarget || absoluteLeaTarget) && isVirtualAddressRangeFileBacked(transferEnd, 1, SECTION_FLAGS_EXECUTE)) {
+                                var indirectInstruction = PE.getDisasmString(transferEnd),
+                                    indirectLength = PE.getDisasmLength(transferEnd),
+                                    indirectJump = indirectInstruction && indirectInstruction.match(materializedJump);
+
+                                if (indirectJump && indirectJump[1] === (moveTarget ? moveTarget[1] : leaTarget ? leaTarget[1] : absoluteLeaTarget[1]) &&
+                                    indirectLength > 0 && indirectLength <= 15 &&
+                                    isVirtualAddressRangeFileBacked(transferEnd, indirectLength, SECTION_FLAGS_EXECUTE)) {
+                                    var targetDisplacement = leaTarget ? parseInt(leaTarget[3], 0) : 0;
+                                    target = moveTarget ? parseInt(moveTarget[2], 0) : absoluteLeaTarget ?
+                                        parseInt(absoluteLeaTarget[2], 0) :
+                                        transferEnd + (leaTarget[2] === "+" ? targetDisplacement : -targetDisplacement);
+                                    transferEnd += indirectLength;
+                                }
+                            }
+                        }
+
+                        if (target !== -1 && transferLength > 0 && transferLength <= 15 &&
+                            isVirtualAddressRangeFileBacked(nextAddress, transferLength, SECTION_FLAGS_EXECUTE) &&
+                            !(storageAddress < transferEnd && storageAddress + pointerSize > nextAddress)) {
+
+                            if (isVirtualAddressRangeFileBacked(target, 1, SECTION_FLAGS_EXECUTE)) {
+                                // A save followed by a distant transfer is a snapshot, not proof of reuse.
+                                if (Math.abs(storageAddress - entryPoint) <= 0x400 &&
+                                    Math.abs(target - entryPoint) >= 0x1000 &&
+                                    isVirtualAddressRangeFileBacked(storageAddress, pointerSize, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) {
+                                    isEpStackSavePresent = true;
+                                }
+
+                                var traceAddress = target, traceVisited = {}, loadedRegister = String();
+
+                                for (var traceStep = 0; state.ReachabilityProven && traceStep < 24; traceStep++) {
+                                    if (traceVisited[traceAddress] ||
+                                        !isVirtualAddressRangeFileBacked(traceAddress, 1, SECTION_FLAGS_EXECUTE)) break;
+                                    traceVisited[traceAddress] = true;
+
+                                    var traceInstruction = PE.getDisasmString(traceAddress),
+                                        traceLength = PE.getDisasmLength(traceAddress),
+                                        traceOpCode = getAsmOpCode(traceInstruction),
+                                        traceNextAddress = traceAddress + traceLength;
+
+                                    if (!traceOpCode || traceOpCode === "DB" || traceLength < 1 || traceLength > 15 ||
+                                        !isVirtualAddressRangeFileBacked(traceAddress, traceLength, SECTION_FLAGS_EXECUTE) ||
+                                        (traceAddress < storageAddress + pointerSize && traceNextAddress > storageAddress)) break;
+
+                                    var ripLoad = is64bit && traceInstruction.match(ripStackLoad),
+                                        absoluteLoad = traceInstruction.match(absoluteStackLoad),
+                                        restore = traceInstruction.match(stackRestore),
+                                        traceJump = traceInstruction.match(directJump),
+                                        loadDisplacement = ripLoad ? parseInt(ripLoad[3], 0) : 0,
+                                        loadAddress = absoluteLoad ? parseInt(absoluteLoad[2], 0) : ripLoad ?
+                                            traceNextAddress + (ripLoad[2] === "+" ? loadDisplacement : -loadDisplacement) : -1,
+                                        loadedSource = ripLoad ? ripLoad[1] : absoluteLoad ? absoluteLoad[1] : String();
+
+                                    if (loadAddress === storageAddress) {
+                                        if (loadedSource === stackPointer) {
+                                            isEpStackHandoffPresent = true;
+                                            break;
+                                        }
+                                        loadedRegister = loadedSource;
+                                    } else if (restore && restore[1] === loadedRegister) {
+                                        isEpStackHandoffPresent = true;
+                                        break;
+                                    } else if (traceJump) {
+                                        traceAddress = parseInt(traceJump[1], 0);
+                                        continue;
+                                    } else if (!/^(?:NOP|FNOP|PAUSE|ENDBR32|ENDBR64)$/.test(traceOpCode) &&
+                                        traceInstruction !== "LEA " + stackPointer + ", [" + stackPointer + "]") {
+                                        break;
+                                    }
+
+                                    traceAddress = traceNextAddress;
+                                }
+
+                                if (isEpStackHandoffPresent) break;
+                            }
+                        }
+                    }
+                }
+
+                if (adjustment) {
+                    var amount = parseInt(adjustment[2], 0);
+                    if (!isFinite(amount) || amount > 0x200) continue;
+                    depth += adjustment[1] === "SUB" ? amount : -amount;
+                } else if (nativePush.test(instruction) || (is64bit ? opCode === "PUSHFQ" : opCode === "PUSHFD")) {
+                    depth += pointerSize;
+                } else if (nativePop.test(instruction) || (is64bit ? opCode === "POPFQ" : opCode === "POPFD")) {
+                    depth -= pointerSize;
+                } else if (/^(?:ENTER|LEAVE|PUSH|POP|IRET|RET|SYS(?:CALL|ENTER|RET|EXIT)|INT|HLT|UD2|CALLF|LOOP)/.test(opCode) ||
+                    unknownStackWrite.test(instruction)) {
+                    continue;
+                }
+
+                if (depth < 0 || depth > 0x200) continue;
+                var isDirectCall = /^CALL (?:0X[0-9A-F]+|[0-9]+)$/.test(instruction);
+                if (isDirectCall && !isEpDirectCallReturnProven(address)) continue;
+
+                // A callee may change RSP even when it returns; do not prove a handoff beyond any CALL.
+                var reachabilityProven = state.ReachabilityProven && opCode !== "CALL";
+
+                var stackRegisters = {}, registerCopy = instruction.match(stackRegisterCopy),
+                    registerLea = instruction.match(stackRegisterLea), registerWrite = instruction.match(stackRegisterWrite),
+                    partialWrite = instruction.match(epPartialRegisterWritePattern);
+
+                for (var knownRegister in state.StackRegisters) stackRegisters[knownRegister] = true;
+
+                if (opCode === "CALL" || opCode === "XCHG") {
+                    stackRegisters = {};
+                } else if (registerCopy) {
+                    if ((registerCopy[2] === stackPointer && depth === 0) || stackRegisters[registerCopy[2]]) {
+                        stackRegisters[registerCopy[1]] = true;
+                    } else {
+                        delete stackRegisters[registerCopy[1]];
+                    }
+                } else if (registerLea) {
+                    if (depth === 0) stackRegisters[registerLea[1]] = true;
+                    else delete stackRegisters[registerLea[1]];
+                } else if (registerWrite) {
+                    delete stackRegisters[getNativeRegisterKey(registerWrite[1])];
+                } else if (partialWrite) {
+                    delete stackRegisters[getEpPartialRegisterKey(partialWrite[1])];
+                } else if (opCode !== "CMP" && opCode !== "TEST" && opCode !== "NOP" && opCode !== "FNOP" &&
+                    opCode !== "PAUSE" && !adjustment && !nativePush.test(instruction) && !nativePop.test(instruction) &&
+                    !jump && !branch) {
+                    // Unsupported instructions may write an alias of a saved pointer.
+                    stackRegisters = {};
+                }
+
+                var zeroFlag = opCode === "CALL" ? -1 : advanceEpZeroFlag(instruction, opCode, state.ZeroFlag),
+                    carryFlag = opCode === "CALL" ? -1 : advanceEpCarryFlag(instruction, opCode, state.CarryFlag);
+
+                if (jump) {
+                    pending.push({ Address: parseInt(jump[1], 0), Depth: depth, ZeroFlag: zeroFlag, CarryFlag: carryFlag,
+                        StackRegisters: stackRegisters, ReachabilityProven: reachabilityProven });
+                } else if (branch) {
+                    var branchResult = getEpKnownBranchResult(opCode, state.ZeroFlag, state.CarryFlag),
+                        branchReachabilityProven = reachabilityProven && branchResult !== -1;
+
+                    if (branchResult !== 0) pending.push({ Address: parseInt(branch[2], 0), Depth: depth, ZeroFlag: zeroFlag,
+                        CarryFlag: carryFlag, StackRegisters: stackRegisters, ReachabilityProven: branchReachabilityProven });
+                    if (branchResult !== 1) pending.push({ Address: nextAddress, Depth: depth, ZeroFlag: zeroFlag,
+                        CarryFlag: carryFlag, StackRegisters: stackRegisters, ReachabilityProven: branchReachabilityProven });
+                } else if (opCode !== "JMP" && opCode !== "CALLF" && opCode !== "JMPF") {
+                    pending.push({ Address: nextAddress, Depth: depth, ZeroFlag: zeroFlag, CarryFlag: carryFlag,
+                        StackRegisters: stackRegisters, ReachabilityProven: reachabilityProven });
+                }
+            }
+        }
+
+        if (isEpStackHandoffPresent) log(logType.emulation, "Saved entry-point stack pointer restored after transfer");
+        else if (isEpStackSavePresent) log(logType.emulation, "Entry-point stack pointer saved in writable code before a distant jump");
+    }
+
+    if (isEpStackHandoffPresent) options = addOption(options, "EP stack handoff");
+    else if (isEpStackSavePresent) options = addOption(options, "EP stack save before transfer");
+
+
+
+
     // Check for called stubs which reconstruct their own nearby executable bytes
 
     var isSelfModifyingEpCallStubPresent = false;
