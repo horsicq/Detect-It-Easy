@@ -454,6 +454,51 @@ if (manifest.includes("requireAdministrator")) {
 
 ## Advanced Analysis
 
+### Native Analysis Primitives
+
+These additive methods return decoded instructions, mappings, byte matches and candidate masks. Scripts retain rule order, guards, verification, logging and verdicts. All address, offset and size arguments use finite safe JavaScript integers (`Number.MAX_SAFE_INTEGER`, or `9007199254740991`); values outside that range are rejected rather than rounded. Older engines can be supported with `typeof PE.method === "function"` checks and the existing API path.
+
+#### getDisasmInfo()
+
+**`PE.getDisasmInfo(va)`** → `{text, length, nextAddress}` or `null`.
+
+Decodes one instruction. All three fields equal the respective legacy `getDisasmString`, `getDisasmLength` and `getDisasmNextAddress` results in the same engine. Unmapped VA, invalid/truncated decoding or unsafe addresses return `null`. PE x86/x64 lengths are `1..15`. See [Binary disassembly functions](Binary.md#getdisasminfo).
+
+#### mapVirtualRange()
+
+**`PE.mapVirtualRange(va, size, requiredFlags, fileBacked)`** → `{sectionIndex, fileOffset}` or `null`.
+
+Validates a positive-length range wholly contained in one PE section. Sections are checked in their existing order, and every bit in the unsigned 32-bit `requiredFlags` must be present in that section's characteristics. `va` must be at or above the image base, and the inclusive end address must also be a safe integer. Invalid PE metadata, unmapped ranges and overflow return `null`. For overlapping sections, the first containing section with the requested flags is selected; a failed file or VA endpoint check returns `null` without trying later overlaps.
+
+- With `fileBacked === false`, the section extent is `max(VirtualSize, SizeOfRawData)`. The result contains the zero-based `sectionIndex` and omits `fileOffset`.
+- With `fileBacked === true`, the entire range must lie within both the raw section size and the file. Both `VAToOffset(va)` and `VAToOffset(va + size - 1)` must equal the calculated file offsets. The result also contains the first byte's `fileOffset`.
+
+```javascript
+var mapped = PE.mapVirtualRange(address, 5, 0x20000000, true); // IMAGE_SCN_MEM_EXECUTE
+if (mapped) {
+    var sectionIndex = mapped.sectionIndex;
+    var fileOffset = mapped.fileOffset;
+}
+```
+
+#### findAnyBytes()
+
+**`PE.findAnyBytes(offset, size, patterns)`** → `{offset, patternIndex}` or `null`.
+
+Searches exact numeric byte arrays in a strict file range. The earliest complete match wins, with the lower pattern index breaking ties. No text conversion is performed; UTF-16LE must be supplied as its explicit bytes. Maximum 128 patterns and 65536 total pattern bytes. See [Binary.findAnyBytes](Binary.md#findanybytes) for validation and examples.
+
+#### findSignatures()
+
+**`PE.findSignatures(offset, size, signatures)`** → `[firstOffset0, firstOffset1, ...]`.
+
+Each result equals the corresponding existing `PE.findSignature` call, including quoted text and wildcard behavior. Results preserve input order and use `-1` for no match. Maximum 128 strings and 65536 units of signature source text. Invalid requests return `null` in the C engine or `[]` in the Qt engine. See [Binary.findSignatures](Binary.md#findsignatures).
+
+#### findByteRelationCandidates()
+
+**`PE.findByteRelationCandidates(offset, size, groups, tailBytes)`** → `Uint32Array` or `null`.
+
+Returns flat `[relativeOffset, groupMask, ...]` pairs for groups of byte equalities. Every pair in a group must match; the mask includes all matching groups. Candidate positions are strictly below `size - tailBytes`. Maximum 32 groups, 256 total pairs and a 16 MiB file range. Legacy QtScript builds return an ordinary array with identical unsigned values. The script verifies candidates and selects any heuristic result. See [Binary.findByteRelationCandidates](Binary.md#findbyterelationcandidates) for the complete contract.
+
 ### Hash Analysis
 
 Functions for calculating and comparing import hashes for malware analysis and similarity detection.

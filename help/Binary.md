@@ -113,6 +113,62 @@ if (Binary.compareEP("EB016860E8000000008B1C2483C312812BE8B10600FE4BFD822C24")) 
 
 **Returns:** Offset in the file if found, `-1` otherwise.
 
+#### findSignatures()
+**`findSignatures(nOffset, nSize, signatures)`** - Search several signatures and return their first file offsets in input order.
+
+For each index `i`, the result is exactly the result of `findSignature(nOffset, nSize, signatures[i])`; an absent signature has offset `-1`. The existing signature parser, quoted text, masks and range handling are preserved. In particular, `??` matches any byte and `**` matches a nonzero byte. This method does not change the legacy matching boundaries.
+
+**Limits:** At most 128 strings and 65536 units of source text in total (UTF-8 bytes in the C engine; QString characters in the Qt engine). Numeric arguments must be finite safe integers. An empty input array returns an empty result. Invalid argument types or excessive budgets return `null` in the C engine and `[]` in the Qt engine.
+
+```javascript
+var patterns = ["'MZ'", "55??8BEC", "28********2A"];
+if (typeof PE.findSignatures === "function") {
+    var offsets = PE.findSignatures(0, PE.getSize(), patterns);
+    if (offsets && offsets.length === patterns.length) {
+        // Select and log matches in the order required by the script.
+    }
+}
+```
+
+#### findAnyBytes()
+**`findAnyBytes(nOffset, nSize, patterns)`** - Find the earliest complete exact byte pattern in a file range.
+
+`patterns` is an array of numeric byte arrays. Every element must be an integer in `0..255`; strings, wildcard signatures and implicit text encoding are not accepted. The result is `{offset, patternIndex}`, where `offset` is an absolute file offset and `patternIndex` is zero-based. The lowest offset wins; at an equal offset the lower pattern index wins. A pattern must fit completely inside `[nOffset, nOffset + nSize)`.
+
+**Limits:** Nonnegative finite safe integers for offset and size; the entire range must be inside the file. At most 128 patterns and 65536 bytes in total. Individual patterns must be nonempty. An empty outer array or zero size has no match. Returns `null` when there is no match or on invalid arguments.
+
+```javascript
+var match = PE.findAnyBytes(0, PE.getSize(), [
+    [0x4D, 0x5A],                  // MZ
+    [0x50, 0x45, 0x00, 0x00]       // PE signature
+]);
+if (match) {
+    var fileOffset = match.offset;
+    var selectedPattern = match.patternIndex;
+}
+```
+
+#### findByteRelationCandidates()
+**`findByteRelationCandidates(nOffset, nSize, groups, tailBytes)`** - Return positions satisfying groups of byte equalities.
+
+Each group contains pairs of relative byte offsets. A group matches at candidate `p` when every pair `[a, b]` satisfies `byte[p + a] === byte[p + b]`. The returned flat `Uint32Array` contains `[relativeOffset, groupMask, ...]`, with positions in ascending order. Each position occurs once, and bit `g` is set for every matching group `g`. Offsets are relative to `nOffset`. Qt builds using the legacy QtScript engine return an ordinary array with the same unsigned values; QJSEngine and the C engine return `Uint32Array`.
+
+**Limits:** Nonnegative finite safe integers for offset and size; the complete file range must exist and be at most 16 MiB. At most 32 groups and 256 pairs in total. Each group must be nonempty, each pair must have exactly two integers, and pair offsets must be in `0..tailBytes`. `tailBytes` must be an integer in `0..4294967295`.
+
+Candidate positions use the exclusive boundary `p < nSize - tailBytes`. If `tailBytes >= nSize`, or the outer group array is empty, the valid result is empty. Results are never silently truncated. Invalid requests return `null`.
+
+```javascript
+var groups = [[[3, 40], [0x3F, 40]], [[3, 41], [0x3F, 41]]];
+var candidates = PE.findByteRelationCandidates(offset, size, groups, 0x100);
+if (candidates) {
+    for (var i = 0; i < candidates.length; i += 2) {
+        var candidateOffset = offset + candidates[i];
+        var groupMask = candidates[i + 1];
+        // The script verifies the candidate and decides the result.
+    }
+}
+```
+
 #### findString()
 **`qint64 findString(qint64 nOffset, qint64 nSize, QString sString)`** - Search for a string in the file.
 
@@ -537,6 +593,21 @@ var nTime = Binary.endTiming(nProfiling, "PROFILING");
 **`QString getDisasmString(qint64 nAddress)`** - Get disassembly string for instruction.
 
 **`qint64 getDisasmNextAddress(qint64 nAddress)`** - Get address of next instruction.
+
+#### getDisasmInfo()
+**`getDisasmInfo(nAddress)`** - Decode one instruction and return `{text, length, nextAddress}`.
+
+The fields are identical to `getDisasmString(nAddress)`, `getDisasmLength(nAddress)` and `getDisasmNextAddress(nAddress)` in the same engine. Text formatting is preserved, including the C engine's existing mnemonic representation. `nextAddress` preserves the existing API's control-flow semantics; scripts should use the returned field.
+
+The address must be a nonnegative finite safe integer. An unmapped address, truncated or invalid instruction, decoding failure or an unsafe returned address produces `null`. For PE x86/x64, a valid instruction length is `1..15`.
+
+```javascript
+var info = PE.getDisasmInfo(address);
+if (info) {
+    var instruction = info.text;
+    var nextAddress = info.nextAddress;
+}
+```
 
 ### System Information
 **`QString getOperationSystemName()`** - Get operating system name.

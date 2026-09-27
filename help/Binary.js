@@ -83,6 +83,42 @@ Binary.findString = function(nOffset, nSize, sValue) {}
      */
 Binary.findSignature = function(nOffset, nSize, sValue) {}
     /**
+     * Search several signatures using the same parser and matching behavior as findSignature.
+     * @param {Number} nOffset - Safe integer file offset; uses findSignature range handling.
+     * @param {Number} nSize - Safe integer byte count; uses findSignature range handling.
+     * @param {String[]} signatures - At most 128 signatures, with a total text budget of 65536.
+     * @returns {Number[]|null} First offset for each signature, or -1 if absent. Invalid arguments
+     * return null in the C engine and an empty array in the Qt engine.
+     * @see Binary.findSignature
+     */
+Binary.findSignatures = function(nOffset, nSize, signatures) {}
+    /**
+     * Find the earliest complete exact byte pattern in the strict file range [nOffset, nOffset+nSize).
+     * No string encoding or wildcard interpretation is applied.
+     * @param {Number} nOffset - Nonnegative safe integer file offset.
+     * @param {Number} nSize - Nonnegative safe integer byte count; the complete range must be in the file.
+     * @param {Number[][]} patterns - At most 128 nonempty arrays of integer bytes (0..255),
+     * with at most 65536 bytes in total. An empty outer array is allowed.
+     * @returns {{offset: Number, patternIndex: Number}|null} Lowest file offset and zero-based
+     * pattern index; ties use the lower index. Returns null if absent or arguments are invalid.
+     */
+Binary.findAnyBytes = function(nOffset, nSize, patterns) {}
+    /**
+     * Return byte-equality candidates without interpreting the matched data.
+     * All pairs within a group must match; group bit g is set when every pair in groups[g] matches.
+     * @param {Number} nOffset - Nonnegative safe integer file offset.
+     * @param {Number} nSize - Nonnegative safe integer byte count, at most 16 MiB; range must be in the file.
+     * @param {Number[][][]} groups - At most 32 nonempty groups and 256 pairs in total.
+     * Each pair contains two integer byte offsets in the range 0..tailBytes. An empty outer array is allowed.
+     * @param {Number} tailBytes - Integer in 0..4294967295. Candidate positions satisfy p < nSize-tailBytes.
+     * @returns {Uint32Array|Number[]|null} Flat [relativeOffset, groupMask, ...] pairs in ascending offset order;
+     * each position appears once with all matching bits. Invalid arguments return null.
+     * A valid request without candidates returns an empty typed array. Legacy QtScript builds
+     * return an ordinary array with the same unsigned values.
+     */
+Binary.findByteRelationCandidates = function(nOffset, nSize, groups, tailBytes) {}
+
+    /**
      * Get the directory of the file.
      * @returns {String}
      */
@@ -192,3 +228,10 @@ Binary.readSWord = function(nOffset) {}
      * @returns {Uint} The value with its bytes swapped.
      */
 Binary.swapBytes = function(nValue) {}
+    /**
+     * Decode one instruction and return the same text, length and next address as the existing disassembly APIs.
+     * @param {Number} nAddress - Nonnegative safe integer virtual address.
+     * @returns {{text: String, length: Number, nextAddress: Number}|null} Decoded instruction;
+     * null for an unmapped address or decoding failure. PE x86/x64 lengths must be in 1..15.
+     */
+Binary.getDisasmInfo = function(nAddress) {}
