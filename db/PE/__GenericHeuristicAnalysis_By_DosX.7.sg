@@ -12384,6 +12384,8 @@ function isEpImagePageSweepProven(stopOpCodes) {
  * Direct conditional branches contribute both successors. Unknown calls or transfers,
  * undecodable bytes, cycles and exhausted budgets remain unproven rather than guessed.
  *
+ * Multi-byte NOP operands are architectural no-ops and do not access memory.
+ *
  * @param {number} startAddress - File-backed executable virtual address to examine.
  * @param {RegExp} terminalPattern - Exact terminal instruction required on every path.
  * @returns {boolean} Whether all bounded reachable paths end at that terminal.
@@ -12412,7 +12414,7 @@ function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
             if (directBranch && opCode !== "JMPF") {
                 successors.push(parseInt(directBranch[2], 0));
                 if (opCode !== "JMP") successors.push(nextAddress);
-            } else if (/^(?:NOP|PAUSE|ENDBR32|ENDBR64)$/.test(instruction)) {
+            } else if (opCode === "NOP" || /^(?:PAUSE|ENDBR32|ENDBR64)$/.test(instruction)) {
                 successors.push(nextAddress);
             } else {
                 break;
