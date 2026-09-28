@@ -4658,8 +4658,7 @@ function scanForBadFileFormat_NET_and_Native() {
             } else {
                 var exceptionDirectoryOffset = PE.VAToOffset(exceptionDirectoryAddress),
                     exceptionDirectoryData = PE.readBytes(exceptionDirectoryOffset, exceptionDirectorySize),
-                    runtimeFunctionMappedRanges = [],
-                    runtimeFunctionCodeRanges = [];
+                    runtimeFunctionMappedRanges = [];
 
                 // A prefix-maximum interval index answers whether one section contains a
                 // complete range in O(log n). Unlike a monotonic cursor, it remains exact
@@ -4796,22 +4795,12 @@ function scanForBadFileFormat_NET_and_Native() {
                         Rva: runtimeFunctionSectionRva,
                         EndRva: runtimeFunctionSectionEndRva
                     });
-
-                    // Accept both code and execute flags: current Windows kernels describe
-                    // discardable initialization code without the execute characteristic.
-                    if ((PE.section[d].Flags & (SECTION_FLAGS_CODE | SECTION_FLAGS_EXECUTE)) !== 0) {
-                        runtimeFunctionCodeRanges.push({
-                            Rva: runtimeFunctionSectionRva,
-                            EndRva: runtimeFunctionSectionEndRva
-                        });
-                    }
                 }
 
                 prepareRuntimeFunctionRangeIndex(runtimeFunctionMappedRanges);
-                prepareRuntimeFunctionRangeIndex(runtimeFunctionCodeRanges);
 
                 var cachedRuntimeFunctionMappedRangeIndex = -1,
-                    cachedRuntimeFunctionCodeRangeIndex = -1;
+                    cachedRuntimeFunctionBodyRangeIndex = -1;
 
                 // Large native images can contain hundreds of thousands of fixed-size entries.
                 // Decode this bounded hot path inline while preserving unsigned RVA values.
@@ -4830,27 +4819,27 @@ function scanForBadFileFormat_NET_and_Native() {
                             (exceptionDirectoryData[i + 10] << 16) |
                             (exceptionDirectoryData[i + 11] << 24)) >>> 0,
                         runtimeFunctionSize = runtimeFunctionEndRva - runtimeFunctionBeginRva,
-                        isRuntimeFunctionCodeRangeValid = false,
+                        isRuntimeFunctionBodyRangeValid = false,
                         isRuntimeFunctionUnwindPointerValid = runtimeFunctionBeginRva === 0 &&
                             runtimeFunctionEndRva === 0 && runtimeFunctionUnwindRva === 0,
                         isRuntimeFunctionIndirect = runtimeFunctionUnwindRva % 2 !== 0;
 
                     if (runtimeFunctionSize > 0) {
-                        var cachedRuntimeFunctionCodeRange = runtimeFunctionCodeRanges[cachedRuntimeFunctionCodeRangeIndex];
+                        var cachedRuntimeFunctionBodyRange = runtimeFunctionMappedRanges[cachedRuntimeFunctionBodyRangeIndex];
 
-                        // Adjacent records overwhelmingly reference the same code section.
-                        // Keep the binary index as an exact fallback for every other layout.
-                        if (cachedRuntimeFunctionCodeRange &&
-                            runtimeFunctionBeginRva >= cachedRuntimeFunctionCodeRange.Rva &&
-                            runtimeFunctionEndRva <= cachedRuntimeFunctionCodeRange.EndRva) {
-                            isRuntimeFunctionCodeRangeValid = true;
+                        // Section flags cannot prove whether a mapped range contains code.
+                        // Adjacent records usually reference the same section.
+                        if (cachedRuntimeFunctionBodyRange &&
+                            runtimeFunctionBeginRva >= cachedRuntimeFunctionBodyRange.Rva &&
+                            runtimeFunctionEndRva <= cachedRuntimeFunctionBodyRange.EndRva) {
+                            isRuntimeFunctionBodyRangeValid = true;
                         } else {
-                            var runtimeFunctionCodeRangeIndex = findRuntimeFunctionRangeIndex(runtimeFunctionCodeRanges,
+                            var runtimeFunctionBodyRangeIndex = findRuntimeFunctionRangeIndex(runtimeFunctionMappedRanges,
                                 runtimeFunctionBeginRva, runtimeFunctionEndRva);
 
-                            if (runtimeFunctionCodeRangeIndex !== -1) {
-                                cachedRuntimeFunctionCodeRangeIndex = runtimeFunctionCodeRangeIndex;
-                                isRuntimeFunctionCodeRangeValid = true;
+                            if (runtimeFunctionBodyRangeIndex !== -1) {
+                                cachedRuntimeFunctionBodyRangeIndex = runtimeFunctionBodyRangeIndex;
+                                isRuntimeFunctionBodyRangeValid = true;
                             }
                         }
                     }
@@ -4897,9 +4886,9 @@ function scanForBadFileFormat_NET_and_Native() {
                     // Current Microsoft images may retain zero-length or reversed entries.
                     // Neither can cover a control PC, so range ordering alone is not evidence
                     // of corruption; positive ranges and every metadata pointer remain strict.
-                    if (runtimeFunctionSize > 0 && !isRuntimeFunctionCodeRangeValid) {
+                    if (runtimeFunctionSize > 0 && !isRuntimeFunctionBodyRangeValid) {
                         log(logType.any, "AMD64 unwind function entry #" + runtimeFunctionIndex +
-                            " references a non-code range from VA 0x" + (PE_Cached.imageBase + runtimeFunctionBeginRva).toString(16) +
+                            " references an unmapped range from VA 0x" + (PE_Cached.imageBase + runtimeFunctionBeginRva).toString(16) +
                             " to VA 0x" + (PE_Cached.imageBase + runtimeFunctionEndRva).toString(16));
 
                         isInvalidUnwindMetadataPresent = true;
@@ -4914,7 +4903,6 @@ function scanForBadFileFormat_NET_and_Native() {
                 // Clean up: release the potentially large exception-directory buffer
                 exceptionDirectoryData = undefined;
                 runtimeFunctionMappedRanges = undefined;
-                runtimeFunctionCodeRanges = undefined;
             }
         }
     }
@@ -5324,7 +5312,15 @@ function scanForBadFileFormat_NET_and_Native() {
             tlsDirectoryRva = PE.read_uint32(tlsDirectoryEntryOffset),
             tlsDirectorySize = PE.read_uint32(tlsDirectoryEntryOffset + 4),
             tlsDirectoryMinimumSize = PE_Cached.is64bit ? 0x28 : 0x18,
-            tlsDirectoryOffset = tlsDirectoryRva !== 0 ? PE.VAToOffset(PE_Cached.imageBase + tlsDirectoryRva) : -1;
+            tlsDirectoryAddress = PE_Cached.imageBase + tlsDirectoryRva,
+            isTlsDirectoryFileBacked = tlsDirectoryRva !== 0 && isVirtualAddressRangeFileBacked(tlsDirectoryAddress, tlsDirectoryMinimumSize, 0),
+            tlsDirectoryOffset = isTlsDirectoryFileBacked ? PE.VAToOffset(tlsDirectoryAddress) : -1;
+
+        if (tlsDirectorySize >= tlsDirectoryMinimumSize && !isTlsDirectoryFileBacked) {
+            log(logType.any, "TLS directory is not file-backed");
+
+            isInvalidTlsMetadataPresent = true;
+        }
 
         if (tlsDirectorySize >= tlsDirectoryMinimumSize && tlsDirectoryOffset !== -1 &&
             tlsDirectoryOffset + tlsDirectoryMinimumSize <= PE_Cached.fileSize) {
@@ -5419,8 +5415,10 @@ function scanForBadFileFormat_NET_and_Native() {
             tlsCallbackDirectoryRva = PE.read_uint32(tlsCallbackDirectoryEntryOffset),
             tlsCallbackDirectorySize = PE.read_uint32(tlsCallbackDirectoryEntryOffset + 4),
             tlsCallbackDirectoryMinimumSize = PE_Cached.is64bit ? 0x28 : 0x18,
-            tlsCallbackDirectoryOffset = tlsCallbackDirectoryRva !== 0 ?
-                PE.VAToOffset(PE_Cached.imageBase + tlsCallbackDirectoryRva) : -1;
+            tlsCallbackDirectoryAddress = PE_Cached.imageBase + tlsCallbackDirectoryRva,
+            tlsCallbackDirectoryOffset = tlsCallbackDirectoryRva !== 0 &&
+                isVirtualAddressRangeFileBacked(tlsCallbackDirectoryAddress, tlsCallbackDirectoryMinimumSize, 0) ?
+                PE.VAToOffset(tlsCallbackDirectoryAddress) : -1;
 
         if (tlsCallbackDirectorySize >= tlsCallbackDirectoryMinimumSize && tlsCallbackDirectoryOffset !== -1 &&
             tlsCallbackDirectoryOffset + tlsCallbackDirectoryMinimumSize <= PE_Cached.fileSize) {
@@ -5433,8 +5431,9 @@ function scanForBadFileFormat_NET_and_Native() {
             }
 
             if (tlsCallbackArrayAddress !== -1 && tlsCallbackArrayAddress !== 0) {
-                var tlsCallbackArrayOffset = PE.VAToOffset(tlsCallbackArrayAddress),
-                    tlsCallbackAddressSize = PE_Cached.is64bit ? 8 : 4;
+                var tlsCallbackAddressSize = PE_Cached.is64bit ? 8 : 4,
+                    tlsCallbackArrayOffset = isVirtualAddressRangeFileBacked(tlsCallbackArrayAddress, tlsCallbackAddressSize, 0) ?
+                        PE.VAToOffset(tlsCallbackArrayAddress) : -1;
 
                 if (tlsCallbackArrayOffset === -1) {
                     log(logType.any, "TLS callback array is not file-backed");
