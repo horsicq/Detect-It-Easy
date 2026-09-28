@@ -645,18 +645,18 @@ function scanForObfuscations_NET() {
     const intConfusionXorPattern = opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.ldc_i4;
 
     if (validateNetByteCode(intConfusionXorPattern)) {
-        if (validateNetByteCode( // samples by: Inx Obfuscator
+        if (validateNetByteCodeAny(// samples by: Inx Obfuscator
             intConfusionXorPattern +
-            (opCodes.setStrict(opCodes.bne_un_s, "09") + opCodes.ldc_i4_2 + opCodes.stloc_0 + opCodes.sizeof + opCodes.add)
-        ) ||
-            validateNetByteCode( // samples by: MindLated, NetShield
+            (opCodes.setStrict(opCodes.bne_un_s, "09") + opCodes.ldc_i4_2 + opCodes.stloc_0 + opCodes.sizeof + opCodes.add), function () {
+            return [
+                // samples by: MindLated, NetShield
                 intConfusionXorPattern +
-                (opCodes.bne_un + opCodes.ldc_i4 + opCodes.stloc + opCodes.sizeof + opCodes.add)
-            ) ||
-            validateNetByteCode( // samples by: VavilonProtect
+                (opCodes.bne_un + opCodes.ldc_i4 + opCodes.stloc + opCodes.sizeof + opCodes.add),
+                // samples by: VavilonProtect
                 intConfusionXorPattern +
                 (opCodes.bne_un + opCodes.ldc_i4_2 + opCodes.stloc_s + opCodes.sizeof + opCodes.add)
-            )
+            ];
+        })
         ) {
             log(logType.net, "Int confusion detected at offset " + lastOffsetDetected);
 
@@ -760,14 +760,15 @@ function scanForObfuscations_NET() {
 
     var isCalliInvokesPresent = false;
 
-    if (validateNetByteCode( // samples by: MindLated
+    if (validateNetByteCodeAny(// samples by: MindLated
         opCodes.setStrict(opCodes.ldftn, "** ?? 00 0A") +
-        opCodes.setStrict(opCodes.calli, "** 00 00 11")
-    ) ||
-        validateNetByteCode( // samples by: ArmDot, DarksProtector
+        opCodes.setStrict(opCodes.calli, "** 00 00 11"), function () {
+        return [
+            // samples by: ArmDot, DarksProtector
             opCodes.ldelem_i +
             opCodes.setStrict(opCodes.calli, "** 00 00 11")
-        )) {
+        ];
+    })) {
         log(logType.net, "Calli invokes detected at offset " + lastOffsetDetected);
 
         isCalliInvokesPresent = true;
@@ -782,16 +783,14 @@ function scanForObfuscations_NET() {
 
     var isLdftnPointersPresent = false;
 
-    if (validateNetByteCode(
-        opCodes.nop + opCodes.setStrict(opCodes.ldftn, "** 00 00 06") + opCodes.stelem_i
-    ) ||
-        validateNetByteCode(
-            opCodes.nop + opCodes.setStrict(opCodes.ldftn, "** 00 00 0A") + opCodes.stelem_i
-        ) ||
-        validateNetByteCode( // samples by: Quantum (private)
+    if (validateNetByteCodeAny(opCodes.nop + opCodes.setStrict(opCodes.ldftn, "** 00 00 06") + opCodes.stelem_i, function () {
+        return [
+            opCodes.nop + opCodes.setStrict(opCodes.ldftn, "** 00 00 0A") + opCodes.stelem_i,
+            // samples by: Quantum (private)
             opCodes.setStrict(opCodes.ldftn, "** 00 00 0A") +
             opCodes.setStrict(opCodes.calli, "** 00 00 11")
-        )) {
+        ];
+    })) {
         log(logType.net, "Ldftn pointers method-obfuscation detected at offset " + lastOffsetDetected);
 
         isLdftnPointersPresent = true;
@@ -807,63 +806,52 @@ function scanForObfuscations_NET() {
     var isCtrlFlowPresent = false;
 
     if (
-        validateNetByteCode( // samples by: ConfuserEx
+        validateNetByteCodeAny(// samples by: ConfuserEx
             opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s +
-            opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s
-        ) ||
-        validateNetByteCode( // samples by: ConfuserEx (neo mod)
-            opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.dup + opCodes.stloc_0 + opCodes.ldc_i4_3 + opCodes.rem_un + opCodes.switch__nobody
-        ) ||
-        validateNetByteCode( // samples by: .NET Reactor (v6.9.8)
-            opCodes.setStrict(opCodes.ldc_i4, "00 00 00 00") + opCodes.br + opCodes.br + opCodes.ldloc
-        ) ||
-        validateNetByteCode( // samples by: .NET Reactor
+            opCodes.nop + opCodes.ldloc_0 + opCodes.ldc_i4 + opCodes.mul + opCodes.ldc_i4 + opCodes.xor + opCodes.br_s, function () {
+            return [
+                // samples by: ConfuserEx (neo mod)
+            opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes.xor + opCodes.dup + opCodes.stloc_0 + opCodes.ldc_i4_3 + opCodes.rem_un + opCodes.switch__nobody,
+                // samples by: .NET Reactor (v6.9.8)
+            opCodes.setStrict(opCodes.ldc_i4, "00 00 00 00") + opCodes.br + opCodes.br + opCodes.ldloc,
+                // samples by: .NET Reactor
             opCodes.ldsfld + opCodes.brfalse + opCodes.pop +
             opCodes.setStrict(opCodes.ldc_i4, "01 00 00 00") + // MSIL: 'ldc.4 1'
-            opCodes.br + opCodes.nop
-        ) ||
-        validateNetByteCode( // samples by: .NET Reactor
+            opCodes.br + opCodes.nop,
+                // samples by: .NET Reactor
             opCodes.setNullValue(opCodes.ldc_i4) +
             opCodes.ldsfld + opCodes.brtrue + opCodes.pop + opCodes.ldc_i4 +
-            opCodes.br
-        ) ||
-        validateNetByteCode( // samples by: .NET Reactor (legacy~~)
+            opCodes.br,
+                // samples by: .NET Reactor (legacy~~)
             opCodes.stloc + opCodes.ldloc +
             opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "** ** ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00", "switch__nobody") +
-            opCodes.ldc_i4 + opCodes.br
-        ) ||
-        validateNetByteCode( // Crypto Obfuscator
-            opCodes.ldc_i4_3 + opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "01 00 00 00 F6 FF FF FF") + opCodes.ldc_i4_1 + opCodes.brtrue_s + opCodes.ldtoken + opCodes.pop
-        ) ||
-        validateNetByteCode( // samples by: MindLated, NetShield
+            opCodes.ldc_i4 + opCodes.br,
+                // Crypto Obfuscator
+            opCodes.ldc_i4_3 + opCodes.joinNoBodyAndValue(opCodes.switch__nobody, "01 00 00 00 F6 FF FF FF") + opCodes.ldc_i4_1 + opCodes.brtrue_s + opCodes.ldtoken + opCodes.pop,
+                // samples by: MindLated, NetShield
             opCodes.setNullValue(opCodes.ldc_i4) + // MSIL: 'ldc.i4 0'
             opCodes.stloc + opCodes.br + opCodes.nop + opCodes.ldloc +
             opCodes.setStrict(opCodes.ldc_i4, "01 00 00 00") + // MSIL: 'ldc.i4 1'
-            opCodes.ceq + opCodes.brfalse
-        ) ||
-        validateNetByteCode( // samples by: Rose Obfuscator
+            opCodes.ceq + opCodes.brfalse,
+                // samples by: Rose Obfuscator
             opCodes.setNullValue(opCodes.ldc_i4) + // MSIL: 'ldc.i4 0'
-            opCodes.stloc + opCodes.br + opCodes.nop + opCodes.ldloc + opCodes.ldc_i4 + opCodes.ceq + opCodes.brfalse
-        ) ||
-        validateNetByteCode( // samples by: Smart Assembly
+            opCodes.stloc + opCodes.br + opCodes.nop + opCodes.ldloc + opCodes.ldc_i4 + opCodes.ceq + opCodes.brfalse,
+                // samples by: Smart Assembly
             opCodes.ldc_i4 + opCodes.br + opCodes.ldloc_s + opCodes.ldc_i4_s + opCodes.ldc_i4_0 + opCodes.stelem_i1 +
-            opCodes.ldc_i4 + opCodes.br
-        ) ||
-        validateNetByteCode( // samples by: ConfuserEx (Beds mod)
+            opCodes.ldc_i4 + opCodes.br,
+                // samples by: ConfuserEx (Beds mod)
             opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes._unknown + opCodes.ldc_i4 + opCodes._unknown + opCodes.stloc_0 + opCodes.nop + opCodes.ldloc_0 +
-            opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes._unknown + opCodes.ldc_i4 + opCodes._unknown + opCodes.ceq + opCodes.brfalse_s
-        ) ||
-        validateNetByteCode( // samples by: DotNetPatcher
+            opCodes.ldc_i4 + opCodes.ldc_i4 + opCodes._unknown + opCodes.ldc_i4 + opCodes._unknown + opCodes.ceq + opCodes.brfalse_s,
+                // samples by: DotNetPatcher
             opCodes.setStrict(opCodes.stloc_s, "05") + opCodes.nop + opCodes.ldloc_s + opCodes._unknown + opCodes.ceq + opCodes.brfalse_s + opCodes._unknown +
-            opCodes.setStrict(opCodes.stloc_s, "05") + opCodes.nop + opCodes.ldloc_s + opCodes._unknown + opCodes.ceq + opCodes.brfalse_s
-        ) ||
-        validateNetByteCode( // samples by: VMProtect
+            opCodes.setStrict(opCodes.stloc_s, "05") + opCodes.nop + opCodes.ldloc_s + opCodes._unknown + opCodes.ceq + opCodes.brfalse_s,
+                // samples by: VMProtect
             opCodes.ldloc_0 + opCodes.setStrict(opCodes.ldc_i4, "?? ** ** **") + opCodes._unknown + opCodes.stloc_0 +
-            opCodes.ldloc_0 + opCodes.setStrict(opCodes.ldc_i4, "?? ** ** **") + opCodes.xor + opCodes.stloc_0
-        ) ||
-        validateNetByteCode( // samples by: VMProtect
+            opCodes.ldloc_0 + opCodes.setStrict(opCodes.ldc_i4, "?? ** ** **") + opCodes.xor + opCodes.stloc_0,
+                // samples by: VMProtect
             opCodes.setStrict(opCodes.ldc_i4, "?? ** ** **") + opCodes._unknown + opCodes.stloc_0 + opCodes.setStrict(opCodes.ldftn, "** ?? ?? ??")
-        )
+            ];
+        })
     ) {
         log(logType.net, "Control flow obfuscation detected at offset " + lastOffsetDetected);
 
@@ -1114,31 +1102,29 @@ function scanForObfuscations_NET() {
     var isMathInversionsPresent = false;
 
     if (validateNetByteCode(opCodes.ldc_i4 + opCodes.not) && (
-        validateNetByteCode( // ~(-(~(-(~(-(~(-( num ))))))))
+        validateNetByteCodeAny(// ~(-(~(-(~(-(~(-( num ))))))))
             opCodes.ldc_i4 +
             opCodes.not + opCodes.neg + opCodes.not + opCodes.neg +
-            opCodes.not + opCodes.neg + opCodes.not + opCodes.neg
-        ) ||
-        validateNetByteCode( // ~(~(-(-(~(~( num ))))))
+            opCodes.not + opCodes.neg + opCodes.not + opCodes.neg, function () {
+            return [
+                // ~(~(-(-(~(~( num ))))))
             opCodes.ldc_i4 +
             opCodes.not + opCodes.not + opCodes.neg + opCodes.neg +
-            opCodes.not + opCodes.not
-        ) ||
-        validateNetByteCode( // ~(-(~(~(-(-( num ))))))
+            opCodes.not + opCodes.not,
+                // ~(-(~(~(-(-( num ))))))
             opCodes.ldc_i4 +
             opCodes.not + opCodes.neg + opCodes.not + opCodes.not +
-            opCodes.neg + opCodes.neg
-        ) ||
-        validateNetByteCode( // ~(-(~(-(~(~( num ))))))
+            opCodes.neg + opCodes.neg,
+                // ~(-(~(-(~(~( num ))))))
             opCodes.ldc_i4 +
             opCodes.not + opCodes.neg + opCodes.not + opCodes.neg +
-            opCodes.not + opCodes.not
-        ) ||
-        validateNetByteCode( // ~(-(~(-(~(-( num ))))))
+            opCodes.not + opCodes.not,
+                // ~(-(~(-(~(-( num ))))))
             opCodes.ldc_i4 +
             opCodes.not + opCodes.neg + opCodes.not + opCodes.neg +
             opCodes.not + opCodes.neg
-        )
+            ];
+        })
     )) {
         log(logType.net, "Math inversions detected at offset " + lastOffsetDetected);
 
@@ -5852,39 +5838,79 @@ function validateSignature(pattern) {
  * @returns {boolean} True if the byte code is found in any section, otherwise false.
  * @sideEffects Updates `lastOffsetDetected` and writes a log entry on success.
  */
+/**
+ * Evaluate an OR group in its original pattern order. The first alternative
+ * keeps its short-circuit search; remaining expressions are built only after
+ * it fails. Section selection, logs and the verdict stay in this script.
+ */
+function validateNetByteCodeAny(firstPattern, buildRemainingPatterns) {
+    if (validateNetByteCode(firstPattern)) return true;
+    var patterns = buildRemainingPatterns();
+    var scanBytes = 0;
+    for (var i = 0; i < PE_Cached.numberOfSections; i++) {
+        if (isNetByteCodeSectionEligible(i)) scanBytes += Math.max(0, PE.section[i].FileSize);
+    }
+    // Small ranges retain the cheaper single-search short-circuit path.
+    if (typeof PE.findSignatures !== "function" || patterns.length < 2 || scanBytes < 65536) {
+        for (var p = 0; p < patterns.length; p++) {
+            if (validateNetByteCode(patterns[p])) return true;
+        }
+        return false;
+    }
+    var offsets = [];
+    for (var p = 0; p < patterns.length; p++) offsets.push(-1);
+    for (var i = 0; i < PE_Cached.numberOfSections; i++) {
+        if (!isNetByteCodeSectionEligible(i)) continue;
+        var query = [], indices = [];
+        for (var p = 0; p < patterns.length; p++) {
+            if (offsets[p] === -1) { query.push(patterns[p]); indices.push(p); }
+        }
+        var found = PE.findSignatures(PE.section[i].FileOffset, PE.section[i].FileSize, query);
+        if (!found || found.length !== query.length) {
+            for (var p = 0; p < patterns.length; p++) {
+                if (validateNetByteCode(patterns[p])) return true;
+            }
+            return false;
+        }
+        for (var p = 0; p < indices.length; p++) {
+            if (found[p] !== -1) offsets[indices[p]] = found[p];
+        }
+        // No lower-priority pattern can beat the first alternative.
+        if (offsets[0] !== -1) break;
+    }
+    for (var p = 0; p < patterns.length; p++) {
+        if (offsets[p] === -1) continue;
+        lastOffsetDetected = "0x" + Number(offsets[p]).toString(16);
+        log(logType.net, "ByteCode detected: " + patterns[p]);
+        return true;
+    }
+    return false;
+}
+
+function isNetByteCodeSectionEligible(i) {
+    const section = PE.section[i];
+    if (PE_Cached.numberOfSections <= 1) return true;
+    if (section.FileOffset === 0 || section.FileSize === 0) return false;
+    var isDedicatedResourceSection = i === PE_Cached.indexOfResourceSection && section.Name === ".rsrc" &&
+        i !== PE_Cached.indexOfRelocsSection && i !== PE_Cached.indexOfEntryPointSection &&
+        i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection;
+    var isDedicatedRelocsSection = i === PE_Cached.indexOfRelocsSection && section.Name === ".reloc" &&
+        i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection &&
+        i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection;
+    return !isDedicatedResourceSection && !isDedicatedRelocsSection;
+}
+
 function validateNetByteCode(byteCode) {
     for (var i = 0; i < PE_Cached.numberOfSections; i++) {
-        const
-            section = PE.section[i],
-            sectionOffset = section.FileOffset,
-            sectionSize = section.FileSize;
-
-        if (PE_Cached.numberOfSections > 1) {
-            if (sectionOffset === 0 || sectionSize === 0) {
-                continue;
-            }
-
-            var isDedicatedResourceSection = i === PE_Cached.indexOfResourceSection && section.Name === ".rsrc" &&
-                i !== PE_Cached.indexOfRelocsSection && i !== PE_Cached.indexOfEntryPointSection &&
-                i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection;
-
-            var isDedicatedRelocsSection = i === PE_Cached.indexOfRelocsSection && section.Name === ".reloc" &&
-                i !== PE_Cached.indexOfResourceSection && i !== PE_Cached.indexOfEntryPointSection &&
-                i !== PE_Cached.indexOfTlsSection && i !== PE_Cached.indexOfImportsSection;
-
-            if (isDedicatedResourceSection || isDedicatedRelocsSection) {
-                continue;
-            }
-        }
-
-        var offsetFound = PE.findSignature(sectionOffset, sectionSize, byteCode);
+        if (!isNetByteCodeSectionEligible(i)) continue;
+        var section = PE.section[i];
+        var offsetFound = PE.findSignature(section.FileOffset, section.FileSize, byteCode);
         if (offsetFound !== -1) {
             lastOffsetDetected = "0x" + Number(offsetFound).toString(16);
             log(logType.net, "ByteCode detected: " + byteCode);
             return true;
         }
     }
-
     return false;
 }
 
