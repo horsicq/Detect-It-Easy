@@ -1,0 +1,93 @@
+CRT user-entry discovery experiment (archived, not production-ready)
+
+Purpose
+-------
+Find user main() behind a conventional native CRT startup and start the large
+EP control-flow scan there without spending its 512-instruction budget on CRT.
+The companion .js file preserves the exact five experimental helpers removed
+from db/PE/__GenericHeuristicAnalysis_By_DosX.7.sg. It is a code excerpt, not
+a standalone DiE rule. The former call-site integration is preserved as a
+comment at the end of the .js file.
+
+What was built
+--------------
+- getEpImportNameAtSlot(): resolve an exact file-backed IAT slot to its
+  declared function and normalized library name.
+- getEpCrtSafeSseLength(): bounded x86 length decoding for a few SSE forms
+  missing from the DiE decoder. Unknown opcodes remain unknown.
+- isEpCrtCookieReturnProven(): prove bounded return of the entry-stub cookie
+  initializer, admitting only named returning system queries.
+- isEpCrtDirectCallNonreturnProven(): reject a candidate only when a bounded
+  direct callee is proven non-returning.
+- getEpCrtUserEntryCandidate(): recognize a VC-compatible cookie stub, walk
+  the startup CFG, and locate a unique call with argc/argv/envp handoff.
+
+The prototype never made compiler-name or product-name checks. It used
+instruction and PE-structure evidence, with bounded CFG traversal and
+file-backed address validation. No verdict was emitted by discovery itself.
+All files outside the recognized shape fell back to the declared EP.
+
+Observed results
+----------------
+- In the obfusheader.h sample directory supplied on 2026-09-28, discovery
+  found a post-CRT candidate in 42/66 EXEs: all Clang configurations and
+  MSVC release configurations. The other 24 fell back to EP: all 22 GCC
+  configurations and both MSVC debug configurations. This is NOT 42/66
+  verified complete coverage of user code.
+- An instrumented map-oracle run over 652 compiler builds reported correct
+  candidates for 21 mapped VC, 178 mapped Clang, and 36 mapped Rust builds,
+  with no wrong candidate among those mapped builds. GCC and TCC fell back.
+  Four additional Clang roots had no map oracle.
+- Exact Protection-result comparison showed no changes or script errors on
+  84 legacy compiler builds, 568 annual compiler builds, 702 System32 files,
+  and the 66 obfusheader.h samples. A separate installed-EXE comparison
+  covered 4,798 files before the final restrictive IAT lookup change and
+  found no Protection-result changes or errors.
+- Synthetic positives confirmed that an anomaly in main() could be reached
+  where the original EP scan missed it. Synthetic non-returning calls, a
+  dead decoy, malformed imports, and unsupported x86 SSE opcodes exercised
+  the fail-closed paths. These tests did NOT establish that pre-main code
+  was preserved or that arbitrary CRT versions were covered.
+
+Why the one-root integration was removed
+----------------------------------------
+The table-size check for VC C++ initializers was UNSOUND as a no-user-code
+proof. It required two pointer-sized entries in the XC range, but allowed a
+nonzero executable callback. In the supplied MSVC release files this range
+contains [0, nonzero callback]. The scanner then started at main() and did
+not analyze that earlier callback. Allowing the three-entry debug table in
+a scratch build found main(), but its third entry pointed to an additional
+function (e.g. VA 0x140001000 / 0x401000) that also runs before main().
+
+The GCC builds have two TLS callback addresses even in baseline variants.
+The MinGW runtime can invoke dynamic TLS initializers and C++ initializer
+tables before calling main(). Merely removing the TLS guard would reproduce
+the same omission. An exact Protection-result comparison cannot reveal this
+false-negative risk: the current separate obfusheader.h signature still
+prints the same result even when the emulation misses pre-main code.
+
+References:
+- Microsoft CRT initialization and .CRT$XCU callbacks:
+  https://learn.microsoft.com/en-us/cpp/c-runtime-library/crt-initialization
+- MinGW-w64 crtexe.c (_initterm, TLS callback, then _tmain):
+  https://github.com/mirror/mingw-w64/blob/master/mingw-w64-crt/crt/crtexe.c
+
+Conditions for revisiting
+-------------------------
+1. Treat TLS callbacks, C/C++ initializer callbacks, and main() as separate
+   analysis roots with independent bounded budgets and provenance. Do not
+   combine their evidence into one synthetic CFG path or let one root starve
+   another's instruction budget.
+2. Prove the CRT-to-main handoff for each admitted runtime shape. A callback
+   pointer being file-backed does not prove it is CRT-only or harmless.
+3. Preserve analysis of all earlier user-controlled roots. If any reachable
+   callback or handoff is unresolved, fail closed to the declared EP unless
+   a separate scanner can cover that root without inventing reachability.
+4. Validate each admitted compiler/runtime/version/configuration against
+   symbol-map or debugger oracles, plus synthetic negative variants with
+   user code in TLS and initializer tables and large clean/packed corpora.
+5. Never describe a tested corpus percentage as a universal guarantee for
+   every compiler, future CRT, custom entry point, or modified startup.
+
+The independent JMPF and multi-byte NOP corrections were kept in the main
+heuristic. They do not depend on CRT entry discovery.
