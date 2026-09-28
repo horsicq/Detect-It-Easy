@@ -2243,6 +2243,7 @@ function NetOpCodes() {
         if (!opCode || typeof opCode !== "string") {
             _error("Invalid opcode provided.");
         }
+
         if (!value || typeof value !== "string") {
             _error("Invalid value provided.");
         }
@@ -2339,6 +2340,7 @@ function getFileNameWithoutExtension(fileName) {
 
     // Remove the file extension by splitting on the last dot and returning the first part
     var lastDotIndex = fileName.lastIndexOf(".");
+
     if (lastDotIndex === -1) {
         return fileName; // No extension found, return original name
     }
@@ -6379,6 +6381,7 @@ function isTokenObfuscated(token) {
             digitLetterTransitions++;
         }
     }
+
     if (digitLetterTransitions >= 8) return true;
 
     // Product filenames may combine a short name, release year and build number.
@@ -6485,6 +6488,7 @@ function traceEpWrittenCodeTransfer() {
                 }
             }
         }
+
         return undefined;
     }
 
@@ -6763,6 +6767,7 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
                     delete linked[overwrittenRegister];
                     if (!patterns.ByteRead.test(instruction)) delete byteRegisters[overwrittenRegister];
                 }
+
                 if (partialWrite) {
                     var partialKey = getEpPartialRegisterKey(partialWrite[1]);
                     delete kinds[partialKey];
@@ -6784,6 +6789,7 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
         var pebKeys = Object.keys(pebState).sort(), pebStateKey = String();
         for (var k = 0; k < pebKeys.length; k++) pebStateKey += pebKeys[k] + pebState[pebKeys[k]];
         var stateKey = key + ":" + pebProven + ":" + pebStateKey + ":" + stage + ":" + fieldKeys.join(",") + ":" + byteRead + ":" + kindState + ":" + Object.keys(byteRegisters).sort().join(",") + ":" + Object.keys(linked).sort().join(",") + ":" + Object.keys(unsafeTargets).sort().join(",") + ":" + state.Backward;
+
         if (visited[stateKey]) continue;
         visited[stateKey] = true;
 
@@ -6893,6 +6899,7 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
             if (adcBitCount >= 30) return false;
             adcBits[factAddress] = 1 << adcBitCount++;
         }
+
         if (copyAddress === -1 && facts[factAddress].RepMovsb) {
             if (repBitCount >= 30) return false;
             repBits[factAddress] = 1 << repBitCount++;
@@ -6909,11 +6916,15 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
     }
 
     var reverse = [transferAddress];
+
     for (var reverseIndex = 0; reverseIndex < reverse.length; reverseIndex++) {
         var reverseKey = reverse[reverseIndex].toString();
+
         if (canReachTransfer[reverseKey]) continue;
         canReachTransfer[reverseKey] = true;
+
         var previous = predecessors[reverseKey] || [];
+
         for (var p = 0; p < previous.length; p++) reverse.push(previous[p]);
     }
 
@@ -6937,7 +6948,9 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
 
         if (destinationProof && !state.CopySeen) {
             var valueKeys = Object.keys(state.Values).sort();
+
             for (var v = 0; v < valueKeys.length; v++) stateKey += ":" + valueKeys[v] + "=" + state.Values[valueKeys[v]];
+
             if (state.Address === copyAddress && readSeen) {
                 var destination = state.Values[registerKey(destinationProof.Register)];
                 if (!(destination >= destinationProof.Start && destination < destinationProof.End)) continue;
@@ -7694,6 +7707,7 @@ function scanForObfuscations_Native() {
                         var writeBase = syntheticEpKnownAddresses[getNativeRegisterKey(registerWriteAddress[1])];
                         if (writeBase !== undefined) writeAddress = parseInt(writeBase, 0) + (registerWriteAddress[3] ? parseInt(registerWriteAddress[3], 0) * (registerWriteAddress[2] === "-" ? -1 : 1) : 0);
                     }
+
                     if (writeAddress < 0 || writeAddress > epMaximumSafeInteger || !isFinite(writeAddress) || syntheticEpMemoryWrites.length >= 16) syntheticEpUnknownMemoryWrite = true;
                     else syntheticEpMemoryWrites.push({ Start: writeAddress, End: writeAddress + writeSize });
                 }
@@ -7725,6 +7739,7 @@ function scanForObfuscations_Native() {
                         var writtenRange = syntheticEpMemoryWrites[writeIndex];
                         if (writtenRange.Start < stackPivotAddress + stackPivotPointerSize && writtenRange.End > stackPivotAddress) break;
                     }
+
                     if (writeIndex !== syntheticEpMemoryWrites.length) break;
 
                     // Replacing SP invalidates every earlier top-of-stack fact. The new RET target
@@ -8895,6 +8910,7 @@ function scanForObfuscations_Native() {
                     isOverlappingEpCodePresent = true;
                     break;
                 }
+
                 if (overlappingEpDecodedStarts[overlappingEpCurrentAddress.toString()]) break;
 
                 for (var byteIndex = 1; byteIndex < currentEpInstructionLength; byteIndex++) {
@@ -8905,6 +8921,7 @@ function scanForObfuscations_Native() {
                     }
                     overlappingEpDecodedInteriors[(overlappingEpCurrentAddress + byteIndex).toString()] = true;
                 }
+
                 if (isOverlappingEpCodePresent) break;
 
                 overlappingEpInstructionCount++;
@@ -8991,6 +9008,7 @@ function scanForObfuscations_Native() {
             for (var factIndex = 0; factIndex < indirectEpFactKeys.length; factIndex++) {
                 indirectEpStateKey += ":" + indirectEpFactKeys[factIndex] + "=" + indirectEpKnownAddresses[indirectEpFactKeys[factIndex]];
             }
+
             if (indirectEpVisitedStates[indirectEpStateKey]) continue;
             indirectEpVisitedStates[indirectEpStateKey] = true;
 
@@ -9164,6 +9182,7 @@ function scanForObfuscations_Native() {
 
             if (conditionalBranch) {
                 var indirectEpBranchResult = getEpKnownBranchResult(currentEpOpCode, indirectEpState.ZeroFlag, indirectEpState.CarryFlag);
+
                 if (indirectEpBranchResult !== 0) indirectEpSuccessors.push(parseInt(conditionalBranch[2], 0));
                 if (indirectEpBranchResult !== 1) indirectEpSuccessors.push(indirectEpNextAddress);
             } else if (directJump) {
@@ -9587,11 +9606,13 @@ function scanForObfuscations_Native() {
                         epPolymorphismPendingCarryFlags.push(epPolymorphismCurrentCarryFlag);
                     } else {
                         var revisitBranchResult = getEpKnownBranchResult(epPolymorphismOpCode, revisitZeroFlag, revisitCarryFlag);
+
                         if (revisitBranchResult !== 0) {
                             epPolymorphismPendingAddresses.push(revisitTargetAddress);
                             epPolymorphismPendingZeroFlags.push(revisitZeroFlag);
                             epPolymorphismPendingCarryFlags.push(revisitCarryFlag);
                         }
+
                         if (epPolymorphismOpCode !== "JMP" && epPolymorphismOpCode !== "JMPF" && revisitBranchResult !== 1) {
                             epPolymorphismPendingAddresses.push(revisitNextAddress);
                             epPolymorphismPendingZeroFlags.push(revisitZeroFlag);
@@ -10030,6 +10051,7 @@ function scanForObfuscations_Native() {
                         epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
                         epPolymorphismPendingCarryFlags.push(epPolymorphismNextCarryFlag);
                     }
+
                     if (epPolymorphismBranchTaken !== 1) {
                         epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
                         epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
@@ -10053,6 +10075,7 @@ function scanForObfuscations_Native() {
             var epInvalidBranchPendingAddresses = epBitstreamStartAddresses.slice(), epInvalidBranchPendingIndex = 0;
             while (epInvalidBranchPendingIndex < epInvalidBranchPendingAddresses.length) {
                 var reachableAddress = epInvalidBranchPendingAddresses[epInvalidBranchPendingIndex++], reachableKey = reachableAddress.toString();
+
                 if (epInvalidBranchProvenReachable[reachableKey] || !epBitstreamSuccessors.hasOwnProperty(reachableKey)) continue;
                 epInvalidBranchProvenReachable[reachableKey] = true;
                 var reachableSuccessors = epBitstreamSuccessors[reachableKey];
@@ -11134,6 +11157,7 @@ function scanForObfuscations_Native() {
     }
 
     var isRepBitstreamCopyPresent = false;
+
     if (PE_Cached.isEntryPointAnalysisAllowed && epBitstreamAdcCount >= 8 && epBitstreamMovsbCount >= 2 && epBitstreamIndirectTransferPresent) {
         for (var i = 0; i < epBitstreamIndirectTransferAddresses.length && !isRepBitstreamCopyPresent; i++) {
             isRepBitstreamCopyPresent = isEpBitstreamPathProven(epBitstreamStartAddresses,
@@ -11791,6 +11815,7 @@ function scanForObfuscations_Native() {
                                 protectedStartupPendingZeroFlags.push(protectedStartupNextZeroFlag);
                                 protectedStartupPendingCarryFlags.push(protectedStartupNextCarryFlag);
                             }
+
                             if (protectedStartupBranchTaken !== 1) {
                                 protectedStartupPendingAddresses.push(protectedStartupNextAddress);
                                 protectedStartupPendingZeroFlags.push(protectedStartupNextZeroFlag);
@@ -12487,6 +12512,7 @@ function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
                 for (var i = 0; i < nodes[key].Successors.length; i++) {
                     if (!proven[nodes[key].Successors[i].toString()]) allTerminal = false;
                 }
+
                 if (allTerminal) proven[key] = true;
             }
         }
@@ -12670,6 +12696,7 @@ function getEpGuardedFlowEvidence() {
         visited[key] = true;
 
         var instruction = PE.getDisasmString(address), length = PE.getDisasmLength(address), opCode = getAsmOpCode(instruction);
+
         if (!opCode || length < 1 || length > 15 || !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
         processed++;
 
@@ -12731,6 +12758,7 @@ function getEpGuardedFlowEvidence() {
             next.StackTarget = undefined;
         } else if (rip || absolute || based || native || nativeOp || copy) {
             var targetRegister = getNativeRegisterKey((rip || absolute || based || native || nativeOp || copy)[1 + (nativeOp ? 1 : 0)]), target;
+
             if (rip) target = address + length + (rip[2] === "-" ? -1 : 1) * parseInt(rip[3], 0);
             else if (absolute) target = parseInt(absolute[2], 0);
             else if (based && next.Known[getNativeRegisterKey(based[2])]) target = next.Known[getNativeRegisterKey(based[2])].Value +
@@ -12782,6 +12810,7 @@ function getEpGuardedFlowEvidence() {
                 isVirtualAddressRangeFileBacked(branchTarget, 1, SECTION_FLAGS_EXECUTE)) {
                 evidence.OpaqueBranchAddress = address;
             }
+
             if (opCode !== "JMP" && outcome !== 1) pending.push(next);
             if (outcome !== 0 && isVirtualAddressRangeFileBacked(branchTarget, 1, SECTION_FLAGS_EXECUTE)) {
                 var taken = { Address: branchTarget, Known: next.Known, Flags: next.Flags, StackTarget: next.StackTarget };
@@ -12793,6 +12822,7 @@ function getEpGuardedFlowEvidence() {
             // loses its old constant, while any unmodeled memory write loses the
             // proven top-of-stack target without inventing a replacement value.
             var writtenRegister = instruction.match(/^(?:MOV|MOVABS|MOVSX|MOVSXD|MOVZX|LEA|CMOV[A-Z]+|POP) ([A-Z][A-Z0-9]*)(?:,|$)/);
+
             if (writtenRegister) delete next.Known[getNativeRegisterKey(writtenRegister[1])];
             if (opCode === "POP" || !writtenRegister || writtenRegister[1] === "ESP" || writtenRegister[1] === "RSP") next.StackTarget = undefined;
         } else if (/^(?:NOP|FNOP|PAUSE)$/.test(opCode)) {
@@ -13422,6 +13452,7 @@ function getNameOfMangledItem(itemPattern) {
                             continue;
                         }
                     }
+
                     // If directly followed by digit, skip stdlib type
                     if (/^\d/.test(afterStdlib)) {
                         pos += 2;
