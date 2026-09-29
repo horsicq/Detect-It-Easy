@@ -172,8 +172,6 @@ rule Anomaly__SectionNameEmpty {
 
 rule Anomaly__SectionNameNonPrintable {
 	// Non-printable characters in section names indicate hand-crafting
-	strings:
-		$np = /[\x01-\x1f\x7f-\xff]{1}/ // at least one non-printable
 	condition:
 		IsPE and
 		for any i in (0..pe.number_of_sections - 1) : (
@@ -363,7 +361,7 @@ rule Anomaly__LargeOverlay {
 		IsPE and
 		pe.number_of_sections > 0 and
 		pe.overlay.offset > 0 and
-		pe.overlay.size > filesize / 2
+		pe.overlay.size > filesize \ 2
 }
 
 rule Anomaly__OverlayPresent {
@@ -463,7 +461,7 @@ rule Anomaly__ResourceDominatedBinary {
 		pe.characteristics & 0x2000 == 0 and  // not DLL
 		for any i in (0..pe.number_of_sections - 1) : (
 			pe.sections[i].name == ".rsrc" and
-			pe.sections[i].raw_data_size > filesize * 9 / 10
+			pe.sections[i].raw_data_size > filesize * 9 \ 10
 		)
 }
 
