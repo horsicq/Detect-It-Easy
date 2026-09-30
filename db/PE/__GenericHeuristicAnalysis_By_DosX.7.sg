@@ -8664,6 +8664,7 @@ function scanForObfuscations_Native() {
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isI386 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         var isFpuEnvironmentStored = false,
+            hasFpuInstructionPointerSource = false,
             fpuEpNeutralInstructionCount = 0,
             fpuEpCurrentAddress = PE_Cached.addressOfUnmanagedEntryPoint;
 
@@ -8682,19 +8683,27 @@ function scanForObfuscations_Native() {
                 // Match the two exact encodings of FNSTENV [ESP-0xC] without depending on
                 // textual x87 decoding, then advance over the complete instruction atomically.
                 storesRawFpuEnvironmentAtStack = currentEpOffset !== -1 && (PE.compare("D9 74 24 F4", currentEpOffset) || PE.compare("D9 B4 24 F4 FF FF FF", currentEpOffset)),
-                isRawFpuNop = currentEpOffset !== -1 && PE.compare("D9 D0", currentEpOffset);
+                isRawFpuNop = currentEpOffset !== -1 && PE.compare("D9 D0", currentEpOffset),
+                fpuOpcodeByte = currentEpOffset !== -1 ? PE.readByte(currentEpOffset) : -1,
+                fpuSecondByte = (fpuOpcodeByte === 0xD8 || fpuOpcodeByte === 0xD9) &&
+                    isVirtualAddressRangeFileBacked(fpuEpCurrentAddress, 2, SECTION_FLAGS_EXECUTE) ? PE.readByte(currentEpOffset + 1) : -1,
+                isRawFpuSource = (fpuOpcodeByte === 0xD9 && fpuSecondByte >= 0xE8 && fpuSecondByte <= 0xEE) ||
+                    (fpuOpcodeByte === 0xD8 && fpuSecondByte >= 0xC0);
 
             if (!currentEpOpCode || currentEpInstructionLength <= 0) break; // Safety check
 
             if (storesRawFpuEnvironmentAtStack) {
                 // Override the decoded length with the exact short or long raw encoding.
                 currentEpInstructionLength = PE.compare("D9 74 24 F4", currentEpOffset) ? 4 : 7;
-            } else if (isRawFpuNop) {
-                // Treat FNOP bytes atomically even when their textual decoding differs.
+            } else if (isRawFpuNop || isRawFpuSource) {
+                // Some DiE builds render these complete x87 instructions as separate bytes.
                 currentEpInstructionLength = 2;
             }
 
             var storesFpuEnvironmentAtStack = /^(?:FSTENV|FNSTENV) (?:(?:BYTE|WORD|DWORD|QWORD|TBYTE|FWORD) PTR )?\[ESP ?- ?(?:0X0*C|12)\]$/i.test(currentEpInstruction),
+                isFpuInstructionPointerSource = isRawFpuNop || isRawFpuSource || (fpuOpcodeByte >= 0xD8 && fpuOpcodeByte <= 0xDF &&
+                    /^F[A-Z0-9]+$/.test(currentEpOpCode) &&
+                    !/^(?:F(?:N)?(?:INIT|CLEX|STCW|STSW|STENV|SAVE)|FLDCW|FLDENV|FRSTOR)$/.test(currentEpOpCode)),
                 popsNativeRegister = /^POP E(?:AX|BX|CX|DX|SI|DI|BP)$/i.test(currentEpInstruction),
                 registerWrite = currentEpInstruction.match(epFlagsNeutralRegisterWritePattern) ||
                     currentEpInstruction.match(epTrackedRegisterWritePattern),
@@ -8702,9 +8711,13 @@ function scanForObfuscations_Native() {
                     currentEpOpCode === "PAUSE" || epSimplePolymorphicInstructionPattern.test(currentEpInstruction) ||
                     (registerWrite && currentEpOpCode !== "POP") || /^(?:CMP|TEST)$/.test(currentEpOpCode);
 
+            if (/^(?:FINIT|FNINIT|FLDENV|FRSTOR)$/.test(currentEpOpCode)) hasFpuInstructionPointerSource = false;
+            else if (isFpuInstructionPointerSource) hasFpuInstructionPointerSource = true;
+
             if (storesFpuEnvironmentAtStack || storesRawFpuEnvironmentAtStack) {
-                // Remember that the current stack top now contains the saved x87 EIP field.
-                isFpuEnvironmentStored = true;
+                // FNSTENV preserves the previous x87 FIP; without a reachable x87 source,
+                // its saved pointer cannot be attributed to this entry-point code.
+                isFpuEnvironmentStored = hasFpuInstructionPointerSource;
                 fpuEpNeutralInstructionCount = 0;
             } else if (popsNativeRegister && isFpuEnvironmentStored) {
                 // A native-width POP consumes the saved EIP and completes the recovery idiom.
