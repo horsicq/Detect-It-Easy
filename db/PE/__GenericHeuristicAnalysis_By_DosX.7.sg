@@ -12836,7 +12836,13 @@ function getEpGuardedFlowEvidence() {
             // proven top-of-stack target without inventing a replacement value.
             var writtenRegister = instruction.match(/^(?:MOV|MOVABS|MOVSX|MOVSXD|MOVZX|LEA|CMOV[A-Z]+|POP) ([A-Z][A-Z0-9]*)(?:,|$)/);
 
-            if (writtenRegister) delete next.Known[getNativeRegisterKey(writtenRegister[1])];
+            if (writtenRegister) {
+                var writtenRegisterName = writtenRegister[1],
+                    writtenRegisterKey = /^(?:[ABCD][HLX]|(?:SI|DI|BP|SP)L?|R(?:8|9|1[0-5])[BW])$/.test(writtenRegisterName) ?
+                        getEpPartialRegisterKey(writtenRegisterName) : getNativeRegisterKey(writtenRegisterName);
+
+                delete next.Known[writtenRegisterKey];
+            }
             if (opCode === "POP" || !writtenRegister || writtenRegister[1] === "ESP" || writtenRegister[1] === "RSP") next.StackTarget = undefined;
         } else if (/^(?:NOP|FNOP|PAUSE)$/.test(opCode)) {
             // Padding changes neither the proven pointer nor the modeled flags.
