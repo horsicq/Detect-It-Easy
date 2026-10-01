@@ -14,7 +14,7 @@ function detect() {
     var rdataSection = PE.section[".rdata"];
 
     if (rdataSection) {
-        var rustModuleOffset = PE.findSignature(rdataSection.FileOffset, Math.min(0x5000, rdataSection.FileSize), "'\\mod.rs'");
+        var rustModuleOffset = PE.findSignature(rdataSection.FileOffset, Math.min(0x5000, rdataSection.FileSize), "'mod.rs'"); // \mods.rs || /mod.rs
 
         if (rustModuleOffset !== -1) {
             var rdataSectionEndOffset = rdataSection.FileOffset + rdataSection.FileSize,
@@ -36,6 +36,18 @@ function detect() {
 
             if (i === 7) bDetected = true;
         }
+    }
+
+    if (!bDetected) {
+        if (PE.isLibraryPresentExp(/^std-[0-9a-fA-F]{8,16}(\.dll)?$/) || PE.isFunctionPresent("__rust_dealloc")) {
+            bDetected = true;
+
+            _setResult("library", "Rust Runtime", String(), "dynamic");
+        }
+    }
+
+    if (bDetected && PE.isRichSignaturePresent() && PE.compareEP(PE.is64() ? "4883EC28" : "83EC28")) { // sub eax/rsp, 0x28
+        sOptions = "MSVC";
     }
 
     sLang = "Rust";
