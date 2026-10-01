@@ -14,9 +14,10 @@ function detect() {
     var rdataSection = PE.section[".rdata"];
 
     if (rdataSection) {
-        var rustModuleOffset = PE.findSignature(rdataSection.FileOffset, Math.min(0x5000, rdataSection.FileSize), "'mod.rs'"); // \mods.rs || /mod.rs
+        var rustModuleOffset = PE.findSignature(rdataSection.FileOffset, Math.min(0x5000, rdataSection.FileSize), "'mod.rs'"),
+            rustSourceAnchorSeparator = rustModuleOffset !== -1 ? PE.readByte(rustModuleOffset - 1) : undefined;
 
-        if (rustModuleOffset !== -1) {
+        if (rustModuleOffset !== -1 && (rustSourceAnchorSeparator === 0x5C || rustSourceAnchorSeparator === 0x2F)) { // 0x5C = '\', 0x2F = '/'
             var rdataSectionEndOffset = rdataSection.FileOffset + rdataSection.FileSize,
                 currentSearchOffset = rustModuleOffset,
                 rustSourcePathPattern = "%% %% %% %% %% %% %% %% %% %% %% '.rs' 00",
