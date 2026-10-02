@@ -14502,6 +14502,15 @@ function verifyEncryptedPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, k
  * @returns {string} Detected algorithm label, or an empty string.
  */
 function scanBufferForEncryptedPe(dataBuffer, bufferSize) {
+    // Check if the native function is present
+    if (typeof PE !== "undefined" && typeof PE.scanBufferForEncryptedPe === "function") {
+        return PE.scanBufferForEncryptedPe(dataBuffer, bufferSize);
+    }
+    if (typeof Binary !== "undefined" && typeof Binary.scanBufferForEncryptedPe === "function") {
+        return Binary.scanBufferForEncryptedPe(dataBuffer, bufferSize);
+    }
+
+    // Fallback: Old implementation in JavaScript
     const maxSearchIndex = bufferSize - 0x100;
 
     for (var offset = 0; offset < maxSearchIndex; offset++) {
@@ -16492,7 +16501,17 @@ function scanForMaliciousCode_NET_and_Native() {
 
         if (encryptedPeScanCache[cacheKey] !== undefined) return encryptedPeScanCache[cacheKey];
 
-        const algorithm = scanBufferForEncryptedPe(PE.readBytes(areaOffset, areaSize), areaSize);
+        var algorithm = "";
+
+        // Check if native function is present
+        if (typeof PE !== "undefined" && typeof PE.scanBufferForEncryptedPe === "function") {
+            algorithm = PE.scanBufferForEncryptedPe(areaOffset, areaSize);
+        } else if (typeof Binary !== "undefined" && typeof Binary.scanBufferForEncryptedPe === "function") {
+            algorithm = Binary.scanBufferForEncryptedPe(areaOffset, areaSize);
+        } else {
+            // Old implementation fallback: read bytes and run JavaScript KPA
+            algorithm = scanBufferForEncryptedPe(PE.readBytes(areaOffset, areaSize), areaSize);
+        }
 
         encryptedPeScanCache[cacheKey] = algorithm;
 
