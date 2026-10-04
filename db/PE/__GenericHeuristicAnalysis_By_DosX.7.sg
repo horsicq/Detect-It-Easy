@@ -14608,17 +14608,15 @@ function scanBufferForEncryptedPe(dataBuffer, bufferSize) {
             if (cipherByteKey0 === keyXorM &&
                 dataBuffer[offset + encryptedPeKey1Offsets[keyLength]] === keyXorZ) {
                 if (verifyEncryptedPeSignature(dataBuffer, offset, maxValidLfaNew, keyLength, 0)) return "XOR-XNOR";
-            } else {
-                if (cipherByteKey0 === keyAddM) {
-                    if (dataBuffer[offset + encryptedPeKey1Offsets[keyLength]] === keyAddZ &&
-                        verifyEncryptedPeSignature(dataBuffer, offset, maxValidLfaNew, keyLength, 1)) return "ADD-SUB";
-                } else {
-                    if (cipherByteKey0 === keyRevM) {
-                        if (dataBuffer[offset + encryptedPeKey1Offsets[keyLength]] === keyRevZ &&
-                            verifyEncryptedPeSignature(dataBuffer, offset, maxValidLfaNew, keyLength, 2)) return "SUB-REV";
-                    }
-                }
             }
+
+            // MZ key candidates can coincide across algorithms. A failed full XOR proof
+            // must still allow ADD/SUB and reverse subtraction to validate the header.
+            if (cipherByteKey0 === keyAddM && dataBuffer[offset + encryptedPeKey1Offsets[keyLength]] === keyAddZ &&
+                verifyEncryptedPeSignature(dataBuffer, offset, maxValidLfaNew, keyLength, 1)) return "ADD-SUB";
+
+            if (cipherByteKey0 === keyRevM && dataBuffer[offset + encryptedPeKey1Offsets[keyLength]] === keyRevZ &&
+                verifyEncryptedPeSignature(dataBuffer, offset, maxValidLfaNew, keyLength, 2)) return "SUB-REV";
         }
     }
 
