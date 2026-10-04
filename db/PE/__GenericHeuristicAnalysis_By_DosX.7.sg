@@ -13915,8 +13915,13 @@ function isVirtualAddressRangeFileBacked(address, size, requiredSectionFlags) {
  * @returns {boolean} True if the declared CLR directory has non-zero RVA and size; otherwise false.
  */
 function isNetMetaDataPresent() {
+    if (PE_Cached.fileSize < 0x40) return false;
+
     var optHeaderOffset = getOptHeaderOffset();
 
+    if (optHeaderOffset < 24 || optHeaderOffset >= PE_Cached.fileSize) return false;
+
+    var optHeaderEnd = Math.min(optHeaderOffset + PE.readWord(optHeaderOffset - 4), PE_Cached.fileSize);
     var numRvaAndSizesOffset, clrDirOffset;
 
     if (!PE_Cached.is64bit) {
@@ -13927,14 +13932,14 @@ function isNetMetaDataPresent() {
         clrDirOffset = optHeaderOffset + 0xE0; // CLR offset for PE64
     }
 
-    // Check if the offsets are within the bounds of the PE file size
-    if (clrDirOffset + 8 > PE_Cached.fileSize ||
-        numRvaAndSizesOffset + 4 > PE_Cached.fileSize) {
+    // Section headers may follow a short Optional Header at these same physical offsets.
+    // Only bytes inside the declared Optional Header can supply CLR directory evidence.
+    if (clrDirOffset + 8 > optHeaderEnd || numRvaAndSizesOffset + 4 > optHeaderEnd) {
         return false;
     }
 
     // Check if the number of RVA and sizes is valid
-    if (PE.read_int32(numRvaAndSizesOffset) < 15) {
+    if (PE.read_uint32(numRvaAndSizesOffset) < 15) {
         return false;
     }
 
