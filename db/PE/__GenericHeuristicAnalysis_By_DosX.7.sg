@@ -5676,38 +5676,42 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
     var isPdbFullPathPresent = false;
 
     var numberOfDebugDataRecords = PE.getNumberOfDebugDataRecords(),
-        pdbExtensionPatternOffset = -1,
+        pdbPathBeginOffset = -1,
         pdbDebugDataOffset = 0,
         pdbDebugDataSize = 0;
 
-    // A PDB path is part of a Debug Directory record. Restricting the search to
-    // these records avoids both unrelated `.pdb` strings and a full image scan.
-    for (var i = 0; i < numberOfDebugDataRecords && pdbExtensionPatternOffset === -1; i++) {
+    // CodeView stores the path after its fixed header; its extension and case are unrestricted.
+    // https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/Object/CVDebugRecord.h
+    for (var i = 0; i < numberOfDebugDataRecords; i++) {
         var currentDebugDataOffset = PE.getDebugDataOffset(i),
             currentDebugDataSize = PE.getDebugDataSize(i);
 
         if (PE.getDebugDataType(i) === "CODEVIEW" && currentDebugDataOffset > 0 &&
-            currentDebugDataSize > 6 && currentDebugDataOffset < PE_Cached.fileSize) {
-            currentDebugDataSize = Math.min(currentDebugDataSize, PE_Cached.fileSize - currentDebugDataOffset);
-            pdbExtensionPatternOffset = PE.findSignature(currentDebugDataOffset, currentDebugDataSize, "%% %% %% '.pdb' 00");
+            currentDebugDataSize > 16 && currentDebugDataSize <= PE_Cached.fileSize - currentDebugDataOffset) {
+            var codeViewHeaderSize = PE.compare("'RSDS'", currentDebugDataOffset) ? 24 : PE.compare("'NB10'", currentDebugDataOffset) ? 16 : 0;
 
-            if (pdbExtensionPatternOffset !== -1) {
-                pdbDebugDataOffset = currentDebugDataOffset;
-                pdbDebugDataSize = currentDebugDataSize;
+            // Require a complete header and a terminator inside this record, not in adjacent data.
+            if (codeViewHeaderSize && currentDebugDataSize > codeViewHeaderSize &&
+                PE.findSignature(currentDebugDataOffset + codeViewHeaderSize, currentDebugDataSize - codeViewHeaderSize, "00") !== -1) {
+                var candidatePdbPathOffset = currentDebugDataOffset + codeViewHeaderSize,
+                    candidatePdbPath = PE.getString(candidatePdbPathOffset, Math.min(256, currentDebugDataSize - codeViewHeaderSize)),
+                    isCandidatePdbAbsolute = /^(?:\/|[a-zA-Z]:[\\/]|\\\\[^\\]+\\[^\\]+\\)/.test(candidatePdbPath);
+
+                // Native-image records may precede the original record; retain an absolute path if either has one.
+                if (pdbPathBeginOffset === -1 || isCandidatePdbAbsolute) {
+                    pdbPathBeginOffset = candidatePdbPathOffset;
+                    pdbDebugDataOffset = currentDebugDataOffset;
+                    pdbDebugDataSize = currentDebugDataSize;
+                }
+
+                if (isCandidatePdbAbsolute) break;
             }
         }
     }
 
-    var pdbPathBeginOffset = pdbDebugDataOffset,
-        pdbPath = String();
+    var pdbPath = String();
 
-    if (pdbExtensionPatternOffset !== -1) {
-        for (var i = pdbExtensionPatternOffset; i > pdbDebugDataOffset && pdbPathBeginOffset === pdbDebugDataOffset; i--) {
-            if (PE.readByte(i) === 0x00) {
-                pdbPathBeginOffset = i + 1;
-            }
-        }
-
+    if (pdbPathBeginOffset !== -1) {
         var pdbPathMaxSize = Math.min(256, pdbDebugDataOffset + pdbDebugDataSize - pdbPathBeginOffset);
         pdbPath = File.cleanString(PE.getString(pdbPathBeginOffset, pdbPathMaxSize));
 
@@ -5721,7 +5725,8 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
         pdbPath = pdbPath.replace(/[\n\r]/g, String());
 
-        if (pdbPath.match(/^(?:[a-zA-Z]:[\\/]|\\\\[^\\]+\\[^\\]+\\)/) !== null) {
+        // A leading slash denotes a POSIX absolute path, including paths remapped by the build.
+        if (pdbPath.match(/^(?:\/|[a-zA-Z]:[\\/]|\\\\[^\\]+\\[^\\]+\\)/) !== null) {
             log(logType.any, "PDB absolute path: \"" + pdbPath + "\"");
 
             isPdbFullPathPresent = true;
