@@ -6857,14 +6857,31 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
             }
 
             if (transform) {
-                var hashRegister = registerKey(transform[2]), hashOperand = instruction.substring(instruction.indexOf(", ") + 2),
-                    hashSource = /^[A-Z][A-Z0-9]*$/i.test(hashOperand) ? registerKey(hashOperand) : String(),
-                    isZeroing = /^(?:XOR|SUB) ([A-Z][A-Z0-9]*), \1$/i.test(instruction);
+                var hashRegister = registerKey(transform[2]), hashOperands = instruction.substring(instruction.indexOf(", ") + 2).split(", "),
+                    hashOperand = hashOperands[0], hashSource = /^[A-Z][A-Z0-9]*$/i.test(hashOperand) ? registerKey(hashOperand) : String(),
+                    isReplacingMultiply = transform[1] === "IMUL" && hashOperands.length === 2,
+                    hashImmediateText = isReplacingMultiply ? hashOperands[1] : hashOperand,
+                    hashImmediate = /^(?:-?0X[0-9A-F]+|-?[0-9]+)$/i.test(hashImmediateText) ? parseInt(hashImmediateText, 0) : undefined,
+                    isZeroing = /^(?:XOR|SUB) ([A-Z][A-Z0-9]*), \1$/i.test(instruction) || (transform[1] === "IMUL" && hashImmediate === 0),
+                    isIdentity = /^(?:ADD|SUB|XOR)$/.test(transform[1]) && hashImmediate === 0 ||
+                        transform[1] === "IMUL" && hashImmediate === 1 ||
+                        /^(?:ROR|ROL)$/.test(transform[1]) && hashImmediate !== undefined && (hashImmediate & (/^R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])$/.test(transform[2]) ? 63 : 31)) === 0;
+
+                // Three-operand IMUL replaces the destination with source * immediate.
+                if (isReplacingMultiply && hashSource !== hashRegister) {
+                    kinds[hashRegister] = {};
+                    if (kinds[hashSource]) for (var kind in kinds[hashSource]) kinds[hashRegister][kind] = true;
+                    if (byteRegisters[hashSource]) byteRegisters[hashRegister] = true;
+                    else delete byteRegisters[hashRegister];
+                    if (linked[hashSource]) linked[hashRegister] = true;
+                    else delete linked[hashRegister];
+                }
+
                 if (!kinds[hashRegister] || isZeroing) kinds[hashRegister] = {};
                 if (isZeroing) {
                     delete byteRegisters[hashRegister];
                     delete linked[hashRegister];
-                } else {
+                } else if (!isIdentity) {
                     if (byteRegisters[hashRegister] || byteRegisters[hashSource]) {
                         byteRegisters[hashRegister] = true;
                         linked[hashRegister] = true;
