@@ -6588,7 +6588,11 @@ function traceEpWrittenCodeTransfer() {
         // A write matters only when a reachable instruction still differs from the file.
         for (var i = 0; i < writtenRanges.length; i++) {
             var range = writtenRanges[i];
-            if (target >= range.Address && target < range.Address + range.Size) {
+            var targetLength = target < range.Address && range.Address - target < 15 ? PE.getDisasmLength(target) : 0;
+
+            // An instruction is rewritten when its operand bytes change, too.
+            if (target < range.Address + range.Size && (target >= range.Address ||
+                (targetLength > range.Address - target && isVirtualAddressRangeFileBacked(target, targetLength, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)))) {
                 for (var address = target; address < range.Address + range.Size;) {
                     var length = PE.getDisasmLength(address), opCode = getAsmOpCode(PE.getDisasmString(address));
 
