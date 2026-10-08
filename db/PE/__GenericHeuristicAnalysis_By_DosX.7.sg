@@ -5758,6 +5758,59 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
 
 
+    // Type 17 declares an embedded Portable PDB; an RSDS path can coexist with it.
+
+    var isEmbeddedPdbPresent = false;
+
+    // https://github.com/dotnet/runtime/blob/main/docs/design/specs/PE-COFF.md#embedded-portable-pdb-debug-directory-entry-type-17
+
+    var embeddedPdbOptionalHeaderOffset = PE_Cached.fileSize >= 0x40 ? getOptHeaderOffset() : -1;
+
+    if (embeddedPdbOptionalHeaderOffset >= 24 && embeddedPdbOptionalHeaderOffset <= PE_Cached.fileSize - 2) {
+        var embeddedPdbOptionalHeaderSize = PE.readWord(embeddedPdbOptionalHeaderOffset - 4),
+            embeddedPdbOptionalHeaderMagic = PE.readWord(embeddedPdbOptionalHeaderOffset),
+            embeddedPdbDirectoryStart = embeddedPdbOptionalHeaderMagic === 0x20B ? 0x70 : 0x60;
+
+        if ((embeddedPdbOptionalHeaderMagic === 0x10B || embeddedPdbOptionalHeaderMagic === 0x20B) &&
+            embeddedPdbOptionalHeaderSize >= embeddedPdbDirectoryStart + 56 && embeddedPdbOptionalHeaderOffset + embeddedPdbOptionalHeaderSize <= PE_Cached.fileSize &&
+            PE.read_uint32(embeddedPdbOptionalHeaderOffset + embeddedPdbDirectoryStart - 4) > 6) {
+            var embeddedPdbDirectoryEntryOffset = embeddedPdbOptionalHeaderOffset + embeddedPdbDirectoryStart + 48,
+                embeddedPdbDirectoryRva = PE.read_uint32(embeddedPdbDirectoryEntryOffset),
+                embeddedPdbDirectorySize = PE.read_uint32(embeddedPdbDirectoryEntryOffset + 4),
+                embeddedPdbDirectoryAddress = PE_Cached.imageBase + embeddedPdbDirectoryRva;
+
+            if (embeddedPdbDirectoryRva !== 0 && embeddedPdbDirectorySize >= 28 && embeddedPdbDirectorySize % 28 === 0 &&
+                isVirtualAddressRangeFileBacked(embeddedPdbDirectoryAddress, embeddedPdbDirectorySize, 0)) {
+                for (var i = 0; i < embeddedPdbDirectorySize && !isEmbeddedPdbPresent; i += 28) {
+                    var embeddedPdbRecordOffset = PE.VAToOffset(embeddedPdbDirectoryAddress + i);
+
+                    if (PE.read_uint32(embeddedPdbRecordOffset + 12) !== 17 || PE.read_uint32(embeddedPdbRecordOffset) !== 0 ||
+                        PE.read_uint32(embeddedPdbRecordOffset + 4) !== 0 || PE.readWord(embeddedPdbRecordOffset + 10) !== 0x100) continue;
+
+                    var embeddedPdbDataSize = PE.read_uint32(embeddedPdbRecordOffset + 16),
+                        embeddedPdbDataOffset = PE.read_uint32(embeddedPdbRecordOffset + 24);
+
+                    if (embeddedPdbDataSize <= 8 || embeddedPdbDataOffset <= 0 || embeddedPdbDataOffset > PE_Cached.fileSize - embeddedPdbDataSize) continue;
+                    if (!PE.compare("'MPDB'", embeddedPdbDataOffset)) continue;
+
+                    var embeddedPdbUncompressedSize = PE.read_uint32(embeddedPdbDataOffset + 4);
+
+                    // The high bit is reserved for a future format; no decompression or integrity claim is made here.
+                    if (embeddedPdbUncompressedSize === 0 || embeddedPdbUncompressedSize >= 0x80000000) continue;
+
+                    log(logType.net, "Embedded Portable PDB: " + embeddedPdbDataSize + " bytes, uncompressed size " + embeddedPdbUncompressedSize);
+
+                    isEmbeddedPdbPresent = true;
+                }
+            }
+        }
+    }
+
+    if (isEmbeddedPdbPresent) options = addOption(options, "Embedded PDB (release)");
+
+
+
+
     // Check for Costura.Fody embedded PDB. It is a .NET tool (library) that embeds DLL builds into the main assembly.
 
     var isCosturaEmbeddedDebugData = false;
