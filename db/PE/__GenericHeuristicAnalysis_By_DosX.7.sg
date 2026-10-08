@@ -7786,8 +7786,8 @@ function scanForObfuscations_Native() {
         // currently proven to occupy the top stack slot. RET matches only the latter.
 
         // Branches fork independent register and stack proofs; no facts merge at a join.
-        // Direct jumps retain one state, while both Jcc successors consume the same budget.
-        var syntheticEpPendingPaths = [{ Address: -1, TargetAddress: String(), TargetType: String(), KnownAddresses: {}, MemoryWrites: [], UnknownMemoryWrite: false, NeutralCount: 0, Visited: {} }],
+        // Direct jumps retain one state; only feasible Jcc successors consume the shared budget.
+        var syntheticEpPendingPaths = [{ ZeroFlag: -1, CarryFlag: -1, Address: -1, TargetAddress: String(), TargetType: String(), KnownAddresses: {}, MemoryWrites: [], UnknownMemoryWrite: false, NeutralCount: 0, Visited: {} }],
             syntheticEpInstructionBudget = 0;
 
         for (var pathIndex = 0; pathIndex < syntheticEpPendingPaths.length && pathIndex < 8 && !isSyntheticEpTransferPresent; pathIndex++) {
@@ -7800,6 +7800,8 @@ function scanForObfuscations_Native() {
             var syntheticEpMemoryWrites = syntheticEpPath.MemoryWrites,
                 syntheticEpUnknownMemoryWrite = syntheticEpPath.UnknownMemoryWrite;
             syntheticEpNeutralInstructionCount = syntheticEpPath.NeutralCount;
+
+            var syntheticEpZeroFlag = syntheticEpPath.ZeroFlag, syntheticEpCarryFlag = syntheticEpPath.CarryFlag;
 
             for (var i = 0; i < 512 && syntheticEpInstructionBudget < 512 && !isSyntheticEpTransferPresent; i++) {
                 var currentEpInstruction = syntheticEpFollowAddress === -1 ? emulateAndGetAsmInstructionByIndex(i) :
@@ -7814,6 +7816,9 @@ function scanForObfuscations_Native() {
 
                 syntheticEpVisitedAddresses[currentEpAddress] = true;
                 syntheticEpInstructionBudget++;
+                // Each path carries only directly proven flag facts; unknown outcomes still fork.
+                syntheticEpZeroFlag = advanceEpZeroFlag(currentEpInstruction, currentEpOpCode, syntheticEpZeroFlag);
+                syntheticEpCarryFlag = advanceEpCarryFlag(currentEpInstruction, currentEpOpCode, syntheticEpCarryFlag);
 
                 // Extract only register forms whose value can be followed without emulation.
                 var registerLiteralAddress = currentEpInstruction.match(syntheticEpRegisterLiteralAddressPattern),
@@ -8031,20 +8036,25 @@ function scanForObfuscations_Native() {
                     // Remove only the overwritten register instead of discarding all provenance.
                     delete syntheticEpKnownAddresses[getNativeRegisterKey(registerWrite[1])];
                 } else if (conditionalBranch) {
-                    var branchTarget = parseInt(conditionalBranch[2], 0);
+                    var branchTarget = parseInt(conditionalBranch[2], 0),
+                        syntheticEpBranchResult = getEpKnownBranchResult(currentEpOpCode, syntheticEpZeroFlag, syntheticEpCarryFlag);
 
-                    if (syntheticEpPendingPaths.length < 8 && !syntheticEpVisitedAddresses[branchTarget] &&
+                    if (syntheticEpBranchResult !== 0 && syntheticEpPendingPaths.length < 8 && !syntheticEpVisitedAddresses[branchTarget] &&
                         isVirtualAddressRangeFileBacked(branchTarget, 1, SECTION_FLAGS_EXECUTE)) {
                         var branchAddresses = {}, branchVisited = {};
                         for (var register in syntheticEpKnownAddresses) branchAddresses[register] = syntheticEpKnownAddresses[register];
                         for (var address in syntheticEpVisitedAddresses) branchVisited[address] = true;
                         syntheticEpPendingPaths.push({
+                            ZeroFlag: syntheticEpZeroFlag, CarryFlag: syntheticEpCarryFlag,
                             Address: branchTarget, TargetAddress: syntheticEpTargetAddress,
                             TargetType: syntheticEpTargetType, KnownAddresses: branchAddresses,
                             MemoryWrites: syntheticEpMemoryWrites.slice(), UnknownMemoryWrite: syntheticEpUnknownMemoryWrite,
                             NeutralCount: syntheticEpNeutralInstructionCount, Visited: branchVisited
                         });
                     }
+
+                    // A proven taken branch has no executable physical fall-through.
+                    if (syntheticEpBranchResult === 1) break;
                 } else if (/^(?:CMP|TEST)$/.test(currentEpOpCode)) {
                     // Comparisons preserve all register and stack facts on this path.
                 } else if (currentEpOpCode === "JMP") {
