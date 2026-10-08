@@ -6693,12 +6693,17 @@ function traceEpWrittenCodeTransfer() {
         } else if ((match = instruction.match(comparePattern))) {
             var comparedValue = registers[registerKey(match[1])];
 
+            // Provenance aliases share storage, but a dword comparison ignores the upper half.
+            if (comparedValue !== undefined && /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(match[1])) comparedValue = comparedValue >>> 0;
+
             if (PE_Cached.is64bit && /^R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])$/i.test(match[1]) &&
                 parseInt(match[2], 0) > 0x7FFFFFFF) break;
 
             zeroFlag = comparedValue === undefined ? undefined : comparedValue === parseInt(match[2], 0);
         } else if ((match = instruction.match(testPattern))) {
             var testedValue = registers[registerKey(match[1])];
+            if (testedValue !== undefined && /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(match[1])) testedValue = testedValue >>> 0;
+
             zeroFlag = testedValue === undefined ? undefined : testedValue === 0;
         } else if ((match = instruction.match(stackPattern))) {
             if (match[1] === "PUSH") {
