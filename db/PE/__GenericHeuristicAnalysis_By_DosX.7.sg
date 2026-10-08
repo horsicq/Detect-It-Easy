@@ -986,7 +986,8 @@ function scanForObfuscations_NET() {
 
 
 
-    // If in the assembly you can find the second object starting with “<Module>”, then this is a fakeee!
+    // TODO: Check suspicious <Module> suffixes through TypeDef names, not arbitrary strings or backing fields.
+    /*
 
     var isModuleCtorMultiple = false;
 
@@ -997,7 +998,9 @@ function scanForObfuscations_NET() {
             secondCtorSearchSize = PE_Cached.fileSize - PE_Cached.overlaySize - secondCtorSearchOffset,
             secondCtorNameOffset = secondCtorSearchSize > 0 ? PE.findSignature(secondCtorSearchOffset, secondCtorSearchSize, "'<Module>'") : -1;
 
-        if (secondCtorNameOffset !== -1 && PE.readByte(secondCtorNameOffset + 8) !== 0x00) {
+        var secondCtorSuffix = secondCtorNameOffset !== -1 && secondCtorNameOffset + 8 < PE_Cached.fileSize - PE_Cached.overlaySize ? PE.readByte(secondCtorNameOffset + 8) : 0;
+
+        if (secondCtorSuffix > 0 && secondCtorSuffix < 0x80 && !(secondCtorSuffix >= 0x41 && secondCtorSuffix <= 0x5A) && !(secondCtorSuffix >= 0x61 && secondCtorSuffix <= 0x7A)) {
             log(logType.net, "Fake <Module> detected at offset 0x" + Number(secondCtorNameOffset).toString(16));
 
             isModuleCtorMultiple = true;
@@ -1005,19 +1008,7 @@ function scanForObfuscations_NET() {
     }
 
     if (isModuleCtorMultiple) options = addOption(options, "Fake .cctor name");
-
-
-
-
-    var isBadCctor = false;
-
-    if (currentCtorOffset === -1) {
-        log(logType.net, "It seems that the .cctor is missing. Bad PE format!");
-
-        isBadCctor = true;
-    }
-
-    if (isBadCctor) options = addOption(options, "Bad .cctor format");
+    */
 
 
 
@@ -5505,6 +5496,21 @@ function scanForBadFileFormat_NET_and_Native() {
     }
 
     if (isNetImportsCorrupted) addCorruptedDataOption(corruptedDataLevel.critical, "DotNET headers/meta");
+
+
+
+
+    // Ordinary managed builds retain the global module type name; its absence does not prove a loading failure.
+
+    var isModuleTypeMissing = false;
+
+    if (PE_Cached.isDotNet && !PE.isNetObjectPresent("<Module>")) {
+        log(logType.net, "The standard <Module> type name is missing");
+
+        isModuleTypeMissing = true;
+    }
+
+    if (isModuleTypeMissing) addCorruptedDataOption(corruptedDataLevel.degraded, "Missing module type");
 
 
 
