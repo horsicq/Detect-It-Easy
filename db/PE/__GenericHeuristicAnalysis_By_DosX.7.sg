@@ -13712,6 +13712,10 @@ function getWinAuthCertificateSize() {
 
     if (securityDirectoryOffset + 8 > optionalHeaderEnd) return 0;
 
+    // Bytes in an undeclared directory slot are not a certificate-table entry.
+    // Certificate Table has index 4, so NumberOfRvaAndSizes must exceed 4: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#optional-header-data-directories-image-only
+    if (PE.read_uint32(optionalHeaderOffset + (PE_Cached.is64bit ? 0x6C : 0x5C)) <= 4) return 0;
+
     const
         certificateOffset = PE.read_uint32(securityDirectoryOffset),
         certificateSize = PE.read_uint32(securityDirectoryOffset + 4),
