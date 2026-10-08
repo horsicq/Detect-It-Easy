@@ -6637,6 +6637,12 @@ function traceEpWrittenCodeTransfer() {
                 !isVirtualAddressRangeFileBacked(writeAddress, size, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) break;
 
             if (writtenRanges.length >= 4) break;
+
+            // A write overlapping a simulated stack slot invalidates its stored return-address proof.
+            if (stack.length && registers.RSP !== undefined && writeAddress < registers.RSP + stack.length * (PE_Cached.isI386 ? 4 : 8) && writeAddress + size > registers.RSP) {
+                stack = [];
+            }
+
             writtenRanges.push({ Address: writeAddress, Size: size });
 
             for (var byteIndex = 0; byteIndex < size; byteIndex++) {
@@ -6697,6 +6703,8 @@ function traceEpWrittenCodeTransfer() {
 
             zeroFlag = testedValue === undefined ? undefined : testedValue === 0;
         } else if ((match = instruction.match(stackPattern))) {
+            var stackPointerValue = registers.RSP, poppedValue;
+
             if (match[1] === "PUSH") {
                 if (stack.length >= 32) break;
                 if (PE_Cached.is64bit && /^(?:0X[0-9A-F]+|[0-9]+)$/i.test(match[2]) &&
@@ -6705,7 +6713,28 @@ function traceEpWrittenCodeTransfer() {
                     parseInt(match[2], 0) : registers[registerKey(match[2])]);
             } else {
                 if (!stack.length) break;
-                assignRegister(registers, match[2], stack.pop());
+                poppedValue = stack.pop();
+            }
+
+            // PUSH reads its operand before decrementing SP; POP increments SP before writing its destination.
+            assignRegister(registers, PE_Cached.isI386 ? "ESP" : "RSP", stackPointerValue === undefined ? undefined : stackPointerValue + (match[1] === "PUSH" ? -1 : 1) * (PE_Cached.isI386 ? 4 : 8));
+
+            if (match[1] === "PUSH" && registers.RSP !== undefined) {
+                // PUSH writes memory too; restored or unknown bytes cannot retain an earlier mutation proof.
+                var pushedValue = stack[stack.length - 1], pushedSize = PE_Cached.isI386 ? 4 : 8;
+
+                for (var pushedByteIndex = 0; pushedByteIndex < pushedSize; pushedByteIndex++) {
+                    var pushedByteAddress = registers.RSP + pushedByteIndex, pushedByteKey = pushedByteAddress.toString();
+                    if (!writtenBytes.hasOwnProperty(pushedByteKey)) continue;
+
+                    var pushedByteValue = pushedValue === undefined ? undefined : Math.floor(pushedValue / Math.pow(0x100, pushedByteIndex)) & 0xFF;
+                    if (pushedByteValue === undefined || pushedByteValue === PE.readByte(PE.VAToOffset(pushedByteAddress))) delete writtenBytes[pushedByteKey];
+                    else writtenBytes[pushedByteKey] = pushedByteValue;
+                }
+            }
+
+            if (match[1] === "POP") {
+                assignRegister(registers, match[2], poppedValue);
                 if (registerKey(match[2]) === "RSP") stack = [];
             }
         } else if (opCode === "RET" || opCode === "RETN") {
