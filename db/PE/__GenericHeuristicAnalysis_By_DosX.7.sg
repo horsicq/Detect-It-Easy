@@ -4371,6 +4371,8 @@ function scanForBadFileFormat_NET_and_Native() {
     const declaredDataDirectoryCount = dataDirectoryNumberOffset + 4 <= dataDirectoryOptionalHeaderEnd ?
         PE.read_uint32(dataDirectoryNumberOffset) : 0;
 
+    var dataDirectoryMappedRanges;
+
     var dataDirectoryNames = [
         "EAT", "Imports", "Resources", "Exceptions", "Security", "Relocs", "Debug", "Architecture",
         "GlobalPtr", "TLS", "Load config", "Bound imports", "IAT", "Delay imports", "CLR"
@@ -4403,10 +4405,42 @@ function scanForBadFileFormat_NET_and_Native() {
             // VirtualSize beyond SizeOfRawData is mapped as zero-filled memory. Accept
             // such ranges here; dedicated directory parsers separately report content
             // that must be present in the file but cannot be read.
-            if (currentDataDirectoryRva >= sectionLayoutSizeOfImage ||
-                currentDataDirectoryEndRva >= sectionLayoutSizeOfImage ||
-                (!isVirtualAddressRangeMapped(PE_Cached.imageBase + currentDataDirectoryRva, currentDataDirectorySize, 0) &&
-                    (PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryRva) === -1 || PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryEndRva) === -1))) {
+            var isCurrentDataDirectoryMapped = isVirtualAddressRangeMapped(PE_Cached.imageBase + currentDataDirectoryRva, currentDataDirectorySize, 0);
+
+            if (!isCurrentDataDirectoryMapped && currentDataDirectoryRva < sectionLayoutSizeOfImage &&
+                currentDataDirectoryEndRva < sectionLayoutSizeOfImage &&
+                PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryRva) !== -1 &&
+                PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryEndRva) !== -1) {
+                // Endpoint translations cannot prove an intervening page is mapped. Build
+                // the sorted coverage once, and include section-alignment padding conservatively.
+                if (!dataDirectoryMappedRanges) {
+                    var dataDirectoryMappingAlignment = Math.max(0x1000, PE.getImageOptionalHeader("SectionAlignment"));
+
+                    dataDirectoryMappedRanges = [[0, Math.min(sectionLayoutSizeOfImage,
+                        Math.ceil(PE.getImageOptionalHeader("SizeOfHeaders") / dataDirectoryMappingAlignment) * dataDirectoryMappingAlignment)]];
+
+                    for (var d = 0; d < PE_Cached.numberOfSections; d++) {
+                        var dataDirectorySectionRva = PE.getSectionVirtualAddress(d),
+                            dataDirectorySectionSize = Math.max(PE.getSectionVirtualSize(d), PE.getSectionFileSize(d));
+
+                        if (dataDirectorySectionSize > 0) dataDirectoryMappedRanges.push([dataDirectorySectionRva,
+                            Math.min(sectionLayoutSizeOfImage, dataDirectorySectionRva + Math.ceil(dataDirectorySectionSize / dataDirectoryMappingAlignment) * dataDirectoryMappingAlignment)]);
+                    }
+
+                    dataDirectoryMappedRanges.sort(function (leftRange, rightRange) { return leftRange[0] - rightRange[0]; });
+                }
+
+                var dataDirectoryCoveredRva = currentDataDirectoryRva;
+
+                for (var d = 0; d < dataDirectoryMappedRanges.length && dataDirectoryCoveredRva <= currentDataDirectoryEndRva; d++) {
+                    if (dataDirectoryMappedRanges[d][0] > dataDirectoryCoveredRva) break;
+                    dataDirectoryCoveredRva = Math.max(dataDirectoryCoveredRva, dataDirectoryMappedRanges[d][1]);
+                }
+
+                isCurrentDataDirectoryMapped = dataDirectoryCoveredRva > currentDataDirectoryEndRva;
+            }
+
+            if (currentDataDirectoryRva >= sectionLayoutSizeOfImage || currentDataDirectoryEndRva >= sectionLayoutSizeOfImage || !isCurrentDataDirectoryMapped) {
                 isUnmappedDataDirectoryPresent = true;
             }
 
