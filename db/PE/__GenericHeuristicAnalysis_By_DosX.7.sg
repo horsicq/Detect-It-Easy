@@ -13690,13 +13690,14 @@ function getOptHeaderOffset() {
 
 
 /**
- * Returns the size of a structurally valid trailing Windows Authenticode table.
+ * Returns the size of a bounded, length-consistent trailing attribute-certificate table.
  *
  * The Security directory is the only PE data directory whose address is a raw file
  * offset. Restricting the result to an aligned table which exactly consumes the file
  * tail prevents malformed directory values from hiding unrelated overlay bytes.
+ * Entry lengths must cover the whole table; this does not verify a digital signature.
  *
- * @returns {number} Certificate-table size in bytes, or zero when no valid trailing table exists.
+ * @returns {number} Certificate-table size in bytes, or zero when its bounds or lengths cannot be established.
  */
 function getWinAuthCertificateSize() {
     if (PE_Cached.overlaySize < 8) return 0;
@@ -13724,6 +13725,22 @@ function getWinAuthCertificateSize() {
     if (certificateOffset < PE_Cached.overlayOffset || certificateSize < 8 ||
         certificateOffset % 8 !== 0 || certificateSize % 8 !== 0 ||
         certificateOffset + certificateSize !== overlayEndOffset) return 0;
+
+    // A directory range alone cannot distinguish certificate metadata from an overlay payload.
+    // Each dwLength includes the header and advances on an eight-byte boundary: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#the-attribute-certificate-table-image-only
+    var entryOffset = certificateOffset;
+
+    for (var entryCount = 0; entryCount < 256 && entryOffset < overlayEndOffset; entryCount++) {
+        if (entryOffset + 8 > overlayEndOffset) return 0;
+
+        var entrySize = PE.read_uint32(entryOffset);
+        if (entrySize < 8 || entrySize > overlayEndOffset - entryOffset) return 0;
+
+        entryOffset += Math.ceil(entrySize / 8) * 8;
+    }
+
+    // On malformed lengths or budget exhaustion, retain the bytes for ordinary overlay analysis.
+    if (entryOffset !== overlayEndOffset) return 0;
 
     return certificateSize;
 }
