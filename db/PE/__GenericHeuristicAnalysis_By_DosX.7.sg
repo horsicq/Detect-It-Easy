@@ -5386,6 +5386,8 @@ function scanForBadFileFormat_NET_and_Native() {
                     tlsCallbackPointerSize = PE_Cached.is64bit ? 8 : 4,
                     tlsCallbacksAvailablePointerCount = -1;
 
+                var isTlsCallbackArrayZeroTerminated = false;
+
                 if (tlsCallbacksOffset !== -1) {
                     var tlsCallbacksRva = tlsCallbacksAddress - PE_Cached.imageBase;
 
@@ -5398,6 +5400,10 @@ function scanForBadFileFormat_NET_and_Native() {
 
                         if (tlsCallbacksOffsetInSection >= 0 && tlsCallbacksOffsetInSection < tlsCallbacksSectionRawSize &&
                             PE.getSectionFileOffset(d) + tlsCallbacksOffsetInSection === tlsCallbacksOffset) {
+                            // A complete pointer beyond raw data is zero-initialized by the loader.
+                            isTlsCallbackArrayZeroTerminated = (tlsCallbacksSectionRawSize - tlsCallbacksOffsetInSection) % tlsCallbackPointerSize === 0 &&
+                                PE.getSectionVirtualSize(d) >= tlsCallbacksSectionRawSize + tlsCallbackPointerSize;
+
                             tlsCallbacksAvailablePointerCount = Math.floor(
                                 (tlsCallbacksSectionRawSize - tlsCallbacksOffsetInSection) / tlsCallbackPointerSize
                             );
@@ -5419,7 +5425,7 @@ function scanForBadFileFormat_NET_and_Native() {
                             if (tlsCallbackAddress === 0) isTlsCallbackArrayTerminated = true;
                         }
 
-                        if (!isTlsCallbackArrayTerminated) {
+                        if (!isTlsCallbackArrayTerminated && !isTlsCallbackArrayZeroTerminated) {
                             log(logType.any, "TLS callback array is not null-terminated");
 
                             isInvalidTlsMetadataPresent = true;
