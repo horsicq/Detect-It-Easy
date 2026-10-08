@@ -98,7 +98,7 @@ function detect() {
 		if(X.isVerbose()) sOption('sz:'+outSz(X.U32(8)+12))
 	}
 
-	else if(X.fSig(20,0x100,"'<aks:song xmlns:aks=\"http://www.julien-nevo.com/ArkosTrackerSong\"") > 0) {
+	else if(X.fSig(20,0x100,"'<aks:song xmlns:aks=\"http://www.julien-nevo.com/ArkosTrackerSong\"'") > 0) {
 		sName = "Julien Névo's Arkos Tracker 2 module (.AKS)"; //fmt[NEVO_ARKOSTRACKER2]
 		sVersion = 'unpacked'; bDetected = 1;
 	}
@@ -160,7 +160,7 @@ function detect() {
 		}
 	}
 
-	else if(X.c("'AMC V1.2 REPLAY!'") && X.c("0000003C0002	",0x4E)) {
+	else if(X.c("'AMC V1.2 REPLAY!'") && X.c("0000003C0002",0x4E)) {
 		// ref https://gitlab.com/uade-music-player/uade/-/raw/master/amigasrc/players/wanted_team/AMComposer/src/AMComposer 1.2_v4.asm
 		sName = "Marc Hawlitzeck's A.M. Composer module (.AMC)"; //fmt[HAWLITZECK_AMCOMPOSER]
 		bDetected = 1;
@@ -350,7 +350,7 @@ function detect() {
 		if(bad) sVersion = sVersion.appendS('malformed'+bad,'/');
 	}
 
-	else if(X.c("'AMX ")) {
+	else if(X.c("'AMX '")) {
 		//ref http://and.intercon.ru/releases/audio/xsynth/
 		sName = "Dmitry 'AND' Andreev's XSynth module (.AMX)"; //fmt[AND_XSYNTH_AMX]
 		bDetected = 1
@@ -1574,7 +1574,7 @@ function detect() {
 			sOptionT(X.SA(0x1F,0x20));
 	}
 
-	else if(X.c("'JSR_FMT~")) {
+	else if(X.c("'JSR_FMT~'")) {
 		//ref https://github.com/XorJS/FM-Tracker & https://jsr-productions.com/_blogpost3319ddc.html
 		// & https://github.com/XorJS/FM-Tracker/blob/main/FM.ASM
 		sName = "Jean-Sebastien 'XorJS' Royer's FM-Tracker module (.FMT)"; //fmt[XORJS_FMTRACKER]
@@ -3453,7 +3453,7 @@ function detect() {
 		}
 	}
 
-	else if(X.c("'PSY'..'SONG")) {
+	else if(X.c("'PSY'..'SONG'")) {
 		sName = "J.M.A. Segura/Psycledelics' Psycle Modular Music Creation Studio module (.PSY)"; //fmt[SEGURA_PSYCLEMMCS]
 		bDetected = 1;
 		sV = X.SA(3,1); sVersion = "v"+sV;
@@ -3883,14 +3883,14 @@ function detect() {
 					sz = X.U32(p); sOptionT(X.SC(p+4,sz,'CP1252'),"style: ");
 					break;
 				}
-				else if(X.c("Header V02         '00",p)) {  p += 20;
+				else if(X.c("'Header V02         '00",p)) {  p += 20;
 					sz = X.U32(p); sOptionT(X.SC(p+4,sz,'CP1252')); p+=sz+4;
 					sz = X.U32(p); sOptionT(X.SC(p+4,sz,'CP1252'),"by: "); p+=sz+4;
 					sz = X.U32(p); sOptionT(X.SC(p+4,sz,'CP1252'),"style: "); p+=sz+4+5;
 					sz = X.U32(p); sOptionT(X.SC(p+4,sz,'CP1252'));
 					break;
 				}
-				p = X.fSig(p+1,TOEOF,"''>>>  Chunk End  <<<'00");
+				p = X.fSig(p+1,TOEOF,"'>>>  Chunk End  <<<'00");
 				if(p == -1) break;
 				p += 20
 			}
@@ -4408,7 +4408,7 @@ function detect() {
 		}
 	}
 
-	else if(X.c("'RJP'3. 0000 0000")) {
+	else if(X.c("'RJP'.. 0000 0000")) {
 		sName = "Richard Joseph's module instruments (.INS)"; //fmt[RICHARDJOSEPH_INS]
 		bDetected = 1;
 		sVersion = "v"+X.SA(3,1)
@@ -4703,13 +4703,13 @@ function detect() {
 			switch (hkhd) {
 				case -16:
 					pklen = X.U32(p,_BE); hksz += pklen; o = 4; //InfoText RLE-COMPRESSED... doesn't seem to happen at all
-					if(pklen >= 10 && X.c(p+o, "'PACK'FFFF")) if(!X.isDeepScan()) { p = -1; break } else {
+					if(pklen >= 10 && X.c("'PACK'FFFF", p+o)) if(!X.isDeepScan()) { break } else {
 //_l2r('symmod',p,'Packed infotext')
 						o += 6; unplen = X.U32(p+o, _BE); o += 4;
 						maxlen = pklen-10; if(0xFFFFFFFF/170 >= maxlen) maxlen *= 170; else maxlen = 0xFFFFFFFF;
 						if(unplen > maxlen) unplen = maxlen;
-						rledone = false; ofs = 0; left = unplen;
-						while(!rledone && o < Math.min(hksz, pklen)) {
+						rledone = false; ofs = 0; left = unplen; t = '';
+						while(!rledone && o < Math.min(hksz, pklen) && t.length < 0x100) {
 							tp = X.I8(p+o); o++;
 							switch(tp) {
 							case 0: // as-is
@@ -4724,7 +4724,7 @@ function detect() {
 								break;
 							case 2: // repeat dword twice
 								dw = X.SA(p+o,4); o += 4;
-								if(left >= l*4 && o < pklen) { unp += dw+dw; left -= 8; }
+								if(left >= 8 && o < pklen) { t += dw+dw; left -= 8; }
 								else rledone = true;
 								break;
 							case 3: // 0s
@@ -4748,7 +4748,7 @@ function detect() {
 				case 10: case 11: case 12: pro = true; break; //Sample Boost/Detune/Phase
 				case -6: bpm = Math.round(1.24 * Math.min(X.I32(p,_BE), 800)); break; //Tempo
 				case -10: hksz += X.I32(p,_BE);
-					if(X.c(p+8, "'PACK'FFFF")) _l2r('symmod',p,'ordsz:'+(X.U32(p+14,_BE)>>6)); break;
+					if(debug && X.c("'PACK'FFFF", p+4)) _l2r('symmod',p,'ordsz:'+(X.U32(p+10,_BE)>>6)); break;
 				case -11: hksz += X.I32(p,_BE); break;
 				case -12: hksz = 0; break; //EmptySample: no payload
 				case -13: case -14: case -15: hksz += X.I32(p,_BE); break;
@@ -6941,8 +6941,8 @@ function isAHX() {
 	//ref http://lclevy.free.fr/exotica/ahx/ahxformat.txt
 	// & https://github.com/pete-gordon/hivelytracker/blob/master/Replayer_Windows/hvl_replay.c
 	if(X.Sz() < 30) return false;
-	if(X.c("'THX'0.")) fmt = "ahx";
-	else if(X.c("'HVL'0.")) fmt = "hvl";
+	if(X.c("'THX'") && X.U8(3) < 0x10) fmt = "ahx";
+	else if(X.c("'HVL'") && X.U8(3) < 0x10) fmt = "hvl";
 	else return false;
 	bad = 0;
 	var b6 = X.U8(6);
@@ -8244,7 +8244,7 @@ if(!bDetected && isProTracker3(0)) {
 	}
 	if(bad.length) sVersion = sVersion.appendS('malformed'+bad,'/');
 	if(X.isVerbose()) {
-		if(X.c("'by ",0x3F)) { sOptionT(decAnsi(0x1E,0x20,CPSpeccy)); sOptionT(decAnsi(0x42,0x20,CPSpeccy),'by: ') }
+		if(X.c("'by '",0x3F)) { sOptionT(decAnsi(0x1E,0x20,CPSpeccy)); sOptionT(decAnsi(0x42,0x20,CPSpeccy),'by: ') }
 		sOptionT(tracker,'in: ');
 		switch(ttn) {
 			case 0: sOption('tuning 0: 1625000Hz PT3.3'); break;
@@ -10571,8 +10571,8 @@ function isJesperOlsen() {
 //+(X.c("'BODY'",sofs-8)?' IFF ['+Hex(X.U32(sofs-4,_BE))+'-'+Hex(sofs+X.U32(sofs-4,_BE))+']':' raw'))
 			p += 2;
 		}
-		if(X.c("'BODY'00'",lo-8)) lo = X.fSig("'FORM'00??????",lo-150,lo-20); songsz = lo;
-		if(X.c("'BODY'00'",hi-8)) hi += X.U32(hi-4,_BE); //BODY tag skip
+		if(X.c("'BODY'00",lo-8)) lo = X.fSig(lo-150,130,"'FORM'00??????"); songsz = lo;
+		if(X.c("'BODY'00",hi-8)) hi += X.U32(hi-4,_BE); //BODY tag skip
 		else hi += ssz<<1;
 		sz = hi;
 	}
@@ -11357,7 +11357,7 @@ if(!bDetected && isDigitalSonixChrome()) {
 
 function isPaulShields() {
 	//ref https://gitlab.com/uade-music-player/uade/-/raw/master/amigasrc/players/wanted_team/PaulShields/src/Paul%20Shields_v3.asm
-	if(!X.c("00000000 0000000 0000")) return;
+	if(!X.c("00000000 00000000 0000")) return;
 	if((t = X.U16(0xA4)) === X.U16(0xA8) && t === X.U16(0xAC) && t === X.U16(0xB0)
 	  && (t = X.I16(0xA0,_BE)) > 0 && !(t%2) && X.c("00B400B6",t)) { fmt = 1; p = 0xA6 }
 	else if((t = X.U16(0x204)) === X.U16(0x208) && t === X.U16(0x20C) && t === X.U16(0x210)
