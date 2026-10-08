@@ -8841,14 +8841,30 @@ function scanForObfuscations_Native() {
                 storesRawFpuEnvironmentAtStack = currentEpOffset !== -1 && (PE.compare("D9 74 24 F4", currentEpOffset) || PE.compare("D9 B4 24 F4 FF FF FF", currentEpOffset)),
                 isRawFpuNop = currentEpOffset !== -1 && PE.compare("D9 D0", currentEpOffset),
                 fpuOpcodeByte = currentEpOffset !== -1 ? PE.readByte(currentEpOffset) : -1,
-                fpuSecondByte = (fpuOpcodeByte === 0xD8 || fpuOpcodeByte === 0xD9) &&
+                fpuSecondByte = (fpuOpcodeByte === 0xD8 || fpuOpcodeByte === 0xD9 || fpuOpcodeByte === 0xDD) &&
                     isVirtualAddressRangeFileBacked(fpuEpCurrentAddress, 2, SECTION_FLAGS_EXECUTE) ? PE.readByte(currentEpOffset + 1) : -1,
                 isRawFpuSource = (fpuOpcodeByte === 0xD9 && fpuSecondByte >= 0xE8 && fpuSecondByte <= 0xEE) ||
-                    (fpuOpcodeByte === 0xD8 && fpuSecondByte >= 0xC0);
+                    (fpuOpcodeByte === 0xD8 && fpuSecondByte >= 0xC0),
+                isRawFpuStateSave = fpuOpcodeByte === 0xDD && fpuSecondByte >= 0 && fpuSecondByte < 0xC0 && (fpuSecondByte & 0x38) === 0x30;
 
             if (!currentEpOpCode || currentEpInstructionLength <= 0) break; // Safety check
 
-            if (storesRawFpuEnvironmentAtStack) {
+            if (isRawFpuStateSave) {
+                // Decode the complete DD /6 memory operand so displacement bytes cannot become fake x87 sources.
+                var fpuSaveMode = fpuSecondByte >>> 6, fpuSaveRm = fpuSecondByte & 7, fpuSaveLength = 2;
+
+                if (fpuSaveRm === 4) {
+                    if (!isVirtualAddressRangeFileBacked(fpuEpCurrentAddress, 3, SECTION_FLAGS_EXECUTE)) break;
+                    fpuSaveLength++;
+                    if (fpuSaveMode === 0 && (PE.readByte(currentEpOffset + 2) & 7) === 5) fpuSaveLength += 4;
+                } else if (fpuSaveMode === 0 && fpuSaveRm === 5) fpuSaveLength += 4;
+
+                if (fpuSaveMode === 1) fpuSaveLength++;
+                else if (fpuSaveMode === 2) fpuSaveLength += 4;
+
+                if (!isVirtualAddressRangeFileBacked(fpuEpCurrentAddress, fpuSaveLength, SECTION_FLAGS_EXECUTE)) break;
+                currentEpInstructionLength = fpuSaveLength;
+            } else if (storesRawFpuEnvironmentAtStack) {
                 // Override the decoded length with the exact short or long raw encoding.
                 currentEpInstructionLength = PE.compare("D9 74 24 F4", currentEpOffset) ? 4 : 7;
             } else if (isRawFpuNop || isRawFpuSource) {
@@ -8867,7 +8883,9 @@ function scanForObfuscations_Native() {
                     currentEpOpCode === "PAUSE" || epSimplePolymorphicInstructionPattern.test(currentEpInstruction) ||
                     (registerWrite && currentEpOpCode !== "POP") || /^(?:CMP|TEST)$/.test(currentEpOpCode);
 
-            if (/^(?:FINIT|FNINIT|FLDENV|FRSTOR)$/.test(currentEpOpCode)) hasFpuInstructionPointerSource = false;
+            // FSAVE/FNSAVE reinitialize x87, including FIP; a later environment cannot reuse the old source.
+            // https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html (Vol. 2, FSAVE/FNSAVE)
+            if (isRawFpuStateSave || /^(?:FINIT|FNINIT|FSAVE|FNSAVE|FLDENV|FRSTOR)$/.test(currentEpOpCode)) hasFpuInstructionPointerSource = false;
             else if (isFpuInstructionPointerSource) hasFpuInstructionPointerSource = true;
 
             if (storesFpuEnvironmentAtStack || storesRawFpuEnvironmentAtStack) {
