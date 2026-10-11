@@ -13002,8 +13002,12 @@ function getEpGuardedFlowEvidence() {
             }
             continue;
         } else if (opCode === "CALL") {
-            // An indirect call may return, but it cannot preserve our register or flag facts.
-            if (!/^CALL (?:0X[0-9A-F]+|[0-9]+)$/i.test(instruction) || isEpDirectCallReturnProven(address)) {
+            var indirectCall = instruction.match(/^CALL ([A-Z][A-Z0-9]*)$/i),
+                indirectCallTarget = indirectCall && next.Known[getNativeRegisterKey(indirectCall[1])],
+                callReturnProven = indirectCallTarget ? isEpBoundedDirectFlowProven(indirectCallTarget.Value, /^RET(?:N)?(?: (?:0X[0-9A-F]+|\d+))?$/i) : isEpDirectCallReturnProven(address);
+
+            // A possible return is not evidence: unknown indirect calls must not expose unreachable fall-through.
+            if (callReturnProven) {
                 next.Known = {};
                 next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
                 next.StackTarget = undefined;
