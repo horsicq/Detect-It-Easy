@@ -7792,6 +7792,7 @@ function scanForObfuscations_Native() {
             syntheticEpPushedRegisterPattern = new RegExp("^PUSH (" + epGeneralPurposeRegister + ")$", "i"),
             syntheticEpStoredRegisterPattern = new RegExp("^MOV " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (" + syntheticEpStackTransferRegister + ")$", "i"),
             syntheticEpPoppedRegisterPattern = new RegExp("^POP (" + epGeneralPurposeRegister + ")$", "i"),
+            syntheticEpAddressArithmeticPattern = new RegExp("^(ADD|SUB) (" + syntheticEpStackTransferRegister + "), (0X[0-9A-F]+|[0-9]+)$", "i"),
             syntheticEpExchangedRegisterPattern = new RegExp("^XCHG " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (" + syntheticEpStackTransferRegister + ")$", "i"),
             syntheticEpStoredAddressPattern = new RegExp("^MOV " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (0X[0-9A-F]+|\\d+)$", "i"),
             syntheticEpStackArithmeticPattern = new RegExp("^(ADD|SUB) " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (0X[0-9A-F]+|\\d+)$", "i"),
@@ -8005,7 +8006,7 @@ function scanForObfuscations_Native() {
                     delete syntheticEpKnownAddresses[getNativeRegisterKey(exchangedRegister[1])];
 
                     syntheticEpNeutralInstructionCount = 0;
-                } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetAddress && isVirtualAddressRangeFileBacked(parseInt(syntheticEpTargetAddress, 0), 1, SECTION_FLAGS_EXECUTE)) {
+                } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetType !== "call return" && syntheticEpTargetAddress && isVirtualAddressRangeFileBacked(parseInt(syntheticEpTargetAddress, 0), 1, SECTION_FLAGS_EXECUTE)) {
                     // RET at a process entry point is meaningful here only as a concealed transfer.
                     if (syntheticEpTargetType === "stack pivot") {
                         log(logType.emulation, "Stack pivot redirects Ret near EP to executable code at VA 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
@@ -8017,9 +8018,14 @@ function scanForObfuscations_Native() {
 
                     isSyntheticEpTransferPresent = true;
                 } else if (currentEpOpCode === "CALL") {
-                    var mutatedReturnTarget = getEpCallReturnMutationTarget(currentEpAddress);
+                    var mutatedReturnTarget = getEpCallReturnMutationTarget(currentEpAddress), callNextOffset = PE.VAToOffset(currentEpAddress);
 
-                    if (mutatedReturnTarget !== undefined) {
+                    if (callNextOffset !== -1 && isVirtualAddressRangeFileBacked(currentEpAddress, 5, SECTION_FLAGS_EXECUTE) && PE.compare("E8 00 00 00 00", callNextOffset)) {
+                        // CALL-next pushes its exact continuation; an unchanged return alone is not a synthetic transfer.
+                        syntheticEpTargetAddress = (currentEpAddress + 5).toString();
+                        syntheticEpTargetType = "call return";
+                        syntheticEpNeutralInstructionCount = 0;
+                    } else if (mutatedReturnTarget !== undefined) {
                         log(logType.emulation, "Call return address redirects Ret near EP to executable code at VA 0x" + mutatedReturnTarget.toString(16));
 
                         isSyntheticEpTransferPresent = true;
@@ -8048,6 +8054,20 @@ function scanForObfuscations_Native() {
                         } else {
                             delete syntheticEpKnownAddresses[valuePreservingRegisterKey];
                         }
+                    }
+                } else if (/^(?:ADD|SUB) /.test(currentEpInstruction)) {
+                    var addressArithmetic = currentEpInstruction.match(syntheticEpAddressArithmeticPattern);
+                    if (!addressArithmetic) break;
+
+                    var addressRegisterKey = getNativeRegisterKey(addressArithmetic[2]), addressValue = syntheticEpKnownAddresses[addressRegisterKey], addressDelta = parseInt(addressArithmetic[3], 0);
+                    if (addressValue !== undefined && addressDelta <= (PE_Cached.isI386 ? 0xFFFFFFFF : 0x7FFFFFFF)) {
+                        addressValue = parseInt(addressValue, 0) + (addressArithmetic[1] === "ADD" ? addressDelta : -addressDelta);
+                        if (PE_Cached.isI386) addressValue >>>= 0;
+
+                        if (addressValue >= 0 && addressValue <= epMaximumSafeInteger && isVirtualAddressRangeFileBacked(addressValue, 1, SECTION_FLAGS_EXECUTE)) syntheticEpKnownAddresses[addressRegisterKey] = addressValue.toString();
+                        else delete syntheticEpKnownAddresses[addressRegisterKey];
+                    } else {
+                        delete syntheticEpKnownAddresses[addressRegisterKey];
                     }
                 } else if (partialRegisterWrite) {
                     delete syntheticEpKnownAddresses[getEpPartialRegisterKey(partialRegisterWrite[1])];
