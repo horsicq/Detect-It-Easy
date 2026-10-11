@@ -2755,19 +2755,13 @@ function scanForPackersAndCryptors_NET_and_Native() { // For .NET and Native app
 
     if (PE_Cached.isEntryPointAnalysisAllowed) {
         if (PE_Cached.numberOfSections > 1 && PE_Cached.isEntryPointCorrect) {
-            // Get addresses of the last section and entry point
+            // Raw offsets do not identify virtual sections: a zero-filled .bss can have offset zero.
+            var lastSectionIndex = PE_Cached.numberOfSections - 1, entryPointAddress = PE_Cached.addressOfUnmanagedEntryPoint,
+                lastSectionAddress = PE_Cached.imageBase + PE.getSectionVirtualAddress(lastSectionIndex),
+                lastSectionSize = Math.max(PE.getSectionVirtualSize(lastSectionIndex), PE.getSectionFileSize(lastSectionIndex));
 
-            var lastSectionAddress = -1,
-                entryPointAddress = PE_Cached.addressOfUnmanagedEntryPoint;
-
-            // Get last section with non -1 address
-            for (var i = 1; lastSectionAddress === -1 && i <= PE_Cached.numberOfSections; i++) {
-                lastSectionAddress = PE.OffsetToVA(PE.getSectionFileOffset(PE_Cached.numberOfSections - i));
-            }
-
-            // Check if a valid last-section address was found and the entry point is at or after it
-            if (lastSectionAddress !== -1 && entryPointAddress >= lastSectionAddress) {
-                log(logType.any, "EP VA 0x" + entryPointAddress.toString(16) + " is at or beyond last-section VA 0x" + lastSectionAddress.toString(16));
+            if (PE_Cached.indexOfEntryPointSection === lastSectionIndex && entryPointAddress >= lastSectionAddress && entryPointAddress < lastSectionAddress + lastSectionSize) {
+                log(logType.any, "EP VA 0x" + entryPointAddress.toString(16) + " is inside the last section at VA 0x" + lastSectionAddress.toString(16));
 
                 isLastSectionEP = true;
 
