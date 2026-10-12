@@ -9896,6 +9896,7 @@ function scanForObfuscations_Native() {
                 epPolymorphismSectionFileEnd = PE.getSectionFileOffset(epPolymorphismSectionIndex) + PE.getSectionFileSize(epPolymorphismSectionIndex),
                 epCurrentPrefixCount = 0,
                 epCurrentPrefixGroupOneCount = 0,
+                epCurrentLockPrefixCount = 0,
                 epCurrentPrefixGroupTwoCount = 0,
                 epCurrentPrefixGroupThreeCount = 0,
                 epCurrentPrefixGroupFourCount = 0,
@@ -9918,6 +9919,7 @@ function scanForObfuscations_Native() {
 
                     epCurrentGroupOnePrefix = epCurrentPrefixByte;
                     epCurrentPrefixGroupOneCount++;
+                    if (epCurrentPrefixByte === 0xF0) epCurrentLockPrefixCount++;
                     epCurrentRedundantPrefixPresent = epCurrentRedundantPrefixPresent || epCurrentPrefixGroupOneCount > 1;
                 } else if (epCurrentPrefixByte === 0x2E || epCurrentPrefixByte === 0x36 ||
                     epCurrentPrefixByte === 0x3E || epCurrentPrefixByte === 0x26 ||
@@ -9949,6 +9951,31 @@ function scanForObfuscations_Native() {
             }
 
             if (epCurrentPrefixGroupTwoCount > 1 && epCurrentPrefixCount >= 4) epCurrentRedundantPrefixPresent = true;
+
+            // XACQUIRE/XRELEASE may accompany LOCK on a memory read-modify-write instruction.
+            // Intel SDM, XACQUIRE/XRELEASE: https://cdrdv2-public.intel.com/789589/334569-sdm-vol-2d.pdf
+            if (epCurrentPrefixGroupOneCount === 2 && epCurrentLockPrefixCount === 1 && epCurrentPrefixCount + 1 < epPolymorphismInstructionLength) {
+                var epHleOpcodeOffset = epPolymorphismInstructionOffset + epCurrentPrefixCount,
+                    epHleOpcode = PE.readByte(epHleOpcodeOffset), epHleModRmOffset = epHleOpcodeOffset + 1,
+                    epHleTwoByteOpcode = epHleOpcode === 0x0F ? PE.readByte(epHleModRmOffset++) : -1,
+                    epHleModRm = epHleModRmOffset < epPolymorphismInstructionOffset + epPolymorphismInstructionLength ? PE.readByte(epHleModRmOffset) : -1,
+                    epHleGroup = (epHleModRm >> 3) & 7;
+
+                if (epHleModRm >= 0 && (epHleModRm & 0xC0) !== 0xC0 &&
+                    ((epHleOpcode <= 0x31 && (epHleOpcode & 7) <= 1) || epHleOpcode === 0x86 || epHleOpcode === 0x87 ||
+                        ((epHleOpcode === 0x80 || epHleOpcode === 0x81 || epHleOpcode === 0x83) && epHleGroup < 7) ||
+                        ((epHleOpcode === 0xFE || epHleOpcode === 0xFF) && epHleGroup <= 1) ||
+                        ((epHleOpcode === 0xF6 || epHleOpcode === 0xF7) && (epHleGroup === 2 || epHleGroup === 3)) ||
+                        (epHleOpcode === 0x0F && (epHleTwoByteOpcode === 0xB0 || epHleTwoByteOpcode === 0xB1 ||
+                            epHleTwoByteOpcode === 0xC0 || epHleTwoByteOpcode === 0xC1 || epHleTwoByteOpcode === 0xAB ||
+                            epHleTwoByteOpcode === 0xB3 || epHleTwoByteOpcode === 0xBB ||
+                            (epHleTwoByteOpcode === 0xBA && epHleGroup >= 5) || (epHleTwoByteOpcode === 0xC7 && epHleGroup === 1))))) {
+                    epCurrentConflictingPrefixPresent = false;
+                    epCurrentRedundantPrefixPresent = epCurrentPrefixGroupTwoCount > Object.keys(epCurrentGroupTwoPrefixesFound).length ||
+                        (epCurrentPrefixGroupTwoCount > 1 && epCurrentPrefixCount >= 4) || epCurrentPrefixGroupThreeCount > 1 ||
+                        epCurrentPrefixGroupFourCount > 1 || epCurrentRexPrefixCount > 1;
+                }
+            }
 
             // Save raw candidates until every decoded boundary is known. Linkers deliberately
             // encode long Nop instructions with repeated 66 prefixes for alignment.
