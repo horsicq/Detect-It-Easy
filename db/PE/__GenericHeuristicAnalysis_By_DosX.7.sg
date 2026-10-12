@@ -8757,11 +8757,13 @@ function scanForObfuscations_Native() {
             pebModuleWalkIndexedPebLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?" + pebModuleWalkSegment + ":\\[(" + pebModuleWalkNativeRegister + ") ?\\+ ?" + pebModuleWalkPebAddress + "\\]$", "i"),
             pebModuleWalkLdrLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?\\[(" + pebModuleWalkNativeRegister + ") ?\\+ ?" + pebModuleWalkLdrOffset + "\\]$", "i"),
             pebModuleWalkListLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?\\[(" + pebModuleWalkNativeRegister + ") ?\\+ ?" + pebModuleWalkListOffset + "\\]$", "i"),
+            pebModuleWalkListAddressPattern = new RegExp("^LEA (" + pebModuleWalkNativeRegister + "), \\[(" + pebModuleWalkNativeRegister + ") ?\\+ ?" + pebModuleWalkListOffset + "\\]$", "i"),
+            pebModuleWalkIndirectListLoadPattern = new RegExp("^MOV (" + pebModuleWalkNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?\\[(" + pebModuleWalkNativeRegister + ")\\]$", "i"),
             pebModuleWalkZeroRegisterPattern = new RegExp("^(?:(?:XOR|SUB) (" + epGeneralPurposeRegister + "), \\1|(?:MOV|AND) (" + epGeneralPurposeRegister + "), (?:0X0+|0+))$", "i");
 
         pebModuleWalkPatterns = { PebLoad: pebModuleWalkPebLoadPattern, LdrLoad: pebModuleWalkLdrLoadPattern, ListLoad: pebModuleWalkListLoadPattern };
 
-        // State 0 proves a whole-register zero, state 1 a PEB pointer, and state 2 its Ldr pointer.
+        // States 0/1/2/3 prove a whole-register zero, PEB pointer, Ldr pointer, or module-list field address.
         // Copies preserve the proof, while writes invalidate only their physical register.
         // Unknown instructions discard all proofs but may begin a new chain later.
         var pebModuleWalkRegisterStates = {}, pebModuleWalkFallthrough = {};
@@ -8780,6 +8782,8 @@ function scanForObfuscations_Native() {
                 zeroRegister = currentEpInstruction.match(pebModuleWalkZeroRegisterPattern),
                 ldrPointerLoad = currentEpInstruction.match(pebModuleWalkLdrLoadPattern),
                 moduleListLoad = currentEpInstruction.match(pebModuleWalkListLoadPattern),
+                moduleListAddress = currentEpInstruction.match(pebModuleWalkListAddressPattern),
+                indirectModuleListLoad = currentEpInstruction.match(pebModuleWalkIndirectListLoadPattern),
                 registerCopy = currentEpInstruction.match(epRegisterCopyPattern),
                 simplePolymorphicInstruction = currentEpInstruction.match(epSimplePolymorphicInstructionPattern),
                 valuePreservingInstruction = currentEpInstruction.match(epValuePreservingInstructionPattern),
@@ -8792,11 +8796,19 @@ function scanForObfuscations_Native() {
 
                 // An indexed FS/GS read is equivalent only when its full base register is proven zero.
                 pebModuleWalkRegisterStates[pebRegister] = 1;
-            } else if (moduleListLoad && pebModuleWalkRegisterStates[getNativeRegisterKey(moduleListLoad[2])] === 2) {
-                // Reading a loader list through a proven Ldr pointer completes the proof.
+            } else if ((moduleListLoad && pebModuleWalkRegisterStates[getNativeRegisterKey(moduleListLoad[2])] === 2) || (indirectModuleListLoad && pebModuleWalkRegisterStates[getNativeRegisterKey(indirectModuleListLoad[2])] === 3)) {
+                // Only a native-width read through the proven Ldr field completes the chain, not LEA alone.
                 log(logType.emulation, "PEB loader module-list walk near EP: " + currentEpInstruction);
 
                 isPebModuleWalkPresent = true;
+            } else if (moduleListAddress) {
+                var moduleListAddressDestination = getNativeRegisterKey(moduleListAddress[1]);
+
+                if (pebModuleWalkRegisterStates[getNativeRegisterKey(moduleListAddress[2])] === 2) {
+                    pebModuleWalkRegisterStates[moduleListAddressDestination] = 3;
+                } else {
+                    delete pebModuleWalkRegisterStates[moduleListAddressDestination];
+                }
             } else if (ldrPointerLoad) {
                 var ldrDestinationRegister = getNativeRegisterKey(ldrPointerLoad[1]),
                     ldrSourceRegister = getNativeRegisterKey(ldrPointerLoad[2]);
