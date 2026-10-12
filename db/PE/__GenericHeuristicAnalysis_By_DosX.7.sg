@@ -9126,8 +9126,8 @@ function scanForObfuscations_Native() {
 
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
-        var overlappingEpPendingPaths = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, KnownZeroRegisters: {} }],
-            overlappingEpVisitedStarts = {},
+        var overlappingEpPendingPaths = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, KnownZeroRegisters: {}, ZeroFlag: -1, CarryFlag: -1 }],
+            overlappingEpVisitedStates = {},
             overlappingEpDecodedStarts = {},
             overlappingEpDecodedInteriors = {},
             overlappingEpInstructionCount = 0;
@@ -9138,10 +9138,9 @@ function scanForObfuscations_Native() {
             overlappingEpInstructionCount < 512 && !isOverlappingEpCodePresent; streamIndex++) {
             var overlappingEpPath = overlappingEpPendingPaths[streamIndex],
                 overlappingEpCurrentAddress = overlappingEpPath.Address,
-                overlappingEpKnownZeroRegisters = overlappingEpPath.KnownZeroRegisters;
-
-            if (overlappingEpVisitedStarts[overlappingEpCurrentAddress.toString()]) continue;
-            overlappingEpVisitedStarts[overlappingEpCurrentAddress.toString()] = true;
+                overlappingEpKnownZeroRegisters = overlappingEpPath.KnownZeroRegisters,
+                overlappingEpZeroFlag = overlappingEpPath.ZeroFlag,
+                overlappingEpCarryFlag = overlappingEpPath.CarryFlag;
 
             while (overlappingEpInstructionCount < 512) {
                 var currentEpInstruction = PE.getDisasmString(overlappingEpCurrentAddress),
@@ -9151,27 +9150,31 @@ function scanForObfuscations_Native() {
                 if (!currentEpOpCode || currentEpOpCode === "DB" || currentEpInstructionLength <= 0 || currentEpInstructionLength > 15 ||
                     !isVirtualAddressRangeFileBacked(overlappingEpCurrentAddress, currentEpInstructionLength, SECTION_FLAGS_EXECUTE)) break;
 
+                var overlappingEpStateKey = overlappingEpCurrentAddress + ":" + overlappingEpZeroFlag + ":" + overlappingEpCarryFlag + ":" + Object.keys(overlappingEpKnownZeroRegisters).sort().join(",");
+                if (overlappingEpVisitedStates[overlappingEpStateKey]) break;
+                overlappingEpVisitedStates[overlappingEpStateKey] = true;
+
                 if (overlappingEpDecodedInteriors[overlappingEpCurrentAddress.toString()]) {
                     log(logType.emulation, "Overlapping branch target near EP at VA 0x" + overlappingEpCurrentAddress.toString(16));
                     isOverlappingEpCodePresent = true;
                     break;
                 }
 
-                if (overlappingEpDecodedStarts[overlappingEpCurrentAddress.toString()]) break;
-
-                for (var byteIndex = 1; byteIndex < currentEpInstructionLength; byteIndex++) {
-                    if (overlappingEpDecodedStarts[(overlappingEpCurrentAddress + byteIndex).toString()]) {
-                        log(logType.emulation, "Overlapping branch target near EP at VA 0x" + overlappingEpCurrentAddress.toString(16));
-                        isOverlappingEpCodePresent = true;
-                        break;
+                if (!overlappingEpDecodedStarts[overlappingEpCurrentAddress.toString()]) {
+                    for (var byteIndex = 1; byteIndex < currentEpInstructionLength; byteIndex++) {
+                        if (overlappingEpDecodedStarts[(overlappingEpCurrentAddress + byteIndex).toString()]) {
+                            log(logType.emulation, "Overlapping branch target near EP at VA 0x" + overlappingEpCurrentAddress.toString(16));
+                            isOverlappingEpCodePresent = true;
+                            break;
+                        }
+                        overlappingEpDecodedInteriors[(overlappingEpCurrentAddress + byteIndex).toString()] = true;
                     }
-                    overlappingEpDecodedInteriors[(overlappingEpCurrentAddress + byteIndex).toString()] = true;
+
+                    if (isOverlappingEpCodePresent) break;
+                    overlappingEpDecodedStarts[overlappingEpCurrentAddress.toString()] = true;
                 }
 
-                if (isOverlappingEpCodePresent) break;
-
                 overlappingEpInstructionCount++;
-                overlappingEpDecodedStarts[overlappingEpCurrentAddress.toString()] = true;
 
                 // A proven null dereference transfers control to an exception handler;
                 // physical bytes after it are not a reachable fall-through stream.
@@ -9193,22 +9196,35 @@ function scanForObfuscations_Native() {
                     overlappingEpKnownZeroRegisters = {};
                 }
 
-                var directControlFlow = currentEpInstruction.match(/^(?:CALL|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
+                var directControlFlow = currentEpInstruction.match(/^(?:CALL|J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i),
+                    branchResult = directControlFlow && currentEpOpCode !== "CALL" && currentEpOpCode !== "JMP" ?
+                        getEpKnownBranchResult(currentEpOpCode, overlappingEpZeroFlag, overlappingEpCarryFlag) : -1,
+                    nextZeroFlag = currentEpOpCode === "CALL" ? overlappingEpZeroFlag : advanceEpZeroFlag(currentEpInstruction, currentEpOpCode, overlappingEpZeroFlag),
+                    nextCarryFlag = currentEpOpCode === "CALL" ? overlappingEpCarryFlag : advanceEpCarryFlag(currentEpInstruction, currentEpOpCode, overlappingEpCarryFlag);
 
-                if (directControlFlow) {
+                if (directControlFlow && branchResult !== 0) {
                     var directControlFlowTarget = parseInt(directControlFlow[1], 0);
 
                     if (Math.abs(directControlFlowTarget - PE_Cached.addressOfUnmanagedEntryPoint) <= 0x200 &&
                         isVirtualAddressRangeFileBacked(directControlFlowTarget, 1, SECTION_FLAGS_EXECUTE)) {
                         var branchZeroRegisters = {};
                         for (var zeroRegister in overlappingEpKnownZeroRegisters) branchZeroRegisters[zeroRegister] = true;
-                        overlappingEpPendingPaths.push({ Address: directControlFlowTarget, KnownZeroRegisters: branchZeroRegisters });
+                        overlappingEpPendingPaths.push({ Address: directControlFlowTarget, KnownZeroRegisters: branchZeroRegisters, ZeroFlag: nextZeroFlag, CarryFlag: nextCarryFlag });
                     }
                 }
 
                 if (currentEpOpCode === "CALL" && !isEpDirectCallReturnProven(overlappingEpCurrentAddress)) break;
-                if (currentEpOpCode === "CALL") overlappingEpKnownZeroRegisters = {};
+                if (currentEpOpCode === "CALL") {
+                    overlappingEpKnownZeroRegisters = {};
+                    overlappingEpZeroFlag = -1;
+                    overlappingEpCarryFlag = -1;
+                } else {
+                    overlappingEpZeroFlag = nextZeroFlag;
+                    overlappingEpCarryFlag = nextCarryFlag;
+                }
 
+                // A proven taken branch has no physical fall-through to decode.
+                if (branchResult === 1) break;
                 if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 && currentEpOpCode !== "CALL") break;
                 overlappingEpCurrentAddress += currentEpInstructionLength;
             }
