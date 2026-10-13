@@ -9571,7 +9571,7 @@ function scanForObfuscations_Native() {
 
         // Keep address facts per reachable path: an unrelated write on one branch must
         // not erase a proof on another. Calls and unknown writes still fail closed.
-        var indirectEpPendingStates = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, KnownAddresses: {}, ZeroFlag: -1, CarryFlag: -1 }],
+        var indirectEpPendingStates = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, KnownAddresses: {}, ZeroFlag: -1, CarryFlag: -1, StackPointerZero: false }],
             indirectEpVisitedStates = {};
 
         for (var i = 0; i < indirectEpPendingStates.length && i < 512 && !isIndirectEpTransferPresent; i++) {
@@ -9585,8 +9585,12 @@ function scanForObfuscations_Native() {
             if (!currentEpOpCode || currentEpOpCode === "DB" || currentEpLength < 1 || currentEpLength > 15 ||
                 !isVirtualAddressRangeFileBacked(currentEpAddress, currentEpLength, SECTION_FLAGS_EXECUTE)) continue;
 
+            if (PE_Cached.isI386 && /^AAM (?:0X0+|0+)$/i.test(currentEpInstruction)) continue;
+            if (isEpProvenFaultingInstruction(currentEpInstruction, currentEpOpCode, indirectEpState.StackPointerZero, indirectEpKnownAddresses)) continue;
+
             var indirectEpFactKeys = Object.keys(indirectEpKnownAddresses).sort(),
-                indirectEpStateKey = currentEpAddress + ":" + indirectEpState.ZeroFlag + ":" + indirectEpState.CarryFlag;
+                indirectEpStateKey = currentEpAddress + ":" + indirectEpState.ZeroFlag + ":" + indirectEpState.CarryFlag + ":" + indirectEpState.StackPointerZero,
+                indirectEpNextStackPointerZero = advanceEpStackPointerZero(currentEpInstruction, currentEpOpCode, indirectEpState.StackPointerZero);
 
             for (var factIndex = 0; factIndex < indirectEpFactKeys.length; factIndex++) {
                 indirectEpStateKey += ":" + indirectEpFactKeys[factIndex] + "=" + indirectEpKnownAddresses[indirectEpFactKeys[factIndex]];
@@ -9596,7 +9600,8 @@ function scanForObfuscations_Native() {
             indirectEpVisitedStates[indirectEpStateKey] = true;
 
             // Classify producers, copies, consumers and invalidators before mutating provenance.
-            var registerLiteralAddress = currentEpInstruction.match(epLiteralMovePattern),
+            var zeroedAddressRegister = currentEpInstruction.match(epZeroRegisterPattern),
+                registerLiteralAddress = currentEpInstruction.match(epLiteralMovePattern),
                 registerCopy = currentEpInstruction.match(epRegisterCopyPattern),
                 registerArithmetic = currentEpInstruction.match(indirectEpArithmeticPattern),
                 registerLea = currentEpInstruction.match(indirectEpLeaPattern),
@@ -9613,7 +9618,9 @@ function scanForObfuscations_Native() {
                     currentEpOpCode === "PAUSE" ||
                     (simplePolymorphicInstruction && !(PE_Cached.is64bit && epRegister32BitPattern.test(simplePolymorphicRegister)));
 
-            if (registerLiteralAddress) {
+            if (zeroedAddressRegister) {
+                indirectEpKnownAddresses[getNativeRegisterKey(zeroedAddressRegister[1] || zeroedAddressRegister[2])] = 0;
+            } else if (registerLiteralAddress) {
                 var indirectEpTargetRegister = getNativeRegisterKey(registerLiteralAddress[1]),
                     indirectEpTargetAddress = parseInt(registerLiteralAddress[2], 0);
 
@@ -9621,8 +9628,8 @@ function scanForObfuscations_Native() {
                 if (indirectEpTargetAddress <= epMaximumSafeInteger) {
                     if (epRegister32BitPattern.test(registerLiteralAddress[1])) indirectEpTargetAddress = indirectEpTargetAddress >>> 0;
 
-                    // Retain only literals which resolve back into the current PE image.
-                    if (PE.VAToOffset(indirectEpTargetAddress) !== -1) {
+                    // A zero remains useful for proving a later null dereference, not as an image target.
+                    if (indirectEpTargetAddress === 0 || PE.VAToOffset(indirectEpTargetAddress) !== -1) {
                         indirectEpKnownAddresses[indirectEpTargetRegister] = indirectEpTargetAddress;
                     } else {
                         delete indirectEpKnownAddresses[indirectEpTargetRegister];
@@ -9640,7 +9647,7 @@ function scanForObfuscations_Native() {
                 if (indirectEpTargetAddress !== undefined) {
                     if (epRegister32BitPattern.test(registerCopy[1])) indirectEpTargetAddress = indirectEpTargetAddress >>> 0;
 
-                    if (PE.VAToOffset(indirectEpTargetAddress) !== -1) {
+                    if (indirectEpTargetAddress === 0 || PE.VAToOffset(indirectEpTargetAddress) !== -1) {
                         indirectEpKnownAddresses[indirectEpTargetRegister] = indirectEpTargetAddress;
                     } else {
                         delete indirectEpKnownAddresses[indirectEpTargetRegister];
@@ -9663,7 +9670,7 @@ function scanForObfuscations_Native() {
 
                     if (isDwordArithmetic) arithmeticAddress >>>= 0;
                     if (arithmeticAddress >= 0 && arithmeticAddress <= epMaximumSafeInteger &&
-                        isVirtualAddressRangeFileBacked(arithmeticAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                        (arithmeticAddress === 0 || isVirtualAddressRangeFileBacked(arithmeticAddress, 1, SECTION_FLAGS_EXECUTE))) {
                         indirectEpKnownAddresses[arithmeticRegisterKey] = arithmeticAddress;
                     } else {
                         delete indirectEpKnownAddresses[arithmeticRegisterKey];
@@ -9704,7 +9711,7 @@ function scanForObfuscations_Native() {
 
                     if (PE_Cached.isI386 || epRegister32BitPattern.test(leaDestination)) leaTargetAddress >>>= 0;
                     if (leaTargetAddress >= 0 && leaTargetAddress <= epMaximumSafeInteger &&
-                        isVirtualAddressRangeFileBacked(leaTargetAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                        (leaTargetAddress === 0 || isVirtualAddressRangeFileBacked(leaTargetAddress, 1, SECTION_FLAGS_EXECUTE))) {
                         indirectEpKnownAddresses[leaDestinationKey] = leaTargetAddress;
                     } else {
                         delete indirectEpKnownAddresses[leaDestinationKey];
@@ -9730,7 +9737,8 @@ function scanForObfuscations_Native() {
             } else if (simplePolymorphicInstruction) {
                 // Only PE32+ r32 self-operations reach this branch. They zero-extend one
                 // physical register but cannot invalidate addresses proven in other registers.
-                delete indirectEpKnownAddresses[getNativeRegisterKey(simplePolymorphicRegister)];
+                var indirectEpSelfRegisterKey = getNativeRegisterKey(simplePolymorphicRegister);
+                if (indirectEpKnownAddresses[indirectEpSelfRegisterKey] !== 0) delete indirectEpKnownAddresses[indirectEpSelfRegisterKey];
             } else if (valuePreservingInstruction) {
                 var valuePreservingRegister = valuePreservingInstruction[1] || valuePreservingInstruction[2],
                     valuePreservingRegisterKey = getNativeRegisterKey(valuePreservingRegister),
@@ -9740,7 +9748,7 @@ function scanForObfuscations_Native() {
                     // Revalidate the zero-extended low DWORD before retaining its provenance.
                     valuePreservingAddress = valuePreservingAddress >>> 0;
 
-                    if (PE.VAToOffset(valuePreservingAddress) !== -1) {
+                    if (valuePreservingAddress === 0 || PE.VAToOffset(valuePreservingAddress) !== -1) {
                         indirectEpKnownAddresses[valuePreservingRegisterKey] = valuePreservingAddress;
                     } else {
                         delete indirectEpKnownAddresses[valuePreservingRegisterKey];
@@ -9782,7 +9790,7 @@ function scanForObfuscations_Native() {
                 for (var factKey in indirectEpKnownAddresses) indirectEpSuccessorFacts[factKey] = indirectEpKnownAddresses[factKey];
                 indirectEpPendingStates.push({
                     Address: indirectEpSuccessorAddress, KnownAddresses: indirectEpSuccessorFacts,
-                    ZeroFlag: indirectEpNextZeroFlag, CarryFlag: indirectEpNextCarryFlag
+                    ZeroFlag: indirectEpNextZeroFlag, CarryFlag: indirectEpNextCarryFlag, StackPointerZero: indirectEpNextStackPointerZero
                 });
             }
         }
