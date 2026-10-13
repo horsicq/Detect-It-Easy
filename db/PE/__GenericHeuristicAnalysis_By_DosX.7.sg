@@ -13710,8 +13710,9 @@ function getEpGuardedFlowEvidence() {
         stackStore = PE_Cached.isI386 ? /^MOV DWORD PTR \[ESP\], (E(?:AX|BX|CX|DX|SI|DI|BP))$/i :
             new RegExp("^MOV QWORD PTR \\[RSP\\], (" + register64 + ")$", "i"),
         pushedRegister = new RegExp("^PUSH (" + (PE_Cached.isI386 ? register32 : register64) + ")$", "i"),
-        stackArithmetic = PE_Cached.isI386 ? /^(ADD|SUB) DWORD PTR \[ESP\], (0X[0-9A-F]+|[0-9]+)$/i :
-            /^(ADD|SUB) QWORD PTR \[RSP\], (0X[0-9A-F]+|[0-9]+)$/i,
+        poppedRegister = new RegExp("^POP (" + addressRegister + ")$", "i"),
+        stackArithmetic = PE_Cached.isI386 ? /^(ADD|SUB) DWORD PTR \[ESP\], (-?(?:0X[0-9A-F]+|[0-9]+))$/i :
+            /^(ADD|SUB) QWORD PTR \[RSP\], (-?(?:0X[0-9A-F]+|[0-9]+))$/i,
         directBranch = /^(J[A-Z]+) (0X[0-9A-F]+|[0-9]+)$/i;
 
     var pending = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, Known: {}, Flags: { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 }, StackTarget: undefined }],
@@ -13743,7 +13744,7 @@ function getEpGuardedFlowEvidence() {
             rip = instruction.match(ripAddress), absolute = instruction.match(absoluteLea), based = instruction.match(basedLea),
             native = instruction.match(nativeMove), nativeOp = instruction.match(nativeArithmetic), copy = instruction.match(registerCopy),
             exchange = instruction.match(stackExchange), store = instruction.match(stackStore), push = instruction.match(pushedRegister),
-            stackOp = instruction.match(stackArithmetic), branch = instruction.match(directBranch);
+            pop = instruction.match(poppedRegister), stackOp = instruction.match(stackArithmetic), branch = instruction.match(directBranch);
 
         if (zero || move || operation) {
             // Function-scoped vars must not reuse a previous instruction's resolved value.
@@ -13812,10 +13813,19 @@ function getEpGuardedFlowEvidence() {
             var exchangedRegister = getNativeRegisterKey((exchange || store || push)[1]), knownTarget = next.Known[exchangedRegister];
             next.StackTarget = knownTarget ? knownTarget.Value : undefined;
             if (exchange) delete next.Known[exchangedRegister];
+            if (push) delete next.Known.RSP;
+        } else if (pop) {
+            var poppedKey = getNativeRegisterKey(pop[1]);
+            if (next.StackTarget !== undefined) next.Known[poppedKey] = { Value: next.StackTarget, Steps: 0, Kinds: 0 };
+            else delete next.Known[poppedKey];
+            next.StackTarget = undefined;
+            delete next.Known.RSP;
         } else if (stackOp) {
             var stackDelta = parseInt(stackOp[2], 0);
-            if (PE_Cached.is64bit && stackDelta > 0x7FFFFFFF) next.StackTarget = undefined;
+            // QWORD arithmetic sign-extends its immediate; dword stack targets wrap at 32 bits.
+            if (PE_Cached.is64bit && (stackDelta < -0x80000000 || stackDelta > 0x7FFFFFFF)) next.StackTarget = undefined;
             else if (next.StackTarget !== undefined) next.StackTarget += (stackOp[1] === "ADD" ? 1 : -1) * stackDelta;
+            if (PE_Cached.isI386 && next.StackTarget !== undefined) next.StackTarget >>>= 0;
             if (next.StackTarget < 0 || next.StackTarget > 0x1FFFFFFFFFFFFF || !isFinite(next.StackTarget)) next.StackTarget = undefined;
             next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
         } else if (/^RET(?:N)?$/.test(opCode)) {
@@ -13871,11 +13881,13 @@ function getEpGuardedFlowEvidence() {
 
                 delete next.Known[writtenRegisterKey];
             }
-            if (opCode === "POP" || !writtenRegister || writtenRegister[1] === "ESP" || writtenRegister[1] === "RSP") next.StackTarget = undefined;
+            if (opCode === "POP" || !writtenRegister || writtenRegisterKey === "RSP") next.StackTarget = undefined;
+            if (opCode === "POP") delete next.Known.RSP;
         } else if (/^(?:NOP|FNOP|PAUSE)$/.test(opCode)) {
             // Padding changes neither the proven pointer nor the modeled flags.
         } else if (/^(?:PUSH|PUSHF|PUSHFD|PUSHFQ|XCHG)$/.test(opCode)) {
             if (opCode === "XCHG") next.Known = {};
+            else delete next.Known.RSP;
             next.StackTarget = undefined;
         } else {
             next.Known = {};
