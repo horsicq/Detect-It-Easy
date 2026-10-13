@@ -8603,6 +8603,8 @@ function scanForObfuscations_Native() {
     // Microsoft hybrid-architecture DLL thunks can contain a genuine register self-move.
     // Keep this weak standalone signal executable-only instead of labeling compatibility code.
     if (!PE_Cached.isDynamicLinkLibrary && PE_Cached.isArchX86) {
+        var redundantEpSelfMoveFallthrough = {};
+
         for (var i = 0; i < 32 && !isRedundantEpRegisterSelfMovePresent; i++) {
             var currentEpInstruction = emulateAndGetAsmInstructionByIndex(i),
                 currentEpOpCode = getAsmOpCode(currentEpInstruction);
@@ -8616,6 +8618,8 @@ function scanForObfuscations_Native() {
             } else if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 || /^J[A-Z]*$/.test(currentEpOpCode)) {
                 break;
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructionAddresses[i], redundantEpSelfMoveFallthrough)) break;
         }
     }
 
