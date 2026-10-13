@@ -6757,7 +6757,7 @@ function traceEpWrittenCodeTransfer() {
                 if (registerKey(match[2]) === "RSP") stack = [];
             }
         } else if (opCode === "RET" || opCode === "RETN") {
-            if (!/^(?:RET|RETN)$/.test(instruction) || !stack.length) break;
+            if (!/^(?:RET|RETN)$/.test(instruction) || !stack.length || !isEpNativeNearTransfer(currentAddress, instruction, instructionLength)) break;
 
             var returnTarget = stack.pop();
             var returnRange = getWrittenRange(returnTarget);
@@ -6766,6 +6766,8 @@ function traceEpWrittenCodeTransfer() {
 
             break;
         } else if ((match = instruction.match(indirectBranchPattern))) {
+            if (!isEpNativeNearTransfer(currentAddress, instruction, instructionLength)) break;
+
             var indirectTarget = registers[registerKey(match[1])];
             var indirectRange = getWrittenRange(indirectTarget);
 
@@ -6777,6 +6779,8 @@ function traceEpWrittenCodeTransfer() {
             var branchTarget = parseInt(match[1], 0);
 
             if (opCode === "JMP") {
+                if (!isEpNativeNearTransfer(currentAddress, instruction, instructionLength)) break;
+
                 var branchRange = getWrittenRange(branchTarget);
                 if (branchRange) return { WriteAddress: branchRange.Address, TargetAddress: branchTarget };
 
@@ -6784,6 +6788,8 @@ function traceEpWrittenCodeTransfer() {
             } else {
                 if (zeroFlag === undefined) break;
                 if ((opCode === "JE" || opCode === "JZ") === zeroFlag) {
+                    if (!isEpNativeNearTransfer(currentAddress, instruction, instructionLength)) break;
+
                     // A proven taken conditional transfer needs the same write check as Jmp.
                     var conditionalRange = getWrittenRange(branchTarget);
                     if (conditionalRange) return { WriteAddress: conditionalRange.Address, TargetAddress: branchTarget };
