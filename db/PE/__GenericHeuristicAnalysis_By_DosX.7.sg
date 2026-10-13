@@ -9804,17 +9804,18 @@ function scanForObfuscations_Native() {
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const trapFlagNativeRegister = PE_Cached.isI386 ? "E(?:AX|BX|CX|DX|SI|DI|BP)" :
             "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
+            trapFlagWordRegister = PE_Cached.isI386 ? "(?:AX|BX|CX|DX|SI|DI|BP)" : "(?:AX|BX|CX|DX|SI|DI|BP|R(?:8|9|1[0-5])W)",
             trapFlagStackPointer = PE_Cached.isI386 ? "ESP" : "RSP",
             trapFlagPushPattern = PE_Cached.isI386 ? /^(?:PUSHF|PUSHFD)$/ : /^(?:PUSHF|PUSHFQ)$/,
             trapFlagPopPattern = PE_Cached.isI386 ? /^(?:POPF|POPFD)$/ : /^(?:POPF|POPFQ)$/,
-            trapFlagPopRegisterPattern = new RegExp("^POP (" + trapFlagNativeRegister + ")$", "i"),
-            trapFlagRegisterTestPattern = new RegExp("^(?:TEST|AND) (" + epGeneralPurposeRegister + "), (?:0X0*100|256)$|^BT (" + epGeneralPurposeRegister + "), (?:0X0*8|8)$", "i"),
+            trapFlagPopRegisterPattern = new RegExp("^POP (" + trapFlagNativeRegister + "|" + trapFlagWordRegister + ")$", "i"),
+            trapFlagRegisterTestPattern = new RegExp("^(?:TEST|AND) (" + epFlagsGeneralPurposeRegister + "), (?:0X0*100|256)$|^BT (" + epFlagsGeneralPurposeRegister + "), (?:0X0*8|8)$", "i"),
             trapFlagStackSetPattern = new RegExp("^OR (?:(?:DWORD|QWORD) PTR )?\\[" + trapFlagStackPointer + "\\], (?:0X0*100|256)$", "i"),
             trapFlagBitTestBranchOpCodes = ["JAE", "JB", "JC", "JNAE", "JNB", "JNC"],
             trapFlagValueTestBranchOpCodes = ["JE", "JNE", "JNZ", "JZ"];
 
-        // State 1 tracks flags saved on the stack; state 2 follows the matching
-        // native-width POP; state 3 waits for a condition compatible with the
+        // State 1 tracks flags saved on the stack; state 2 follows a POP retaining bit 8;
+        // state 3 waits for a condition compatible with the
         // TEST/AND or BT flags; state 4 tracks direct TF modification on the stack.
         var trapFlagState = 0,
             trapFlagRegisters = {},
@@ -9844,6 +9845,8 @@ function scanForObfuscations_Native() {
                     getNativeRegisterKey(testedFlagsRegister[1] || testedFlagsRegister[2]) :
                     String(),
                 isRegisterOnlyInstruction = registerWrite && currentEpOpCode !== "POP";
+
+            if (testedFlagsRegister && (testedFlagsRegisterKey.length === 2 || /W$/.test(testedFlagsRegisterKey))) testedFlagsRegisterKey = getEpPartialRegisterKey(testedFlagsRegisterKey);
 
             var isTrapFlagStatePreservingInstruction = ((trapFlagState === 1 || trapFlagState === 4) &&
                 (isRegisterOnlyInstruction || /^(?:CMP|TEST)$/.test(currentEpOpCode))) ||
@@ -9878,7 +9881,8 @@ function scanForObfuscations_Native() {
                 isEpTrapFlagCheckPresent = true;
             } else if (trapFlagState === 1 && poppedFlagsRegister) {
                 // State 2: preserve the TF bit in the popped register and its exact copies.
-                trapFlagRegisters[getNativeRegisterKey(poppedFlagsRegister[1])] = true;
+                // TF lies in the low WORD, so a word POP proves the same bit without proving upper bits.
+                trapFlagRegisters[poppedFlagsRegister[1].length === 2 || /W$/.test(poppedFlagsRegister[1]) ? getEpPartialRegisterKey(poppedFlagsRegister[1]) : getNativeRegisterKey(poppedFlagsRegister[1])] = true;
                 trapFlagState = 2;
                 trapFlagNeutralInstructionCount = 0;
             } else if (isTrapFlagTestedRegister) {
