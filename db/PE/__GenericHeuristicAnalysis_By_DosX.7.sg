@@ -15603,6 +15603,8 @@ const
  * @returns {boolean} True when the decrypted header fields describe a valid PE image.
  */
 function verifyEncryptedPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, keyLength, mode) {
+    maxValidLfaNew = Math.min(maxValidLfaNew, dataBuffer.length - peStartOffset - 0x20);
+
     var encZero = dataBuffer[peStartOffset + encryptedPeLfa2Offsets[keyLength]],
         cipherByte = dataBuffer[peStartOffset + 0x3E],
         valLfa2 = mode === 0 ? (cipherByte ^ encZero) :
@@ -15710,6 +15712,9 @@ function verifyEncryptedPeSignature(dataBuffer, peStartOffset, maxValidLfaNew, k
  * @returns {string} Detected algorithm label, or an empty string.
  */
 function scanBufferForEncryptedPe(dataBuffer, bufferSize) {
+    // Truncated engine reads must not turn missing bytes into zero-valued XOR operands.
+    bufferSize = Math.min(bufferSize, dataBuffer.length);
+
     // Check if the native function is present
     if (typeof PE !== "undefined" && typeof PE.scanBufferForEncryptedPe === "function") {
         return PE.scanBufferForEncryptedPe(dataBuffer, bufferSize);
