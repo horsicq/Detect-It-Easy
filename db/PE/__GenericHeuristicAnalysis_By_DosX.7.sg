@@ -6720,10 +6720,16 @@ function traceEpWrittenCodeTransfer() {
 
             if (match[1] === "PUSH") {
                 if (stack.length >= 32) break;
+                var pushIsImmediate = /^(?:0X[0-9A-F]+|[0-9]+)$/i.test(match[2]);
+
+                // An immediate has no register alias exposing a word-sized PUSH; only native stack slots are modeled.
+                if (pushIsImmediate && getEpPushOperandSize(currentAddress, instructionLength) !== (PE_Cached.isI386 ? 4 : 8)) break;
+
+                // PUSH writes after decrementing SP; a proven zero destination faults before any later pivot.
+                if (stackPointerValue === (PE_Cached.isI386 ? 4 : 8)) break;
                 if (PE_Cached.is64bit && /^(?:0X[0-9A-F]+|[0-9]+)$/i.test(match[2]) &&
                     parseInt(match[2], 0) > 0x7FFFFFFF) break;
-                stack.push(/^(?:0X[0-9A-F]+|[0-9]+)$/i.test(match[2]) ?
-                    parseInt(match[2], 0) : registers[registerKey(match[2])]);
+                stack.push(pushIsImmediate ? parseInt(match[2], 0) : registers[registerKey(match[2])]);
             } else {
                 if (!stack.length) break;
                 poppedValue = stack.pop();
