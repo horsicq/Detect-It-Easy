@@ -11330,6 +11330,7 @@ function scanForObfuscations_Native() {
             if (/^(?:CALLF|HLT|INT(?:1|3|O)?|IRET(?:D|Q)?|JMPF?|RET(?:F|N)?|SYS(?:CALL|ENTER|RET|EXIT)|UD[012])$/.test(opCode) && !jump) break;
 
             if (jump) {
+                if (!isEpNativeNearTransfer(address, instruction, length)) break;
                 address = parseInt(jump[1], 0);
             } else {
                 if (isEpLinearFallthroughUnproven(instruction, address, preambleState, true)) break;
@@ -11480,7 +11481,7 @@ function scanForObfuscations_Native() {
                         var transferInstruction = PE.getDisasmString(nextAddress),
                             transferLength = PE.getDisasmLength(nextAddress),
                             transfer = transferInstruction && transferInstruction.match(directJump),
-                            target = transfer ? parseInt(transfer[1], 0) : -1,
+                            target = transfer && isEpNativeNearTransfer(nextAddress, transferInstruction, transferLength) ? parseInt(transfer[1], 0) : -1,
                             transferEnd = nextAddress + transferLength;
 
                         if (!transfer && transferInstruction && transferLength > 0 && transferLength <= 15 &&
@@ -11550,6 +11551,7 @@ function scanForObfuscations_Native() {
                                         isEpStackHandoffPresent = true;
                                         break;
                                     } else if (traceJump) {
+                                        if (!isEpNativeNearTransfer(traceAddress, traceInstruction, traceLength)) break;
                                         traceAddress = parseInt(traceJump[1], 0);
                                         continue;
                                     } else if (!/^(?:NOP|FNOP|PAUSE|ENDBR32|ENDBR64)$/.test(traceOpCode) &&
@@ -11621,6 +11623,7 @@ function scanForObfuscations_Native() {
                     carryFlag = opCode === "CALL" ? -1 : advanceEpCarryFlag(instruction, opCode, state.CarryFlag);
 
                 if (jump) {
+                    if (!isEpNativeNearTransfer(address, instruction, length)) continue;
                     pending.push({
                         Address: parseInt(jump[1], 0), Depth: depth, ZeroFlag: zeroFlag, CarryFlag: carryFlag,
                         StackRegisters: stackRegisters, ReachabilityProven: reachabilityProven
@@ -11629,7 +11632,7 @@ function scanForObfuscations_Native() {
                     var branchResult = getEpKnownBranchResult(opCode, state.ZeroFlag, state.CarryFlag),
                         branchReachabilityProven = reachabilityProven && branchResult !== -1;
 
-                    if (branchResult !== 0) pending.push({
+                    if (branchResult !== 0 && isEpNativeNearTransfer(address, instruction, length)) pending.push({
                         Address: parseInt(branch[2], 0), Depth: depth, ZeroFlag: zeroFlag,
                         CarryFlag: carryFlag, StackRegisters: stackRegisters, ReachabilityProven: branchReachabilityProven
                     });
