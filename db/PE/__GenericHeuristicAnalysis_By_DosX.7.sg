@@ -4715,9 +4715,8 @@ function scanForBadFileFormat_NET_and_Native() {
 
                 isInvalidUnwindMetadataPresent = true;
             } else {
-                var exceptionDirectoryOffset = PE.VAToOffset(exceptionDirectoryAddress),
-                    exceptionDirectoryData = PE.readBytes(exceptionDirectoryOffset, exceptionDirectorySize),
-                    runtimeFunctionMappedRanges = [];
+                // Nonzero unwind RVAs can address loaded headers; zero still denotes absent metadata.
+                var runtimeFunctionMappedRanges = [{ Rva: 1, EndRva: Math.min(PE.getImageOptionalHeader("SizeOfHeaders"), PE_Cached.fileSize, sectionLayoutSizeOfImage) }];
 
                 // A prefix-maximum interval index answers whether one section contains a
                 // complete range in O(log n). Unlike a monotonic cursor, it remains exact
@@ -4938,6 +4937,9 @@ function scanForBadFileFormat_NET_and_Native() {
                                 cachedRuntimeFunctionMappedRangeIndex = runtimeFunctionMappedRangeIndex;
                                 isRuntimeFunctionUnwindPointerValid = runtimeFunctionUnwindRva % 4 === 0 ||
                                     isValidWordAlignedUnwindInfo(runtimeFunctionUnwindRva);
+                            } else if (runtimeFunctionUnwindRva !== 0) {
+                                // Split DWORD headers retain format compatibility; only WORD alignment needs the strict layout check.
+                                isRuntimeFunctionUnwindPointerValid = runtimeFunctionUnwindRva % 4 === 0 ? readMappedUnsignedInteger(PE_Cached.imageBase + runtimeFunctionUnwindRva, 4) !== -1 : isValidWordAlignedUnwindInfo(runtimeFunctionUnwindRva);
                             }
                         }
                     }
