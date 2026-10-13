@@ -10944,8 +10944,7 @@ function scanForObfuscations_Native() {
                                 epRepeatedSelfModifyingCallStubInstructionLength = PE.getDisasmLength(epRepeatedSelfModifyingCallStubCurrentAddress),
                                 epRepeatedSelfModifyingCallStubWrite = undefined;
 
-                            if (!epRepeatedSelfModifyingCallStubOpCode ||
-                                epRepeatedSelfModifyingCallStubInstructionLength <= 0) break;
+                            if (!epRepeatedSelfModifyingCallStubOpCode || epRepeatedSelfModifyingCallStubInstructionLength <= 0 || !isVirtualAddressRangeFileBacked(epRepeatedSelfModifyingCallStubCurrentAddress, epRepeatedSelfModifyingCallStubInstructionLength, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE)) break;
 
                             if (!epRepeatedSelfModifyingCallStubReturnReadPresent) {
                                 // First prove that the called stub obtains its own return address.
@@ -10988,12 +10987,14 @@ function scanForObfuscations_Native() {
                                         epRepeatedSelfModifyingCallStubInstructionLength + epRepeatedSelfModifyingCallStubDisplacement;
                                 }
 
-                                var epRepeatedSelfModifyingCallStubSectionAddress = PE_Cached.imageBase + epSelfModifyingCallStubSectionRva;
+                                var epRepeatedSelfModifyingCallStubSectionAddress = PE_Cached.imageBase + epSelfModifyingCallStubSectionRva,
+                                    epRepeatedSelfModifyingCallStubWriteSize = epRepeatedSelfModifyingCallStubInstruction.indexOf("QWORD PTR") !== -1 ? 8 : epRepeatedSelfModifyingCallStubInstruction.indexOf("DWORD PTR") !== -1 ? 4 : epRepeatedSelfModifyingCallStubInstruction.indexOf("WORD PTR") !== -1 ? 2 : 1;
 
                                 // Require the write to remain inside the same executable/writable
                                 // section and close enough to reconstruct the current stub.
                                 if (epRepeatedSelfModifyingCallStubWriteAddress >= epRepeatedSelfModifyingCallStubSectionAddress &&
-                                    epRepeatedSelfModifyingCallStubWriteAddress < epRepeatedSelfModifyingCallStubSectionAddress + epSelfModifyingCallStubSectionRawSize &&
+                                    epRepeatedSelfModifyingCallStubWriteAddress + epRepeatedSelfModifyingCallStubWriteSize <= epRepeatedSelfModifyingCallStubSectionAddress + epSelfModifyingCallStubSectionRawSize &&
+                                    isVirtualAddressRangeFileBacked(epRepeatedSelfModifyingCallStubWriteAddress, epRepeatedSelfModifyingCallStubWriteSize, SECTION_FLAGS_EXECUTE | SECTION_FLAGS_WRITE) &&
                                     Math.abs(epRepeatedSelfModifyingCallStubWriteAddress - epDirectCallTargetAddress) <= epRepeatedSelfModifyingCallStubMaximumWriteDistance) {
                                     var epRepeatedSelfModifyingCallStubSectionKey = epSelfModifyingCallStubSectionIndex.toString();
 
