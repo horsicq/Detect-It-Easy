@@ -4766,8 +4766,8 @@ function scanForBadFileFormat_NET_and_Native() {
                  * The Microsoft x64 ABI specifies a DWORD-aligned UNWIND_INFO structure.
                  * Current Microsoft-produced images also contain WORD-aligned records which
                  * the Windows unwinder accepts. Such a compatibility record is admitted only
-                 * after its header, unwind-code slots and optional trailer are all file-backed
-                 * and structurally valid; alignment by itself never bypasses validation.
+                 * after its header, unwind-code slots and optional trailer are completely readable
+                 * from proven loaded bytes and structurally valid; alignment alone never bypasses validation.
                  *
                  * @param {number} unwindRva - RVA of the candidate UNWIND_INFO record.
                  * @returns {boolean} <code>true</code> for a complete supported record.
@@ -4775,13 +4775,18 @@ function scanForBadFileFormat_NET_and_Native() {
                  * @see {@link https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64?view=msvc-170} Microsoft x64 RUNTIME_FUNCTION, UNWIND_INFO and UNWIND_CODE specification
                  */
                 function isValidWordAlignedUnwindInfo(unwindRva) {
-                    var unwindAddress = PE_Cached.imageBase + unwindRva;
+                    var unwindAddress = PE_Cached.imageBase + unwindRva,
+                        unwindHeader = readFileBackedVirtualBytes(unwindAddress, 4);
 
-                    if (!isVirtualAddressRangeFileBacked(unwindAddress, 4, 0)) return false;
+                    if (!unwindHeader) {
+                        var unwindHeaderValue = readMappedUnsignedInteger(unwindAddress, 4);
 
-                    var unwindOffset = PE.VAToOffset(unwindAddress),
-                        unwindHeader = PE.readBytes(unwindOffset, 4),
-                        versionAndFlags = unwindHeader[0],
+                        if (unwindHeaderValue === -1) return false;
+
+                        unwindHeader = [unwindHeaderValue & 0xFF, (unwindHeaderValue >>> 8) & 0xFF, (unwindHeaderValue >>> 16) & 0xFF, unwindHeaderValue >>> 24];
+                    }
+
+                    var versionAndFlags = unwindHeader[0],
                         version = versionAndFlags & 0x07,
                         flags = versionAndFlags >>> 3,
                         prologSize = unwindHeader[1],
@@ -4805,10 +4810,22 @@ function scanForBadFileFormat_NET_and_Native() {
                         unwindInfoSize += 4; // Exception-handler RVA
                     }
 
-                    if (!isVirtualAddressRangeFileBacked(unwindAddress, unwindInfoSize, 0)) return false;
+                    var unwindInfo = unwindInfoSize === 4 ? unwindHeader : readFileBackedVirtualBytes(unwindAddress, unwindInfoSize);
 
-                    var unwindInfo = PE.readBytes(unwindOffset, unwindInfoSize),
-                        unwindCodeIndex = 0;
+                    // A complete loaded record may include virtual zeros; raw decoys outside the section are irrelevant.
+                    if (!unwindInfo) {
+                        unwindInfo = [];
+
+                        for (var unwindDataOffset = 0; unwindDataOffset < unwindInfoSize; unwindDataOffset += 4) {
+                            var unwindDataValue = readMappedUnsignedInteger(unwindAddress + unwindDataOffset, 4);
+
+                            if (unwindDataValue === -1) return false;
+
+                            unwindInfo.push(unwindDataValue & 0xFF, (unwindDataValue >>> 8) & 0xFF, (unwindDataValue >>> 16) & 0xFF, unwindDataValue >>> 24);
+                        }
+                    }
+
+                    var unwindCodeIndex = 0;
 
                     while (unwindCodeIndex < unwindCodeCount) {
                         var unwindCodeOffset = 4 + unwindCodeIndex * 2,
