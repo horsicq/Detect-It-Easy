@@ -12606,6 +12606,35 @@ function readFileBackedVirtualBytes(address, size) {
 
 
 /**
+ * Reads the four native address fields of a complete, physically backed TLS directory.
+ * Split sections use loaded order; inexact QWORD fields retain the existing unknown value.
+ *
+ * @param {number} address - Loaded address of IMAGE_TLS_DIRECTORY.
+ * @returns {number[]|undefined} Template start/end, index and callback-array VAs, or unknown.
+ * @see {@link https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#the-tls-directory} PE TLS directory layout
+ */
+function readFileBackedTlsDirectory(address) {
+    var pointerSize = PE_Cached.is64bit ? 8 : 4,
+        directoryData = readFileBackedVirtualBytes(address, pointerSize * 4 + 8);
+
+    if (!directoryData) return undefined;
+
+    var fields = [];
+
+    for (var i = 0; i < 4; i++) {
+        var fieldOffset = i * pointerSize,
+            lowDword = readUnsignedDwordFromBuffer(directoryData, fieldOffset),
+            highDword = PE_Cached.is64bit ? readUnsignedDwordFromBuffer(directoryData, fieldOffset + 4) : 0;
+
+        fields.push(highDword > 0x1FFFFF ? -1 : lowDword + highDword * 0x100000000);
+    }
+
+    return fields;
+}
+
+
+
+/**
  * Resolves a bounded, null-terminated PE TLS callback array from file-backed bytes.
  * Unknown or malformed metadata stays inconclusive; no callback is inferred merely
  * from the presence of a TLS data directory. Callback code is validated separately.
