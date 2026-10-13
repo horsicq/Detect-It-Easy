@@ -11314,6 +11314,7 @@ function scanForObfuscations_Native() {
             if (!opCode || opCode === "DB" || length < 1 || length > 15 ||
                 !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) break;
 
+            if (isEpProvenFaultingInstruction(instruction, opCode, preambleState.StackPointerZero)) break;
             var jump = instruction.match(directJump);
 
             if (opCode === "CALL") {
@@ -11331,7 +11332,7 @@ function scanForObfuscations_Native() {
             if (jump) {
                 address = parseInt(jump[1], 0);
             } else {
-                if (isEpLinearFallthroughUnproven(instruction, address, preambleState)) break;
+                if (isEpLinearFallthroughUnproven(instruction, address, preambleState, true)) break;
                 address += length;
             }
         }
@@ -11454,6 +11455,8 @@ function scanForObfuscations_Native() {
 
                 if (!opCode || opCode === "DB" || length < 1 || length > 15 ||
                     !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
+                // AAM with a zero radix faults before a later stack snapshot can execute.
+                if (/^AAM (?:0X0+|0+)$/i.test(instruction)) continue;
 
                 var ripStore = is64bit && instruction.match(ripStackStore),
                     absoluteStore = instruction.match(absoluteStackStore), jump = instruction.match(directJump),
