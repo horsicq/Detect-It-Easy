@@ -12963,6 +12963,39 @@ function isEpNativeNearTransfer(address, instruction, length) {
 
 
 /**
+ * Gets the stack-slot width of an already decoded x86 PUSH or PUSHF instruction.
+ * Effective REX.W overrides 66; a later legacy prefix discards that REX.
+ * Intel SDM Vol. 2A, 2.2.1: https://cdrdv2-public.intel.com/858446/253666-088-sdm-vol-2a.pdf
+ * The caller validates executable mapping; this helper bounds every raw prefix read.
+ *
+ * @param {number} address - Virtual address of the decoded PUSH instruction.
+ * @param {number} length - Complete decoded instruction length.
+ * @returns {number} Two, four or eight bytes, or zero when the instruction range is unproven.
+ */
+function getEpPushOperandSize(address, length) {
+    if (!PE_Cached.isArchX86 || !isFinite(address) || length < 1 || length > 15 || length % 1 !== 0) return 0;
+
+    var offset = PE.VAToOffset(address), hasWordOperand = false, hasRexW = false;
+    if (offset < 0 || offset + length > PE_Cached.fileSize) return 0;
+
+    for (var index = 0; index < length; index++) {
+        var prefix = PE.readByte(offset + index);
+        if (prefix === 0x66) {
+            hasWordOperand = true;
+            hasRexW = false;
+        } else if ([0xF2, 0xF3, 0x2E, 0x36, 0x3E, 0x26, 0x64, 0x65, 0x67].indexOf(prefix) !== -1) {
+            hasRexW = false;
+        } else if (PE_Cached.is64bit && prefix >= 0x40 && prefix <= 0x4F) {
+            hasRexW = (prefix & 8) !== 0;
+        } else return hasWordOperand && !hasRexW ? 2 : PE_Cached.isI386 ? 4 : 8;
+    }
+
+    return 0;
+}
+
+
+
+/**
  * Proves a bounded direct native control-flow graph reaches the same terminal on every path.
  * Direct conditional branches contribute both successors. Unknown calls or transfers,
  * undecodable bytes, cycles and exhausted budgets remain unproven rather than guessed.
