@@ -13027,6 +13027,11 @@ function getEpGuardedFlowEvidence() {
                 steps = old.Steps + 1;
                 kinds = old.Kinds | (/^(?:SHR|SHL|ROL|ROR)$/.test(operation[1]) ? 2 :
                     /^(?:AND|OR|XOR)$/.test(operation[1]) ? 4 : 1);
+                // A masked zero shift count changes neither flags nor arithmetic evidence.
+                if (/^(?:SHR|SHL|ROL|ROR)$/.test(operation[1]) && !shift) {
+                    steps = old.Steps;
+                    kinds = old.Kinds;
+                }
                 if (operation[1] === "ADD") value = (value + operand) >>> 0;
                 else if (operation[1] === "SUB") value = (value - operand) >>> 0;
                 else if (operation[1] === "AND") value = (value & operand) >>> 0;
@@ -13041,8 +13046,8 @@ function getEpGuardedFlowEvidence() {
             if (value === undefined || !isFinite(value)) delete next.Known[destination];
             else next.Known[destination] = { Value: value, Steps: steps, Kinds: kinds };
 
-            if (!move && (!operation || !/^(?:ROL|ROR)$/.test(operation[1]))) {
-                if (value === undefined || (operation && /^(?:SHR|SHL)$/.test(operation[1]) && !(parseInt(operation[3], 0) & 31))) {
+            if (!move && (!operation || !/^(?:ROL|ROR)$/.test(operation[1])) && !(operation && /^(?:SHR|SHL)$/.test(operation[1]) && !(parseInt(operation[3], 0) & 31))) {
+                if (value === undefined) {
                     next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
                 } else {
                     var parityByte = value & 0xFF, parityBits = 0;
