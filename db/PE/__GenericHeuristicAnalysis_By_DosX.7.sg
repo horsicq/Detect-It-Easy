@@ -9442,7 +9442,7 @@ function scanForObfuscations_Native() {
 
     if (PE_Cached.isEntryPointAnalysisAllowed && !PE_Cached.isDriver && PE_Cached.isArchX86 &&
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
-        var overlappingEpPendingPaths = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, KnownZeroRegisters: {}, ZeroFlag: -1, CarryFlag: -1 }],
+        var overlappingEpPendingPaths = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, KnownZeroRegisters: {}, ZeroFlag: -1, CarryFlag: -1, StackPointerZero: false }],
             overlappingEpVisitedStates = {},
             overlappingEpDecodedStarts = {},
             overlappingEpDecodedInteriors = {},
@@ -9456,7 +9456,8 @@ function scanForObfuscations_Native() {
                 overlappingEpCurrentAddress = overlappingEpPath.Address,
                 overlappingEpKnownZeroRegisters = overlappingEpPath.KnownZeroRegisters,
                 overlappingEpZeroFlag = overlappingEpPath.ZeroFlag,
-                overlappingEpCarryFlag = overlappingEpPath.CarryFlag;
+                overlappingEpCarryFlag = overlappingEpPath.CarryFlag,
+                overlappingEpStackPointerZero = overlappingEpPath.StackPointerZero;
 
             while (overlappingEpInstructionCount < 512) {
                 var currentEpInstruction = PE.getDisasmString(overlappingEpCurrentAddress),
@@ -9466,7 +9467,10 @@ function scanForObfuscations_Native() {
                 if (!currentEpOpCode || currentEpOpCode === "DB" || currentEpInstructionLength <= 0 || currentEpInstructionLength > 15 ||
                     !isVirtualAddressRangeFileBacked(overlappingEpCurrentAddress, currentEpInstructionLength, SECTION_FLAGS_EXECUTE)) break;
 
-                var overlappingEpStateKey = overlappingEpCurrentAddress + ":" + overlappingEpZeroFlag + ":" + overlappingEpCarryFlag + ":" + Object.keys(overlappingEpKnownZeroRegisters).sort().join(",");
+                if (PE_Cached.isI386 && /^AAM (?:0X0+|0+)$/i.test(currentEpInstruction)) break;
+                if (isEpProvenFaultingInstruction(currentEpInstruction, currentEpOpCode, overlappingEpStackPointerZero)) break;
+
+                var overlappingEpStateKey = overlappingEpCurrentAddress + ":" + overlappingEpZeroFlag + ":" + overlappingEpCarryFlag + ":" + overlappingEpStackPointerZero + ":" + Object.keys(overlappingEpKnownZeroRegisters).sort().join(",");
                 if (overlappingEpVisitedStates[overlappingEpStateKey]) break;
                 overlappingEpVisitedStates[overlappingEpStateKey] = true;
 
@@ -9491,6 +9495,7 @@ function scanForObfuscations_Native() {
                 }
 
                 overlappingEpInstructionCount++;
+                overlappingEpStackPointerZero = advanceEpStackPointerZero(currentEpInstruction, currentEpOpCode, overlappingEpStackPointerZero);
 
                 // A proven null dereference transfers control to an exception handler;
                 // physical bytes after it are not a reachable fall-through stream.
@@ -9525,7 +9530,7 @@ function scanForObfuscations_Native() {
                         isVirtualAddressRangeFileBacked(directControlFlowTarget, 1, SECTION_FLAGS_EXECUTE)) {
                         var branchZeroRegisters = {};
                         for (var zeroRegister in overlappingEpKnownZeroRegisters) branchZeroRegisters[zeroRegister] = true;
-                        overlappingEpPendingPaths.push({ Address: directControlFlowTarget, KnownZeroRegisters: branchZeroRegisters, ZeroFlag: nextZeroFlag, CarryFlag: nextCarryFlag });
+                        overlappingEpPendingPaths.push({ Address: directControlFlowTarget, KnownZeroRegisters: branchZeroRegisters, ZeroFlag: nextZeroFlag, CarryFlag: nextCarryFlag, StackPointerZero: overlappingEpStackPointerZero });
                     }
                 }
 
