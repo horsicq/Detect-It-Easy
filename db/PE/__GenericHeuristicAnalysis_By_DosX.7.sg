@@ -13699,8 +13699,8 @@ function getEpGuardedFlowEvidence() {
         immediateMove = new RegExp("^MOV (" + register32 + "|ESP), " + literal + "$", "i"),
         selfZero = new RegExp("^(?:SUB|XOR) (" + register32 + "), \\1$", "i"),
         arithmetic = new RegExp("^(ADD|SUB|AND|OR|XOR|SHR|SHL|ROL|ROR) (" + register32 + "), " + literal + "$", "i"),
-        ripAddress = new RegExp("^LEA (" + register64 + "), \\[RIP ([+-]) (0X[0-9A-F]+|[0-9]+)\\]$", "i"),
-        absoluteLea = new RegExp("^LEA (" + register64 + "), \\[(0X[0-9A-F]+|[0-9]+)\\]$", "i"),
+        ripAddress = new RegExp("^LEA (" + register32 + "|" + register64 + "), \\[(?:RIP|EIP) ([+-]) (0X[0-9A-F]+|[0-9]+)\\]$", "i"),
+        absoluteLea = new RegExp("^LEA (" + register32 + "|" + register64 + "), (?:(?:CS|DS|ES|SS|FS|GS):)?\\[(?:[RE]IZ\\*(?:1|2|4|8) \\+ )?(0X[0-9A-F]+|[0-9]+)\\]$", "i"),
         basedLea = new RegExp("^LEA (" + addressRegister + "), \\[(" + addressRegister + ")(?: ([+-]) (0X[0-9A-F]+|[0-9]+))?\\]$", "i"),
         nativeMove = new RegExp("^MOV(?:ABS)? (" + register64 + "|RSP), " + literal + "$", "i"),
         nativeArithmetic = new RegExp("^(ADD|SUB) (" + register64 + "), " + literal + "$", "i"),
@@ -13801,8 +13801,8 @@ function getEpGuardedFlowEvidence() {
         } else if (rip || absolute || based || native || nativeOp || copy) {
             var targetRegister = getNativeRegisterKey((rip || absolute || based || native || nativeOp || copy)[1 + (nativeOp ? 1 : 0)]), target = undefined;
 
-            if (rip) target = address + length + (rip[2] === "-" ? -1 : 1) * parseInt(rip[3], 0);
-            else if (absolute) target = parseInt(absolute[2], 0);
+            if (rip) target = getEpEncodedLeaTarget(address, instruction, length);
+            else if (absolute) target = getEpEncodedLeaTarget(address, instruction, length);
             else if (based && next.Known[getNativeRegisterKey(based[2])]) target = next.Known[getNativeRegisterKey(based[2])].Value +
                 (based[4] ? (based[3] === "-" ? -1 : 1) * parseInt(based[4], 0) : 0);
             else if (native) target = parseInt(native[2], 0);
