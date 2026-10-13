@@ -4537,7 +4537,11 @@ function scanForBadFileFormat_NET_and_Native() {
                         var delayImportPointerAddress = delayImportPointer + (isDelayImportRvaBased ? PE_Cached.imageBase : 0);
 
                         if (d === 2) {
-                            isInvalidDelayImportDescriptorPresent = !isVirtualAddressRangeMapped(delayImportPointerAddress, 1, 0);
+                            // delayimp stores an entire HMODULE here, not merely its first byte.
+                            var delayImportModuleHandleSize = PE_Cached.is64bit ? 8 : 4;
+
+                            // Writable storage may span adjacent sections, including their zero-filled tails.
+                            isInvalidDelayImportDescriptorPresent = !isVirtualAddressRangeMapped(delayImportPointerAddress, delayImportModuleHandleSize, 0) && !readFileBackedVirtualBytes(delayImportPointerAddress, delayImportModuleHandleSize) && !isBadFormatRangeCovered(delayImportPointerAddress - PE_Cached.imageBase, delayImportPointerAddress - PE_Cached.imageBase + delayImportModuleHandleSize - 1);
                         } else {
                             var delayImportPointerOffset = PE.VAToOffset(delayImportPointerAddress),
                                 delayImportPointerSize = d === 1 ? 1 : (PE_Cached.is64bit ? 8 : 4);
