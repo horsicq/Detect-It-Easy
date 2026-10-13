@@ -5389,30 +5389,19 @@ function scanForBadFileFormat_NET_and_Native() {
             tlsDirectorySize = PE.read_uint32(tlsDirectoryEntryOffset + 4),
             tlsDirectoryMinimumSize = PE_Cached.is64bit ? 0x28 : 0x18,
             tlsDirectoryAddress = PE_Cached.imageBase + tlsDirectoryRva,
-            isTlsDirectoryFileBacked = tlsDirectoryRva !== 0 && isVirtualAddressRangeFileBacked(tlsDirectoryAddress, tlsDirectoryMinimumSize, 0),
-            tlsDirectoryOffset = isTlsDirectoryFileBacked ? PE.VAToOffset(tlsDirectoryAddress) : -1;
+            tlsDirectoryFields = tlsDirectoryRva !== 0 && tlsDirectorySize >= tlsDirectoryMinimumSize ? readFileBackedTlsDirectory(tlsDirectoryAddress) : undefined;
 
-        if (tlsDirectorySize >= tlsDirectoryMinimumSize && !isTlsDirectoryFileBacked) {
+        if (tlsDirectorySize >= tlsDirectoryMinimumSize && !tlsDirectoryFields) {
             log(logType.any, "TLS directory is not file-backed");
 
             isInvalidTlsMetadataPresent = true;
         }
 
-        if (tlsDirectorySize >= tlsDirectoryMinimumSize && tlsDirectoryOffset !== -1 &&
-            tlsDirectoryOffset + tlsDirectoryMinimumSize <= PE_Cached.fileSize) {
-            var tlsTemplateStartAddress, tlsTemplateEndAddress, tlsIndexAddress, tlsCallbacksAddress;
-
-            if (PE_Cached.is64bit) {
-                tlsTemplateStartAddress = readUnsignedQword(tlsDirectoryOffset);
-                tlsTemplateEndAddress = readUnsignedQword(tlsDirectoryOffset + 0x08);
-                tlsIndexAddress = readUnsignedQword(tlsDirectoryOffset + 0x10);
-                tlsCallbacksAddress = readUnsignedQword(tlsDirectoryOffset + 0x18);
-            } else {
-                tlsTemplateStartAddress = PE.read_uint32(tlsDirectoryOffset);
-                tlsTemplateEndAddress = PE.read_uint32(tlsDirectoryOffset + 0x04);
-                tlsIndexAddress = PE.read_uint32(tlsDirectoryOffset + 0x08);
-                tlsCallbacksAddress = PE.read_uint32(tlsDirectoryOffset + 0x0C);
-            }
+        if (tlsDirectoryFields) {
+            var tlsTemplateStartAddress = tlsDirectoryFields[0],
+                tlsTemplateEndAddress = tlsDirectoryFields[1],
+                tlsIndexAddress = tlsDirectoryFields[2],
+                tlsCallbacksAddress = tlsDirectoryFields[3];
 
             if (tlsTemplateStartAddress !== -1 && tlsTemplateEndAddress !== -1 &&
                 tlsTemplateStartAddress !== 0 && tlsTemplateEndAddress !== 0 &&
