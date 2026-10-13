@@ -13837,7 +13837,7 @@ function getEpGuardedFlowEvidence() {
             if (next.StackTarget < 0 || next.StackTarget > 0x1FFFFFFFFFFFFF || !isFinite(next.StackTarget)) next.StackTarget = undefined;
             next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
         } else if (/^RET(?:N)?$/.test(opCode)) {
-            if (next.StackTarget !== undefined && isVirtualAddressRangeFileBacked(next.StackTarget, 1, SECTION_FLAGS_EXECUTE)) {
+            if (isEpNativeNearTransfer(address, instruction, length) && next.StackTarget !== undefined && isVirtualAddressRangeFileBacked(next.StackTarget, 1, SECTION_FLAGS_EXECUTE)) {
                 evidence.ReturnTarget = next.StackTarget;
             }
             continue;
@@ -13847,7 +13847,10 @@ function getEpGuardedFlowEvidence() {
                 callReturnProven = indirectCallTarget ? isEpBoundedDirectFlowProven(indirectCallTarget.Value, /^RET(?:N)?(?: (?:0X[0-9A-F]+|\d+))?$/i) : isEpDirectCallReturnProven(address);
 
             // A possible return is not evidence: unknown indirect calls must not expose unreachable fall-through.
-            if (callReturnProven) {
+            if (callReturnProven && isEpNativeNearTransfer(address, instruction, length)) {
+                // The callee cannot return when native CALL first writes its return address to zero.
+                if (next.Known.RSP && next.Known.RSP.Value === (PE_Cached.isI386 ? 4 : 8)) continue;
+
                 next.Known = {};
                 next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
                 next.StackTarget = undefined;
@@ -13862,6 +13865,9 @@ function getEpGuardedFlowEvidence() {
             else if (opCode === "JNS") outcome = next.Flags.SF === -1 ? -1 : 1 - next.Flags.SF;
             else if (opCode === "JE" || opCode === "JZ") outcome = next.Flags.ZF;
             else if (opCode === "JNE" || opCode === "JNZ") outcome = next.Flags.ZF === -1 ? -1 : 1 - next.Flags.ZF;
+
+            // Operand width affects only a taken transfer, not its proven untaken continuation.
+            if (outcome !== 0 && !isEpNativeNearTransfer(address, instruction, length)) continue;
 
             // A Jcc to its continuation has identical successors; the separate degenerate-Jcc rule owns it.
             if (opCode !== "JMP" && branchTarget !== next.Address && outcome !== -1 && next.Flags.Steps >= 3 &&
