@@ -13820,19 +13820,25 @@ function getFirstEpAsmInstruction() {
 
 
 /**
- * Extracts the leading opcode token from a disassembled instruction.
+ * Extracts the leading opcode token and normalizes legacy far-transfer spellings.
+ * LCALL/LJMP/LRET must use existing CALL/JMP/RETF stop paths; the original instruction
+ * still controls near-transfer and direct-target proofs, so no far return is assumed.
  *
  * @param {string} instruction - The assembly instruction.
- * @returns {string|undefined} The opcode, the original one-token instruction, or a falsy input.
+ * @returns {string|undefined} The normalized opcode, the original one-token instruction, or a falsy input.
  * @example
  * getAsmOpCode("MOV EAX, 4"); // "MOV"
  */
 function getAsmOpCode(instruction) {
     if (!instruction) return instruction;
 
-    const separatorIndex = instruction.indexOf(" ");
+    const separatorIndex = instruction.indexOf(" "), opCode = separatorIndex === -1 ? instruction : instruction.substring(0, separatorIndex);
 
-    return separatorIndex === -1 ? instruction : instruction.substring(0, separatorIndex);
+    if (opCode === "LCALL") return "CALL";
+    if (opCode === "LJMP") return "JMP";
+    if (opCode === "LRET") return "RETF";
+
+    return opCode;
 }
 
 
