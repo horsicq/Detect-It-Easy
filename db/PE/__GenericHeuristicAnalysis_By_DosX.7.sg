@@ -1717,7 +1717,7 @@ function scanForAntiAnalysis_Native() {
             antiDebugPebAddress = PE_Cached.isI386 ? "(?:0X0*30|48)" : "(?:0X0*60|96)",
             antiDebugPebFieldOffset = PE_Cached.isI386 ? "(?:0X0*(?:2|68)|2|104)" : "(?:0X0*(?:2|BC)|2|188)",
             antiDebugPebLoadPattern = new RegExp("^MOV (" + antiDebugNativeRegister + "), (?:(?:DWORD|QWORD) PTR )?" + antiDebugPebSegment + ":\\[" + antiDebugPebAddress + "\\]$", "i"),
-            antiDebugPebFieldAccessPattern = new RegExp("\\[(" + antiDebugNativeRegister + ") ?\\+ ?" + antiDebugPebFieldOffset + "\\]", "i"),
+            antiDebugPebFieldAccessPattern = new RegExp("(?:^| )(?:(?:CS|DS|ES|SS):)?\\[(" + antiDebugNativeRegister + ") ?\\+ ?" + antiDebugPebFieldOffset + "\\]", "i"),
             antiDebugRegisterCopyPattern = new RegExp("^MOV (" + antiDebugNativeRegister + "), (" + antiDebugNativeRegister + ")$", "i"),
             antiDebugRegisterWritePattern = new RegExp("^(?:MOV(?:ABS)?|MOVZX|MOVSX|MOVSXD|LEA|XOR|ADD|SUB|ADC|SBB|AND|OR|NOT|NEG|INC|DEC|POP) (" + antiDebugGeneralPurposeRegister + ")(?:,|$)", "i"),
             antiDebugPartialRegisterWritePattern = /^(?:MOV|XOR|ADD|SUB|AND|OR|NOT|NEG|INC|DEC) ((?:[ABCD][HL]|[ABCD]X|SI|DI|BP|SIL|DIL|BPL|R(?:8|9|1[0-5])(?:B|W)))(?:,|$)/i,
@@ -1762,6 +1762,7 @@ function scanForAntiAnalysis_Native() {
                 isNativeAntiDebugPresent = true;
             } else if (isPebDebugFieldAccess) {
                 // Accept a debug-field read only through a register proven to contain the PEB.
+                // FS/GS add their own base to that pointer, so their reads do not prove a PEB field access.
                 log(logType.emulation, "PEB debug-field access near EP: " + currentEpInstruction);
 
                 nativeAntiDebugType = "PEB";
