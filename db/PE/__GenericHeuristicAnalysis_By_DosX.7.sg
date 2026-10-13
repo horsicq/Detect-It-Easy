@@ -13671,7 +13671,7 @@ function advanceEpStackPointerZero(instruction, opCode, isZero, knownAddresses) 
 
 
 /**
- * Rejects a physical EP fall-through when a conditional branch may skip it.
+ * Rejects a physical EP fall-through skipped by a branch or a proven mandatory fault.
  * The caller owns a separate flag state for each physical instruction sweep.
  * The EP cache and the manual x87 sweep supply consecutive decoded instructions;
  * only branches need another engine length lookup. An unknown branch ends the
@@ -13679,29 +13679,39 @@ function advanceEpStackPointerZero(instruction, opCode, isZero, knownAddresses) 
  *
  * @param {string} instruction - Current decoded instruction.
  * @param {number} address - Virtual address of the current instruction.
- * @param {Object} state - Caller-owned ZF/CF facts for one physical sweep.
+ * @param {Object} state - Caller-owned flag and zero-stack-pointer facts for one sweep.
+ * @param {boolean} [isPathContinuation] - Preserve facts when a validated CFG edge revisits a lower address.
  * @returns {boolean} Whether subsequent physical bytes lack proven reachability.
  */
-function isEpLinearFallthroughUnproven(instruction, address, state) {
+function isEpLinearFallthroughUnproven(instruction, address, state, isPathContinuation) {
     if (!isFinite(address)) return true;
 
-    if (state.PreviousAddress === undefined || address <= state.PreviousAddress) {
+    if (state.PreviousAddress === undefined || (!isPathContinuation && address <= state.PreviousAddress)) {
         state.ZeroFlag = -1;
         state.CarryFlag = -1;
+        state.StackPointerZero = false;
         state.PreviousInstruction = String();
     }
 
     var opCode = getAsmOpCode(instruction),
         branch = instruction && instruction.match(/^(J(?!MP)[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
 
+    // AAM with a zero base raises #DE before any ordinary fall-through, independently of AL.
+    // Intel SDM, AAM "Protected Mode Exceptions": https://cdrdv2-public.intel.com/858446/253666-088-sdm-vol-2a.pdf
+    if (/^AAM (?:0X0+|0+)$/i.test(instruction)) return true;
+    if (isEpProvenFaultingInstruction(instruction, opCode, state.StackPointerZero)) return true;
+    state.StackPointerZero = advanceEpStackPointerZero(instruction, opCode, state.StackPointerZero);
+
     if (branch) {
         var length = PE.getDisasmLength(address);
         if (!isFinite(length) || length < 1 || length > 15 || length % 1 !== 0) return true;
 
-        if (parseInt(branch[2], 0) !== address + length &&
-            getEpKnownBranchResult(opCode, state.ZeroFlag, state.CarryFlag) !== 0 &&
-            !(/^(?:XOR|SUB|CMP) ([A-Z][A-Z0-9]*), \1$/i.test(state.PreviousInstruction) &&
-                /^(?:JA|JNBE|JB|JNAE|JC|JG|JNLE|JL|JNGE|JNE|JNZ|JO|JNP|JPO|JS)$/.test(opCode))) return true;
+        var isKnownUntaken = getEpKnownBranchResult(opCode, state.ZeroFlag, state.CarryFlag) === 0 ||
+            (/^(?:XOR|SUB|CMP) ([A-Z][A-Z0-9]*), \1$/i.test(state.PreviousInstruction) && /^(?:JA|JNBE|JB|JNAE|JC|JG|JNLE|JL|JNGE|JNE|JNZ|JO|JNP|JPO|JS)$/.test(opCode));
+
+        // A word-sized taken branch truncates EIP even when the decoder prints the physical next address.
+        if (!isKnownUntaken && !isEpNativeNearTransfer(address, instruction, length)) return true;
+        if (parseInt(branch[2], 0) !== address + length && !isKnownUntaken) return true;
     }
 
     state.ZeroFlag = advanceEpZeroFlag(instruction, opCode, state.ZeroFlag);
