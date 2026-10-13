@@ -13678,8 +13678,8 @@ function isEpDirectCallReturnProven(callAddress) {
 /**
  * Finds constant arithmetic branches and computed stack/RET transfers on a bounded
  * entry-point graph. Direct jumps and conditional edges are decoded at their real
- * targets. An indirect CALL contributes only a possible return edge: the result
- * describes code reachable if that call returns, never a guaranteed runtime path.
+ * targets. Calls expose their continuation only through a bounded return proof;
+ * unknown callees cannot expose later physical bytes as reachable evidence.
  * Register constants are discarded at calls and unknown register writes;
  * ROL/ROR preserve PF, SF and ZF, so their following Jcc must use the preceding
  * flag producer. The returned addresses are absent when a proof is unavailable.
@@ -13696,13 +13696,13 @@ function getEpGuardedFlowEvidence() {
         register64 = "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
         addressRegister = PE_Cached.isI386 ? register32 : register64,
         literal = "(-?(?:0X[0-9A-F]+|[0-9]+))",
-        immediateMove = new RegExp("^MOV (" + register32 + "), " + literal + "$", "i"),
+        immediateMove = new RegExp("^MOV (" + register32 + "|ESP), " + literal + "$", "i"),
         selfZero = new RegExp("^(?:SUB|XOR) (" + register32 + "), \\1$", "i"),
         arithmetic = new RegExp("^(ADD|SUB|AND|OR|XOR|SHR|SHL|ROL|ROR) (" + register32 + "), " + literal + "$", "i"),
         ripAddress = new RegExp("^LEA (" + register64 + "), \\[RIP ([+-]) (0X[0-9A-F]+|[0-9]+)\\]$", "i"),
         absoluteLea = new RegExp("^LEA (" + register64 + "), \\[(0X[0-9A-F]+|[0-9]+)\\]$", "i"),
         basedLea = new RegExp("^LEA (" + addressRegister + "), \\[(" + addressRegister + ")(?: ([+-]) (0X[0-9A-F]+|[0-9]+))?\\]$", "i"),
-        nativeMove = new RegExp("^MOV(?:ABS)? (" + register64 + "), " + literal + "$", "i"),
+        nativeMove = new RegExp("^MOV(?:ABS)? (" + register64 + "|RSP), " + literal + "$", "i"),
         nativeArithmetic = new RegExp("^(ADD|SUB) (" + register64 + "), " + literal + "$", "i"),
         registerCopy = new RegExp("^MOV (" + register32 + "|" + register64 + "), (" + register32 + "|" + register64 + ")$", "i"),
         stackExchange = PE_Cached.isI386 ? /^XCHG DWORD PTR \[ESP\], (E(?:AX|BX|CX|DX|SI|DI|BP))$/i :
@@ -13715,7 +13715,7 @@ function getEpGuardedFlowEvidence() {
             /^(ADD|SUB) QWORD PTR \[RSP\], (-?(?:0X[0-9A-F]+|[0-9]+))$/i,
         directBranch = /^(J[A-Z]+) (0X[0-9A-F]+|[0-9]+)$/i;
 
-    var pending = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, Known: {}, Flags: { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 }, StackTarget: undefined }],
+    var pending = [{ Address: PE_Cached.addressOfUnmanagedEntryPoint, Known: {}, Flags: { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 }, StackTarget: undefined, StackPointerZero: false }],
         visited = {}, processed = 0;
 
     while (pending.length && processed < 1024 && (evidence.OpaqueBranchAddress === -1 || evidence.ReturnTarget === undefined)) {
@@ -13723,20 +13723,22 @@ function getEpGuardedFlowEvidence() {
         if (!isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) continue;
 
         var key = address + ":" + state.Flags.PF + ":" + state.Flags.SF + ":" + state.Flags.ZF + ":" +
-            state.Flags.Steps + ":" + state.Flags.Kinds + ":" + state.StackTarget + ":" + JSON.stringify(state.Known);
+            state.Flags.Steps + ":" + state.Flags.Kinds + ":" + state.StackTarget + ":" + state.StackPointerZero + ":" + JSON.stringify(state.Known);
         if (visited[key]) continue;
         visited[key] = true;
 
         var instruction = PE.getDisasmString(address), length = PE.getDisasmLength(address), opCode = getAsmOpCode(instruction);
 
-        if (!opCode || length < 1 || length > 15 || !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
+        if (!opCode || opCode === "DB" || length < 1 || length > 15 || !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
+        if (/^AAM (?:0X0+|0+)$/i.test(instruction)) continue;
+        if (isEpProvenFaultingInstruction(instruction, opCode, state.StackPointerZero, state.Known)) continue;
         processed++;
 
         var next = {
             Address: address + length, Known: {}, Flags: {
                 PF: state.Flags.PF, SF: state.Flags.SF, ZF: state.Flags.ZF,
                 Steps: state.Flags.Steps, Kinds: state.Flags.Kinds
-            }, StackTarget: state.StackTarget
+            }, StackTarget: state.StackTarget, StackPointerZero: advanceEpStackPointerZero(instruction, opCode, state.StackPointerZero, state.Known)
         };
         for (var register in state.Known) next.Known[register] = state.Known[register];
 
@@ -13783,6 +13785,7 @@ function getEpGuardedFlowEvidence() {
 
             if (value === undefined || !isFinite(value)) delete next.Known[destination];
             else next.Known[destination] = { Value: value, Steps: steps, Kinds: kinds };
+            if (destination === "RSP") next.StackTarget = undefined;
 
             if (!move && (!operation || !/^(?:ROL|ROR)$/.test(operation[1])) && !(operation && /^(?:SHR|SHL)$/.test(operation[1]) && !(parseInt(operation[3], 0) & 31))) {
                 if (value === undefined) {
@@ -13808,8 +13811,12 @@ function getEpGuardedFlowEvidence() {
             if (copy && /^(?:E[A-Z]{2}|R(?:8|9|1[0-5])D)$/.test(copy[1]) && target !== undefined) target >>>= 0;
             if (isFinite(target) && target >= 0 && target <= 0x1FFFFFFFFFFFFF) next.Known[targetRegister] = { Value: target, Steps: 0, Kinds: 0 };
             else delete next.Known[targetRegister];
+            if (targetRegister === "RSP") next.StackTarget = undefined;
             if (nativeOp) next.Flags = { PF: -1, SF: -1, ZF: -1, Steps: 0, Kinds: 0 };
         } else if (exchange || store || push) {
+            // Native PUSH decrements SP before writing; a proven slot at zero cannot become a return target.
+            if (push && next.Known.RSP && next.Known.RSP.Value === (PE_Cached.isI386 ? 4 : 8)) continue;
+
             var exchangedRegister = getNativeRegisterKey((exchange || store || push)[1]), knownTarget = next.Known[exchangedRegister];
             next.StackTarget = knownTarget ? knownTarget.Value : undefined;
             if (exchange) delete next.Known[exchangedRegister];
@@ -13864,7 +13871,7 @@ function getEpGuardedFlowEvidence() {
 
             if (opCode !== "JMP" && outcome !== 1) pending.push(next);
             if (outcome !== 0 && isVirtualAddressRangeFileBacked(branchTarget, 1, SECTION_FLAGS_EXECUTE)) {
-                var taken = { Address: branchTarget, Known: next.Known, Flags: next.Flags, StackTarget: next.StackTarget };
+                var taken = { Address: branchTarget, Known: next.Known, Flags: next.Flags, StackTarget: next.StackTarget, StackPointerZero: next.StackPointerZero };
                 pending.push(taken);
             }
             continue;
