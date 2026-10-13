@@ -5266,10 +5266,9 @@ function scanForBadFileFormat_NET_and_Native() {
             loadConfigDirectoryAddress = PE_Cached.imageBase + loadConfigDirectoryRva,
             guardCfMinimumLoadConfigSize = PE_Cached.is64bit ? 0x94 : 0x5C;
 
-        if (loadConfigDirectoryRva !== 0 && loadConfigDirectorySize >= 4 &&
-            isVirtualAddressRangeFileBacked(loadConfigDirectoryAddress, loadConfigDirectorySize, 0)) {
-            var loadConfigDirectoryOffset = PE.VAToOffset(loadConfigDirectoryAddress),
-                declaredLoadConfigSize = PE.read_uint32(loadConfigDirectoryOffset),
+        // Only the consumed prefix needs bytes; loaded fields may cross unrelated raw section offsets.
+        if (loadConfigDirectoryRva !== 0 && loadConfigDirectorySize >= 4 && (isVirtualAddressRangeFileBacked(loadConfigDirectoryAddress, loadConfigDirectorySize, 0) || readFileBackedVirtualBytes(loadConfigDirectoryAddress, Math.min(loadConfigDirectorySize, guardCfMinimumLoadConfigSize)))) {
+            var declaredLoadConfigSize = readMappedUnsignedInteger(loadConfigDirectoryAddress, 4),
                 effectiveLoadConfigSize = Math.min(loadConfigDirectorySize, declaredLoadConfigSize);
 
             if (effectiveLoadConfigSize >= guardCfMinimumLoadConfigSize) {
@@ -5280,15 +5279,11 @@ function scanForBadFileFormat_NET_and_Native() {
                     guardCfFunctionTableOffset = PE_Cached.is64bit ? 0x80 : 0x50,
                     guardCfFunctionCountOffset = PE_Cached.is64bit ? 0x88 : 0x54,
                     guardCfFlagsOffset = PE_Cached.is64bit ? 0x90 : 0x58,
-                    guardCfCheckPointer = PE_Cached.is64bit ? readUnsignedQword(loadConfigDirectoryOffset + guardCfCheckPointerOffset) :
-                        PE.read_uint32(loadConfigDirectoryOffset + guardCfCheckPointerOffset),
-                    guardCfDispatchPointer = PE_Cached.is64bit ? readUnsignedQword(loadConfigDirectoryOffset + guardCfDispatchPointerOffset) :
-                        PE.read_uint32(loadConfigDirectoryOffset + guardCfDispatchPointerOffset),
-                    guardCfFunctionTable = PE_Cached.is64bit ? readUnsignedQword(loadConfigDirectoryOffset + guardCfFunctionTableOffset) :
-                        PE.read_uint32(loadConfigDirectoryOffset + guardCfFunctionTableOffset),
-                    guardCfFunctionCount = PE_Cached.is64bit ? readUnsignedQword(loadConfigDirectoryOffset + guardCfFunctionCountOffset) :
-                        PE.read_uint32(loadConfigDirectoryOffset + guardCfFunctionCountOffset),
-                    guardCfFlags = PE.read_uint32(loadConfigDirectoryOffset + guardCfFlagsOffset),
+                    guardCfCheckPointer = readMappedUnsignedInteger(loadConfigDirectoryAddress + guardCfCheckPointerOffset, PE_Cached.is64bit ? 8 : 4),
+                    guardCfDispatchPointer = readMappedUnsignedInteger(loadConfigDirectoryAddress + guardCfDispatchPointerOffset, PE_Cached.is64bit ? 8 : 4),
+                    guardCfFunctionTable = readMappedUnsignedInteger(loadConfigDirectoryAddress + guardCfFunctionTableOffset, PE_Cached.is64bit ? 8 : 4),
+                    guardCfFunctionCount = readMappedUnsignedInteger(loadConfigDirectoryAddress + guardCfFunctionCountOffset, PE_Cached.is64bit ? 8 : 4),
+                    guardCfFlags = readMappedUnsignedInteger(loadConfigDirectoryAddress + guardCfFlagsOffset, 4),
                     isGuardCfMetadataDeclared = (PE.getImageOptionalHeader("DllCharacteristics") &
                         IMAGE_DLLCHARACTERISTICS_GUARD_CF) || (guardCfFlags & 0x00000700);
 
