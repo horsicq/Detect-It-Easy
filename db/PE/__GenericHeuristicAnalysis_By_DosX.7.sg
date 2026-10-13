@@ -13473,7 +13473,7 @@ function getEpEncodedLeaTarget(address, instruction, length) {
 
 /**
  * Proves a bounded direct native control-flow graph reaches the same terminal on every path.
- * Direct conditional branches contribute both successors. Unknown calls or transfers,
+ * Direct conditional branches, including counter-based LOOPs, contribute both successors. Unknown calls or transfers,
  * undecodable bytes, cycles and exhausted budgets remain unproven rather than guessed.
  *
  * Multi-byte NOP operands are architectural no-ops and do not access memory.
@@ -13485,10 +13485,12 @@ function getEpEncodedLeaTarget(address, instruction, length) {
 function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
     var pending = [startAddress], nextIndex = 0, nodes = {}, nodeCount = 0;
 
-    while (nextIndex < pending.length && nodeCount < 64) {
+    while (nextIndex < pending.length) {
         var address = pending[nextIndex++], key = address.toString();
 
         if (nodes.hasOwnProperty(key)) continue;
+        // Duplicate successors do not consume the unique-node budget or invalidate a completed graph.
+        if (nodeCount >= 64) break;
         if (!isVirtualAddressRangeFileBacked(address, 1, SECTION_FLAGS_EXECUTE)) break;
 
         var instruction = PE.getDisasmString(address),
@@ -13499,11 +13501,14 @@ function isEpBoundedDirectFlowProven(startAddress, terminalPattern) {
         if (!opCode || opCode === "DB" || length < 1 || length > 15 ||
             !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) break;
 
+        if (isTerminal && /^(?:RET|RETN)$/.test(opCode) && !isEpNativeNearTransfer(address, instruction, length)) break;
+
         var successors = [], nextAddress = address + length,
-            directBranch = instruction && instruction.match(/^(J[A-Z]+) (0X[0-9A-F]+|\d+)$/i);
+            directBranch = instruction && instruction.match(/^(J[A-Z]+|LOOP(?:E|NE|NZ|Z)?) (0X[0-9A-F]+|\d+)$/i);
 
         if (!isTerminal) {
             if (directBranch && opCode !== "JMPF") {
+                if (!isEpNativeNearTransfer(address, instruction, length)) break;
                 successors.push(parseInt(directBranch[2], 0));
                 if (opCode !== "JMP") successors.push(nextAddress);
             } else if (opCode === "NOP" || /^(?:PAUSE|ENDBR32|ENDBR64)$/.test(instruction)) {
