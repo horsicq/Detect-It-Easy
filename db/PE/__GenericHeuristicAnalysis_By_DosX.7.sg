@@ -7262,9 +7262,12 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
         } else if ((match = instruction.match(absolutePattern))) setRegister(next, match[1], parseInt(match[2], 0));
         else if ((match = instruction.match(arithmeticPattern))) {
             var oldValue = next[registerKey(match[2])];
+            // A dword operation truncates its input before arithmetic, avoiding an inexact qword sum.
+            if (oldValue !== undefined && /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(match[2])) oldValue >>>= 0;
             setRegister(next, match[2], oldValue === undefined ? undefined : oldValue + parseInt(match[3], 0) * (match[1] === "SUB" ? -1 : 1));
         } else if ((match = instruction.match(unaryPattern))) {
             var oldValue = next[registerKey(match[2])];
+            if (oldValue !== undefined && /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(match[2])) oldValue >>>= 0;
             setRegister(next, match[2], oldValue === undefined ? undefined : oldValue + (match[1] === "INC" ? 1 : -1));
         } else if ((match = instruction.match(writePattern))) {
             delete next[registerKey(match[1])];
