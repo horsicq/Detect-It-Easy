@@ -16924,13 +16924,40 @@ function scanForMaliciousCode_NET_and_Native() {
     if (verdicts.length === 0 && PE_Cached.isEntryPointAnalysisAllowed && PE_Cached.isArchX86) {
         var pariteAddress = PE_Cached.addressOfUnmanagedEntryPoint,
             pariteLoopCount = 0,
-            pariteState = 0; // 0 = initial, 1 = Push/Xor found, 2 = Sub found
+            pariteState = 0, // 0 = initial, 1 = Push/Xor found, 2 = Sub found
+            pariteVisitedAddresses = {},
+            pariteStackPointerZero = false;
+
+        const pariteStopOpCodes = ["RET", "RETN", "RETF", "IRET", "IRETD", "IRETQ", "HLT", "UD2", "INT3", "CALL"];
 
         for (var i = 0; i < 364; i++) {
-            var currentInstruction = PE.getDisasmString(pariteAddress),
-                currentOpCode = getAsmOpCode(currentInstruction);
+            if (pariteVisitedAddresses[pariteAddress] || !isVirtualAddressRangeFileBacked(pariteAddress, 1, SECTION_FLAGS_EXECUTE)) break;
 
-            if (!currentInstruction) break; // Safety check
+            var currentInstruction = PE.getDisasmString(pariteAddress),
+                currentOpCode = getAsmOpCode(currentInstruction),
+                nextPariteAddress = PE.getDisasmNextAddress(pariteAddress),
+                currentInstructionSize = nextPariteAddress - pariteAddress;
+
+            if (!currentInstruction || currentInstructionSize < 1 || currentInstructionSize > 15 ||
+                !isVirtualAddressRangeFileBacked(pariteAddress, currentInstructionSize, SECTION_FLAGS_EXECUTE)) break;
+
+            pariteVisitedAddresses[pariteAddress] = true;
+
+            // Do not classify patterns in physical bytes after a terminal transfer or mandatory fault.
+            if (isEpLinearScanStopped(currentOpCode, pariteAddress, pariteStopOpCodes) ||
+                isEpProvenFaultingInstruction(currentInstruction, currentOpCode, pariteStackPointerZero) || /^AAM (?:0X0+|0+)$/i.test(currentInstruction) ||
+                (currentOpCode === "JNE" && !isEpNativeNearTransfer(pariteAddress, currentInstruction, currentInstructionSize))) break;
+
+            pariteStackPointerZero = advanceEpStackPointerZero(currentInstruction, currentOpCode, pariteStackPointerZero);
+
+            if (currentOpCode === "JMP") {
+                var pariteJumpTarget = currentInstruction.match(/^JMP (0X[0-9A-F]+|\d+)$/i);
+                if (!pariteJumpTarget || !isEpNativeNearTransfer(pariteAddress, currentInstruction, currentInstructionSize)) break;
+
+                pariteAddress = parseInt(pariteJumpTarget[1], 0);
+                pariteState = 0;
+                continue;
+            }
 
             switch (pariteState) {
                 case 0:
@@ -16963,7 +16990,7 @@ function scanForMaliciousCode_NET_and_Native() {
                     break;
             }
 
-            pariteAddress = PE.getDisasmNextAddress(pariteAddress);
+            pariteAddress = nextPariteAddress;
         }
 
         if (pariteLoopCount >= 0x20) {
