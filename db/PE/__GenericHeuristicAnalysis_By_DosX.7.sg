@@ -13624,6 +13624,53 @@ function isEpProvenFaultingInstruction(instruction, opCode, isStackPointerZero, 
 
 
 /**
+ * Tracks only a directly proven zero native stack pointer in user-mode x86 code.
+ * Unrelated instructions preserve this fact; unproven replacement or partial writes
+ * discard it. Native/dword replacements may reuse existing constants when provided.
+ * A zero pointer alone is not a fault until a mandatory memory or stack access occurs.
+ *
+ * @param {string} instruction - Current decoded instruction.
+ * @param {string} opCode - Current instruction mnemonic.
+ * @param {boolean} isZero - Whether the incoming native stack pointer is proven zero.
+ * @param {Object} [knownAddresses] - Optional canonical-register map of numbers or existing Value records.
+ * @returns {boolean} Whether the outgoing native stack pointer is proven zero.
+ */
+function advanceEpStackPointerZero(instruction, opCode, isZero, knownAddresses) {
+    if (!PE_Cached.isArchX86 || PE_Cached.isDriver) return false;
+
+    if (knownAddresses) {
+        var replacement = instruction.match(/^(?:MOV|XCHG) (ESP|RSP), ([A-Z][A-Z0-9]*)$/i),
+            exchange = !replacement && instruction.match(/^XCHG ([A-Z][A-Z0-9]*), (ESP|RSP)$/i),
+            sourceRegister = replacement ? replacement[2] : exchange && exchange[1],
+            stackRegister = replacement ? replacement[1] : exchange && exchange[2];
+
+        // A dword SP write zero-extends in AMD64; only that width may discard a known upper half.
+        if (sourceRegister && (stackRegister === "ESP" ? /^(?:E(?:AX|BX|CX|DX|SI|DI|BP|SP)|R(?:8|9|1[0-5])D)$/.test(sourceRegister) :
+            PE_Cached.is64bit && /^R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])$/.test(sourceRegister))) {
+            var source = knownAddresses[getNativeRegisterKey(sourceRegister)], sourceValue = typeof source === "number" ? source : source && source.Value;
+            if (sourceValue !== undefined && isFinite(sourceValue)) return (stackRegister === "ESP" ? sourceValue >>> 0 : sourceValue) === 0;
+        }
+    }
+
+    var zero = instruction.match(/^(?:MOV(?:ABS)?|AND) (ESP|RSP), (?:0X0+|0+)$/i) || instruction.match(/^(?:XOR|SUB) (ESP|RSP), \1$/i);
+    if (zero && (zero[1] === "ESP" || PE_Cached.is64bit)) return true;
+
+    // Aliases retain a whole-pointer zero only when their operation cannot introduce any set bit.
+    if (isZero && /^MOV(?:SX|SXD|ZX) (?:RSP|ESP|SP), (?:ESP|SP|SPL)$/i.test(instruction)) return true;
+    if (isZero && /^(?:(?:MOV|XCHG|XOR|SUB) ((?:R|E)?SP|SPL), \1|LEA ((?:R|E)?SP), \[\2\]|NEG (?:RSP|ESP|SP|SPL)|BSWAP (?:RSP|ESP))$/i.test(instruction)) return true;
+    if (isZero && /^(?:AND|SHL|SHR|SAR|ROL|ROR) (?:RSP|ESP|SP|SPL), .+$/i.test(instruction)) return true;
+    if (isZero && /^(?:MOV|ADD|SUB|OR|XOR|RCL|RCR) (?:RSP|ESP|SP|SPL), (?:0X0+|0+)$/i.test(instruction)) return true;
+
+    if (/^(?:CALLF?|PUSH(?:A[LD]?|F[DQ]?)?|POP(?:A[LD]?|F[DQ]?)?|RET(?:F|N)?|ENTER|LEAVE)$/.test(opCode)) return false;
+    if (/^(?:CMP|TEST|BT|MUL|DIV|IDIV)$/.test(opCode) || (opCode === "IMUL" && instruction.indexOf(",") === -1)) return isZero;
+    if (/^[A-Z][A-Z0-9]* (?:RSP|ESP|SP|SPL)(?:,|$)/i.test(instruction) || /^(?:XCHG|XADD) .*, (?:RSP|ESP|SP|SPL)$/i.test(instruction)) return false;
+
+    return isZero;
+}
+
+
+
+/**
  * Rejects a physical EP fall-through when a conditional branch may skip it.
  * The caller owns a separate flag state for each physical instruction sweep.
  * The EP cache and the manual x87 sweep supply consecutive decoded instructions;
