@@ -9768,10 +9768,11 @@ function scanForObfuscations_Native() {
             if (conditionalBranch) {
                 var indirectEpBranchResult = getEpKnownBranchResult(currentEpOpCode, indirectEpState.ZeroFlag, indirectEpState.CarryFlag);
 
-                if (indirectEpBranchResult !== 0) indirectEpSuccessors.push(parseInt(conditionalBranch[2], 0));
+                // A PE32 word-sized edge truncates EIP; the decoder's full VA is not its target.
+                if (indirectEpBranchResult !== 0 && isEpNativeNearTransfer(currentEpAddress, currentEpInstruction, currentEpLength)) indirectEpSuccessors.push(parseInt(conditionalBranch[2], 0));
                 if (indirectEpBranchResult !== 1) indirectEpSuccessors.push(indirectEpNextAddress);
             } else if (directJump) {
-                indirectEpSuccessors.push(parseInt(directJump[1], 0));
+                if (isEpNativeNearTransfer(currentEpAddress, currentEpInstruction, currentEpLength)) indirectEpSuccessors.push(parseInt(directJump[1], 0));
             } else {
                 indirectEpSuccessors.push(indirectEpNextAddress);
             }
