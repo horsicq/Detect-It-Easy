@@ -8889,7 +8889,8 @@ function scanForObfuscations_Native() {
         var constantEpKnownRegisterValues = {},
             constantEpComparisonOrigin = String(),
             constantEpComparisonEqual = false,
-            constantEpNeutralInstructionCount = 0;
+            constantEpNeutralInstructionCount = 0,
+            constantEpComparisonFallthrough = {};
 
         // Values use canonical physical-register keys, but truncation is applied whenever
         // a 32-bit destination is written. This mirrors x86-64 zero-extension and also lets
@@ -8900,6 +8901,10 @@ function scanForObfuscations_Native() {
                 currentEpOpCode = getAsmOpCode(currentEpInstruction);
 
             if (!currentEpOpCode) break; // Safety check
+
+            // Reuse incoming literal facts before a division or memory write can invalidate its source.
+            if (isEpProvenFaultingInstruction(currentEpInstruction, currentEpOpCode, constantEpComparisonFallthrough.StackPointerZero, constantEpKnownRegisterValues)) break;
+            var constantEpNextStackPointerZero = advanceEpStackPointerZero(currentEpInstruction, currentEpOpCode, constantEpComparisonFallthrough.StackPointerZero, constantEpKnownRegisterValues);
 
             var literalMove = currentEpInstruction.match(epLiteralMovePattern),
                 registerCopy = currentEpInstruction.match(epRegisterCopyPattern),
@@ -8999,7 +9004,9 @@ function scanForObfuscations_Native() {
                     constantEpNeutralInstructionCount = 0;
                 }
             } else if (registerWrite) {
-                delete constantEpKnownRegisterValues[getNativeRegisterKey(registerWrite[1])];
+                // Whole-register zero producers prove a value as well as replacing the earlier flags.
+                if (epZeroRegisterPattern.test(currentEpInstruction)) constantEpKnownRegisterValues[getNativeRegisterKey(registerWrite[1])] = 0;
+                else delete constantEpKnownRegisterValues[getNativeRegisterKey(registerWrite[1])];
                 constantEpComparisonOrigin = String();
                 constantEpNeutralInstructionCount = 0;
             } else if (partialRegisterWrite) {
@@ -9013,6 +9020,9 @@ function scanForObfuscations_Native() {
                 constantEpComparisonOrigin = String();
                 constantEpNeutralInstructionCount = 0;
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructionAddresses[i], constantEpComparisonFallthrough)) break;
+            constantEpComparisonFallthrough.StackPointerZero = constantEpNextStackPointerZero;
         }
     }
 
