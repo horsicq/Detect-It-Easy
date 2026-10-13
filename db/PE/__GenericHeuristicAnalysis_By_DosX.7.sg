@@ -13555,6 +13555,75 @@ function getEpKnownBranchResult(opCode, zeroFlag, carryFlag) {
 
 
 /**
+ * Rejects mandatory null-pointer accesses and integer division by a proven zero in user-mode x86 code.
+ * Only exact register operands, flat null addresses and implicit stack operations are covered; unknown
+ * values, indexed addresses, segment bases and hint-only instructions remain unproven.
+ *
+ * @param {string} instruction - Current decoded instruction.
+ * @param {string} opCode - Current instruction mnemonic.
+ * @param {boolean} isStackPointerZero - Whether the incoming native SP is proven zero.
+ * @param {Object} [knownAddresses] - Optional canonical-register map of numbers or existing Value records.
+ * @returns {boolean} Whether the instruction cannot have an ordinary fall-through.
+ */
+function isEpProvenFaultingInstruction(instruction, opCode, isStackPointerZero, knownAddresses) {
+    if (!PE_Cached.isArchX86 || PE_Cached.isDriver) return false;
+    if (!isStackPointerZero && !knownAddresses && !/\[(?:0X0+|0+)\]/i.test(instruction)) return false;
+    var knownStackPointer = knownAddresses && knownAddresses.RSP;
+    isStackPointerZero = isStackPointerZero || knownStackPointer === 0 || Boolean(knownStackPointer && knownStackPointer.Value === 0);
+    if (isStackPointerZero && /^(?:CALL|PUSH(?:A[LD]?|F[DQ]?)?|POP(?:A[LD]?|F[DQ]?)?|RET(?:F|N)?|ENTER)$/.test(opCode)) return true;
+
+    var divisor = (opCode === "DIV" || opCode === "IDIV") && instruction.match(/^(?:DIV|IDIV) ((?:R|E)?(?:AX|BX|CX|DX|SI|DI|BP|SP)|[ABCD][HL]|(?:SI|DI|BP|SP)L|R(?:8|9|1[0-5])[BDW]?)$/i);
+    if (divisor) {
+        var divisorRegister = divisor[1],
+            divisorKey = /^(?:[ABCD][HLX]|(?:SI|DI|BP|SP)L?|R(?:8|9|1[0-5])[BW])$/.test(divisorRegister) ? getEpPartialRegisterKey(divisorRegister) : getNativeRegisterKey(divisorRegister),
+            knownDivisor = knownAddresses && knownAddresses[divisorKey], divisorValue = typeof knownDivisor === "number" ? knownDivisor : knownDivisor && knownDivisor.Value;
+
+        if (divisorKey === "RSP" && isStackPointerZero) return true;
+        if (typeof divisorValue !== "number" || !isFinite(divisorValue) || divisorValue < 0 || divisorValue > 0x1FFFFFFFFFFFFF || divisorValue % 1 !== 0) return false;
+
+        // DIV/IDIV always raise #DE for zero; partial operands use only their encoded alias bits.
+        if (/^[ABCD]H$/.test(divisorRegister)) divisorValue = (divisorValue >>> 8) & 0xFF;
+        else if (/^(?:[ABCD]L|(?:SI|DI|BP|SP)L|R(?:8|9|1[0-5])B)$/.test(divisorRegister)) divisorValue &= 0xFF;
+        else if (/^(?:[ABCD]X|SI|DI|BP|SP|R(?:8|9|1[0-5])W)$/.test(divisorRegister)) divisorValue &= 0xFFFF;
+        else if (/^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/.test(divisorRegister)) divisorValue >>>= 0;
+
+        return divisorValue === 0;
+    }
+
+    // LOCK/HLE change synchronization, not the mandatory access through the same memory operand.
+    var memoryOpCode = opCode;
+    if (/^(?:LOCK|XACQUIRE|XRELEASE)$/.test(opCode)) {
+        var memoryInstruction = instruction.match(/^(?:(?:XACQUIRE|XRELEASE) )?(?:LOCK )?([A-Z][A-Z0-9]*) /i);
+        if (!memoryInstruction) return false;
+        memoryOpCode = memoryInstruction[1];
+    }
+
+    // CMPXCHG8B/16B read the memory operand even when the comparison fails; they cannot bypass a null access.
+    // Intel SDM, CMPXCHG8B/CMPXCHG16B: https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-2a-manual.pdf#page=285
+    if (!/^(?:MOV(?:ABS|SX|SXD|ZX)?|XCHG|XADD|CMPXCHG(?:8B|16B)?|ADD|SUB|AND|OR|XOR|INC|DEC|NEG|NOT|CMP|TEST|CMOV[A-Z]+|SET[A-Z]+|PUSH|POP|DIV|IDIV)$/.test(memoryOpCode)) return false;
+
+    // An absolute flat address of zero faults too; FS/GS bases and hint-only memory operands remain unknown.
+    if (/\b(?:BYTE|WORD|DWORD|QWORD|XMMWORD) PTR (?:(?:CS|DS|ES|SS):)?\[(?:0X0+|0+)\]/i.test(instruction)) return true;
+
+    var memoryBase = instruction.match(PE_Cached.isI386 ? /\b(?:BYTE|WORD|DWORD|QWORD|XMMWORD) PTR (?:(?:CS|DS|ES|SS):)?\[(E(?:AX|BX|CX|DX|SI|DI|BP|SP))\]/i : /\b(?:BYTE|WORD|DWORD|QWORD|XMMWORD) PTR (?:(?:CS|DS|ES|SS):)?\[((?:R|E)(?:AX|BX|CX|DX|SI|DI|BP|SP)|R(?:8|9|1[0-5])D?)\]/i);
+    if (!memoryBase) return false;
+
+    var baseRegister = getNativeRegisterKey(memoryBase[1]), knownValue = knownAddresses && knownAddresses[baseRegister],
+        addressValue = typeof knownValue === "number" ? knownValue : knownValue && knownValue.Value;
+
+    if (typeof addressValue !== "number" || !isFinite(addressValue) || addressValue < 0 || addressValue > 0x1FFFFFFFFFFFFF || addressValue % 1 !== 0) {
+        addressValue = undefined;
+    } else if (PE_Cached.is64bit && /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(memoryBase[1])) {
+        // An AMD64 address-size override uses the low dword even when the full register is nonzero.
+        addressValue >>>= 0;
+    }
+
+    return (baseRegister === "RSP" && isStackPointerZero) || addressValue === 0;
+}
+
+
+
+/**
  * Rejects a physical EP fall-through when a conditional branch may skip it.
  * The caller owns a separate flag state for each physical instruction sweep.
  * The EP cache and the manual x87 sweep supply consecutive decoded instructions;
