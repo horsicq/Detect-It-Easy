@@ -6813,6 +6813,7 @@ function traceEpWrittenCodeTransfer() {
  * Verify export parsing, hashing and indirect transfer on one reachable EP path.
  * Facts from alternative branches never merge. The bounded graph fails closed if
  * too many states are needed, and revisiting one instruction adds no new evidence.
+ * Byte-dependency masks reject discarded inputs without treating every shift as a clobber.
  * @param {number[]} starts - EP and synthetic-transfer starting addresses.
  * @param {Object} successors - Decoded executable CFG edges indexed by address.
  * @param {Object} instructions - Decoded instructions indexed by address.
@@ -6839,6 +6840,31 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
         return register.replace(/^E/, "R").replace(/(?:B|W|D)$/, String());
     }
 
+    /**
+     * Gets an operand alias's data-bearing bits, including the AH byte offset.
+     *
+     * @param {string} name - Decoded register alias.
+     * @returns {Object} Low/high dword masks for its operand bits.
+     */
+    function dependencyMask(name) {
+        if (/^R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])$/i.test(name)) return { Low: 0xFFFFFFFF, High: 0xFFFFFFFF };
+        if (/^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(name)) return { Low: 0xFFFFFFFF, High: 0 };
+        return { Low: /^[ABCD]H$/i.test(name) ? 0xFF00 : /^(?:[ABCD]L|SIL|DIL|BPL|SPL|R(?:8|9|1[0-5])B)$/i.test(name) ? 0xFF : 0xFFFF, High: 0 };
+    }
+
+    /**
+     * Clips copied dependency bits to the destination width without mutating shared path facts.
+     *
+     * @param {Object|undefined} facts - Existing dependency masks.
+     * @param {string} name - Full-register copy destination.
+     * @returns {Object|undefined} Immutable masks after its width conversion.
+     */
+    function copyDependency(facts, name) {
+        if (!facts) return undefined;
+        var mask = dependencyMask(name), low = (facts.Low & mask.Low) >>> 0, high = (facts.High & mask.High) >>> 0;
+        return low || high ? { Low: low, High: high } : undefined;
+    }
+
     for (var i = 0; i < indirectAddresses.length; i++) indirect[indirectAddresses[i].toString()] = true;
     for (var i = 0; i < starts.length; i++) {
         pending.push({ Address: starts[i], PebState: {}, PebProven: false, Stage: 0, Fields: {}, ByteRead: false, ByteRegisters: {}, Linked: {}, Kinds: {}, UnsafeTargets: {}, Backward: false });
@@ -6851,7 +6877,7 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
         var stage = state.Stage, fields = {}, kinds = {}, pebState = {}, byteRegisters = {}, linked = {}, unsafeTargets = {}, pebProven = state.PebProven;
         for (var field in state.Fields) fields[field] = true;
         for (var pebRegister in state.PebState) pebState[pebRegister] = state.PebState[pebRegister];
-        for (var byteRegister in state.ByteRegisters) byteRegisters[byteRegister] = true;
+        for (var byteRegister in state.ByteRegisters) byteRegisters[byteRegister] = state.ByteRegisters[byteRegister];
         for (var linkedRegister in state.Linked) linked[linkedRegister] = true;
         for (var unsafeRegister in state.UnsafeTargets) unsafeTargets[unsafeRegister] = true;
         for (var register in state.Kinds) {
@@ -6861,7 +6887,8 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
 
         var pebLoad = instruction.match(patterns.PebLoad), ldrLoad = instruction.match(patterns.LdrLoad),
             listLoad = instruction.match(patterns.ListLoad), registerCopy = instruction.match(patterns.RegisterCopy), registerExchange = instruction.match(patterns.RegisterExchange),
-            registerWrite = instruction.match(patterns.RegisterWrite), partialWrite = instruction.match(patterns.PartialWrite);
+            registerWrite = instruction.match(patterns.RegisterWrite), partialWrite = instruction.match(patterns.PartialWrite) ||
+                instruction.match(/^SET[A-Z]+ ([ABCD][HL]|SIL|DIL|BPL|SPL|R(?:8|9|1[0-5])B)$/i);
 
         if (pebLoad) {
             pebState[getNativeRegisterKey(pebLoad[1])] = 1;
@@ -6892,13 +6919,26 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
 
         var byteRead = state.ByteRead, hashPresent = false;
         if (stage === 2) {
-            var fieldMatch = instruction.match(patterns.Field), transform = instruction.match(patterns.Transform);
+            var fieldMatch = instruction.match(patterns.Field), transform = instruction.match(patterns.Transform),
+                byteShift = instruction.match(/^(SHR|SHL|SAL|SAR) ([A-Z][A-Z0-9]*), (0X[0-9A-F]+|\d+)$/i),
+                byteWiden = instruction.match(/^(?:RCL|RCR|BSWAP) ([A-Z][A-Z0-9]*)(?:,|$)/i);
             if (fieldMatch) fields[parseInt(fieldMatch[1], 0).toString()] = true;
             if (patterns.ByteRead.test(instruction)) {
                 byteRead = true;
                 var byteLoad = instruction.match(/^MOV(?:ZX|SX)? ([A-Z][A-Z0-9]*), BYTE PTR (?:[A-Z]+:)?\[/i);
-                if (byteLoad) byteRegisters[registerKey(byteLoad[1])] = true;
-                else if (/^LODSB(?: |$)/i.test(instruction)) byteRegisters.RAX = true;
+                if (byteLoad) {
+                    var byteDestinationIsDword = /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(byteLoad[1]),
+                        byteDestination = registerKey(byteLoad[1]), oldByteMask = byteRegisters[byteDestination] || { Low: 0, High: 0 },
+                        byteWriteMask = dependencyMask(byteLoad[1]), byteSeedMask = /^MOVSX /i.test(instruction) ? byteWriteMask : { Low: /^[ABCD]H$/i.test(byteLoad[1]) ? 0xFF00 : 0xFF, High: 0 };
+                    // Partial loads preserve only already-proven upper dependencies, not arbitrary upper values.
+                    byteRegisters[byteDestination] = {
+                        Low: ((oldByteMask.Low & ~byteWriteMask.Low) | byteSeedMask.Low) >>> 0,
+                        High: byteDestinationIsDword ? 0 : ((oldByteMask.High & ~byteWriteMask.High) | byteSeedMask.High) >>> 0
+                    };
+                } else if (/^LODSB(?: |$)/i.test(instruction)) {
+                    var oldLodsMask = byteRegisters.RAX || { Low: 0, High: 0 };
+                    byteRegisters.RAX = { Low: (oldLodsMask.Low | 0xFF) >>> 0, High: oldLodsMask.High };
+                }
             }
 
             if (transform) {
@@ -6912,13 +6952,21 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
                         transform[1] === "IMUL" && hashImmediate === 1 ||
                         /^(?:ROR|ROL)$/.test(transform[1]) && hashImmediate !== undefined && (hashImmediate & (/^R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])$/.test(transform[2]) ? 63 : 31)) === 0;
 
+                var hashOperandMask = dependencyMask(transform[2]), hashDestinationDependency = copyDependency(byteRegisters[hashRegister], transform[2]),
+                    hashSourceDependency = copyDependency(byteRegisters[hashSource], hashOperand);
+                if (byteRegisters[hashRegister] && !hashDestinationDependency) {
+                    delete byteRegisters[hashRegister];
+                    delete linked[hashRegister];
+                    delete kinds[hashRegister];
+                } else if (hashDestinationDependency) byteRegisters[hashRegister] = hashDestinationDependency;
+
                 // Three-operand IMUL replaces the destination with source * immediate.
                 if (isReplacingMultiply && hashSource !== hashRegister) {
                     kinds[hashRegister] = {};
                     if (kinds[hashSource]) for (var kind in kinds[hashSource]) kinds[hashRegister][kind] = true;
-                    if (byteRegisters[hashSource]) byteRegisters[hashRegister] = true;
+                    if (hashSourceDependency) byteRegisters[hashRegister] = hashSourceDependency;
                     else delete byteRegisters[hashRegister];
-                    if (linked[hashSource]) linked[hashRegister] = true;
+                    if (linked[hashSource] && hashSourceDependency) linked[hashRegister] = true;
                     else delete linked[hashRegister];
                 }
 
@@ -6927,11 +6975,140 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
                     delete byteRegisters[hashRegister];
                     delete linked[hashRegister];
                 } else if (!isIdentity) {
-                    if (byteRegisters[hashRegister] || byteRegisters[hashSource]) {
-                        byteRegisters[hashRegister] = true;
-                        linked[hashRegister] = true;
+                    if (byteRegisters[hashRegister] || hashSourceDependency) {
+                        if (/^(?:ROR|ROL)$/.test(transform[1]) && hashImmediate !== undefined && hashDestinationDependency) {
+                            var rotatedLow = hashDestinationDependency.Low, rotatedHigh = hashDestinationDependency.High,
+                                hashRotateCount = hashImmediate & (hashOperandMask.High ? 63 : 31);
+
+                            // A known rotate permutes dependency bits; it cannot spread them to the whole operand.
+                            // Intel SDM, RCL/RCR/ROL/ROR: https://cdrdv2-public.intel.com/782151/253667-sdm-vol-2b.pdf
+                            if (transform[1] === "ROR") hashRotateCount = -hashRotateCount & (hashOperandMask.High ? 63 : 31);
+
+                            var hashRotatePart = hashRotateCount & 31;
+
+                            if (hashRotateCount >= 32) {
+                                rotatedLow = hashDestinationDependency.High;
+                                rotatedHigh = hashDestinationDependency.Low;
+                            }
+
+                            if (hashRotatePart) {
+                                var rotateLowSource = rotatedLow, rotateHighSource = rotatedHigh;
+
+                                if (hashOperandMask.High) {
+                                    rotatedLow = ((rotateLowSource << hashRotatePart) | (rotateHighSource >>> (32 - hashRotatePart))) >>> 0;
+                                    rotatedHigh = ((rotateHighSource << hashRotatePart) | (rotateLowSource >>> (32 - hashRotatePart))) >>> 0;
+                                } else rotatedLow = ((rotateLowSource << hashRotatePart) | (rotateLowSource >>> (32 - hashRotatePart))) >>> 0;
+                            }
+
+                            byteRegisters[hashRegister] = { Low: rotatedLow, High: rotatedHigh };
+                        } else if (transform[1] === "IMUL" && byteRegisters[hashRegister] && ((hashImmediate > 1 && hashImmediate <= 0x40000000 && (hashImmediate & (hashImmediate - 1)) === 0) ||
+                            (!hashOperandMask.High && (hashImmediate === 0x80000000 || hashImmediate === -0x80000000)))) {
+                            var multipliedDependency = byteRegisters[hashRegister], multiplyShift = 0, multiplyFactor = hashImmediate >>> 0;
+
+                            // A positive power of two is a shift, including a replacing three-operand IMUL.
+                            // Qword IMUL sign-extends imm32; its sign-bit-only value is a shift only for dword writes.
+                            while (multiplyFactor > 1) {
+                                multiplyFactor /= 2;
+                                multiplyShift++;
+                            }
+
+                            byteRegisters[hashRegister] = {
+                                Low: (multipliedDependency.Low << multiplyShift) >>> 0,
+                                High: hashOperandMask.High ? ((multipliedDependency.High << multiplyShift) | (multipliedDependency.Low >>> (32 - multiplyShift))) >>> 0 : 0
+                            };
+
+                            if (!byteRegisters[hashRegister].Low && !byteRegisters[hashRegister].High) {
+                                delete byteRegisters[hashRegister];
+                                delete linked[hashRegister];
+                                kinds[hashRegister] = {};
+                            }
+                        } else byteRegisters[hashRegister] = dependencyMask(transform[2]);
+
+                        if (byteRegisters[hashRegister]) linked[hashRegister] = true;
                     }
                     kinds[hashRegister][transform[1]] = true;
+                }
+            } else if (byteShift) {
+                var shiftedRegister = registerKey(byteShift[2]), byteMask = byteRegisters[shiftedRegister], shiftLeft = byteShift[1] === "SHL" || byteShift[1] === "SAL",
+                    shiftWidth = /^R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])$/i.test(byteShift[2]) ? 64 :
+                        /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(byteShift[2]) ? 32 : /^(?:[ABCD][HL]|SIL|DIL|BPL|SPL|R(?:8|9|1[0-5])B)$/i.test(byteShift[2]) ? 8 : 16,
+                    shiftCount = parseInt(byteShift[3], 0) & (shiftWidth === 64 ? 63 : 31);
+
+                // Shift only the operand's dependency bits; AH and partial writes leave unrelated bits untouched.
+                if (byteMask) {
+                    var shiftedLow = byteMask.Low, shiftedHigh = byteMask.High;
+                    if (shiftWidth === 64 && shiftCount) {
+                        if (shiftLeft) {
+                            shiftedLow = shiftCount < 32 ? (byteMask.Low << shiftCount) >>> 0 : 0;
+                            shiftedHigh = shiftCount < 32 ? ((byteMask.High << shiftCount) | (byteMask.Low >>> (32 - shiftCount))) >>> 0 : (byteMask.Low << (shiftCount - 32)) >>> 0;
+                        } else {
+                            shiftedLow = shiftCount < 32 ? ((byteMask.Low >>> shiftCount) | (byteMask.High << (32 - shiftCount))) >>> 0 : byteMask.High >>> (shiftCount - 32);
+                            shiftedHigh = shiftCount < 32 ? byteMask.High >>> shiftCount : 0;
+                        }
+                    } else if (shiftWidth === 32) {
+                        shiftedLow = shiftLeft ? (byteMask.Low << shiftCount) >>> 0 : byteMask.Low >>> shiftCount;
+                        shiftedHigh = 0;
+                    } else if (shiftWidth < 32) {
+                        var shiftedOperandMask = dependencyMask(byteShift[2]).Low, shiftedOperandOffset = /^[ABCD]H$/i.test(byteShift[2]) ? 8 : 0,
+                            shiftedBits = (byteMask.Low & shiftedOperandMask) >>> shiftedOperandOffset;
+                        shiftedBits = shiftLeft ? shiftedBits << shiftCount : shiftedBits >>> shiftCount;
+                        shiftedLow = ((byteMask.Low & ~shiftedOperandMask) | ((shiftedBits << shiftedOperandOffset) & shiftedOperandMask)) >>> 0;
+                    }
+                    // SAR broadcasts a dependency only when the original sign bit carried that dependency.
+                    if (byteShift[1] === "SAR" && shiftCount) {
+                        if (shiftWidth === 64 && (byteMask.High & 0x80000000)) {
+                            shiftedHigh = (shiftedHigh | (shiftCount >= 32 ? 0xFFFFFFFF : 0xFFFFFFFF << (32 - shiftCount))) >>> 0;
+                            if (shiftCount > 32) shiftedLow = (shiftedLow | (0xFFFFFFFF << (64 - shiftCount))) >>> 0;
+                        } else if (shiftWidth === 32 && (byteMask.Low & 0x80000000)) shiftedLow = (shiftedLow | (0xFFFFFFFF << (32 - shiftCount))) >>> 0;
+                        else if (shiftWidth < 32 && (byteMask.Low & (1 << (shiftWidth - 1 + shiftedOperandOffset)))) {
+                            var signMask = shiftCount >= shiftWidth ? shiftedOperandMask : (((shiftedOperandMask >>> shiftedOperandOffset) << (shiftWidth - shiftCount)) << shiftedOperandOffset) & shiftedOperandMask;
+                            shiftedLow = (shiftedLow | signMask) >>> 0;
+                        }
+                    }
+                    if (!shiftedLow && !shiftedHigh) {
+                        delete byteRegisters[shiftedRegister];
+                        delete linked[shiftedRegister];
+                        delete kinds[shiftedRegister];
+                    } else byteRegisters[shiftedRegister] = { Low: shiftedLow, High: shiftedHigh };
+                }
+            } else if (byteWiden) {
+                var widenedRegister = registerKey(byteWiden[1]), previousMask = byteRegisters[widenedRegister], operandMask = dependencyMask(byteWiden[1]);
+                if (previousMask && /^BSWAP /i.test(instruction)) {
+                    var swappedLow = 0, swappedHigh = 0;
+                    for (var byteIndex = 0; byteIndex < 4; byteIndex++) {
+                        swappedLow |= ((previousMask.Low >>> (byteIndex * 8)) & 0xFF) << ((3 - byteIndex) * 8);
+                        swappedHigh |= ((previousMask.High >>> (byteIndex * 8)) & 0xFF) << ((3 - byteIndex) * 8);
+                    }
+                    byteRegisters[widenedRegister] = operandMask.High ? { Low: swappedHigh >>> 0, High: swappedLow >>> 0 } : { Low: swappedLow >>> 0, High: 0 };
+                    if (!byteRegisters[widenedRegister].Low && !byteRegisters[widenedRegister].High) {
+                        delete byteRegisters[widenedRegister];
+                        delete linked[widenedRegister];
+                        delete kinds[widenedRegister];
+                    }
+                } else {
+                    var rotateImmediate = instruction.match(/^(?:RCL|RCR) [A-Z][A-Z0-9]*, (0X[0-9A-F]+|\d+)$/i),
+                        rotateWidth = operandMask.High ? 64 : operandMask.Low === 0xFFFFFFFF ? 32 : operandMask.Low === 0xFFFF ? 16 : 8,
+                        effectiveRotateCount = rotateImmediate ? parseInt(rotateImmediate[1], 0) & (rotateWidth === 64 ? 63 : 31) : -1;
+
+                    if (effectiveRotateCount >= 0 && rotateWidth < 32) effectiveRotateCount %= rotateWidth + 1;
+
+                    // A zero effective count cannot spread dependency bits; a dword write still clears the upper half.
+                    if (effectiveRotateCount === 0) {
+                        if (previousMask && rotateWidth === 32) {
+                            byteRegisters[widenedRegister] = copyDependency(previousMask, byteWiden[1]);
+                            if (!byteRegisters[widenedRegister]) {
+                                delete byteRegisters[widenedRegister];
+                                delete linked[widenedRegister];
+                                delete kinds[widenedRegister];
+                            }
+                        }
+                    } else if (previousMask && ((previousMask.Low & operandMask.Low) || (previousMask.High & operandMask.High))) {
+                        // Other unmodeled transforms may move byte-derived bits anywhere in the written operand.
+                        byteRegisters[widenedRegister] = {
+                            Low: (previousMask.Low | operandMask.Low) >>> 0,
+                            High: /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(byteWiden[1]) ? 0 : (previousMask.High | operandMask.High) >>> 0
+                        };
+                    }
                 }
             } else {
                 if (registerCopy) {
@@ -6940,9 +7117,9 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
                         kinds[hashDestination] = {};
                         for (var kind in kinds[hashSource]) kinds[hashDestination][kind] = true;
                     } else delete kinds[hashDestination];
-                    if (byteRegisters[hashSource]) byteRegisters[hashDestination] = true;
+                    if (byteRegisters[hashSource]) byteRegisters[hashDestination] = copyDependency(byteRegisters[hashSource], registerCopy[1]);
                     else delete byteRegisters[hashDestination];
-                    if (linked[hashSource]) linked[hashDestination] = true;
+                    if (linked[hashSource] && byteRegisters[hashDestination]) linked[hashDestination] = true;
                     else delete linked[hashDestination];
                     if (unsafeTargets[hashSource]) unsafeTargets[hashDestination] = true;
                     else delete unsafeTargets[hashDestination];
@@ -6953,6 +7130,10 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
                     swapFacts(kinds, left, right);
                     swapFacts(linked, left, right);
                     swapFacts(byteRegisters, left, right);
+                    if (byteRegisters[left]) byteRegisters[left] = copyDependency(byteRegisters[left], registerExchange[1]);
+                    if (byteRegisters[right]) byteRegisters[right] = copyDependency(byteRegisters[right], registerExchange[2]);
+                    if (!byteRegisters[left]) delete linked[left];
+                    if (!byteRegisters[right]) delete linked[right];
                     swapFacts(unsafeTargets, left, right);
                     if (leftLinked && !rightLinked) unsafeTargets[left] = true;
                     if (rightLinked && !leftLinked) unsafeTargets[right] = true;
@@ -6973,7 +7154,7 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
             }
 
             for (var register in kinds) {
-                if (linked[register] && Object.keys(kinds[register]).length >= 2) {
+                if (byteRegisters[register] && linked[register] && Object.keys(kinds[register]).length >= 2) {
                     hashPresent = true;
                     break;
                 }
@@ -6984,7 +7165,12 @@ function isEpResolverPathProven(starts, successors, instructions, indirectAddres
         for (var k = 0; k < kindKeys.length; k++) kindState += kindKeys[k] + "=" + Object.keys(kinds[kindKeys[k]]).sort().join(",") + ";";
         var pebKeys = Object.keys(pebState).sort(), pebStateKey = String();
         for (var k = 0; k < pebKeys.length; k++) pebStateKey += pebKeys[k] + pebState[pebKeys[k]];
-        var stateKey = key + ":" + pebProven + ":" + pebStateKey + ":" + stage + ":" + fieldKeys.join(",") + ":" + byteRead + ":" + kindState + ":" + Object.keys(byteRegisters).sort().join(",") + ":" + Object.keys(linked).sort().join(",") + ":" + Object.keys(unsafeTargets).sort().join(",") + ":" + state.Backward;
+        var byteKeys = Object.keys(byteRegisters).sort(), byteStateKey = String();
+        for (var k = 0; k < byteKeys.length; k++) {
+            var byteFact = byteRegisters[byteKeys[k]];
+            if (byteFact) byteStateKey += byteKeys[k] + "=" + byteFact.Low + "," + byteFact.High + ";";
+        }
+        var stateKey = key + ":" + pebProven + ":" + pebStateKey + ":" + stage + ":" + fieldKeys.join(",") + ":" + byteRead + ":" + kindState + ":" + byteStateKey + ":" + Object.keys(linked).sort().join(",") + ":" + Object.keys(unsafeTargets).sort().join(",") + ":" + state.Backward;
 
         if (visited[stateKey]) continue;
         visited[stateKey] = true;
