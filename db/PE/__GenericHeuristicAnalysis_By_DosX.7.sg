@@ -520,6 +520,25 @@ function scanForObfuscations_NET() {
         } else if (PE_Cached.isAMD64 || PE_Cached.isARM64) {
             if (PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint) !== 0x00) {
                 isNativeEntryPointModified = true;
+
+                // The AMD64 CLR emitter may load its sole _CorExeMain IAT slot before JMP RAX.
+                // Verify the actual slot, not just a loader-like instruction pattern.
+                var clrEntryPointOffset = PE.VAToOffset(PE_Cached.addressOfUnmanagedEntryPoint), clrOptionalHeaderOffset = getOptHeaderOffset();
+
+                if (PE_Cached.isAMD64 && isVirtualAddressRangeFileBacked(PE_Cached.addressOfUnmanagedEntryPoint, 12, SECTION_FLAGS_EXECUTE) &&
+                    PE.compareEP("48 A1 ................ FF E0") && PE_Cached.numberOfUnmanagedImports === 1 && PE.getNumberOfImportThunks(0) === 1 &&
+                    /(?:^|[\\/])mscoree(?:\.dll)?$/i.test(PE.getImportLibraryName(0)) && PE.getImportFunctionName(0, 0) === "_CorExeMain" &&
+                    clrOptionalHeaderOffset >= 24 && clrOptionalHeaderOffset + 0xD8 <= PE_Cached.fileSize && PE.readWord(clrOptionalHeaderOffset - 4) >= 0xD8 &&
+                    PE.readWord(clrOptionalHeaderOffset) === 0x20B && PE.read_uint32(clrOptionalHeaderOffset + 0x6C) >= 13) {
+                    var clrImportsRva = PE.read_uint32(clrOptionalHeaderOffset + 0x78), clrIatRva = PE.read_uint32(clrOptionalHeaderOffset + 0xD0),
+                        clrImportDescriptorOffset = PE.VAToOffset(PE_Cached.imageBase + clrImportsRva);
+
+                    if (PE.read_uint32(clrOptionalHeaderOffset + 0x7C) >= 20 && isVirtualAddressRangeFileBacked(PE_Cached.imageBase + clrImportsRva, 20, 0) &&
+                        isVirtualAddressRangeFileBacked(PE_Cached.imageBase + clrIatRva, 16, 0) && PE.read_uint32(clrOptionalHeaderOffset + 0xD4) >= 16 &&
+                        PE.read_uint32(clrImportDescriptorOffset + 16) === clrIatRva && readUnsignedQword(clrEntryPointOffset + 2) === PE_Cached.imageBase + clrIatRva) {
+                        isNativeEntryPointModified = false;
+                    }
+                }
             }
         }
     }
