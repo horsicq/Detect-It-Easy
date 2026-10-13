@@ -8402,11 +8402,11 @@ function scanForObfuscations_Native() {
             opaqueEpNeverTakenBranches = [],
             opaqueEpNeutralInstructionCount = 0,
             // Plain-object entries are configurable, therefore strict-mode delete is safe.
-            opaqueEpKnownZeroRegisters = {};
+            opaqueEpKnownValues = {}, opaqueEpFallthroughState = {};
 
-        // The state machine keeps two facts: registers proven to contain zero, and the
-        // most recent instruction that established deterministic EFLAGS. A MOV may extend
-        // the first fact without replacing the second because MOV itself preserves flags.
+        // Zero tests use only exact zeroes; safe literals also prove zero-extending SP replacements.
+        // Register values and the last deterministic EFLAGS producer remain independent;
+        // a MOV may extend the first fact without replacing the flags it preserves.
 
         // Scan one physical fall-through path. The first control-flow boundary terminates
         // the proof so flags from one basic block cannot be paired with another block's Jcc.
@@ -8415,6 +8415,9 @@ function scanForObfuscations_Native() {
                 currentEpOpCode = getAsmOpCode(currentEpInstruction);
 
             if (!currentEpOpCode) break; // Safety check
+
+            if (isEpProvenFaultingInstruction(currentEpInstruction, currentEpOpCode, opaqueEpFallthroughState.StackPointerZero, opaqueEpKnownValues)) break;
+            var opaqueEpNextStackPointerZero = advanceEpStackPointerZero(currentEpInstruction, currentEpOpCode, opaqueEpFallthroughState.StackPointerZero, opaqueEpKnownValues);
 
             // Split each instruction into flag producers, value-provenance operations,
             // candidate consumers, and harmless padding before updating either fact set.
@@ -8442,9 +8445,16 @@ function scanForObfuscations_Native() {
                 if (currentEpOpCode !== "CMP" && currentEpOpCode !== "TEST") {
                     // XOR/SUB reg,reg and AND reg,0 also prove the destination value is zero;
                     // CMP reg,reg and TEST reg,0 prove only flags because they do not write.
-                    var zeroFlagsRegister = getNativeRegisterKey(zeroFlagsInstruction[1] || zeroFlagsInstruction[2]);
+                    var zeroFlagsOperand = zeroFlagsInstruction[1] || zeroFlagsInstruction[2],
+                        zeroFlagsRegister = getNativeRegisterKey(zeroFlagsOperand);
 
-                    opaqueEpKnownZeroRegisters[zeroFlagsRegister] = true;
+                    // A word zero keeps the unknown upper bits; an existing exact value may retain them.
+                    if (/^(?:AX|BX|CX|DX|SI|DI|BP|R(?:8|9|1[0-5])W)$/.test(zeroFlagsOperand)) {
+                        zeroFlagsRegister = getEpPartialRegisterKey(zeroFlagsOperand);
+                        if (opaqueEpKnownValues[zeroFlagsRegister] !== undefined) opaqueEpKnownValues[zeroFlagsRegister] -= opaqueEpKnownValues[zeroFlagsRegister] & 0xFFFF;
+                    } else {
+                        opaqueEpKnownValues[zeroFlagsRegister] = 0;
+                    }
                 }
             } else if (allOnesFlagsInstruction) {
                 // OR reg,-1 fixes the same five flags for an all-one result and destroys
@@ -8457,7 +8467,7 @@ function scanForObfuscations_Native() {
                     allOnesFlagsRegister = getNativeRegisterKey(allOnesFlagsRegister).replace(/W$/, String());
                 }
 
-                delete opaqueEpKnownZeroRegisters[allOnesFlagsRegister];
+                delete opaqueEpKnownValues[allOnesFlagsRegister];
                 opaqueEpOriginInstruction = currentEpInstruction;
                 opaqueEpOriginAddress = epAsmInstructionAddresses[i];
                 opaqueEpAlwaysTakenBranches = opaqueEpAllOnesFlagsAlwaysTakenBranches;
@@ -8474,7 +8484,7 @@ function scanForObfuscations_Native() {
                 opaqueEpNeutralInstructionCount = 0;
             } else if (zeroLiteralRegister) {
                 // MOV reg, 0 preserves prior flags but enables a later TEST/OR reg, reg.
-                opaqueEpKnownZeroRegisters[getNativeRegisterKey(zeroLiteralRegister[1])] = true;
+                opaqueEpKnownValues[getNativeRegisterKey(zeroLiteralRegister[1])] = 0;
 
                 // A value-propagation instruction still consumes the bounded padding budget
                 // of an older EFLAGS proof; expire that proof without losing known zeroes.
@@ -8485,11 +8495,11 @@ function scanForObfuscations_Native() {
                 }
             } else if (registerCopy) {
                 // Preserve zero provenance only through an exact register-to-register copy.
-                if (opaqueEpKnownZeroRegisters[getNativeRegisterKey(registerCopy[2])]) {
-                    opaqueEpKnownZeroRegisters[getNativeRegisterKey(registerCopy[1])] = true;
+                if (opaqueEpKnownValues[getNativeRegisterKey(registerCopy[2])] === 0) {
+                    opaqueEpKnownValues[getNativeRegisterKey(registerCopy[1])] = 0;
                 } else {
                     // The source is unknown, so only the overwritten destination loses proof.
-                    delete opaqueEpKnownZeroRegisters[getNativeRegisterKey(registerCopy[1])];
+                    delete opaqueEpKnownValues[getNativeRegisterKey(registerCopy[1])];
                 }
 
                 if (opaqueEpOriginInstruction && ++opaqueEpNeutralInstructionCount > epNeutralInstructionLimit) {
@@ -8497,7 +8507,7 @@ function scanForObfuscations_Native() {
                     opaqueEpOriginAddress = -1;
                     opaqueEpNeutralInstructionCount = 0;
                 }
-            } else if (zeroTestRegister && opaqueEpKnownZeroRegisters[getNativeRegisterKey(zeroTestRegister[1])]) {
+            } else if (zeroTestRegister && opaqueEpKnownValues[getNativeRegisterKey(zeroTestRegister[1])] === 0) {
                 // TEST/OR of a proven zero register re-establishes deterministic EFLAGS.
                 opaqueEpOriginInstruction = currentEpInstruction;
                 opaqueEpOriginAddress = epAsmInstructionAddresses[i];
@@ -8524,16 +8534,22 @@ function scanForObfuscations_Native() {
                 // EFLAGS provenance with bytes that are not executed on the same path.
                 break;
             } else if (flagsNeutralRegisterWrite) {
-                // A flags-neutral write invalidates only its destination, not candidate EFLAGS.
-                // This retains a constant branch even when polymorphic junk changes another register.
-                delete opaqueEpKnownZeroRegisters[getNativeRegisterKey(flagsNeutralRegisterWrite[1])];
+                // Exact safe literals may prove a later zero-extending SP replacement.
+                // Other flags-neutral writes discard only the destination, not candidate EFLAGS.
+                var opaqueLiteral = currentEpInstruction.match(epLiteralMovePattern), opaqueLiteralValue = opaqueLiteral && parseInt(opaqueLiteral[2], 0);
+                if (opaqueLiteral && isFinite(opaqueLiteralValue) && opaqueLiteralValue >= 0 && opaqueLiteralValue <= epMaximumSafeInteger) {
+                    opaqueEpKnownValues[getNativeRegisterKey(opaqueLiteral[1])] = epRegister32BitPattern.test(opaqueLiteral[1]) ? opaqueLiteralValue >>> 0 : opaqueLiteralValue;
+                } else {
+                    delete opaqueEpKnownValues[getNativeRegisterKey(flagsNeutralRegisterWrite[1])];
+                }
+
                 if (opaqueEpOriginInstruction && ++opaqueEpNeutralInstructionCount > epNeutralInstructionLimit) {
                     opaqueEpOriginInstruction = String();
                     opaqueEpOriginAddress = -1;
                     opaqueEpNeutralInstructionCount = 0;
                 }
             } else if (partialRegisterWrite) {
-                delete opaqueEpKnownZeroRegisters[getEpPartialRegisterKey(partialRegisterWrite[1])];
+                delete opaqueEpKnownValues[getEpPartialRegisterKey(partialRegisterWrite[1])];
                 if (currentEpOpCode === "MOV" || currentEpOpCode === "NOT") {
                     if (opaqueEpOriginInstruction && ++opaqueEpNeutralInstructionCount > epNeutralInstructionLimit) {
                         opaqueEpOriginInstruction = String();
@@ -8555,7 +8571,7 @@ function scanForObfuscations_Native() {
             } else if (registerWrite) {
                 // A flags-changing write destroys both the candidate and this register's value.
                 // Other known-zero registers remain valid until they are individually overwritten.
-                delete opaqueEpKnownZeroRegisters[getNativeRegisterKey(registerWrite[1])];
+                delete opaqueEpKnownValues[getNativeRegisterKey(registerWrite[1])];
                 opaqueEpOriginInstruction = String();
                 opaqueEpOriginAddress = -1;
                 opaqueEpNeutralInstructionCount = 0;
@@ -8567,8 +8583,11 @@ function scanForObfuscations_Native() {
                 opaqueEpOriginInstruction = String();
                 opaqueEpOriginAddress = -1;
                 opaqueEpNeutralInstructionCount = 0;
-                opaqueEpKnownZeroRegisters = {};
+                opaqueEpKnownValues = {};
             }
+
+            if (isEpLinearFallthroughUnproven(currentEpInstruction, epAsmInstructionAddresses[i], opaqueEpFallthroughState)) break;
+            opaqueEpFallthroughState.StackPointerZero = opaqueEpNextStackPointerZero;
         }
     }
 
