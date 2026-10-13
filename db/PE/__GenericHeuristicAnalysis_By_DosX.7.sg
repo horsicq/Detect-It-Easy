@@ -11040,6 +11040,7 @@ function scanForObfuscations_Native() {
             var epIpRecoveryCurrentAddress = parseInt(epDirectCallTargetKey, 10),
                 epIpRecoveryPopLength = PE.getDisasmLength(epIpRecoveryCurrentAddress),
                 epIpRecoveryKnownRegisters = {},
+                epIpRecoveryKnownValues = {},
                 epIpRecoveryRegisterPatterns = {};
 
             epIpRecoveryKnownRegisters[epIpRecoveryRegister] = true;
@@ -11078,7 +11079,37 @@ function scanForObfuscations_Native() {
                 if (!epIpRecoveryOpCode || epIpRecoveryInstructionLength <= 0 ||
                     !isVirtualAddressRangeFileBacked(epIpRecoveryCurrentAddress, epIpRecoveryInstructionLength, SECTION_FLAGS_EXECUTE)) break;
 
-                var epIpRecoveryCopy = epIpRecoveryInstruction.match(epRegisterCopyPattern);
+                // Pointer-use provenance and literal values are different facts: a zero is not a recovered IP.
+                if (isEpProvenFaultingInstruction(epIpRecoveryInstruction, epIpRecoveryOpCode, false, epIpRecoveryKnownValues)) break;
+
+                var epIpRecoveryCopy = epIpRecoveryInstruction.match(epRegisterCopyPattern),
+                    epIpRecoveryLiteral = epIpRecoveryInstruction.match(epLiteralMovePattern),
+                    epIpRecoveryZeroRegister = epIpRecoveryInstruction.match(epZeroRegisterPattern),
+                    epIpRecoveryRegisterWrite = epIpRecoveryInstruction.match(epFlagsNeutralRegisterWritePattern) || epIpRecoveryInstruction.match(epTrackedRegisterWritePattern),
+                    epIpRecoveryPartialWrite = epIpRecoveryInstruction.match(epPartialRegisterWritePattern);
+
+                if (epIpRecoveryZeroRegister) {
+                    epIpRecoveryKnownValues[getNativeRegisterKey(epIpRecoveryZeroRegister[1] || epIpRecoveryZeroRegister[2])] = 0;
+                } else if (epIpRecoveryLiteral || epIpRecoveryCopy) {
+                    var epIpRecoveryValueDestination = getNativeRegisterKey((epIpRecoveryLiteral || epIpRecoveryCopy)[1]),
+                        epIpRecoveryValue = epIpRecoveryLiteral ? parseInt(epIpRecoveryLiteral[2], 0) : epIpRecoveryKnownValues[getNativeRegisterKey(epIpRecoveryCopy[2])];
+
+                    if (epIpRecoveryValue !== undefined && epIpRecoveryValue <= epMaximumSafeInteger) {
+                        epIpRecoveryKnownValues[epIpRecoveryValueDestination] = epRegister32BitPattern.test((epIpRecoveryLiteral || epIpRecoveryCopy)[1]) ? epIpRecoveryValue >>> 0 : epIpRecoveryValue;
+                    } else {
+                        delete epIpRecoveryKnownValues[epIpRecoveryValueDestination];
+                    }
+                } else if (epIpRecoverySimplePolymorphism || epIpRecoveryValuePreserving) {
+                    var epIpRecoveryIdentity = epIpRecoveryInstruction.match(epSimplePolymorphicInstructionPattern) || epIpRecoveryInstruction.match(epValuePreservingInstructionPattern),
+                        epIpRecoveryIdentityRegister = epIpRecoveryIdentity[1] || epIpRecoveryIdentity[2],
+                        epIpRecoveryIdentityKey = /^(?:[ABCD]X|SI|DI|BP|R(?:8|9|1[0-5])W)$/.test(epIpRecoveryIdentityRegister) ? getEpPartialRegisterKey(epIpRecoveryIdentityRegister) : getNativeRegisterKey(epIpRecoveryIdentityRegister);
+
+                    if (epRegister32BitPattern.test(epIpRecoveryIdentityRegister) && epIpRecoveryKnownValues[epIpRecoveryIdentityKey] !== undefined) epIpRecoveryKnownValues[epIpRecoveryIdentityKey] >>>= 0;
+                } else if (epIpRecoveryPartialWrite) {
+                    delete epIpRecoveryKnownValues[getEpPartialRegisterKey(epIpRecoveryPartialWrite[1])];
+                } else if (epIpRecoveryRegisterWrite) {
+                    delete epIpRecoveryKnownValues[getNativeRegisterKey(epIpRecoveryRegisterWrite[1])];
+                }
 
                 if (epIpRecoveryCopy) {
                     var epIpRecoveryCopyDestination = epIpRecoveryCopy[1],
@@ -11096,15 +11127,12 @@ function scanForObfuscations_Native() {
                     continue;
                 }
 
-                var epIpRecoveryRegisterWrite = epIpRecoveryInstruction.match(epFlagsNeutralRegisterWritePattern) ||
-                    epIpRecoveryInstruction.match(epTrackedRegisterWritePattern),
-                    epIpRecoveryPartialWrite = epIpRecoveryInstruction.match(epPartialRegisterWritePattern),
-                    epIpRecoveryNeutralInstruction = epIpRecoveryOpCode === "NOP" || epIpRecoveryOpCode === "FNOP" ||
-                        epIpRecoveryOpCode === "PAUSE" || epIpRecoveryOpCode === "CLC" ||
-                        epIpRecoveryOpCode === "STC" || epIpRecoveryOpCode === "CMC" ||
-                        epStackRoundTripPushPattern.test(epIpRecoveryInstruction) ||
-                        epIpRecoverySimplePolymorphism || epIpRecoveryValuePreserving ||
-                        epIpRecoveryRegisterWrite || epIpRecoveryPartialWrite || /^(?:CMP|TEST)$/.test(epIpRecoveryOpCode);
+                var epIpRecoveryNeutralInstruction = epIpRecoveryOpCode === "NOP" || epIpRecoveryOpCode === "FNOP" ||
+                    epIpRecoveryOpCode === "PAUSE" || epIpRecoveryOpCode === "CLC" ||
+                    epIpRecoveryOpCode === "STC" || epIpRecoveryOpCode === "CMC" ||
+                    epStackRoundTripPushPattern.test(epIpRecoveryInstruction) ||
+                    epIpRecoverySimplePolymorphism || epIpRecoveryValuePreserving ||
+                    epIpRecoveryRegisterWrite || epIpRecoveryPartialWrite || /^(?:CMP|TEST)$/.test(epIpRecoveryOpCode);
 
                 for (var epIpRecoveryKnownRegister in epIpRecoveryKnownRegisters) {
                     var epIpRecoveryPatterns = epIpRecoveryRegisterPatterns[epIpRecoveryKnownRegister];
