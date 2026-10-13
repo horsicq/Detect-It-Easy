@@ -4704,8 +4704,10 @@ function scanForBadFileFormat_NET_and_Native() {
             exceptionDirectorySize = PE.read_uint32(exceptionDirectoryEntryOffset + 4),
             exceptionDirectoryAddress = PE_Cached.imageBase + exceptionDirectoryRva;
 
-        if (exceptionDirectoryRva !== 0 && exceptionDirectorySize !== 0 &&
-            isVirtualAddressRangeFileBacked(exceptionDirectoryAddress, exceptionDirectorySize, 0)) {
+        // The loader consumes records across adjacent sections even when their raw data is separate.
+        var exceptionDirectoryData = exceptionDirectoryRva !== 0 && exceptionDirectorySize !== 0 ? readFileBackedVirtualBytes(exceptionDirectoryAddress, exceptionDirectorySize) : undefined;
+
+        if (exceptionDirectoryData) {
             // AMD64 uses fixed 12-byte RUNTIME_FUNCTION records. A non-zero remainder
             // cannot describe even a future unwind format without changing the directory.
             if (exceptionDirectorySize < 12 || exceptionDirectorySize % 12 !== 0) {
