@@ -10099,6 +10099,7 @@ function scanForObfuscations_Native() {
         // conditional edges without guessing the outcome of other branches.
         var epPolymorphismPendingAddresses = [PE_Cached.addressOfUnmanagedEntryPoint],
             epPolymorphismPendingZeroFlags = [-1],
+            epPolymorphismPendingStackPointerZeros = [false],
             epPolymorphismPendingCarryFlags = [-1],
             epPolymorphismPendingAddressIndex = 0,
             epPolymorphismVisitedAddresses = {},
@@ -10127,6 +10128,7 @@ function scanForObfuscations_Native() {
         if (isSyntheticEpTransferPresent && syntheticEpTargetAddress) {
             epPolymorphismPendingAddresses.push(parseInt(syntheticEpTargetAddress, 0));
             epPolymorphismPendingZeroFlags.push(-1);
+            epPolymorphismPendingStackPointerZeros.push(false);
             epPolymorphismPendingCarryFlags.push(-1);
             epBitstreamStartAddresses.push(parseInt(syntheticEpTargetAddress, 0));
         }
@@ -10137,9 +10139,10 @@ function scanForObfuscations_Native() {
             epPolymorphismPendingAddressIndex < epPolymorphismInstructionLimit * 4) {
             var epPolymorphismCurrentAddress = epPolymorphismPendingAddresses[epPolymorphismPendingAddressIndex],
                 epPolymorphismCurrentZeroFlag = epPolymorphismPendingZeroFlags[epPolymorphismPendingAddressIndex],
+                epPolymorphismCurrentStackPointerZero = epPolymorphismPendingStackPointerZeros[epPolymorphismPendingAddressIndex],
                 epPolymorphismCurrentCarryFlag = epPolymorphismPendingCarryFlags[epPolymorphismPendingAddressIndex++],
                 epPolymorphismAddressKey = epPolymorphismCurrentAddress.toString(),
-                epPolymorphismStateKey = epPolymorphismAddressKey + ":" + epPolymorphismCurrentZeroFlag + ":" + epPolymorphismCurrentCarryFlag,
+                epPolymorphismStateKey = epPolymorphismAddressKey + ":" + epPolymorphismCurrentZeroFlag + ":" + epPolymorphismCurrentCarryFlag + ":" + epPolymorphismCurrentStackPointerZero,
                 epPolymorphismCurrentRva = epPolymorphismCurrentAddress - PE_Cached.imageBase,
                 epPolymorphismSectionIndex = -1;
 
@@ -10162,20 +10165,31 @@ function scanForObfuscations_Native() {
 
             if (epPolymorphismSectionIndex === -1) continue;
 
-            // Count instruction evidence once per address. A later arrival with different
-            // proven flags can still expose another reachable path through that address.
-            var epPolymorphismIsRevisit = !!epPolymorphismVisitedAddresses[epPolymorphismAddressKey];
-            if (!epPolymorphismIsRevisit) {
-                epPolymorphismVisitedAddresses[epPolymorphismAddressKey] = true;
-                epPolymorphismVisitedInstructionCount++;
-            }
-
             var epPolymorphismInstruction = PE.getDisasmString(epPolymorphismCurrentAddress),
                 epPolymorphismOpCode = getAsmOpCode(epPolymorphismInstruction),
                 epPolymorphismInstructionLength = PE.getDisasmLength(epPolymorphismCurrentAddress);
 
             if (!epPolymorphismOpCode || epPolymorphismOpCode === "DB" || epPolymorphismInstructionLength < 1 || epPolymorphismInstructionLength > 15 ||
                 !isVirtualAddressRangeFileBacked(epPolymorphismCurrentAddress, epPolymorphismInstructionLength, SECTION_FLAGS_EXECUTE)) continue;
+            if (/^AAM (?:0X0+|0+)$/i.test(epPolymorphismInstruction)) continue;
+
+            // A proven null user-mode SP faults on stack access; its callee and continuation are unreachable.
+            if (isEpProvenFaultingInstruction(epPolymorphismInstruction, epPolymorphismOpCode, epPolymorphismCurrentStackPointerZero)) continue;
+            var epPolymorphismNextStackPointerZero = advanceEpStackPointerZero(epPolymorphismInstruction, epPolymorphismOpCode, epPolymorphismCurrentStackPointerZero);
+
+            // Word-sized taken transfers cannot seed native-VA callee or branch evidence from the decoder.
+            if ((epPolymorphismOpCode === "CALL" || epPolymorphismOpCode === "JMP" ||
+                (/^(?:J(?!MPF)[A-Z]+|LOOP(?:E|NE|NZ|Z)?)$/.test(epPolymorphismOpCode) && getEpKnownBranchResult(epPolymorphismOpCode, epPolymorphismCurrentZeroFlag, epPolymorphismCurrentCarryFlag) !== 0)) &&
+                !isEpNativeNearTransfer(epPolymorphismCurrentAddress, epPolymorphismInstruction, epPolymorphismInstructionLength)) {
+                continue;
+            }
+
+            // Count evidence only after this path is admitted: a rejected arrival must not consume another path's first visit.
+            var epPolymorphismIsRevisit = !!epPolymorphismVisitedAddresses[epPolymorphismAddressKey];
+            if (!epPolymorphismIsRevisit) {
+                epPolymorphismVisitedAddresses[epPolymorphismAddressKey] = true;
+                epPolymorphismVisitedInstructionCount++;
+            }
 
             if (epPolymorphismIsRevisit) {
                 // Revisit only the control flow. Re-counting opcode evidence would inflate
@@ -10192,10 +10206,12 @@ function scanForObfuscations_Native() {
                         if (isEpDirectCallReturnProven(epPolymorphismCurrentAddress)) {
                             epPolymorphismPendingAddresses.push(revisitNextAddress);
                             epPolymorphismPendingZeroFlags.push(-1);
+                            epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                             epPolymorphismPendingCarryFlags.push(-1);
                         }
                         epPolymorphismPendingAddresses.push(revisitTargetAddress);
                         epPolymorphismPendingZeroFlags.push(epPolymorphismCurrentZeroFlag);
+                        epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                         epPolymorphismPendingCarryFlags.push(epPolymorphismCurrentCarryFlag);
                     } else {
                         var revisitBranchResult = getEpKnownBranchResult(epPolymorphismOpCode, revisitZeroFlag, revisitCarryFlag);
@@ -10203,18 +10219,21 @@ function scanForObfuscations_Native() {
                         if (revisitBranchResult !== 0) {
                             epPolymorphismPendingAddresses.push(revisitTargetAddress);
                             epPolymorphismPendingZeroFlags.push(revisitZeroFlag);
+                            epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                             epPolymorphismPendingCarryFlags.push(revisitCarryFlag);
                         }
 
                         if (epPolymorphismOpCode !== "JMP" && epPolymorphismOpCode !== "JMPF" && revisitBranchResult !== 1) {
                             epPolymorphismPendingAddresses.push(revisitNextAddress);
                             epPolymorphismPendingZeroFlags.push(revisitZeroFlag);
+                            epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                             epPolymorphismPendingCarryFlags.push(revisitCarryFlag);
                         }
                     }
                 } else if (epScanStopOpCodes.indexOf(epPolymorphismOpCode) === -1) {
                     epPolymorphismPendingAddresses.push(revisitNextAddress);
                     epPolymorphismPendingZeroFlags.push(revisitZeroFlag);
+                    epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                     epPolymorphismPendingCarryFlags.push(revisitCarryFlag);
                 }
                 continue;
@@ -10653,28 +10672,33 @@ function scanForObfuscations_Native() {
                     // An unconditional jump has no reachable physical fall-through.
                     epPolymorphismPendingAddresses.push(epPolymorphismTargetAddress);
                     epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
+                    epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                     epPolymorphismPendingCarryFlags.push(epPolymorphismNextCarryFlag);
                 } else if (epPolymorphismOpCode === "CALL") {
                     // A physical fall-through exists only if every bounded callee path returns.
                     if (isEpDirectCallReturning) {
                         epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
                         epPolymorphismPendingZeroFlags.push(-1);
+                        epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                         epPolymorphismPendingCarryFlags.push(-1);
                     }
                     epPolymorphismPendingAddresses.push(epPolymorphismTargetAddress);
                     epPolymorphismPendingZeroFlags.push(epPolymorphismCurrentZeroFlag);
+                    epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                     epPolymorphismPendingCarryFlags.push(epPolymorphismCurrentCarryFlag);
                 } else {
                     // Known flags exclude only a proved-impossible conditional edge.
                     if (epPolymorphismBranchTaken !== 0) {
                         epPolymorphismPendingAddresses.push(epPolymorphismTargetAddress);
                         epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
+                        epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                         epPolymorphismPendingCarryFlags.push(epPolymorphismNextCarryFlag);
                     }
 
                     if (epPolymorphismBranchTaken !== 1) {
                         epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
                         epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
+                        epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                         epPolymorphismPendingCarryFlags.push(epPolymorphismNextCarryFlag);
                     }
                 }
@@ -10683,6 +10707,7 @@ function scanForObfuscations_Native() {
             } else if (epScanStopOpCodes.indexOf(epPolymorphismOpCode) === -1) {
                 epPolymorphismPendingAddresses.push(epPolymorphismNextAddress);
                 epPolymorphismPendingZeroFlags.push(epPolymorphismNextZeroFlag);
+                epPolymorphismPendingStackPointerZeros.push(epPolymorphismNextStackPointerZero);
                 epPolymorphismPendingCarryFlags.push(epPolymorphismNextCarryFlag);
             }
 
@@ -11146,6 +11171,7 @@ function scanForObfuscations_Native() {
         // Clean up: release the control-flow worklist and its potentially dense visited set.
         epPolymorphismPendingAddresses = undefined;
         epPolymorphismPendingZeroFlags = undefined;
+        epPolymorphismPendingStackPointerZeros = undefined;
         epPolymorphismPendingCarryFlags = undefined;
         epPolymorphismVisitedAddresses = undefined;
         epPolymorphismVisitedStates = undefined;
