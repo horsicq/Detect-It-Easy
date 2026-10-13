@@ -5779,44 +5779,33 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     // https://github.com/dotnet/runtime/blob/main/docs/design/specs/PE-COFF.md#embedded-portable-pdb-debug-directory-entry-type-17
 
-    var embeddedPdbOptionalHeaderOffset = PE_Cached.fileSize >= 0x40 ? getOptHeaderOffset() : -1;
+    if (debugDirectoryEntryOffset !== -1) {
+        if (debugDirectoryRva !== 0 && debugDirectorySize >= 28 && debugDirectorySize % 28 === 0) {
+            for (var i = 0; i < numberOfDebugDataRecords && !isEmbeddedPdbPresent; i++) {
+                var embeddedPdbRecordAddress = PE_Cached.imageBase + debugDirectoryRva + i * 28;
 
-    if (embeddedPdbOptionalHeaderOffset >= 24 && embeddedPdbOptionalHeaderOffset <= PE_Cached.fileSize - 2) {
-        var embeddedPdbOptionalHeaderSize = PE.readWord(embeddedPdbOptionalHeaderOffset - 4),
-            embeddedPdbOptionalHeaderMagic = PE.readWord(embeddedPdbOptionalHeaderOffset),
-            embeddedPdbDirectoryStart = embeddedPdbOptionalHeaderMagic === 0x20B ? 0x70 : 0x60;
+                // A record may cross sections even when its payload has one ordinary raw offset.
+                var embeddedPdbRecordData = readFileBackedVirtualBytes(embeddedPdbRecordAddress, 28);
 
-        if ((embeddedPdbOptionalHeaderMagic === 0x10B || embeddedPdbOptionalHeaderMagic === 0x20B) &&
-            embeddedPdbOptionalHeaderSize >= embeddedPdbDirectoryStart + 56 && embeddedPdbOptionalHeaderOffset + embeddedPdbOptionalHeaderSize <= PE_Cached.fileSize &&
-            PE.read_uint32(embeddedPdbOptionalHeaderOffset + embeddedPdbDirectoryStart - 4) > 6) {
-            var embeddedPdbDirectoryEntryOffset = embeddedPdbOptionalHeaderOffset + embeddedPdbDirectoryStart + 48,
-                embeddedPdbDirectoryRva = PE.read_uint32(embeddedPdbDirectoryEntryOffset),
-                embeddedPdbDirectorySize = PE.read_uint32(embeddedPdbDirectoryEntryOffset + 4),
-                embeddedPdbDirectoryAddress = PE_Cached.imageBase + embeddedPdbDirectoryRva;
+                if (!embeddedPdbRecordData) break;
 
-            if (embeddedPdbDirectoryRva !== 0 && embeddedPdbDirectorySize >= 28 && embeddedPdbDirectorySize % 28 === 0 &&
-                isVirtualAddressRangeFileBacked(embeddedPdbDirectoryAddress, embeddedPdbDirectorySize, 0)) {
-                for (var i = 0; i < embeddedPdbDirectorySize && !isEmbeddedPdbPresent; i += 28) {
-                    var embeddedPdbRecordOffset = PE.VAToOffset(embeddedPdbDirectoryAddress + i);
+                if (readUnsignedDwordFromBuffer(embeddedPdbRecordData, 12) !== 17 || readUnsignedDwordFromBuffer(embeddedPdbRecordData, 0) !== 0 ||
+                    readUnsignedDwordFromBuffer(embeddedPdbRecordData, 4) !== 0 || (embeddedPdbRecordData[10] | (embeddedPdbRecordData[11] << 8)) !== 0x100) continue;
 
-                    if (PE.read_uint32(embeddedPdbRecordOffset + 12) !== 17 || PE.read_uint32(embeddedPdbRecordOffset) !== 0 ||
-                        PE.read_uint32(embeddedPdbRecordOffset + 4) !== 0 || PE.readWord(embeddedPdbRecordOffset + 10) !== 0x100) continue;
+                var embeddedPdbDataSize = readUnsignedDwordFromBuffer(embeddedPdbRecordData, 16),
+                    embeddedPdbDataOffset = readUnsignedDwordFromBuffer(embeddedPdbRecordData, 24);
 
-                    var embeddedPdbDataSize = PE.read_uint32(embeddedPdbRecordOffset + 16),
-                        embeddedPdbDataOffset = PE.read_uint32(embeddedPdbRecordOffset + 24);
+                if (embeddedPdbDataSize <= 8 || embeddedPdbDataOffset <= 0 || embeddedPdbDataOffset > PE_Cached.fileSize - embeddedPdbDataSize) continue;
+                if (!PE.compare("'MPDB'", embeddedPdbDataOffset)) continue;
 
-                    if (embeddedPdbDataSize <= 8 || embeddedPdbDataOffset <= 0 || embeddedPdbDataOffset > PE_Cached.fileSize - embeddedPdbDataSize) continue;
-                    if (!PE.compare("'MPDB'", embeddedPdbDataOffset)) continue;
+                var embeddedPdbUncompressedSize = PE.read_uint32(embeddedPdbDataOffset + 4);
 
-                    var embeddedPdbUncompressedSize = PE.read_uint32(embeddedPdbDataOffset + 4);
+                // The high bit is reserved for a future format; no decompression or integrity claim is made here.
+                if (embeddedPdbUncompressedSize === 0 || embeddedPdbUncompressedSize >= 0x80000000) continue;
 
-                    // The high bit is reserved for a future format; no decompression or integrity claim is made here.
-                    if (embeddedPdbUncompressedSize === 0 || embeddedPdbUncompressedSize >= 0x80000000) continue;
+                log(logType.net, "Embedded Portable PDB: " + embeddedPdbDataSize + " bytes, uncompressed size " + embeddedPdbUncompressedSize);
 
-                    log(logType.net, "Embedded Portable PDB: " + embeddedPdbDataSize + " bytes, uncompressed size " + embeddedPdbUncompressedSize);
-
-                    isEmbeddedPdbPresent = true;
-                }
+                isEmbeddedPdbPresent = true;
             }
         }
     }
