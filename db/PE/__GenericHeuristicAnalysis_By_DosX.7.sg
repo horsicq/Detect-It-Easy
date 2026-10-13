@@ -9565,8 +9565,8 @@ function scanForObfuscations_Native() {
         (PE_Cached.imageSubsystem === 2 || PE_Cached.imageSubsystem === 3)) {
         const indirectEpTransferPattern = new RegExp("^(JMP|CALL) (" + epGeneralPurposeRegister + ")$", "i"),
             indirectEpArithmeticPattern = new RegExp("^(ADD|SUB|XOR) (" + epGeneralPurposeRegister + "), (0X[0-9A-F]+|\\d+)$", "i"),
-            indirectEpLeaPattern = new RegExp("^LEA (" + epGeneralPurposeRegister + "), \\[(RIP|" + epGeneralPurposeRegister + ")(?: ([+-]) (0X[0-9A-F]+|\\d+))?\\]$", "i"),
-            indirectEpLeaAbsolutePattern = new RegExp("^LEA (" + epGeneralPurposeRegister + "), \\[(0X[0-9A-F]+|\\d+)\\]$", "i"),
+            indirectEpLeaPattern = new RegExp("^LEA (" + epGeneralPurposeRegister + "), \\[(RIP|EIP|" + epGeneralPurposeRegister + ")(?: ([+-]) (0X[0-9A-F]+|\\d+))?\\]$", "i"),
+            indirectEpLeaAbsolutePattern = new RegExp("^LEA (" + epGeneralPurposeRegister + "), (?:(?:CS|DS|ES|SS|FS|GS):)?\\[(?:[RE]IZ\\*(?:1|2|4|8) \\+ )?(0X[0-9A-F]+|\\d+)\\]$", "i"),
             indirectEpRegisterWritePattern = new RegExp("^(?:MOV(?:ABS)?|MOVZX|MOVSX|MOVSXD|LEA|XOR|ADD|SUB|ADC|SBB|AND|OR|NOT|NEG|INC|DEC|POP) (" + epGeneralPurposeRegister + ")(?:,|$)", "i");
 
         // Keep address facts per reachable path: an unrelated write on one branch must
@@ -9678,16 +9678,13 @@ function scanForObfuscations_Native() {
                 } else {
                     delete indirectEpKnownAddresses[arithmeticRegisterKey];
                 }
-            } else if (registerLeaAbsolute) {
-                var leaDestination = registerLeaAbsolute[1],
+            } else if (registerLeaAbsolute || (registerLea && /^(?:RIP|EIP)$/.test(registerLea[2]))) {
+                var leaDestination = (registerLeaAbsolute || registerLea)[1],
                     leaDestinationKey = getNativeRegisterKey(leaDestination),
-                    leaTargetAddress = parseInt(registerLeaAbsolute[2], 0);
+                    leaTargetAddress = getEpEncodedLeaTarget(currentEpAddress, currentEpInstruction, currentEpLength);
 
-                if (epRegister32BitPattern.test(leaDestination)) leaTargetAddress >>>= 0;
                 if (leaTargetAddress >= 0 && leaTargetAddress <= epMaximumSafeInteger &&
-                    !(PE_Cached.is64bit && !epRegister32BitPattern.test(leaDestination) &&
-                        leaTargetAddress >= 0x80000000 && leaTargetAddress <= 0xFFFFFFFF) &&
-                    isVirtualAddressRangeFileBacked(leaTargetAddress, 1, SECTION_FLAGS_EXECUTE)) {
+                    (leaTargetAddress === 0 || isVirtualAddressRangeFileBacked(leaTargetAddress, 1, SECTION_FLAGS_EXECUTE))) {
                     indirectEpKnownAddresses[leaDestinationKey] = leaTargetAddress;
                 } else {
                     delete indirectEpKnownAddresses[leaDestinationKey];
@@ -9698,14 +9695,11 @@ function scanForObfuscations_Native() {
                     leaDestinationKey = getNativeRegisterKey(leaDestination),
                     leaSourceKey = getNativeRegisterKey(leaSource),
                     leaDisplacement = registerLea[4] ? parseInt(registerLea[4], 0) : 0,
-                    leaInstructionLength = leaSource === "RIP" ? currentEpLength : 0,
-                    leaBaseAddress = leaSource === "RIP" && leaInstructionLength >= 1 && leaInstructionLength <= 15 ?
-                        currentEpAddress + leaInstructionLength : indirectEpKnownAddresses[leaSourceKey],
-                    leaWidthsMatch = leaSource === "RIP" ? PE_Cached.is64bit :
-                        PE_Cached.is64bit ? !epRegister32BitPattern.test(leaSource) :
-                            epRegister32BitPattern.test(leaDestination) && epRegister32BitPattern.test(leaSource);
+                    leaBaseAddress = indirectEpKnownAddresses[leaSourceKey],
+                    leaWidthsMatch = PE_Cached.is64bit ? !epRegister32BitPattern.test(leaSource) :
+                        epRegister32BitPattern.test(leaDestination) && epRegister32BitPattern.test(leaSource);
 
-                if (leaWidthsMatch && leaBaseAddress !== undefined &&
+                if ((leaWidthsMatch || (leaBaseAddress === 0 && leaDisplacement === 0)) && leaBaseAddress !== undefined &&
                     leaDisplacement <= (PE_Cached.is64bit && registerLea[3] === "+" ? 0x7FFFFFFF : 0x80000000)) {
                     var leaTargetAddress = leaBaseAddress + (registerLea[3] === "+" ? leaDisplacement : -leaDisplacement);
 
