@@ -5003,16 +5003,15 @@ function scanForBadFileFormat_NET_and_Native() {
             debugDirectorySize = PE.read_uint32(debugDirectoryEntryOffset + 4),
             debugDirectoryAddress = PE_Cached.imageBase + debugDirectoryRva;
 
-        if (debugDirectoryRva !== 0 && debugDirectorySize !== 0 &&
-            isVirtualAddressRangeFileBacked(debugDirectoryAddress, debugDirectorySize, 0)) {
+        // Validate the same loaded-order bytes used by the debug-data readers, including split records.
+        var debugDirectoryData = debugDirectoryRva !== 0 && debugDirectorySize !== 0 ? readFileBackedVirtualBytes(debugDirectoryAddress, debugDirectorySize) : undefined;
+
+        if (debugDirectoryData) {
             if (debugDirectorySize % 28 !== 0) {
                 log(logType.any, "Debug directory ends with an incomplete entry");
 
                 isMalformedDebugDirectoryPresent = true;
             } else {
-                var debugDirectoryOffset = PE.VAToOffset(debugDirectoryAddress),
-                    debugDirectoryData = PE.readBytes(debugDirectoryOffset, debugDirectorySize);
-
                 for (var i = 0; i < debugDirectoryData.length && !isMalformedDebugDirectoryPresent; i += 28) {
                     var debugEntryIndex = i / 28,
                         debugEntryCharacteristics = readUnsignedDwordFromBuffer(debugDirectoryData, i),
