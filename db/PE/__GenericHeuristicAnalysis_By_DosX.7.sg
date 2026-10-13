@@ -12700,6 +12700,86 @@ function getFileBackedTlsCallbackAddresses() {
 
 
 /**
+ * Reads one unsigned DWORD or QWORD through contiguous loaded-image addresses.
+ * A value may occupy headers, span unrelated raw offsets or end in a zero-filled tail.
+ * Page padding requires proven section backing; low-alignment images retain file-identical bytes.
+ *
+ * @param {number} address - Virtual address of the value.
+ * @param {number} size - Required integer width, four or eight bytes.
+ * @returns {number} Exact value including virtual zero-fill, or -1 if unmapped, truncated or inexact.
+ */
+function readMappedUnsignedInteger(address, size) {
+    if ((size !== 4 && size !== 8) || address < PE_Cached.imageBase || address > 0x1FFFFFFFFFFFFF - size) return -1;
+
+    if (isVirtualAddressRangeFileBacked(address, size, 0)) {
+        var valueOffset = PE.VAToOffset(address);
+
+        return size === 8 ? readUnsignedQword(valueOffset) : PE.read_uint32(valueOffset);
+    }
+
+    var value = 0, fileBackedHeaderSize = Math.min(PE.getImageOptionalHeader("SizeOfHeaders"), PE_Cached.fileSize), imagePageSize = PE_Cached.architecture === "IA64" ? 0x2000 : 0x1000, imageSectionAlignment = PE.getImageOptionalHeader("SectionAlignment");
+
+    // The common value takes one native read. Only a split/virtual tail needs per-byte proof.
+    // VirtualSize beyond SizeOfRawData is zero-filled: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#section-table-section-headers
+    for (var i = 0; i < size; i++) {
+        var byteAddress = address + i,
+            byteValue = -1;
+
+        if (isVirtualAddressRangeFileBacked(byteAddress, 1, 0)) {
+            byteValue = PE.readByte(PE.VAToOffset(byteAddress));
+        } else {
+            var byteRva = byteAddress - PE_Cached.imageBase;
+
+            if (byteRva < fileBackedHeaderSize && PE.VAToOffset(byteAddress) === byteRva) {
+                byteValue = PE.readByte(byteRva);
+            } else {
+                var isDeclaredSectionByte = false;
+
+                for (var d = 0; d < PE_Cached.numberOfSections && byteValue === -1; d++) {
+                    var byteSectionOffset = byteRva - PE.getSectionVirtualAddress(d), byteSectionRawSize = PE.getSectionFileSize(d), byteSectionVirtualSize = PE.getSectionVirtualSize(d);
+
+                    if (byteSectionOffset >= 0 && byteSectionOffset < Math.max(byteSectionRawSize, byteSectionVirtualSize)) isDeclaredSectionByte = true;
+                    if (imageSectionAlignment >= imagePageSize && byteSectionOffset >= byteSectionRawSize && byteSectionOffset < byteSectionVirtualSize) byteValue = 0;
+                }
+
+                // Ordinary image pages zero-fill the tail after actual section contents, not the full SectionAlignment gap.
+                // A low-alignment image uses file-identical layout, so its unowned file bytes must not become fabricated zeros.
+                if (byteValue === -1 && !isDeclaredSectionByte && imageSectionAlignment >= imagePageSize && (imageSectionAlignment & (imageSectionAlignment - 1)) === 0 && byteRva < PE.getImageOptionalHeader("SizeOfImage")) {
+                    for (var d = 0; d < PE_Cached.numberOfSections && byteValue === -1; d++) {
+                        var pageSectionRva = PE.getSectionVirtualAddress(d), pageSectionRawSize = PE.getSectionFileSize(d), pageSectionMappedSize = Math.max(pageSectionRawSize, PE.getSectionVirtualSize(d)), byteOffsetInPageSection = byteRva - pageSectionRva;
+
+                        if (pageSectionRva % imagePageSize === 0 && pageSectionMappedSize > 0 && byteOffsetInPageSection >= pageSectionMappedSize &&
+                            byteOffsetInPageSection < Math.ceil(pageSectionMappedSize / imagePageSize) * imagePageSize && (pageSectionRawSize === 0 || isVirtualAddressRangeFileBacked(PE_Cached.imageBase + pageSectionRva, pageSectionRawSize, 0))) {
+                            byteValue = 0;
+                        }
+                    }
+                } else if (byteValue === -1 && !isDeclaredSectionByte && imageSectionAlignment > 0 && imageSectionAlignment < imagePageSize && (imageSectionAlignment & (imageSectionAlignment - 1)) === 0 &&
+                    imageSectionAlignment === PE.getImageOptionalHeader("FileAlignment") && byteRva < PE.getImageOptionalHeader("SizeOfImage") && PE.getImageOptionalHeader("SizeOfHeaders") <= PE_Cached.fileSize) {
+                    var isFileIdenticalImage = true;
+
+                    for (var d = 0; d < PE_Cached.numberOfSections && isFileIdenticalImage; d++) {
+                        var flatSectionRva = PE.getSectionVirtualAddress(d), flatSectionRawSize = PE.getSectionFileSize(d), flatSectionRawOffset = PE.getSectionFileOffset(d);
+
+                        if (PE.getSectionVirtualSize(d) > flatSectionRawSize || (flatSectionRawSize > 0 && (flatSectionRawOffset !== flatSectionRva || flatSectionRawOffset < 0 || flatSectionRawOffset + flatSectionRawSize > PE_Cached.fileSize))) isFileIdenticalImage = false;
+                    }
+
+                    // Low-alignment images retain file bytes outside named sections; only the tail beyond EOF is zero-filled.
+                    // File/RVA identity is required: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#section-data
+                    if (isFileIdenticalImage) byteValue = byteRva < PE_Cached.fileSize ? PE.readByte(byteRva) : 0;
+                }
+            }
+        }
+
+        if (byteValue < 0) return -1;
+        value += byteValue * Math.pow(256, i);
+    }
+
+    return value <= 0x1FFFFFFFFFFFFF ? value : -1;
+}
+
+
+
+/**
  * Proves that reachable EP code walks pages of its own mapped image.
  * The proof requires a RIP-derived image base and upper bound, a read through the
  * iterator, a page-sized advance, and a backward comparison branch to that read.
