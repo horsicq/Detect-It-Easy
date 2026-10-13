@@ -8011,10 +8011,10 @@ function scanForObfuscations_Native() {
             syntheticEpAddressArithmeticPattern = new RegExp("^(ADD|SUB) (" + syntheticEpStackTransferRegister + "), (0X[0-9A-F]+|[0-9]+)$", "i"),
             syntheticEpExchangedRegisterPattern = new RegExp("^XCHG " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (" + syntheticEpStackTransferRegister + ")$", "i"),
             syntheticEpStoredAddressPattern = new RegExp("^MOV " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (0X[0-9A-F]+|\\d+)$", "i"),
-            syntheticEpStackArithmeticPattern = new RegExp("^(ADD|SUB) " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (0X[0-9A-F]+|\\d+)$", "i"),
-            // A pivot is accepted only when SP receives a complete native-width value.
+            syntheticEpStackArithmeticPattern = new RegExp("^(ADD|SUB) " + syntheticEpStackValueSize + " PTR \\[" + syntheticEpStackPointer + "\\], (-?(?:0X[0-9A-F]+|\\d+))$", "i"),
+            // A dword SP assignment zero-extends in AMD64 and replaces the same native stack.
             // Scaled/indexed LEA forms are excluded because their result is not tracked.
-            syntheticEpStackPivotLiteralPattern = new RegExp("^MOV(?:ABS)? " + syntheticEpStackPointer + ", (0X[0-9A-F]+|\\d+)$", "i"),
+            syntheticEpStackPivotLiteralPattern = new RegExp("^MOV(?:ABS)? " + (PE_Cached.isI386 ? "ESP" : "(?:RSP|ESP)") + ", (0X[0-9A-F]+|\\d+)$", "i"),
             syntheticEpStackPivotRegisterPattern = new RegExp("^(?:MOV|XCHG) " + syntheticEpStackPointer +
                 ", (" + syntheticEpStackTransferRegister + ")$|^LEA " + syntheticEpStackPointer +
                 ", \\[(" + syntheticEpStackTransferRegister + ")\\]$", "i"),
@@ -8165,7 +8165,8 @@ function scanForObfuscations_Native() {
                     var stackDelta = parseInt(stackArithmetic[2], 0),
                         stackTarget = parseInt(syntheticEpTargetAddress, 0);
 
-                    if (stackDelta <= (PE_Cached.isI386 ? 0xFFFFFFFF : 0x7FFFFFFF)) {
+                    // DiE prints sign-extended QWORD immediates as signed literals; DWORD targets still wrap.
+                    if (stackDelta >= -0x80000000 && stackDelta <= (PE_Cached.isI386 ? 0xFFFFFFFF : 0x7FFFFFFF)) {
                         stackTarget += stackArithmetic[1] === "ADD" ? stackDelta : -stackDelta;
                         if (PE_Cached.isI386) stackTarget >>>= 0;
                     } else {
