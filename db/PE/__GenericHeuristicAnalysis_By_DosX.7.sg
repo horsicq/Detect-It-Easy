@@ -11427,8 +11427,8 @@ function scanForObfuscations_Native() {
             directJump = /^JMP (0X[0-9A-F]+|[0-9]+)$/,
             materializedJump = new RegExp("^JMP (" + nativeRegister + ")$"),
             materializedMove = new RegExp("^MOV(?:ABS)? (" + nativeRegister + "), (0X[0-9A-F]+|[0-9]+)$"),
-            materializedLea = new RegExp("^LEA (" + nativeRegister + "), \\[RIP ([+-]) (0X[0-9A-F]+|[0-9]+)\\]$"),
-            materializedLeaAbsolute = new RegExp("^LEA (" + nativeRegister + "), \\[(0X[0-9A-F]+|[0-9]+)\\]$"),
+            materializedLea = new RegExp("^LEA (" + epGeneralPurposeRegister + "), (?:(?:CS|DS|ES|SS|FS|GS):)?\\[(?:RIP|EIP) ([+-]) (0X[0-9A-F]+|[0-9]+)\\]$"),
+            materializedLeaAbsolute = new RegExp("^LEA (" + epGeneralPurposeRegister + "), (?:(?:CS|DS|ES|SS|FS|GS):)?\\[(?:[RE]IZ\\*(?:1|2|4|8) \\+ )?(0X[0-9A-F]+|[0-9]+)\\]$"),
             conditionalBranch = /^(J(?!MP)[A-Z]+) (0X[0-9A-F]+|[0-9]+)$/;
 
         var hasWritableSection = false;
@@ -11494,13 +11494,10 @@ function scanForObfuscations_Native() {
                                     indirectLength = PE.getDisasmLength(transferEnd),
                                     indirectJump = indirectInstruction && indirectInstruction.match(materializedJump);
 
-                                if (indirectJump && indirectJump[1] === (moveTarget ? moveTarget[1] : leaTarget ? leaTarget[1] : absoluteLeaTarget[1]) &&
+                                if (indirectJump && getNativeRegisterKey(indirectJump[1]) === getNativeRegisterKey((moveTarget || leaTarget || absoluteLeaTarget)[1]) &&
                                     indirectLength > 0 && indirectLength <= 15 &&
-                                    isVirtualAddressRangeFileBacked(transferEnd, indirectLength, SECTION_FLAGS_EXECUTE)) {
-                                    var targetDisplacement = leaTarget ? parseInt(leaTarget[3], 0) : 0;
-                                    target = moveTarget ? parseInt(moveTarget[2], 0) : absoluteLeaTarget ?
-                                        parseInt(absoluteLeaTarget[2], 0) :
-                                        transferEnd + (leaTarget[2] === "+" ? targetDisplacement : -targetDisplacement);
+                                    isEpNativeNearTransfer(transferEnd, indirectInstruction, indirectLength)) {
+                                    target = moveTarget ? parseInt(moveTarget[2], 0) : getEpEncodedLeaTarget(nextAddress, transferInstruction, transferLength);
                                     transferEnd += indirectLength;
                                 }
                             }
