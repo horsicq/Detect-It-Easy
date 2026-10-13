@@ -11361,8 +11361,10 @@ function scanForObfuscations_Native() {
                     break;
                 }
 
-                if (nativePush.test(current) || /^(?:PUSHFD|PUSHFQ)$/.test(current)) {
-                    stackDepth += pointerSize;
+                if (nativePush.test(current) || /^PUSH (?:AX|BX|CX|DX|SI|DI|BP|R(?:8|9|1[0-5])W)$/.test(current) || /^(?:PUSHF|PUSHFD|PUSHFQ)$/.test(current)) {
+                    var stackSlotPushSize = getEpPushOperandSize(address, currentLength);
+                    if (!stackSlotPushSize) break;
+                    stackDepth += stackSlotPushSize;
                 } else if (pop) {
                     if (stackDepth < pointerSize) break;
                     stackDepth -= pointerSize;
@@ -11419,7 +11421,9 @@ function scanForObfuscations_Native() {
             ripStackLoad = new RegExp("^MOV (" + stackPointer + "|" + nativeRegister + "), " + pointerWidth + " PTR \\[RIP ([+-]) (0X[0-9A-F]+|[0-9]+)\\]$"),
             absoluteStackLoad = new RegExp("^MOV (" + stackPointer + "|" + nativeRegister + "), " + pointerWidth + " PTR \\[(0X[0-9A-F]+|[0-9]+)\\]$"),
             stackRestore = new RegExp("^MOV " + stackPointer + ", (" + nativeRegister + ")$"),
-            unknownStackWrite = new RegExp("^(?!(?:CMP|TEST) )\\S+ " + stackPointer + "(?:,|$)|^XCHG .*\\b" + stackPointer + "$"),
+            // A partial SP write or x64 ESP zero-extension invalidates native stack depth too.
+            stackPointerAlias = is64bit ? "(?:RSP|ESP|SP|SPL)" : "(?:ESP|SP)",
+            unknownStackWrite = new RegExp("^(?!(?:CMP|TEST) )\\S+ " + stackPointerAlias + "(?:,|$)|^XCHG .*\\b" + stackPointerAlias + "$"),
             directJump = /^JMP (0X[0-9A-F]+|[0-9]+)$/,
             materializedJump = new RegExp("^JMP (" + nativeRegister + ")$"),
             materializedMove = new RegExp("^MOV(?:ABS)? (" + nativeRegister + "), (0X[0-9A-F]+|[0-9]+)$"),
@@ -11570,7 +11574,9 @@ function scanForObfuscations_Native() {
                     if (!isFinite(amount) || amount > 0x200) continue;
                     depth += adjustment[1] === "SUB" ? amount : -amount;
                 } else if (nativePush.test(instruction) || (is64bit ? opCode === "PUSHFQ" : opCode === "PUSHFD")) {
-                    depth += pointerSize;
+                    var stackHandoffPushSize = getEpPushOperandSize(address, length);
+                    if (!stackHandoffPushSize) continue;
+                    depth += stackHandoffPushSize;
                 } else if (nativePop.test(instruction) || (is64bit ? opCode === "POPFQ" : opCode === "POPFD")) {
                     depth -= pointerSize;
                 } else if (/^(?:ENTER|LEAVE|PUSH|POP|IRET|RET|SYS(?:CALL|ENTER|RET|EXIT)|INT|HLT|UD[012]|CALLF|LOOP)/.test(opCode) ||
