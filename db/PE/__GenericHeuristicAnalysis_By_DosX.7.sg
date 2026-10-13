@@ -7252,8 +7252,11 @@ function isEpBitstreamPathProven(startAddresses, transferAddress, copyAddress, s
             setRegister(next, match[1], right);
             setRegister(next, match[2], left);
         } else if ((match = instruction.match(leaPattern))) {
-            var base = next[registerKey(match[2])];
-            setRegister(next, match[1], base === undefined ? undefined : base + parseInt(match[4], 0) * (match[3] === "-" ? -1 : 1));
+            var base = next[registerKey(match[2])], isDwordAddress = PE_Cached.is64bit && /^(?:E[A-Z]+|R(?:8|9|1[0-5])D)$/i.test(match[2]),
+                addressValue = base === undefined ? undefined : (isDwordAddress ? base >>> 0 : base) + parseInt(match[4], 0) * (match[3] === "-" ? -1 : 1);
+            // Address-size truncation precedes the destination write, even when LEA writes a qword register.
+            if (addressValue !== undefined && isDwordAddress) addressValue >>>= 0;
+            setRegister(next, match[1], addressValue);
         } else if ((match = instruction.match(ripPattern))) {
             setRegister(next, match[1], address + PE.getDisasmLength(address) + parseInt(match[3], 0) * (match[2] === "-" ? -1 : 1));
         } else if ((match = instruction.match(absolutePattern))) setRegister(next, match[1], parseInt(match[2], 0));
