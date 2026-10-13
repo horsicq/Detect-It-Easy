@@ -10058,7 +10058,10 @@ function scanForObfuscations_Native() {
             epSelfModifyingCallStubAccumulatorPushPattern = new RegExp("^PUSH " + epSelfModifyingCallStubNativeAccumulator + "$", "i"),
             epSelfModifyingCallStubKeyLoadPattern = /^MOV EAX, (?:(?:DWORD PTR )?(?:[A-Z]+:)?\[[^\]]+\]|0X[0-9A-F]+|\d+)$/i,
             epSelfModifyingCallStubDecodePattern = /^(?:LEA EAX, \[EAX (?:\+|-) (?:0X[0-9A-F]+|\d+)\]|(?:ADD|SUB|XOR) EAX, (?:0X[0-9A-F]+|\d+))$/i,
-            epSelfModifyingCallStubWritePattern = /^XCHG DWORD PTR (?:[A-Z]+:)?\[(?:RIP\s*([+-])\s*(0X[0-9A-F]+|\d+)|(0X[0-9A-F]+|\d+))\], EAX$/i,
+            // FS/GS have unproven bases; CS cannot be written in x86 but its override is ignored in x64.
+            // Intel SDM Vol. 1, 3.7.4.1: https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-1-manual.pdf
+            epSelfModifyingCallStubFlatWriteSegment = PE_Cached.isI386 ? "(?:(?:DS|ES|SS):)?" : "(?:(?:CS|DS|ES|SS):)?",
+            epSelfModifyingCallStubWritePattern = new RegExp("^XCHG DWORD PTR " + epSelfModifyingCallStubFlatWriteSegment + "\\[(?:RIP\\s*([+-])\\s*(0X[0-9A-F]+|\\d+)|(0X[0-9A-F]+|\\d+))\\], EAX$", "i"),
             epSelfModifyingCallStubAccumulatorPopPattern = new RegExp("^POP " + epSelfModifyingCallStubNativeAccumulator + "$", "i"),
             epRepeatedSelfModifyingCallStubNativeRegister = PE_Cached.isI386 ?
                 "E(?:AX|BX|CX|DX|SI|DI|BP)" : "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
@@ -10070,7 +10073,7 @@ function scanForObfuscations_Native() {
                 epSelfModifyingCallStubNativePointer + " PTR )?(?:[A-Z]+:)?\\[" +
                 epRepeatedSelfModifyingCallStubStackPointer + "(?:\\s*[+-]\\s*(?:0X[0-9A-F]+|\\d+))?\\])$", "i"),
             epRepeatedSelfModifyingCallStubTransformPattern = new RegExp("^(?:ADD|ADC|SUB|SBB|XOR|AND|OR|NOT|NEG|ROL|ROR|RCL|RCR|LEA|MOVZX|MOVSX|MOVSXD|BSWAP) (" + epGeneralPurposeRegister + ")(?:,|$)", "i"),
-            epRepeatedSelfModifyingCallStubWritePattern = new RegExp("^(?:MOV|XCHG|CMPXCHG) (?:BYTE|WORD|DWORD|QWORD) PTR (?:[A-Z]+:)?\\[(?:RIP\\s*([+-])\\s*(0X[0-9A-F]+|\\d+)|(0X[0-9A-F]+|\\d+))\\], (" + epGeneralPurposeRegister + ")$", "i"),
+            epRepeatedSelfModifyingCallStubWritePattern = new RegExp("^(?:MOV|XCHG|CMPXCHG) (?:BYTE|WORD|DWORD|QWORD) PTR " + epSelfModifyingCallStubFlatWriteSegment + "\\[(?:RIP\\s*([+-])\\s*(0X[0-9A-F]+|\\d+)|(0X[0-9A-F]+|\\d+))\\], (" + epGeneralPurposeRegister + ")$", "i"),
             epComplexStackMutationOpCodes = [
                 "NEG", "NOT", "SAL", "SHL", "SHR", "SAR", "ROL", "ROR", "RCL", "RCR", "XADD", "XCHG"
             ],
