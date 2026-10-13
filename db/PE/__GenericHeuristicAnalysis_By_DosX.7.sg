@@ -13203,7 +13203,7 @@ function isEpImagePageSweepProven(stopOpCodes) {
     if (entryPoint < 0 || entryPoint > 0x1FFFFFFFFFFFFF) return false;
 
     var pending = [{
-        Address: entryPoint, KnownAddresses: {}, ZeroFlag: -1, CarryFlag: -1,
+        Address: entryPoint, KnownAddresses: {}, ZeroFlag: -1, CarryFlag: -1, StackPointerZero: false,
         ReadAddress: -1, ReadRegister: String(),
         StepAddress: -1, StepRegister: String(), StepStart: -1, CompareAddress: -1,
         CompareLimit: -1, Visited: {}
@@ -13223,6 +13223,8 @@ function isEpImagePageSweepProven(stopOpCodes) {
         if (!opCode || opCode === "DB" || length < 1 || length > 15 ||
             !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) continue;
 
+        if (isEpProvenFaultingInstruction(instruction, opCode, state.StackPointerZero)) continue;
+        state.StackPointerZero = advanceEpStackPointerZero(instruction, opCode, state.StackPointerZero);
         state.Visited[address] = true;
 
         var lea = instruction.match(ripAddress),
@@ -13303,7 +13305,7 @@ function isEpImagePageSweepProven(stopOpCodes) {
 
             pending.push({
                 Address: successors[successorIndex], KnownAddresses: knownAddresses,
-                ZeroFlag: state.ZeroFlag, CarryFlag: state.CarryFlag,
+                ZeroFlag: state.ZeroFlag, CarryFlag: state.CarryFlag, StackPointerZero: state.StackPointerZero,
                 ReadAddress: state.ReadAddress, ReadRegister: state.ReadRegister,
                 StepAddress: state.StepAddress, StepRegister: state.StepRegister,
                 StepStart: state.StepStart, CompareAddress: state.CompareAddress,
