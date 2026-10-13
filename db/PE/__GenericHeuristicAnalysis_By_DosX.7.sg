@@ -12996,6 +12996,67 @@ function getEpPushOperandSize(address, length) {
 
 
 /**
+ * Resolves a complete absolute or IP-relative LEA without a GPR base or index.
+ * The raw address width is authoritative: legacy DiE can sign-extend an EA32 operand in its text.
+ *
+ * @param {number} address - File-backed executable instruction virtual address.
+ * @param {string} instruction - Decoded LEA instruction text.
+ * @param {number} length - Complete decoded instruction length.
+ * @returns {number|undefined} Exact nonnegative address, or no proof for an unsupported form.
+ */
+function getEpEncodedLeaTarget(address, instruction, length) {
+    if (!PE_Cached.isArchX86 || length < 1 || length > 15 || !isVirtualAddressRangeFileBacked(address, length, SECTION_FLAGS_EXECUTE)) return undefined;
+
+    var destination = instruction.match(/^LEA ((?:E(?:AX|BX|CX|DX|SI|DI|BP|SP)|R(?:8|9|1[0-5])D)|R(?:AX|BX|CX|DX|SI|DI|BP|SP|8|9|1[0-5])), (?:(?:CS|DS|ES|SS|FS|GS):)?\[(?:(?:[RE]IZ\*(?:1|2|4|8) \+ )?(?:0X[0-9A-F]+|\d+)|(?:RIP|EIP) [+-] (?:0X[0-9A-F]+|\d+))\]$/i);
+    if (!destination) return undefined;
+
+    var offset = PE.VAToOffset(address), index = 0, hasWordOperand = false, hasAddressOverride = false, rex = 0;
+
+    for (; index < length; index++) {
+        var prefix = PE.readByte(offset + index);
+        if ([0x66, 0x67, 0xF2, 0xF3, 0x2E, 0x36, 0x3E, 0x26, 0x64, 0x65].indexOf(prefix) !== -1) {
+            if (prefix === 0x66) hasWordOperand = true;
+            if (prefix === 0x67) hasAddressOverride = true;
+            rex = 0;
+        } else if (PE_Cached.is64bit && prefix >= 0x40 && prefix <= 0x4F) rex = prefix;
+        else break;
+    }
+
+    // A word destination cannot prove a native pointer; I386 EA16 and LOCK are not these forms.
+    if ((hasWordOperand && !(rex & 8)) || (PE_Cached.isI386 && hasAddressOverride) || index + 6 > length || PE.readByte(offset + index) !== 0x8D) return undefined;
+
+    var modRm = PE.readByte(offset + index + 1), displacementOffset = index + 2,
+        destinationIndex = ((modRm >>> 3) & 7) + (rex & 4 ? 8 : 0),
+        destinationKey = destinationIndex < 8 ? ["RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"][destinationIndex] : "R" + destinationIndex;
+
+    if (getNativeRegisterKey(destination[1]) !== destinationKey) return undefined;
+
+    // RIZ/EIZ denotes the absent SIB index; its scale bits and every segment override have no effect on LEA.
+    var isIpRelative = PE_Cached.is64bit && (modRm & 0xC7) === 5;
+    if ((modRm & 0xC7) === 4 && index + 7 === length && !(rex & 2) && (PE.readByte(offset + index + 2) & 0x3F) === 0x25) displacementOffset++;
+    else if (!((modRm & 0xC7) === 5 && index + 6 === length)) return undefined;
+
+    var target = PE.read_uint32(offset + displacementOffset), isDwordDestination = !PE_Cached.is64bit || !(rex & 8);
+
+    // DiE may print an already resolved IP-relative address; compute it from the signed displacement instead.
+    if (isIpRelative) {
+        var nextAddress = (hasAddressOverride || isDwordDestination ? address >>> 0 : address) + length,
+            displacement = target < 0x80000000 ? target : target - 0x100000000;
+        if (nextAddress > 0x1FFFFFFFFFFFFF) return undefined;
+        target = nextAddress + displacement;
+        if (hasAddressOverride || isDwordDestination) target >>>= 0;
+        if (target < 0 || target > 0x1FFFFFFFFFFFFF || !isFinite(target)) return undefined;
+    } else if (PE_Cached.is64bit && !hasAddressOverride && !isDwordDestination && target >= 0x80000000) {
+        // LEA r32 zero-extends even an EA64 result; only a native EA64 destination sign-extends disp32.
+        return undefined;
+    }
+
+    return target;
+}
+
+
+
+/**
  * Proves a bounded direct native control-flow graph reaches the same terminal on every path.
  * Direct conditional branches contribute both successors. Unknown calls or transfers,
  * undecodable bytes, cycles and exhausted budgets remain unproven rather than guessed.
