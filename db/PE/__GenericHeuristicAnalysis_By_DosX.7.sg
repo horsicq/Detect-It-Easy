@@ -10923,7 +10923,8 @@ function scanForObfuscations_Native() {
                         var epRepeatedSelfModifyingCallStubCurrentAddress = epDirectCallTargetAddress,
                             epRepeatedSelfModifyingCallStubReturnReadPresent = false,
                             epRepeatedSelfModifyingCallStubTransformPresent = false,
-                            epRepeatedSelfModifyingCallStubTransformRegister = String();
+                            epRepeatedSelfModifyingCallStubTransformRegister = String(),
+                            epRepeatedSelfModifyingCallStubFallthrough = {};
 
                         // The generic profile deliberately ignores exact registers and arithmetic.
                         // Requiring three distinct called stubs in the same writable code section
@@ -11017,6 +11018,9 @@ function scanForObfuscations_Native() {
 
                             // Never join instructions across a terminal control-flow boundary.
                             if (epScanStopOpCodes.indexOf(epRepeatedSelfModifyingCallStubOpCode) !== -1) break;
+
+                            // A skipped write cannot reconstruct the stub, even when its bytes follow the branch physically.
+                            if (isEpLinearFallthroughUnproven(epRepeatedSelfModifyingCallStubInstruction, epRepeatedSelfModifyingCallStubCurrentAddress, epRepeatedSelfModifyingCallStubFallthrough)) break;
 
                             // Continue linearly inside the already validated writable code section.
                             epRepeatedSelfModifyingCallStubCurrentAddress += epRepeatedSelfModifyingCallStubInstructionLength;
