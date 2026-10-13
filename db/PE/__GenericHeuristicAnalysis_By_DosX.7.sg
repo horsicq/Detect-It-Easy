@@ -9186,20 +9186,42 @@ function scanForObfuscations_Native() {
                 currentEpOpCode = getAsmOpCode(currentEpInstruction),
                 currentEpInstructionLength = PE.getDisasmLength(fpuEpCurrentAddress),
                 currentEpOffset = PE.VAToOffset(fpuEpCurrentAddress),
-                // Match the two exact encodings of FNSTENV [ESP-0xC] without depending on
-                // textual x87 decoding, then advance over the complete instruction atomically.
-                storesRawFpuEnvironmentAtStack = currentEpOffset !== -1 && (PE.compare("D9 74 24 F4", currentEpOffset) || PE.compare("D9 B4 24 F4 FF FF FF", currentEpOffset)),
-                isRawFpuNop = currentEpOffset !== -1 && PE.compare("D9 D0", currentEpOffset),
-                fpuOpcodeByte = currentEpOffset !== -1 ? PE.readByte(currentEpOffset) : -1,
+                fpuOpcodeOffset = currentEpOffset, fpuPrefixLength = 0, fpuPrefixByte = -1, fpuHasOperandSizeOverride = false, fpuHasAddressSizeOverride = false, fpuHasLockPrefix = false, fpuStackSegmentValid = true;
+
+            // Operand-size override selects the 14-byte environment, whose FIP is at +6 rather than +12.
+            // https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html (Vol. 1, x87 FPU operating environment)
+            while (fpuPrefixLength < 14 && isVirtualAddressRangeFileBacked(fpuEpCurrentAddress, fpuPrefixLength + 1, SECTION_FLAGS_EXECUTE)) {
+                fpuPrefixByte = PE.readByte(fpuOpcodeOffset);
+                if ([0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65, 0x66, 0x67, 0xF0, 0xF2, 0xF3].indexOf(fpuPrefixByte) === -1 && !(fpuPrefixLength === 0 && fpuPrefixByte === 0x9B)) break;
+                if (fpuPrefixByte === 0xF0) fpuHasLockPrefix = true;
+                if (fpuPrefixByte === 0x66) fpuHasOperandSizeOverride = true;
+                if (fpuPrefixByte === 0x67) fpuHasAddressSizeOverride = true;
+                if ([0x26, 0x2E, 0x3E, 0x64, 0x65].indexOf(fpuPrefixByte) !== -1) fpuStackSegmentValid = false;
+                fpuPrefixLength++;
+                fpuOpcodeOffset++;
+            }
+
+            // Match both FNSTENV [ESP-0xC] encodings and consume their complete prefixed instruction.
+            var storesRawFpuEnvironmentAtStack = currentEpOffset !== -1 && !fpuHasAddressSizeOverride && (PE.compare("D9 74 24 F4", fpuOpcodeOffset) || PE.compare("D9 B4 24 F4 FF FF FF", fpuOpcodeOffset)),
+                isRawFpuNop = currentEpOffset !== -1 && PE.compare("D9 D0", fpuOpcodeOffset),
+                fpuOpcodeByte = fpuPrefixLength < 14 ? fpuPrefixByte : currentEpOffset !== -1 ? PE.readByte(fpuOpcodeOffset) : -1,
                 fpuSecondByte = (fpuOpcodeByte === 0xD8 || fpuOpcodeByte === 0xD9 || fpuOpcodeByte === 0xDD) &&
-                    isVirtualAddressRangeFileBacked(fpuEpCurrentAddress, 2, SECTION_FLAGS_EXECUTE) ? PE.readByte(currentEpOffset + 1) : -1,
-                isRawFpuSource = (fpuOpcodeByte === 0xD9 && fpuSecondByte >= 0xE8 && fpuSecondByte <= 0xEE) ||
+                    isVirtualAddressRangeFileBacked(fpuEpCurrentAddress, fpuPrefixLength + 2, SECTION_FLAGS_EXECUTE) ? PE.readByte(fpuOpcodeOffset + 1) : -1,
+                // These documented D9 math forms may also decode as DB; consume both bytes instead of treating the second as integer code.
+                isRawFpuSource = (fpuOpcodeByte === 0xD9 && ((fpuSecondByte >= 0xE8 && fpuSecondByte <= 0xEE) ||
+                    [0xF2, 0xF3, 0xF5].indexOf(fpuSecondByte) !== -1 || (fpuSecondByte >= 0xF8 && fpuSecondByte <= 0xFF))) ||
                     (fpuOpcodeByte === 0xD8 && fpuSecondByte >= 0xC0),
                 isRawFpuStateSave = fpuOpcodeByte === 0xDD && fpuSecondByte >= 0 && fpuSecondByte < 0xC0 && (fpuSecondByte & 0x38) === 0x30;
 
             if (!currentEpOpCode || currentEpInstructionLength <= 0) break; // Safety check
 
-            if (isRawFpuStateSave) {
+            // Only the explicitly decoded raw x87 forms may cross a DB boundary; invalid integer encodings cannot reach recovery.
+            if (currentEpOpCode === "DB" && !storesRawFpuEnvironmentAtStack && !isRawFpuNop && !isRawFpuSource && !isRawFpuStateSave) break;
+
+            // LOCK faults on x87, but a valid locked integer operation must not hide a later recovery sequence.
+            if (fpuHasLockPrefix && fpuOpcodeByte >= 0xD8 && fpuOpcodeByte <= 0xDF) break;
+
+            if (isRawFpuStateSave && !fpuPrefixLength) {
                 // Decode the complete DD /6 memory operand so displacement bytes cannot become fake x87 sources.
                 var fpuSaveMode = fpuSecondByte >>> 6, fpuSaveRm = fpuSecondByte & 7, fpuSaveLength = 2;
 
@@ -9216,13 +9238,16 @@ function scanForObfuscations_Native() {
                 currentEpInstructionLength = fpuSaveLength;
             } else if (storesRawFpuEnvironmentAtStack) {
                 // Override the decoded length with the exact short or long raw encoding.
-                currentEpInstructionLength = PE.compare("D9 74 24 F4", currentEpOffset) ? 4 : 7;
+                currentEpInstructionLength = fpuPrefixLength + (PE.compare("D9 74 24 F4", fpuOpcodeOffset) ? 4 : 7);
             } else if (isRawFpuNop || isRawFpuSource) {
                 // Some DiE builds render these complete x87 instructions as separate bytes.
-                currentEpInstructionLength = 2;
+                currentEpInstructionLength = fpuPrefixLength + 2;
             }
 
-            var storesFpuEnvironmentAtStack = /^(?:FSTENV|FNSTENV) (?:(?:BYTE|WORD|DWORD|QWORD|TBYTE|FWORD) PTR )?\[ESP ?- ?(?:0X0*C|12)\]$/i.test(currentEpInstruction),
+            if (currentEpInstructionLength > 15 || !isVirtualAddressRangeFileBacked(fpuEpCurrentAddress, currentEpInstructionLength, SECTION_FLAGS_EXECUTE)) break;
+            if (isEpProvenFaultingInstruction(currentEpInstruction, currentEpOpCode, fpuEpFallthrough.StackPointerZero)) break;
+
+            var storesFpuEnvironmentAtStack = !fpuHasOperandSizeOverride && fpuStackSegmentValid && /^(?:FSTENV|FNSTENV) (?:(?:BYTE|WORD|DWORD|QWORD|TBYTE|FWORD) PTR )?\[ESP ?- ?(?:0X0*C|12)\]$/i.test(currentEpInstruction),
                 isFpuInstructionPointerSource = isRawFpuNop || isRawFpuSource || (fpuOpcodeByte >= 0xD8 && fpuOpcodeByte <= 0xDF &&
                     /^F[A-Z0-9]+$/.test(currentEpOpCode) &&
                     !/^(?:F(?:N)?(?:INIT|CLEX|STCW|STSW|STENV|SAVE)|FLDCW|FLDENV|FRSTOR)$/.test(currentEpOpCode)),
@@ -9238,7 +9263,7 @@ function scanForObfuscations_Native() {
             if (isRawFpuStateSave || /^(?:FINIT|FNINIT|FSAVE|FNSAVE|FLDENV|FRSTOR)$/.test(currentEpOpCode)) hasFpuInstructionPointerSource = false;
             else if (isFpuInstructionPointerSource) hasFpuInstructionPointerSource = true;
 
-            if (storesFpuEnvironmentAtStack || storesRawFpuEnvironmentAtStack) {
+            if (storesFpuEnvironmentAtStack || (storesRawFpuEnvironmentAtStack && !fpuHasOperandSizeOverride && fpuStackSegmentValid)) {
                 // FNSTENV preserves the previous x87 FIP; without a reachable x87 source,
                 // its saved pointer cannot be attributed to this entry-point code.
                 isFpuEnvironmentStored = hasFpuInstructionPointerSource;
