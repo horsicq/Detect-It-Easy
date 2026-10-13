@@ -4379,6 +4379,44 @@ function scanForBadFileFormat_NET_and_Native() {
 
     var dataDirectoryMappedRanges;
 
+    /**
+     * Checks continuous image coverage across section boundaries and alignment padding.
+     *
+     * @param {number} beginRva - First required RVA.
+     * @param {number} endRva - Last required RVA, inclusive.
+     * @returns {boolean} True when no unmapped gap interrupts the complete range.
+     */
+    function isBadFormatRangeCovered(beginRva, endRva) {
+        if (beginRva < 0 || endRva < beginRva || endRva >= sectionLayoutSizeOfImage) return false;
+
+        if (!dataDirectoryMappedRanges) {
+            // SectionAlignment spaces sections; only hardware pages are committed around their actual contents.
+            var dataDirectoryMappingAlignment = PE_Cached.architecture === "IA64" ? 0x2000 : 0x1000;
+
+            dataDirectoryMappedRanges = [[0, Math.min(sectionLayoutSizeOfImage,
+                Math.ceil(PE.getImageOptionalHeader("SizeOfHeaders") / dataDirectoryMappingAlignment) * dataDirectoryMappingAlignment)]];
+
+            for (var d = 0; d < PE_Cached.numberOfSections; d++) {
+                var dataDirectorySectionRva = PE.getSectionVirtualAddress(d),
+                    dataDirectorySectionSize = Math.max(PE.getSectionVirtualSize(d), PE.getSectionFileSize(d));
+
+                if (dataDirectorySectionSize > 0) dataDirectoryMappedRanges.push([dataDirectorySectionRva,
+                    Math.min(sectionLayoutSizeOfImage, dataDirectorySectionRva + Math.ceil(dataDirectorySectionSize / dataDirectoryMappingAlignment) * dataDirectoryMappingAlignment)]);
+            }
+
+            dataDirectoryMappedRanges.sort(function (leftRange, rightRange) { return leftRange[0] - rightRange[0]; });
+        }
+
+        var coveredRva = beginRva;
+
+        for (var d = 0; d < dataDirectoryMappedRanges.length && coveredRva <= endRva; d++) {
+            if (dataDirectoryMappedRanges[d][0] > coveredRva) break;
+            coveredRva = Math.max(coveredRva, dataDirectoryMappedRanges[d][1]);
+        }
+
+        return coveredRva > endRva;
+    }
+
     var dataDirectoryNames = [
         "EAT", "Imports", "Resources", "Exceptions", "Security", "Relocs", "Debug", "Architecture",
         "GlobalPtr", "TLS", "Load config", "Bound imports", "IAT", "Delay imports", "CLR"
@@ -4414,36 +4452,9 @@ function scanForBadFileFormat_NET_and_Native() {
             var isCurrentDataDirectoryMapped = isVirtualAddressRangeMapped(PE_Cached.imageBase + currentDataDirectoryRva, currentDataDirectorySize, 0);
 
             if (!isCurrentDataDirectoryMapped && currentDataDirectoryRva < sectionLayoutSizeOfImage &&
-                currentDataDirectoryEndRva < sectionLayoutSizeOfImage &&
-                PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryRva) !== -1 &&
-                PE.VAToOffset(PE_Cached.imageBase + currentDataDirectoryEndRva) !== -1) {
-                // Endpoint translations cannot prove an intervening page is mapped. Build
-                // the sorted coverage once, and include section-alignment padding conservatively.
-                if (!dataDirectoryMappedRanges) {
-                    var dataDirectoryMappingAlignment = Math.max(0x1000, PE.getImageOptionalHeader("SectionAlignment"));
-
-                    dataDirectoryMappedRanges = [[0, Math.min(sectionLayoutSizeOfImage,
-                        Math.ceil(PE.getImageOptionalHeader("SizeOfHeaders") / dataDirectoryMappingAlignment) * dataDirectoryMappingAlignment)]];
-
-                    for (var d = 0; d < PE_Cached.numberOfSections; d++) {
-                        var dataDirectorySectionRva = PE.getSectionVirtualAddress(d),
-                            dataDirectorySectionSize = Math.max(PE.getSectionVirtualSize(d), PE.getSectionFileSize(d));
-
-                        if (dataDirectorySectionSize > 0) dataDirectoryMappedRanges.push([dataDirectorySectionRva,
-                            Math.min(sectionLayoutSizeOfImage, dataDirectorySectionRva + Math.ceil(dataDirectorySectionSize / dataDirectoryMappingAlignment) * dataDirectoryMappingAlignment)]);
-                    }
-
-                    dataDirectoryMappedRanges.sort(function (leftRange, rightRange) { return leftRange[0] - rightRange[0]; });
-                }
-
-                var dataDirectoryCoveredRva = currentDataDirectoryRva;
-
-                for (var d = 0; d < dataDirectoryMappedRanges.length && dataDirectoryCoveredRva <= currentDataDirectoryEndRva; d++) {
-                    if (dataDirectoryMappedRanges[d][0] > dataDirectoryCoveredRva) break;
-                    dataDirectoryCoveredRva = Math.max(dataDirectoryCoveredRva, dataDirectoryMappedRanges[d][1]);
-                }
-
-                isCurrentDataDirectoryMapped = dataDirectoryCoveredRva > currentDataDirectoryEndRva;
+                currentDataDirectoryEndRva < sectionLayoutSizeOfImage) {
+                // Raw translations omit valid zero-filled page tails and cannot prove an intervening page is committed.
+                isCurrentDataDirectoryMapped = isBadFormatRangeCovered(currentDataDirectoryRva, currentDataDirectoryEndRva);
             }
 
             if (currentDataDirectoryRva >= sectionLayoutSizeOfImage || currentDataDirectoryEndRva >= sectionLayoutSizeOfImage || !isCurrentDataDirectoryMapped) {
