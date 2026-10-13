@@ -4490,29 +4490,33 @@ function scanForBadFileFormat_NET_and_Native() {
 
         if (delayImportDirectoryRva !== 0 && delayImportDirectorySize !== 0) {
             var delayImportDirectoryAddress = PE_Cached.imageBase + delayImportDirectoryRva,
-                delayImportDirectoryOffset = PE.VAToOffset(delayImportDirectoryAddress);
+                delayImportDescriptorCount = Math.min(Math.floor(delayImportDirectorySize / 0x20), 128),
+                delayImportDirectoryData = delayImportDescriptorCount > 0 ? readFileBackedVirtualBytes(delayImportDirectoryAddress, delayImportDescriptorCount * 0x20) : undefined;
 
-            if (delayImportDirectorySize < 0x20 || delayImportDirectoryOffset < 0 ||
-                delayImportDirectoryOffset + delayImportDirectorySize > PE_Cached.fileSize ||
-                PE.VAToOffset(delayImportDirectoryAddress + delayImportDirectorySize - 1) !==
-                delayImportDirectoryOffset + delayImportDirectorySize - 1) {
+            // Descriptors follow loaded RVAs, not the physical adjacency of section data.
+            // Keep the 128-record read budget while validating the complete declared image range.
+            if (delayImportDescriptorCount === 0 || (!isVirtualAddressRangeMapped(delayImportDirectoryAddress, delayImportDirectorySize, 0) && !isBadFormatRangeCovered(delayImportDirectoryRva, delayImportDirectoryRva + delayImportDirectorySize - 1))) {
                 isInvalidDelayImportDescriptorPresent = true;
             } else {
-                var delayImportDescriptorCount = Math.min(Math.floor(delayImportDirectorySize / 0x20), 128);
-
                 for (var i = 0; i < delayImportDescriptorCount && !isInvalidDelayImportDescriptorPresent; i++) {
-                    var delayImportDescriptorOffset = delayImportDirectoryOffset + i * 0x20,
+                    var delayImportDescriptorOffset = i * 0x20,
                         delayImportDescriptorFields = [],
                         isEmptyDelayImportDescriptor = true;
 
                     for (var d = 0; d < 8; d++) {
-                        var delayImportDescriptorField = PE.read_uint32(delayImportDescriptorOffset + d * 4);
+                        var delayImportDescriptorField = delayImportDirectoryData ? readUnsignedDwordFromBuffer(delayImportDirectoryData, delayImportDescriptorOffset + d * 4) : readMappedUnsignedInteger(delayImportDirectoryAddress + delayImportDescriptorOffset + d * 4, 4);
+
+                        // A zero-filled descriptor terminates the list; unreadable raw bytes do not become zeros.
+                        if (delayImportDescriptorField === -1) {
+                            isInvalidDelayImportDescriptorPresent = true;
+                            break;
+                        }
 
                         delayImportDescriptorFields.push(delayImportDescriptorField);
                         if (delayImportDescriptorField !== 0) isEmptyDelayImportDescriptor = false;
                     }
 
-                    if (isEmptyDelayImportDescriptor) break;
+                    if (isInvalidDelayImportDescriptorPresent || isEmptyDelayImportDescriptor) break;
 
                     var isDelayImportRvaBased = (delayImportDescriptorFields[0] & 1) !== 0;
 
@@ -4547,6 +4551,8 @@ function scanForBadFileFormat_NET_and_Native() {
                     }
                 }
             }
+
+            delayImportDirectoryData = undefined;
 
             if (isInvalidDelayImportDescriptorPresent) log(logType.any, "Delay-import descriptor is incomplete, truncated, or references unmapped data");
         }
