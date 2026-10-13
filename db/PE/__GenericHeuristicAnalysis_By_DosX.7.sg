@@ -13179,7 +13179,7 @@ function readMappedUnsignedInteger(address, size) {
 
 /**
  * Proves that reachable EP code walks pages of its own mapped image.
- * The proof requires a RIP-derived image base and upper bound, a read through the
+ * The proof requires a statically derived image base and upper bound, a read through the
  * iterator, a page-sized advance, and a backward comparison branch to that read.
  * Direct branches fork independently; unknown instructions discard address facts.
  * Calls, malformed bytes and exhausted bounds remain inconclusive.
@@ -13189,8 +13189,9 @@ function readMappedUnsignedInteger(address, size) {
  */
 function isEpImagePageSweepProven(stopOpCodes) {
     const register = "R(?:AX|BX|CX|DX|SI|DI|BP|8|9|1[0-5])",
-        ripAddress = new RegExp("^LEA (" + register + "), \\[RIP ([+-]) (0X[0-9A-F]+|\\d+)\\]$"),
-        absoluteAddress = new RegExp("^LEA (" + register + "), \\[(0X[0-9A-F]+|\\d+)\\]$"),
+        leaRegister = "(?:" + register + "|E(?:AX|BX|CX|DX|SI|DI|BP)|R(?:8|9|1[0-5])D)",
+        ripAddress = new RegExp("^LEA (" + leaRegister + "), (?:(?:CS|DS|ES|SS|FS|GS):)?\\[(?:RIP|EIP) ([+-]) (0X[0-9A-F]+|\\d+)\\]$"),
+        absoluteAddress = new RegExp("^LEA (" + leaRegister + "), (?:(?:CS|DS|ES|SS|FS|GS):)?\\[(?:[RE]IZ\\*(?:1|2|4|8) \\+ )?(0X[0-9A-F]+|\\d+)\\]$"),
         pageRead = new RegExp("^MOV (" + register + "), (?:BYTE|WORD|DWORD|QWORD) PTR \\[(" + register + ")\\]$"),
         pageAdvance = new RegExp("^ADD (" + register + "), (0X[0-9A-F]+|\\d+)$"),
         iteratorCompare = new RegExp("^CMP (" + register + "), (" + register + ")$"),
@@ -13234,14 +13235,13 @@ function isEpImagePageSweepProven(stopOpCodes) {
             nextAddress = address + length;
 
         if (lea || absoluteLea) {
-            var displacement = lea ? parseInt(lea[3], 0) : 0,
-                derivedAddress = absoluteLea ? parseInt(absoluteLea[2], 0) :
-                    nextAddress + (lea[2] === "+" ? displacement : -displacement);
+            var derivedRegister = getNativeRegisterKey((lea || absoluteLea)[1]),
+                derivedAddress = getEpEncodedLeaTarget(address, instruction, length);
 
             if (derivedAddress >= 0 && derivedAddress <= 0x1FFFFFFFFFFFFF) {
-                state.KnownAddresses[(lea || absoluteLea)[1]] = derivedAddress;
+                state.KnownAddresses[derivedRegister] = derivedAddress;
             } else {
-                delete state.KnownAddresses[(lea || absoluteLea)[1]];
+                delete state.KnownAddresses[derivedRegister];
             }
             state.ReadAddress = -1;
             state.StepAddress = -1;
