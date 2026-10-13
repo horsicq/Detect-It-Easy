@@ -5662,7 +5662,30 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
 
     var isPdbFullPathPresent = false;
 
-    var numberOfDebugDataRecords = PE.getNumberOfDebugDataRecords(),
+    var debugOptionalHeaderOffset = PE_Cached.fileSize >= 0x40 ? getOptHeaderOffset() : -1,
+        debugDirectoryEntryOffset = -1;
+
+    // Engine record enumeration may read a stale Debug slot outside NumberOfRvaAndSizes.
+    // Debug is directory index 6: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#optional-header-data-directories-image-only
+    if (debugOptionalHeaderOffset >= 24 && debugOptionalHeaderOffset <= PE_Cached.fileSize - 2) {
+        var debugOptionalHeaderSize = PE.readWord(debugOptionalHeaderOffset - 4),
+            debugOptionalHeaderMagic = PE.readWord(debugOptionalHeaderOffset),
+            debugDirectoryStart = debugOptionalHeaderMagic === 0x20B ? 0x70 : 0x60;
+
+        if ((debugOptionalHeaderMagic === 0x10B || debugOptionalHeaderMagic === 0x20B) &&
+            debugOptionalHeaderSize >= debugDirectoryStart + 56 && debugOptionalHeaderOffset + debugOptionalHeaderSize <= PE_Cached.fileSize &&
+            PE.read_uint32(debugOptionalHeaderOffset + debugDirectoryStart - 4) > 6) {
+            debugDirectoryEntryOffset = debugOptionalHeaderOffset + debugDirectoryStart + 48;
+        }
+    }
+
+    var debugDirectoryRva = debugDirectoryEntryOffset !== -1 ? PE.read_uint32(debugDirectoryEntryOffset) : 0,
+        debugDirectorySize = debugDirectoryEntryOffset !== -1 ? PE.read_uint32(debugDirectoryEntryOffset + 4) : 0,
+        debugCompleteRecordsSize = Math.floor(debugDirectorySize / 28) * 28;
+
+    // Legacy enumeration rounds partial records up and assumes contiguous raw offsets.
+    // Only complete declared records supply a path; a corrupt size cannot exceed the file's record capacity.
+    var numberOfDebugDataRecords = debugDirectoryRva ? Math.min(debugCompleteRecordsSize / 28, Math.floor(PE_Cached.fileSize / 28)) : 0,
         pdbPathBeginOffset = -1,
         pdbDebugDataOffset = 0,
         pdbDebugDataSize = 0;
@@ -5670,10 +5693,17 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
     // CodeView stores the path after its fixed header; its extension and case are unrestricted.
     // https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/Object/CVDebugRecord.h
     for (var i = 0; i < numberOfDebugDataRecords; i++) {
-        var currentDebugDataOffset = PE.getDebugDataOffset(i),
-            currentDebugDataSize = PE.getDebugDataSize(i);
+        // A complete record may itself cross sections; use loaded order rather than raw adjacency.
+        var currentDebugRecordAddress = PE_Cached.imageBase + debugDirectoryRva + i * 28;
 
-        if (PE.getDebugDataType(i) === "CODEVIEW" && currentDebugDataOffset > 0 &&
+        var currentDebugRecordData = readFileBackedVirtualBytes(currentDebugRecordAddress, 28);
+
+        if (!currentDebugRecordData) break;
+
+        var currentDebugDataOffset = readUnsignedDwordFromBuffer(currentDebugRecordData, 24),
+            currentDebugDataSize = readUnsignedDwordFromBuffer(currentDebugRecordData, 16);
+
+        if (readUnsignedDwordFromBuffer(currentDebugRecordData, 12) === 2 && currentDebugDataOffset > 0 &&
             currentDebugDataSize > 16 && currentDebugDataSize <= PE_Cached.fileSize - currentDebugDataOffset) {
             var codeViewHeaderSize = PE.compare("'RSDS'", currentDebugDataOffset) ? 24 : PE.compare("'NB10'", currentDebugDataOffset) ? 16 : 0;
 
@@ -5683,6 +5713,9 @@ function scanForDebugData_NET_and_Native() { // For .NET and Native apps
                 var candidatePdbPathOffset = currentDebugDataOffset + codeViewHeaderSize,
                     candidatePdbPath = PE.getString(candidatePdbPathOffset, Math.min(256, currentDebugDataSize - codeViewHeaderSize)),
                     isCandidatePdbAbsolute = /^(?:\/|[a-zA-Z]:[\\/]|\\\\[^\\]+\\[^\\]+\\)/.test(candidatePdbPath);
+
+                // An empty filename must not hide a usable path in a later CodeView record.
+                if (!candidatePdbPath) continue;
 
                 // Native-image records may precede the original record; retain an absolute path if either has one.
                 if (pdbPathBeginOffset === -1 || isCandidatePdbAbsolute) {
