@@ -13610,7 +13610,7 @@ function getEpCallReturnMutationTarget(callAddress) {
         directCall = callInstruction && callInstruction.match(/^CALL (0X[0-9A-F]+|\d+)$/i),
         callLength = PE.getDisasmLength(callAddress);
 
-    if (!directCall || callLength <= 0 || !isVirtualAddressRangeFileBacked(callAddress, callLength, SECTION_FLAGS_EXECUTE)) return undefined;
+    if (!directCall || !isEpNativeNearTransfer(callAddress, callInstruction, callLength)) return undefined;
 
     var calleeAddress = parseInt(directCall[1], 0),
         fallThroughAddress = callAddress + callLength;
@@ -13641,7 +13641,7 @@ function getEpCallReturnMutationTarget(callAddress) {
         returnLength = PE.getDisasmLength(returnInstructionAddress),
         returnTarget = (fallThroughAddress + (mutation[1] === "ADD" ? 1 : -1) * mutationValue) >>> 0;
 
-    if (!/^RET(?:N)?$/.test(returnInstruction) || returnTarget === fallThroughAddress ||
+    if (!/^RET(?:N)?$/.test(returnInstruction) || !isEpNativeNearTransfer(returnInstructionAddress, returnInstruction, returnLength) || returnTarget === fallThroughAddress ||
         !isVirtualAddressRangeFileBacked(returnInstructionAddress, returnLength, SECTION_FLAGS_EXECUTE) ||
         (returnTarget >= calleeAddress && returnTarget < returnInstructionAddress + returnLength) ||
         !isVirtualAddressRangeFileBacked(returnTarget, 1, SECTION_FLAGS_EXECUTE)) return undefined;
