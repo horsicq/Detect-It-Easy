@@ -12536,6 +12536,76 @@ var epAsmInstructions = [],
     epDirectCallReturnCache = {};
 
 /**
+ * Reads a complete byte range through its loaded addresses, without virtual zero-fill.
+ *
+ * Section boundaries do not change its loaded layout; split records may use unrelated
+ * raw offsets. Every chunk must retain exact VA translation and physical bounds.
+ * Overlapping section mappings remain inconclusive on the split-record fallback.
+ *
+ * @param {number} address - Loaded address of the first byte.
+ * @param {number} size - Required byte count.
+ * @returns {number[]|undefined} Exact file-backed bytes, or unknown.
+ */
+function readFileBackedVirtualBytes(address, size) {
+    var data;
+
+    if (!(size > 0) || size !== Math.floor(size) || size > PE_Cached.fileSize || address < PE_Cached.imageBase || address > 0x1FFFFFFFFFFFFF - size) return undefined;
+
+    if (isVirtualAddressRangeFileBacked(address, size, 0)) {
+        data = PE.readBytes(PE.VAToOffset(address), size);
+    } else {
+        data = [];
+
+        while (data.length < size) {
+            var chunkAddress = address + data.length,
+                chunkRva = chunkAddress - PE_Cached.imageBase,
+                chunkOffset = PE.VAToOffset(chunkAddress),
+                chunkSize = 0,
+                chunkSectionIndex = -1;
+
+            if (chunkOffset < 0) return undefined;
+
+            // Headers can contain loader metadata too, but only their actual file bytes.
+            var headerSize = Math.min(PE.getImageOptionalHeader("SizeOfHeaders"), PE_Cached.fileSize);
+
+            if (chunkRva < headerSize && chunkOffset === chunkRva) {
+                chunkSize = Math.min(size - data.length, headerSize - chunkRva);
+            } else {
+                for (var i = 0; i < PE_Cached.numberOfSections && chunkSize === 0; i++) {
+                    var sectionOffset = chunkRva - PE.getSectionVirtualAddress(i),
+                        sectionRawSize = PE.getSectionFileSize(i);
+
+                    if (sectionOffset >= 0 && sectionOffset < sectionRawSize && PE.getSectionFileOffset(i) + sectionOffset === chunkOffset) {
+                        chunkSize = Math.min(size - data.length, sectionRawSize - sectionOffset);
+                        chunkSectionIndex = i;
+                    }
+                }
+            }
+
+            if (chunkSize <= 0 || chunkOffset + chunkSize > PE_Cached.fileSize || PE.VAToOffset(chunkAddress + chunkSize - 1) !== chunkOffset + chunkSize - 1) return undefined;
+
+            for (var i = 0; i < PE_Cached.numberOfSections; i++) {
+                if (i === chunkSectionIndex) continue;
+
+                var otherSectionRva = PE.getSectionVirtualAddress(i),
+                    otherSectionSize = Math.max(PE.getSectionVirtualSize(i), PE.getSectionFileSize(i));
+
+                if (chunkRva < otherSectionRva + otherSectionSize && otherSectionRva < chunkRva + chunkSize) return undefined;
+            }
+
+            var chunkData = PE.readBytes(chunkOffset, chunkSize);
+
+            if (!chunkData || chunkData.length !== chunkSize) return undefined;
+            for (var i = 0; i < chunkData.length; i++) data.push(chunkData[i]);
+        }
+    }
+
+    return data && data.length === size ? data : undefined;
+}
+
+
+
+/**
  * Resolves a bounded, null-terminated PE TLS callback array from file-backed bytes.
  * Unknown or malformed metadata stays inconclusive; no callback is inferred merely
  * from the presence of a TLS data directory. Callback code is validated separately.
