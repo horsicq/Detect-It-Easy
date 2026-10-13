@@ -8637,6 +8637,8 @@ function scanForObfuscations_Native() {
             degenerateEpBranchTarget = -1,
             degenerateEpNeutralInstructionCount = 0,
             degenerateEpCurrentAddress = PE_Cached.addressOfUnmanagedEntryPoint,
+            degenerateEpStackPointerZero = false,
+            degenerateEpZeroFlag = -1, degenerateEpCarryFlag = -1,
             degenerateEpInstructionInteriors = {};
 
         for (var i = 0; i < 64 && !isDegenerateEpConditionalBranchPresent; i++) {
@@ -8649,6 +8651,10 @@ function scanForObfuscations_Native() {
             if (!currentEpOpCode || currentEpInstructionLength <= 0 || nextEpInstructionAddress !== fallThroughEpInstructionAddress ||
                 epAsmInstructionAddresses[i] !== degenerateEpCurrentAddress ||
                 !isVirtualAddressRangeFileBacked(degenerateEpCurrentAddress, currentEpInstructionLength, SECTION_FLAGS_EXECUTE)) break;
+
+            // An earlier mandatory fault cannot expose a later pair as equivalent executable paths.
+            if (/^AAM (?:0X0+|0+)$/i.test(currentEpInstruction) || isEpProvenFaultingInstruction(currentEpInstruction, currentEpOpCode, degenerateEpStackPointerZero)) break;
+            degenerateEpStackPointerZero = advanceEpStackPointerZero(currentEpInstruction, currentEpOpCode, degenerateEpStackPointerZero);
 
             for (var byteIndex = 1; byteIndex < currentEpInstructionLength; byteIndex++) {
                 degenerateEpInstructionInteriors[(degenerateEpCurrentAddress + byteIndex).toString()] = true;
@@ -8716,6 +8722,13 @@ function scanForObfuscations_Native() {
                 if (epScanStopOpCodes.indexOf(currentEpOpCode) !== -1 || /^J[A-Z]+$/.test(currentEpOpCode)) break;
             }
 
+            // A proven taken branch cannot expose a later physical pair; unknown fall-through remains possible.
+            if (conditionalBranch && parseInt(conditionalBranch[2], 0) !== fallThroughEpInstructionAddress && getEpKnownBranchResult(currentEpOpCode, degenerateEpZeroFlag, degenerateEpCarryFlag) === 1) {
+                break;
+            }
+
+            degenerateEpZeroFlag = advanceEpZeroFlag(currentEpInstruction, currentEpOpCode, degenerateEpZeroFlag);
+            degenerateEpCarryFlag = advanceEpCarryFlag(currentEpInstruction, currentEpOpCode, degenerateEpCarryFlag);
             degenerateEpCurrentAddress = nextEpInstructionAddress;
         }
     }
