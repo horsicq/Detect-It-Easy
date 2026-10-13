@@ -5319,17 +5319,21 @@ function scanForBadFileFormat_NET_and_Native() {
                         // Multiplication is checked before any conversion back to file offsets.
                         var guardCfFunctionEntrySize = 4 + ((guardCfFlags >>> 28) & 0x0F),
                             guardCfFunctionTableSize = guardCfFunctionCount * guardCfFunctionEntrySize,
-                            guardCfFunctionTableEnd = guardCfFunctionTable + guardCfFunctionTableSize - 1;
+                            guardCfFunctionTableEnd = guardCfFunctionTable + guardCfFunctionTableSize - 1,
+                            isGuardCfFunctionTableFileBacked = isVirtualAddressRangeFileBacked(guardCfFunctionTable, guardCfFunctionTableSize, 0);
 
+                        // Valid endpoints do not prove that the loader can read intervening
+                        // entries; admit cross-section tables only with continuous image coverage.
                         if (guardCfFunctionTableSize <= 0 ||
                             guardCfFunctionTableSize > 0x1FFFFFFFFFFFFF ||
                             guardCfFunctionTableEnd > 0x1FFFFFFFFFFFFF ||
                             PE.VAToOffset(guardCfFunctionTable) === -1 ||
-                            PE.VAToOffset(guardCfFunctionTableEnd) === -1) {
+                            PE.VAToOffset(guardCfFunctionTableEnd) === -1 ||
+                            (!isGuardCfFunctionTableFileBacked && !isBadFormatRangeCovered(guardCfFunctionTable - PE_Cached.imageBase, guardCfFunctionTableEnd - PE_Cached.imageBase))) {
                             log(logType.any, "Guard CF function table exceeds file-backed image data: VA 0x" + guardCfFunctionTable.toString(16));
 
                             isInvalidGuardCfMetadataPresent = true;
-                        } else if (isVirtualAddressRangeFileBacked(guardCfFunctionTable, guardCfFunctionTableSize, 0)) {
+                        } else if (isGuardCfFunctionTableFileBacked) {
                             // A physically contiguous table can be decoded in one engine call.
                             // Legal cross-section tables are left to the loader instead of
                             // being misclassified through non-contiguous file offsets.
