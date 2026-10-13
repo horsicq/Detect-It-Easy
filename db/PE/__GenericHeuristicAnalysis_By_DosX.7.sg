@@ -8233,7 +8233,7 @@ function scanForObfuscations_Native() {
                     delete syntheticEpKnownAddresses[getNativeRegisterKey(exchangedRegister[1])];
 
                     syntheticEpNeutralInstructionCount = 0;
-                } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetType !== "call return" && syntheticEpTargetAddress && isVirtualAddressRangeFileBacked(parseInt(syntheticEpTargetAddress, 0), 1, SECTION_FLAGS_EXECUTE)) {
+                } else if (/^RET(?:N)?$/.test(currentEpOpCode) && syntheticEpTargetType !== "call return" && syntheticEpTargetAddress && isEpNativeNearTransfer(currentEpAddress, currentEpInstruction, currentEpLength || PE.getDisasmLength(currentEpAddress)) && isVirtualAddressRangeFileBacked(parseInt(syntheticEpTargetAddress, 0), 1, SECTION_FLAGS_EXECUTE)) {
                     // RET at a process entry point is meaningful here only as a concealed transfer.
                     if (syntheticEpTargetType === "stack pivot") {
                         log(logType.emulation, "Stack pivot redirects Ret near EP to executable code at VA 0x" + parseInt(syntheticEpTargetAddress, 0).toString(16));
@@ -8307,6 +8307,9 @@ function scanForObfuscations_Native() {
                     var branchTarget = parseInt(conditionalBranch[2], 0),
                         syntheticEpBranchResult = getEpKnownBranchResult(currentEpOpCode, syntheticEpZeroFlag, syntheticEpCarryFlag);
 
+                    // A taken word-sized branch truncates EIP, unlike the native VA printed by the decoder.
+                    if (syntheticEpBranchResult !== 0 && !isEpNativeNearTransfer(currentEpAddress, currentEpInstruction, currentEpLength || PE.getDisasmLength(currentEpAddress))) break;
+
                     if (syntheticEpBranchResult !== 0 && syntheticEpPendingPaths.length < 8 && !syntheticEpVisitedAddresses[branchTarget] &&
                         isVirtualAddressRangeFileBacked(branchTarget, 1, SECTION_FLAGS_EXECUTE)) {
                         var branchAddresses = {}, branchVisited = {};
@@ -8329,7 +8332,7 @@ function scanForObfuscations_Native() {
                     var directJump = currentEpInstruction.match(epDirectJumpPattern),
                         directTarget = directJump ? parseInt(directJump[1], 0) : -1;
 
-                    if (!directJump || !isVirtualAddressRangeFileBacked(directTarget, 1, SECTION_FLAGS_EXECUTE)) break;
+                    if (!directJump || !isEpNativeNearTransfer(currentEpAddress, currentEpInstruction, currentEpLength || PE.getDisasmLength(currentEpAddress)) || !isVirtualAddressRangeFileBacked(directTarget, 1, SECTION_FLAGS_EXECUTE)) break;
 
                     syntheticEpFollowAddress = directTarget;
                     continue;
