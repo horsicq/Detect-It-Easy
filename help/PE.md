@@ -99,6 +99,8 @@ if (PE.isDriver()) {
 
 ### Section Lookup and Validation
 
+**`bool isAnySignatureInSectionPresent(nNumber, signatures)`** - Check whether any signature in an array matches the selected section. Inherited from [Binary](Binary.md#isanysignatureinsectionpresent); see its argument validation, return value and example. Section and overlay bounds follow `isSignatureInSectionPresent()`.
+
 **`bool isSectionNamePresent(QString sSectionName)`** - Check if a section with the given name exists.
 
 **`bool isSectionNamePresentExp(QString sSectionName)`** - Check if a section name exists using expression matching.

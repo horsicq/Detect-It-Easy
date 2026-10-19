@@ -4,6 +4,178 @@
 meta("archive", "");
 
 function detect() {
+    function isCRX() {
+        var size = Binary.getSize();
+        if (size < 16 || !Binary.compare("'Cr24'")) return false;
+        var version = Binary.readDword(4), offset;
+        if (version == 2) offset = 16 + Binary.readDword(8) + Binary.readDword(12);
+        else if (version == 3) offset = 12 + Binary.readDword(8);
+        else return false;
+        if (offset <= (version == 2 ? 16 : 12) || offset + 30 > size || !Binary.compare("504b0304", offset)) return false;
+        sVersion = String(version);
+        return true;
+    }
+
+    function isLZFSE() {
+        var size = Binary.getSize(), offset = 0, blocks = 0;
+        if (size < 12 || !Binary.compare("'bvx'")) return false;
+        while (blocks <= 65536 && offset + 4 <= size) {
+            var magic = Binary.readDword(offset), header, packed, raw;
+            if (magic == 0x24787662) return blocks > 0 && offset + 4 == size; // bvx$
+            if (offset + 8 > size) return false;
+            raw = Binary.readDword(offset + 4);
+            if (magic == 0x2d787662) { header = 8; packed = raw; } // bvx-
+            else if (magic == 0x6e787662) { // bvxn (LZVN)
+                if (offset + 12 > size) return false;
+                header = 12; packed = Binary.readDword(offset + 8);
+                if (packed < 8 || raw > packed * 136 || !Binary.compare("0600000000000000", offset + header + packed - 8)) return false;
+            } else if (magic == 0x31787662 || magic == 0x32787662) { // bvx1 / bvx2
+                if (offset + 32 > size) return false;
+                var literals, matches, literalPacked, matchPacked;
+                if (magic == 0x31787662) {
+                    header = 772;
+                    literals = Binary.readDword(offset + 12); matches = Binary.readDword(offset + 16);
+                    literalPacked = Binary.readDword(offset + 20); matchPacked = Binary.readDword(offset + 24);
+                } else {
+                    header = Binary.readDword(offset + 24);
+                    literals = Binary.readDword(offset + 8) & 0xfffff;
+                    literalPacked = ((Binary.readDword(offset + 8) >>> 20) | ((Binary.readDword(offset + 12) & 255) << 12));
+                    matches = (Binary.readDword(offset + 12) >>> 8) & 0xfffff;
+                    matchPacked = (Binary.readDword(offset + 20) >>> 8) & 0xfffff;
+                    if (header < 32 || header > 752) return false;
+                }
+                if (literals > 40000 || matches > 10000) return false;
+                var runLimit = Math.min(matches * 315, 40064);
+                var matchLimit = Math.min(matches * 2359, matches * 15 + matchPacked * 1720);
+                if (raw > runLimit + matchLimit) return false;
+                packed = literalPacked + matchPacked;
+            } else return false;
+            if (header > size - offset || packed > size - offset - header) return false;
+            offset += header + packed;
+            blocks++;
+        }
+        return false;
+    }
+
+    function isDCL() {
+        var size = Binary.getSize();
+        // DCL has only a two-byte prelude. Require its complete token grammar,
+        // valid backreferences, end marker and no unaccounted trailing bytes.
+        if (size < 4 || size > 0x800000 || Binary.readByte(0) > 1 || Binary.readByte(1) < 4 || Binary.readByte(1) > 6) return false;
+        var data = Binary.readBytes(0, size), offset = 0, bits = 0, available = 0, work = 0;
+        function getBits(count) {
+            while (available < count) {
+                if (offset >= size) return -1;
+                bits |= data[offset++] << available; available += 8;
+            }
+            var value = bits & ((1 << count) - 1);
+            bits >>>= count; available -= count;
+            return value;
+        }
+        function tree(runs, width) {
+            var counts = [], lengths = [], symbols = [], offsets = [], i, j;
+            for (i = 0; i <= 13; i++) counts[i] = 0;
+            for (i = 0; i < runs.length; i++) {
+                for (j = 0; j <= (runs[i] >> 4); j++) { lengths.push(runs[i] & 15); counts[runs[i] & 15]++; }
+            }
+            offsets[1] = 0;
+            for (i = 1; i < 13; i++) offsets[i + 1] = offsets[i] + counts[i];
+            for (i = 0; i < lengths.length; i++) symbols[offsets[lengths[i]]++] = i;
+            var table = [], first = 0, position = 0;
+            for (var length = 1; length <= width; length++) {
+                for (i = 0; i < counts[length]; i++) {
+                    var code = first + i, streamBits = 0;
+                    for (j = 0; j < length; j++) streamBits |= (((code >> (length - 1 - j)) & 1) ^ 1) << j;
+                    for (var fill = streamBits; fill < (1 << width); fill += 1 << length) table[fill] = (length << 8) | symbols[position + i];
+                }
+                position += counts[length];
+                first = (first + counts[length]) << 1;
+            }
+            return [table, width, (1 << width) - 1];
+        }
+        function symbol(t) {
+            while (available < t[1] && offset < size) {
+                bits |= data[offset++] << available; available += 8;
+            }
+            var entry = t[0][bits & t[2]], length = entry >>> 8;
+            if (!length || length > available) return -1;
+            bits >>>= length; available -= length;
+            return entry & 255;
+        }
+        var lengths = tree([2,35,36,53,38,23], 7), distances = tree([2,20,53,230,247,151,248], 8), literals = null;
+        var bases = [3,2,4,5,6,7,8,9,10,12,16,24,40,72,136,264], extras = [0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8];
+        var streams = 0;
+        while (offset < size && streams < 65536) {
+            var mode = getBits(8), dictionary = getBits(8), produced = 0, ended = false;
+            if (mode < 0 || mode > 1 || dictionary < 4 || dictionary > 6) return false;
+            if (mode && !literals) literals = tree([11,124,8,7,28,7,188,13,76,4,10,8,12,10,12,10,8,23,8,9,7,6,7,8,7,6,55,8,23,24,12,11,7,9,11,12,6,7,22,5,7,24,6,11,9,6,7,22,7,11,38,7,9,8,25,11,8,11,9,12,8,12,5,38,5,38,5,11,7,5,6,21,6,10,53,8,7,24,10,27,44,253,253,253,252,252,252,13,12,45,12,45,12,61,12,45,44,173], 13);
+            while (++work <= 0x400000) {
+                var match = getBits(1); if (match < 0) return false;
+                if (!match) {
+                    if ((mode ? symbol(literals) : getBits(8)) < 0) return false;
+                    produced++;
+                } else {
+                    var code = symbol(lengths); if (code < 0) return false;
+                    var extra = getBits(extras[code]); if (extra < 0) return false;
+                    var length = bases[code] + extra;
+                    if (length == 519) { ended = true; break; }
+                    var distanceBits = length == 2 ? 2 : dictionary, distanceCode = symbol(distances);
+                    extra = getBits(distanceBits);
+                    if (distanceCode < 0 || extra < 0 || (distanceCode << distanceBits) + extra + 1 > produced) return false;
+                    produced += length;
+                }
+                if (produced > 0x40000000) return false;
+            }
+            if (!ended) return false;
+            // Each concatenated stream begins at the next byte boundary.
+            offset -= available >> 3;
+            bits = 0; available = 0; streams++;
+        }
+        return streams > 0 && offset == size;
+    }
+
+    function isBIGF() {
+        var size = Binary.getSize();
+        if (size < 25 || !(Binary.compare("'BIGF'") || Binary.compare("'BIG4'")) || Binary.compare("'BIGF'00'ZBL'")) return false;
+        var count = Binary.read_uint32(8, _BE), offset = 16;
+        if (!count || count > 65536 || count > (size - 16) / 9) return false;
+        for (var i = 0; i < count; i++) {
+            if (offset + 9 > size) return false;
+            var dataOffset = Binary.read_uint32(offset, _BE), dataSize = Binary.read_uint32(offset + 4, _BE);
+            if (dataOffset == 0xcdcdcdcd && dataSize == 0xcdcdcdcd) return i > 0;
+            if (dataOffset > size || dataSize > size - dataOffset) return false;
+            offset += 8;
+            var length = 0;
+            while (offset < size && length <= 1024 && Binary.readByte(offset) != 0) { offset++; length++; }
+            if (!length || length > 1024 || offset >= size) return false;
+            offset++;
+        }
+        return true;
+    }
+
+    function isMSKN2() {
+        if (Binary.getSize() < 14 || !Binary.compare("'_MCT'00'KSLZ'")) return false;
+        var cmf = Binary.readByte(9), flg = Binary.readByte(10);
+        return (cmf & 15) == 8 && (cmf >> 4) <= 7 && ((cmf * 256 + flg) % 31) == 0;
+    }
+
+    function isSKF2() {
+        var size = Binary.getSize(), length = Binary.readByte(0);
+        if (size < 25 || (length != 6 && length != 7) || !Binary.compare("'SKF2.'", 1)) return false;
+        if (!/^[0-9]{1,2}$/.test(Binary.getString(6, length - 5))) return false;
+        var version = Number(Binary.getString(6, length - 5)), offset = length + 1;
+        var count = version > 18 ? 10 : 4;
+        for (var i = 0; i < count; i++) {
+            if (offset + 4 > size) return false;
+            var field = Binary.readDword(offset); offset += 4;
+            if (field > 1024 || field > size - offset) return false;
+            offset += field;
+        }
+        if (offset + 4 > size || Binary.readDword(offset) > 1000000) return false;
+        sVersion = Binary.getString(4, length - 3);
+        return true;
+    }
+
     if (Binary.compare("a596fdff")) {
         bDetected = true;
         sName = "FTCOMP";
@@ -16,13 +188,13 @@ function detect() {
     } else if (Binary.compare("aced00057704")) {
         bDetected = true;
         sName = "IzPack";
-    } else if (Binary.compare("'bvxn'")) {
+    } else if (isLZFSE()) {
         bDetected = true;
         sName = "LZFSE";
     } else if (Binary.compare("'SIT!'")) {
         bDetected = true;
         sName = "SIT";
-    } else if (Binary.compare("06'SKF3.0'")) {
+    } else if (Binary.compare("06'SKF3.0'") || isSKF2()) {
         bDetected = true;
         sName = "SKF";
     } else if (Binary.compare("'Archive'00................2800000064")) {
@@ -34,7 +206,7 @@ function detect() {
     } else if (Binary.compare("09006bea")) {
         bDetected = true;
         sName = "BFF";
-    } else if (Binary.compare("00069a") || Binary.compare("0006d2")) {
+    } else if (isDCL()) {
         bDetected = true;
         sName = "DCL";
     } else if (Binary.compare("....'-lh'..2d") || Binary.compare("....'-lz'..2d") || Binary.compare("....'-pm'..2d")) {
@@ -90,14 +262,6 @@ function detect() {
     } else if (Binary.compare("'ViG'....1a")) {
         bDetected = true;
         sName = "PaperPort";
-    } else if (Binary.compare("'sqsh'0000")) {
-        bDetected = true;
-        sName = "SquashFS";
-        sOptions = "big endian";
-    } else if (Binary.compare("'hsqs'0300")) {
-        bDetected = true;
-        sName = "SquashFS";
-        sOptions = "little endian";
     } else if (Binary.compare("'im001V'......50....0000")) {
         sName = "SW";
         bDetected = true;
@@ -142,10 +306,11 @@ function detect() {
     } else if (Binary.compare("aa59f0000002")) {
         bDetected = true;
         sName = "SaveDskF";
-    } else if (Binary.compare("'AlB'1a")) {
+    } else if (Binary.getSize() >= 26 && Binary.compare("'AlB'1aff0a0d00'PhIn'000004'FVer'000101")) {
         bDetected = true;
         sName = "BeOS package";
-    } else if (Binary.compare("'BIGF'00")) {
+        sVersion = String(Binary.read_uint32(22, _BE));
+    } else if (isBIGF()) {
         bDetected = true;
         sName = "BIGF";
     } else if (Binary.compare("01ca'Copyright (c) Genus Microprogramming, Inc.'")) {
@@ -180,7 +345,7 @@ function detect() {
         bDetected = true;
         sName = "MPQ";
         sOptions = "by Blizzard";
-    } else if (Binary.compare("'_MCT'00'KSLZ'789c")) {
+    } else if (isMSKN2()) {
         bDetected = true;
         sName = "MSKN 2";
         sOptions = "zlib";
@@ -234,7 +399,7 @@ function detect() {
         bDetected = true;
         sName = "PAC";
         sOptions = "1990-2000 by BVRP Software";
-    } else if (Binary.compare("'Cr24'02")) {
+    } else if (isCRX()) {
         bDetected = true;
         sName = "CRX";
     } else if (Binary.compare("74c42c84e1e5d428")) {

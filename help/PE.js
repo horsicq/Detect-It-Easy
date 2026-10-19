@@ -522,6 +522,19 @@ PE.isLibraryFunctionPresent = function(sLibraryName, sFunctionName) {}
      */
 PE.isLibraryPresent = function(sLibraryName) {}
     /**
+     * Check whether any signature in the array exists in a section.
+     * @param {UInt} nSection - Zero-based section number; uses isSignatureInSectionPresent bounds.
+     * @param {String[]} signatures - Nonempty signature strings; every entry must be valid.
+     * @returns {Bool} True if any pattern matches; false for no match or invalid input.
+     * @see Binary.isAnySignatureInSectionPresent
+     * @example
+     * if (PE.isNet() && PE.getNumberOfSections() > 0 &&
+     *     PE.isAnySignatureInSectionPresent(0, ["'m_isReadOnly'", "'m_useUserOverride'"])) {
+     *     // Verify further evidence before identifying a protector.
+     * }
+     */
+PE.isAnySignatureInSectionPresent = function(nSection, signatures) {}
+    /**
      * Check if a signature (see {@link Binary.compare}) exists in a section.
      * @param {Int} nSection - Section number (from 0).
      * @param {String} sSignature - Signature.

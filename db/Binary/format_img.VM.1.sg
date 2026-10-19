@@ -4,10 +4,19 @@
 meta("format", "VMWare Virtual Disk (VMDK)");
 
 function detect() {
-    if (Binary.compare("'KDMV'01") || Binary.compare("'KDMV'02") || Binary.compare("'KDMV'03")) {
-        sVersion = File.read_uint8(4);
-        bDetected = true;
-    }
+    var size = Binary.getSize();
+    if (size < 512 || !Binary.compare("'KDMV'")) return result();
+    var version = Binary.read_uint32(4);
+    var capacity = Binary.read_uint64(12), grain = Binary.read_uint64(20);
+    var entries = Binary.read_uint32(44);
+    if (version < 1 || version > 3 || capacity <= 0 || grain < 1 || grain > 65536 ||
+        (grain & (grain - 1)) != 0 || entries == 0 || entries > 65536 ||
+        (entries & (entries - 1)) != 0) return result();
+    var descriptor = Binary.read_uint64(28), descriptorSize = Binary.read_uint64(36);
+    if (descriptorSize != 0 && (descriptor < 1 || descriptor > size / 512 ||
+        descriptorSize > Math.floor(size / 512) - descriptor)) return result();
+    sVersion = version;
+    bDetected = true;
 
     return result();
 }

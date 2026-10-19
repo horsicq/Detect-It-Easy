@@ -6,7 +6,37 @@
 meta("archive", "DXA");
 
 function detect() {
-    if (Binary.compare("f70ee9a9")) {
+    // Native unencrypted DxLib v1-v4/v6 headers. The index contains names,
+    // file records and directories; all declared regions must fit the file.
+    // Layout: xxfclib include/xxfclib/formats/dxa/xx_dxa.h.
+    var size = Binary.getSize();
+    var nativeVersion = Binary.read_uint16(2);
+    var header = nativeVersion == 4 ? 28 : 24;
+    var indexSize = Binary.read_uint32(4);
+    var indexAt, files, dirs;
+    if (size >= 24 && Binary.compare("'DX'") && nativeVersion >= 1 && nativeVersion <= 4) {
+        indexAt = Binary.read_uint32(12);
+        files = Binary.read_uint32(16);
+        dirs = Binary.read_uint32(20);
+        if (Binary.read_uint32(8) == header && indexAt >= header && indexAt <= size && indexSize == size - indexAt &&
+                files < dirs && dirs + 16 <= indexSize && Binary.read_uint32(indexAt + dirs + 4) == 0xffffffff) {
+            sVersion = "" + nativeVersion;
+            sOptions = "unencrypted";
+            bDetected = true;
+        }
+    } else if (size >= 48 && Binary.compare("'DX'0600") && Binary.read_uint32(8) == 48 &&
+            Binary.read_uint32(12) == 0 && Binary.read_uint32(20) == 0 &&
+            Binary.read_uint32(28) == 0 && Binary.read_uint32(36) == 0) {
+        indexAt = Binary.read_uint32(16);
+        files = Binary.read_uint32(24);
+        dirs = Binary.read_uint32(32);
+        if (indexAt >= 48 && indexAt <= size && indexSize <= size - indexAt && files < dirs && dirs + 32 <= indexSize &&
+                Binary.read_uint32(indexAt + dirs + 8) == 0xffffffff && Binary.read_uint32(indexAt + dirs + 12) == 0xffffffff) {
+            sVersion = "6";
+            sOptions = "unencrypted";
+            bDetected = true;
+        }
+    } else if (Binary.compare("f70ee9a9")) {
         sOptions = "Arcanum Knights";
         sVersion = "xored"; // Key = B34BB1E8
         bDetected = true;
