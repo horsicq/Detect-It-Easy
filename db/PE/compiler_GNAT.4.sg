@@ -1,0 +1,25 @@
+// Detect It Easy: detection rule file
+// Author: BJNFNE <bjnfne@web.de>
+
+// https://en.wikipedia.org/wiki/GNAT
+meta("compiler", "GNAT");
+
+function detect() {
+    if (PE.isNet()) return; // Doesn't support .NET
+
+    var rdataSection = PE.section[".rdata"];
+
+    if (rdataSection) {
+        if (PE.compareEP("488B05......00C70000000000E9....FFFF0F1F0066662E0F1F840000000000E9......009090") && PE.findString(rdataSection.FileOffset, rdataSection.FileSize, "GNAT_FILE_NAME_CASE_SENSITIVE") !== -1) {
+            bDetected = true;
+            sLang = "Ada";
+
+            var nVersionOffset = PE.findString(rdataSection.FileOffset, rdataSection.FileSize, "GNAT Version: ");
+            if (nVersionOffset !== -1) {
+                sVersion = PE.getString(nVersionOffset + 14, 10).trim();
+            }
+        }
+    }
+
+    return result();
+}
