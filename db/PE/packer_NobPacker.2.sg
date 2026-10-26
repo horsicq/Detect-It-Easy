@@ -1,0 +1,39 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// https://github.com/AlSch092/NobPacker
+// Recognize the default footer and a matching PackedSectionInfo record.
+meta("packer", "NobPacker");
+
+function detect() {
+    var nSize = PE.getSize();
+    if (nSize < 34 || !PE.isOverlayPresent() ||
+        !PE.compare("4D4943524F534F465400", nSize - 10)) {
+        return result();
+    }
+
+    // The last 24-byte record immediately precedes "MICROSOFT\0".
+    var nRecord = nSize - 34;
+    var sSection = PE.getString(nRecord, 8);
+    var nOriginalSize = PE.readDword(nRecord + 8);
+    var nPackedSize = PE.readDword(nRecord + 12);
+    var nOriginalRVA = PE.readDword(nRecord + 16);
+    var nPackedOffset = PE.readDword(nRecord + 20);
+
+    if (nOriginalSize === 0 || nPackedSize === 0 ||
+        nPackedOffset < PE.getOverlayOffset() ||
+        nPackedOffset + nPackedSize > nRecord) {
+        return result();
+    }
+
+    for (var i = 0; i < PE.getNumberOfSections(); i++) {
+        if (PE.getSectionName(i) === sSection &&
+            PE.getSectionVirtualAddress(i) === nOriginalRVA &&
+            PE.getSectionFileSize(i) === 0) {
+            bDetected = true;
+            break;
+        }
+    }
+
+    return result();
+}
