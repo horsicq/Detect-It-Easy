@@ -239,6 +239,14 @@ sImportHash = importHash32.toString(16).toUpperCase();
 
 **`QString getExportFunctionName(quint32 nNumber)`** - Get the name of an exported function.
 
+**`qint32 getNextNamedExportFunctionIndex(qint32 nPrevious)`** - Return the next original export-table slot with a non-empty name. Start with `-1`; `-1` is returned at the end.
+
+**`qint32 getNumberOfNamedExportFunctions()`** - Get the number of entries in the compact named-export cache.
+
+**`qint32 getNamedExportFunctionIndex(qint32 nNumber)`** - Get the original export-table slot for a compact named-export index.
+
+**`QString getNamedExportFunctionName(qint32 nNumber)`** - Get a name from the compact named-export cache.
+
 ### Export Detection
 
 **`bool isExportFunctionPresent(QString sFunctionName)`** - Check if a specific function is exported.
@@ -249,10 +257,10 @@ sImportHash = importHash32.toString(16).toUpperCase();
 
 ```javascript
 if (PE.isExportPresent()) {
-    var numExports = PE.getNumberOfExportFunctions();
+    var numExports = PE.getNumberOfNamedExportFunctions();
 
     for (var i = 0; i < numExports; i++) {
-        var funcName = PE.getExportFunctionName(i);
+        var funcName = PE.getNamedExportFunctionName(i);
         if (funcName.startsWith("Dll")) {
             sDllType = "Custom DLL";
         }

@@ -329,6 +329,7 @@ function initializeCache() {
         /* Number  */ numberOfUnmanagedResources: PE["getNumberOfResources"],
         /* Number  */ numberOfUnmanagedImports: PE["getNumberOfImports"],
         /* Number  */ numberOfUnmanagedExports: PE["getNumberOfExports"],
+        /* Number  */ numberOfNamedUnmanagedExports: PE["getNumberOfNamedExportFunctions"],
         /* Number  */ indexOfEntryPointSection: PE["getEntryPointSection"],
         /* Number  */ indexOfImportsSection: PE["getImportSection"],
         /* Number  */ indexOfExportsSection: PE["getExportSection"],
@@ -5358,37 +5359,56 @@ function scanForBadFileFormat_NET_and_Native() {
 
                             isInvalidGuardCfMetadataPresent = true;
                         } else if (isGuardCfFunctionTableFileBacked) {
-                            // A physically contiguous table can be decoded in one engine call.
-                            // Legal cross-section tables are left to the loader instead of
-                            // being misclassified through non-contiguous file offsets.
-                            var guardCfFunctionTableFileOffset = PE.VAToOffset(guardCfFunctionTable),
-                                guardCfFunctionTableData = PE.readBytes(guardCfFunctionTableFileOffset, guardCfFunctionTableSize),
-                                previousGuardCfFunctionRva = -1;
+                            // Native engines stream the table and validate every entry without
+                            // materializing a large JavaScript byte array. Older engines retain
+                            // the exact scalar path below. Legal cross-section tables are left to
+                            // the loader instead of being misclassified through non-contiguous data.
+                            var nativeGuardCfResult = typeof PE.validateGuardCfFunctionTable === "function" ?
+                                PE.validateGuardCfFunctionTable(guardCfFunctionTable - PE_Cached.imageBase,
+                                    guardCfFunctionCount, guardCfFunctionEntrySize) : null;
 
-                            for (var i = 0; i < guardCfFunctionTableData.length &&
-                                !isInvalidGuardCfMetadataPresent; i += guardCfFunctionEntrySize) {
-                                var guardCfFunctionIndex = i / guardCfFunctionEntrySize,
-                                    guardCfFunctionRva = readUnsignedDwordFromBuffer(guardCfFunctionTableData, i);
-
-                                // The loader binary-searches this table, so descending RVAs are
-                                // contradictory. Equal RVAs remain allowed for toolchain metadata.
-                                if (guardCfFunctionRva < previousGuardCfFunctionRva) {
-                                    log(logType.any, "Guard CF function entry #" + guardCfFunctionIndex +
-                                        " is out of order at VA 0x" + (PE_Cached.imageBase + guardCfFunctionRva).toString(16));
+                            if (nativeGuardCfResult != null) {
+                                if (nativeGuardCfResult.status === 1) {
+                                    log(logType.any, "Guard CF function entry #" + nativeGuardCfResult.entryIndex +
+                                        " is out of order at VA 0x" + (PE_Cached.imageBase + nativeGuardCfResult.functionRva).toString(16));
 
                                     isInvalidGuardCfMetadataPresent = true;
-                                } else if (!isVirtualAddressRangeFileBacked(PE_Cached.imageBase + guardCfFunctionRva, 1, SECTION_FLAGS_EXECUTE)) {
-                                    log(logType.any, "Guard CF function entry #" + guardCfFunctionIndex +
-                                        " points outside executable code at VA 0x" + (PE_Cached.imageBase + guardCfFunctionRva).toString(16));
+                                } else if (nativeGuardCfResult.status === 2) {
+                                    log(logType.any, "Guard CF function entry #" + nativeGuardCfResult.entryIndex +
+                                        " points outside executable code at VA 0x" + (PE_Cached.imageBase + nativeGuardCfResult.functionRva).toString(16));
 
                                     isInvalidGuardCfMetadataPresent = true;
                                 }
+                            } else {
+                                var guardCfFunctionTableFileOffset = PE.VAToOffset(guardCfFunctionTable),
+                                    guardCfFunctionTableData = PE.readBytes(guardCfFunctionTableFileOffset, guardCfFunctionTableSize),
+                                    previousGuardCfFunctionRva = -1;
 
-                                previousGuardCfFunctionRva = guardCfFunctionRva;
+                                for (var i = 0; i < guardCfFunctionTableData.length &&
+                                    !isInvalidGuardCfMetadataPresent; i += guardCfFunctionEntrySize) {
+                                    var guardCfFunctionIndex = i / guardCfFunctionEntrySize,
+                                        guardCfFunctionRva = readUnsignedDwordFromBuffer(guardCfFunctionTableData, i);
+
+                                    // The loader binary-searches this table, so descending RVAs are
+                                    // contradictory. Equal RVAs remain allowed for toolchain metadata.
+                                    if (guardCfFunctionRva < previousGuardCfFunctionRva) {
+                                        log(logType.any, "Guard CF function entry #" + guardCfFunctionIndex +
+                                            " is out of order at VA 0x" + (PE_Cached.imageBase + guardCfFunctionRva).toString(16));
+
+                                        isInvalidGuardCfMetadataPresent = true;
+                                    } else if (!isVirtualAddressRangeFileBacked(PE_Cached.imageBase + guardCfFunctionRva, 1, SECTION_FLAGS_EXECUTE)) {
+                                        log(logType.any, "Guard CF function entry #" + guardCfFunctionIndex +
+                                            " points outside executable code at VA 0x" + (PE_Cached.imageBase + guardCfFunctionRva).toString(16));
+
+                                        isInvalidGuardCfMetadataPresent = true;
+                                    }
+
+                                    previousGuardCfFunctionRva = guardCfFunctionRva;
+                                }
+
+                                // Clean up: release the potentially large fallback buffer.
+                                guardCfFunctionTableData = undefined;
                             }
-
-                            // Clean up: release the potentially large Guard CF table buffer
-                            guardCfFunctionTableData = undefined;
                         }
                     }
                 }
@@ -12764,9 +12784,9 @@ function scanForObfuscations_Native() {
 
     var isStrangeExportsPresent = false;
 
-    if (PE_Cached.numberOfUnmanagedExports > 0) {
-        for (var i = 0; i < PE_Cached.numberOfUnmanagedExports && !isStrangeExportsPresent; i++) {
-            const functionName = PE.getExportFunctionName(i);
+    if (PE_Cached.numberOfNamedUnmanagedExports > 0) {
+        for (var i = 0; i < PE_Cached.numberOfNamedUnmanagedExports && !isStrangeExportsPresent; i++) {
+            const functionName = PE.getNamedExportFunctionName(i);
 
             if (functionName && (/^\d/.test(functionName) || !isAsciiString(functionName))) {
                 log(logType.any, "Unusual export name detected: \"" + File.cleanString(functionName) + "\"");
@@ -15356,8 +15376,8 @@ function scanForLanguagesAndCompilers_NET_and_Native() {
 
 
     // Detect mangler in exports
-    for (var e = 0; e < PE_Cached.numberOfUnmanagedExports && !isPpLibraryPresent; e++) {
-        var exportName = PE.getExportFunctionName(e);
+    for (var e = 0; e < PE_Cached.numberOfNamedUnmanagedExports && !isPpLibraryPresent; e++) {
+        var exportName = PE.getNamedExportFunctionName(e);
         if (exportName && isItemMangled(exportName)) {
             log(logType.any, "Mangler detected at exported item \"" + getNameOfMangledItem(exportName) + "\"");
 

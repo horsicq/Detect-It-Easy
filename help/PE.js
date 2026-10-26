@@ -773,6 +773,30 @@ PE.isResourcesPresent = function() {}
      */
 PE.isExportFunctionPresent = function() {}
     /**
+     * Get the next original export-table slot that has a non-empty name.
+     * Start with -1; returns -1 after the last named export.
+     * @param {Number} nPrevious - Previous original export-table slot
+     * @returns {Number}
+     */
+PE.getNextNamedExportFunctionIndex = function(nPrevious) {}
+    /**
+     * Get the number of entries in the compact named-export cache.
+     * @returns {Number}
+     */
+PE.getNumberOfNamedExportFunctions = function() {}
+    /**
+     * Get the original export-table slot for a compact named-export index.
+     * @param {Number} nNumber - Compact named-export index
+     * @returns {Number}
+     */
+PE.getNamedExportFunctionIndex = function(nNumber) {}
+    /**
+     * Get the name for a compact named-export index.
+     * @param {Number} nNumber - Compact named-export index
+     * @returns {String}
+     */
+PE.getNamedExportFunctionName = function(nNumber) {}
+    /**
      * Check if Export function matches a regular expression.
      * @param {String} sFunctionName - Function pattern
      * @returns {Bool}
