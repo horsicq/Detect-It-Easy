@@ -1,0 +1,25 @@
+// Genuine executable MZ output of PACK2.01 (1995, NoddegamrA).
+// The separate legacy Pack1.0/K.Kokkonen rule remains unchanged.
+meta("packer", "PACK");
+function detect() {
+    if (MSDOS.compareEP("FC061E0E8CC801063801BA....03C28BD805....8EDB8EC033F633FFB90800F3A54B484A79EE8EC38ED8BE4A00AD8BE8B210EA........") &&
+        Binary.getSize() >= 0x80 && Binary.readWord(6) == 1 && Binary.readWord(8) == 2 &&
+        Binary.readWord(0x14) == 3 && Binary.readWord(0x16) == 0 &&
+        Binary.readWord(0x18) == 0x1c && Binary.readWord(0x1a) == 4) {
+        var last = Binary.readWord(2), pages = Binary.readWord(4);
+        var end = (pages - 1) * 512 + (last ? last : 512);
+        if (pages && last <= 512 && end <= Binary.getSize() && end >= 0x80) {
+            var code = 0x20 + 0x3a + Binary.readWord(0x20);
+            var size = end - code;
+            var fixup = Binary.readWord(0x1c) + Binary.readWord(0x1e) * 16;
+            if (size >= 0x40 && size <= 0x10000 && fixup == end - 0x20 - 2 &&
+                Binary.compare("D1EDFECA7505AD8BE8B210C3", code) &&
+                Binary.compare("071F81C5....8ED5BC....34ED33FF34F633D234DB33C0EA........", end - 28)) {
+                sVersion = "2.01";
+                sOptions = "1995 by NoddegamrA";
+                bDetected = true;
+            }
+        }
+    }
+    return result();
+}
