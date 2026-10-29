@@ -33,12 +33,33 @@ function detect() {
         sVersion = "0.36 beta";
     } else if (PE.compareEP("60E809000000..................33C95E870E")) {
         sOptions = "Alt stub";
-    } else if (PE.compare("4D5A4C6F61644C696272617279410000504500004C0102004B45524E454C3332")) {
-        sVersion = "0.33";
-    } else if (PE.compare("4D5A4B45524E454C33322E444C4C00004C6F61644C696272617279410000000047657450726F63416464726573730000")) {
-        sVersion = "0.32";
-    } else if (PE.compare("4D5A4B45524E454C33322E444C4C00005045")) {
-        bDetected = true;
+        // The sectioned 0.39/0.399 producer layout retains its version tag
+        // in MinorLinkerVersion. Keep other alternate stubs unversioned.
+        var nNT = PE.readDword(0x3c);
+        if (nNT === 0x40 && PE.compare("0b0100", nNT + 24) &&
+            PE.isSectionNamePresent(".Upack") &&
+            PE.compareEP("60E809000000..................33C95E870EE3F4")) {
+            switch (PE.readByte(nNT + 27)) {
+                case 0x39: sVersion = "0.39 final"; break;
+                case 0x3a: sVersion = "0.399"; break;
+            }
+        }
+    } else if (PE.readDword(0x3c) === 0x10 &&
+               PE.compare("0b01", 0x28) && PE.readDword(0x38) === 0x1018) {
+        // Compact outputs execute the decoder inside the overlapping COFF
+        // header. API-name strings alone also survive in unpacked images.
+        if (PE.compare("BE........AD50FF7634EB7C4801", 0x18)) {
+            bDetected = true;
+            switch (PE.readByte(0x56)) {
+                case 0x37: sVersion = "0.37 beta"; break;
+                case 0x38: sVersion = "0.38 beta"; break;
+                case 0x39: sVersion = "0.39 final"; break;
+                case 0x3a: sVersion = "0.399"; break;
+            }
+        } else if (PE.compare("BE........FF36E9C3000000", 0x18)) {
+            bDetected = true;
+            if (PE.readByte(0x56) === 0x36) sVersion = "0.36 beta";
+        }
     }
 
     bDetected = bDetected || Boolean(sVersion) || Boolean(sOptions);

@@ -12,6 +12,19 @@ function detect() {
         bDetected = true;
     } else if (Binary.compare("50B8....BA....3bc473..8bc42d....25....8bf8b9....be....fcf3a58bd8b1..d3eb8cd903d95333db53cb")) {
         sVersion = "1.50";
+        // The same bootstrap is also used by genuine 2.01 COM outputs.
+        // Prefer their retained PKLITE version/flags, as the MSDOS rule does.
+        if (Binary.getSize() >= 0x36 && Binary.compare("90", 0x2d) &&
+            (Binary.compare("'PKLITE'", 0x30) || Binary.compare("'PKlite'", 0x30))) {
+            var minor = Binary.readByte(0x2e),
+                flags = Binary.readByte(0x2f),
+                major = flags & 7;
+            if ((major === 1 || major === 2) && minor <= 99 && !(flags & 0xe0)) {
+                sVersion = major + "." + ("0" + minor).slice(-2);
+                if (flags & 8) sOptions = "Extra compression";
+                if (flags & 0x10) sOptions = sOptions.append("Multi-segment file");
+            }
+        }
         bDetected = true;
     } else if (Binary.compare("B8....BA....8cdb03d83b1e....73..83eb..fa8ed3bc....fb83eb..8ec353b9....33ff57be....fcf3a5cb")) {
         sVersion = "1.00, 1.03";
