@@ -1,0 +1,56 @@
+// Detect It Easy: detection rule file
+// https://github.com/XenocodeRCE/Noisette-Obfuscator
+// The bounded constant-outlining profile preserves names. Require the original
+// generated name/value relation as well as both string and Int32 helper forms.
+meta("protector", "Noisette");
+
+function detect() {
+    if (!PE.isNet() || !PE.isSignatureInSectionPresent(0, "0072......700A2B00062A") ||
+        !(PE.isSignatureInSectionPresent(0, "0020........0A2B00062A") ||
+          PE.isSignatureInSectionPresent(0, "00160A2B00062A"))) return result();
+    var count=PE.getNumberOfNetMethods();
+    if (count<3 || count>0x10000) return result();
+    var callers={}, getters=[], i=1, strings=0, integers=0;
+    while(i<=count) {
+        var m=PE.getNetMethodInfo(i);
+        if(m && m.hasBody && m.owner>0 && !m.nameTruncated) {
+            var key="_"+m.owner+":"+m.name;
+            if(!callers[key])callers[key]=[];
+            callers[key].push(i);
+        }
+        if(m && m.hasBody && m.owner>0 && !m.hasExceptionHandlers && !m.nameTruncated &&
+            (m.flags&0x17)==0x16 && m.name.length>2 && m.name.charAt(0)=="_") {
+            var at=m.codeOffset, size=m.codeSize, sig=m.signature.toLowerCase(), value=null, kind=0;
+            if(size==11 && PE.readByte(at)==0 && PE.readByte(at+6)==0x0a &&
+                PE.readByte(at+7)==0x2b && PE.readByte(at+8)==0 &&
+                PE.readByte(at+9)==6 && PE.readByte(at+10)==0x2a) {
+                if(sig=="00000e" && PE.readByte(at+1)==0x72) {
+                    value=PE.getNetUserString(PE.readDword(at+2));
+                    if(typeof value=="string") kind=1;
+                } else if(sig=="000008" && PE.readByte(at+1)==0x20) {
+                    value=PE.readSDword(at+2).toString(); kind=2;
+                }
+            } else if(sig=="000008" && size==7 && PE.readByte(at)==0 &&
+                PE.readByte(at+1)==0x16 && PE.readByte(at+2)==0x0a &&
+                PE.readByte(at+3)==0x2b && PE.readByte(at+4)==0 &&
+                PE.readByte(at+5)==6 && PE.readByte(at+6)==0x2a) {value="0";kind=2;}
+            if(kind) getters.push({rid:i,method:m,value:value,kind:kind});
+        }
+        i++;
+    }
+    i=0;
+    while(i<getters.length) {
+        var g=getters[i], matched=false;
+        var name=g.method.name.substring(1,g.method.name.length-g.value.length-1);
+        if(g.method.name=="_"+name+"_"+g.value) {
+            var candidates=callers["_"+g.method.owner+":"+name],j=0;
+            while(candidates && j<candidates.length && !matched) {
+                matched=PE.isNetMethodCalledBy(g.rid,candidates[j]);j++;
+            }
+        }
+        if(matched) {if(g.kind==1)strings++;else integers++;}
+        i++;
+    }
+    if(strings>=2 && integers>=1) {bDetected=true;sOptions="Constant outlining";}
+    return result();
+}

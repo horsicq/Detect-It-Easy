@@ -1,0 +1,79 @@
+// Detect It Easy: detection rule file
+// https://github.com/AnErrupTion/LoGiC.NET
+// No release is inferred from these copied runtime-helper implementations.
+meta("protector", "LoGiC.NET");
+
+function matches(method, signature) {
+    return PE.compare(signature,method.codeOffset);
+}
+function called(methods, rid) {
+    var i=1;
+    while(i<methods.length) {
+        var m=methods[i];
+        if(m && m.hasBody && m.owner!=1) {
+            if(PE.isNetMethodCalledBy(rid,i)) return true;
+        }
+        i++;
+    }
+    return false;
+}
+function generatedName(name) {
+    var alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",i=0;
+    if(name.length>=500 && name.length<700) {
+        while(i<name.length){if(alphabet.indexOf(name.charAt(i))<0)return false;i++;}
+        return true;
+    }
+    alphabet+=" !:;,^$*&\"'(-_)=?./%+";
+    var markers=["ù","é","è","ç","à","§","¨","£","µ","°"],count=0;
+    while(i<name.length) {
+        if(alphabet.indexOf(name.charAt(i))>=0)i++;
+        else {
+            var matched=false,j=0;
+            while(j<markers.length && !matched) {
+                var marker=markers[j];
+                if(name.substr(i,marker.length)==marker){i+=marker.length;matched=true;}
+                j++;
+            }
+            if(!matched)return false;
+        }
+        if(++count>=70)return false;
+    }
+    return count>=50;
+}
+function detect() {
+    if(!PE.isNet()) return result();
+    var additive=PE.isNetObjectPresent("StringBuilder") && PE.isNetObjectPresent("ToCharArray") &&
+        PE.isSignatureInSectionPresent(0,"FE090500202635B204");
+    var base64=PE.isNetObjectPresent("FromBase64String") && PE.isNetObjectPresent("GetString") &&
+        (PE.isNetObjectPresent("get_UTF8") || PE.isNetObjectPresent("get_UTF32"));
+    if(!additive && !base64) return result();
+    var count=PE.getNumberOfNetMethods();
+    if(count<2 || count>0x10000) return result();
+    var methods=[], i=1;
+    while(i<=count){methods[i]=PE.getNetMethodInfo(i);i++;}
+    i=1;
+    while(i<=count) {
+        var m=methods[i], profile="", probable=false;
+        if(m && m.hasBody && !m.hasExceptionHandlers && m.owner==1 && (m.flags&0x10)) {
+            var sig=m.signature.toLowerCase();
+            if(additive && sig=="00060e0e0808080808") {
+                if(m.codeSize==146 && matches(m,"FE090500202635B2043100FE09040020356A0700310073........FE0E0000FE0900006F........FE0E02002000000000FE0E03002B2FFE0C0200FE0C030093FE0E0100FE0C0000FE0C0100FE09020059D16F........26FE0C0300200100000058FE0E0300FE0C0300FE0C02008E6932C5FE090100203D3700002F00FE090400208E9F17002F00FE0C00006F........2A") ||
+                    m.codeSize==136 && matches(m,"FE090500202635B2043E0000000073........FE0E0000FE0900006F........FE0E02002000000000FE0E0300382F000000FE0C0200FE0C030093FE0E0100FE0C0000FE0C0100FE09020059D16F........26FE0C0300200100000058FE0E0300FE0C0300FE0C02008E693FC2FFFFFFFE090100203D3700003C00000000FE0C00006F........2A")) profile="String encryption: additive UTF16";
+            } else if(base64 && sig=="00010e0e") {
+                if(m.codeSize==131 && PE.getNetUserString(PE.readDword(m.codeOffset+1))=="*$,;:!ù^*&é\"'(-è_çà)" &&
+                    matches(m,"72......7028........FE0E0000FE0C0000FE0E02002000000000FE0E0300383C000000FE0C0200FE0C030093FE0E0100FE090000FE0D0100FE16........6F........7E........6F........FE0B0000FE0C0300200100000058FE0E0300FE0C0300FE0C02008E693FB5FFFFFF28........FE09000028........6F........2A")) profile="String encryption: junk-filtered Base64";
+                else if(m.codeSize==18 && !m.nameTruncated && generatedName(m.name) &&
+                    matches(m,"0028......0A0228......0A6F......0A2A")) {
+                    profile="String encryption: Base64 (probable)";probable=true;
+                }
+            }
+            if(profile && called(methods,i)) {
+                bDetected=true;sOptions=profile;
+                if(probable)sType="~protector";
+                break;
+            }
+        }
+        i++;
+    }
+    return result();
+}

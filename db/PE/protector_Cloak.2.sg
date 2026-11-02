@@ -1,0 +1,29 @@
+// Detect It Easy: detection rule file
+// https://github.com/WhosLogan/Cloak
+meta("protector", "Cloak");
+
+function hasCloakIntegerDecoder() {
+    // At least two adjacent original Int Encryption lookup cases. Keys and
+    // XOR operands are randomized; the compare/branch/return layout is stable.
+    var shortCase = "0220........FE012C0C20........20........612A00";
+    var longCase = "0220........FE01390C00000020........20........612A00";
+    var count = PE.getNumberOfNetMethods();
+    if (count > 0x10000) return false;
+    for (var i = 1; i <= count; i++) {
+        var method = PE.getNetMethodInfo(i);
+        if (method == null || !method.hasBody || method.hasExceptionHandlers || method.signature != "00010808" ||
+            (method.flags & 0x17) != 0x11 || method.codeSize < 0x30 ||
+            PE.readWord(method.codeOffset + method.codeSize - 2) != 0x2a16) continue;
+        if (PE.findSignature(method.codeOffset, method.codeSize, shortCase + shortCase) != -1 ||
+            PE.findSignature(method.codeOffset, method.codeSize, longCase + longCase) != -1) return true;
+    }
+    return false;
+}
+
+function detect() {
+    if (PE.isNet() && PE.isSignatureInBlobPresent_NET("0400010808") && hasCloakIntegerDecoder()) {
+        sOptions = "Int Encryption";
+        bDetected = true;
+    }
+    return result();
+}

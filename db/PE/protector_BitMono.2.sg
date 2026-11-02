@@ -1,0 +1,32 @@
+// Detect It Easy: detection rule file
+// https://github.com/bitmono-project/BitMono
+meta("protector", "BitMono");
+
+function isBitMonoCalliPresent() {
+    // Original CallToCalli: module type -> reflection MethodDef lookup ->
+    // RuntimeMethodHandle local -> GetFunctionPointer -> StandAloneSig calli.
+    // Metadata RIDs and local indexes are deliberately not sample-specific.
+    var prefix = "D00100000228......0A6F......0A20......0628......0A6F......0A";
+    var tails = ["..12..28......0A29......11", "13..12..28......0A29......11",
+        "FE0E....FE0D....28......0A29......11"];
+    var count = PE.getNumberOfNetMethods();
+    if (count > 0x10000) return false;
+    for (var i = 1; i <= count; i++) {
+        var method = PE.getNetMethodInfo(i);
+        if (method == null || !method.hasBody) continue;
+        for (var j = 0; j < tails.length; j++) {
+            if (PE.findSignature(method.codeOffset, method.codeSize, prefix + tails[j]) != -1) return true;
+        }
+    }
+    return false;
+}
+
+function detect() {
+    if (PE.isNet() && PE.isNetObjectPresent("GetTypeFromHandle") &&
+        PE.isNetObjectPresent("ResolveMethod") && PE.isNetObjectPresent("get_MethodHandle") &&
+        PE.isNetObjectPresent("GetFunctionPointer") && isBitMonoCalliPresent()) {
+        sOptions = "CallToCalli";
+        bDetected = true;
+    }
+    return result();
+}

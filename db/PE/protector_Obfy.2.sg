@@ -1,0 +1,44 @@
+// Detect It Easy: detection rule file
+// https://github.com/mortenbrudvik/Obfy
+meta("protector", "Obfy");
+
+function hasObfyXorWorker() {
+    var worker = "028E698D......01FE0E000016FE0E01002B25FE0C0000FE0C010002FE0C01009103FE0C0100038E695D9161D29CFE0C01001758FE0E0100FE0C0100028E6932D2FE0C00002A";
+    var count = PE.getNumberOfNetMethods();
+    if (count > 0x10000) return false;
+    for (var i = 1; i <= count; i++) {
+        var method = PE.getNetMethodInfo(i);
+        if (method != null && method.namespace == "Obfy.Runtime" && method.typeName == "<StringDecryptor>" &&
+            method.name == "XorDecrypt" && method.signature == "00021D051D051D05" &&
+            method.hasBody && !method.hasExceptionHandlers && method.codeSize == 0x46 &&
+            PE.findSignature(method.codeOffset, method.codeSize, worker) == method.codeOffset) return true;
+    }
+    return false;
+}
+
+function detect() {
+    if (!PE.isNet() || !PE.isNetTypePresent("Obfy.Runtime", "<StringDecryptor>") ||
+        !PE.isNetFieldPresent("Obfy.Runtime", "<StringDecryptor>", "_s")) return result();
+    if (PE.isNetFieldPresent("Obfy.Runtime", "<StringDecryptor>", "_k") &&
+        hasObfyXorWorker()) {
+        sOptions = "XOR strings";
+        bDetected = true;
+    } else if (PE.isSignatureInBlobPresent_NET("0400010E08")) {
+        // Published older producers emit this direct string-array getter.
+        // It identifies their output, independently of its runtime validity.
+        var count = PE.getNumberOfNetMethods();
+        if (count > 0x10000) return result();
+        for (var i = 1; i <= count; i++) {
+            var method = PE.getNetMethodInfo(i);
+            if (method != null && method.namespace == "Obfy.Runtime" && method.typeName == "<StringDecryptor>" &&
+                method.name == "Decrypt" && method.signature == "00010E08" && method.hasBody &&
+                !method.hasExceptionHandlers && method.codeSize == 8 &&
+                PE.findSignature(method.codeOffset, method.codeSize, "7E......04029A2A") == method.codeOffset) {
+                sOptions = "Legacy string helper";
+                bDetected = true;
+                break;
+            }
+        }
+    }
+    return result();
+}
