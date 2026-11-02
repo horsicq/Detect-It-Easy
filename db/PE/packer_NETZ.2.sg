@@ -7,6 +7,48 @@ meta("packer", ".NETZ");
 function detect() {
     if (PE.isNetObjectPresent("NetzStarter") && PE.isSignatureInSectionPresent(0, "00'NetzStarter'00'netz'00")) {
         bDetected = true;
+    } else if (PE.isNet() && PE.isNetTypePresent("netz", "NetzStarter") &&
+        PE.isNetUStringPresent("A6C24BF5-3690-4982-887E-11E1B159B249")) {
+        // The compiler may reorder #Strings. Correlate the actual loader
+        // methods and resource token rather than depending on heap adjacency.
+        var count = PE.getNumberOfNetMethods(),
+            methods = [],
+            starts = [],
+            mains = [];
+        if (count > 0x10000) return result();
+        for (var i = 1; i <= count; i++) {
+            var method = PE.getNetMethodInfo(i);
+            methods[i] = method;
+            if (method == null || !method.hasBody || method.namespace != "netz" ||
+                method.typeName != "NetzStarter" || method.signature != "0001081D0E" ||
+                !(method.flags & 0x10)) continue;
+            if (method.name == "Main") {
+                mains.push(i);
+            } else if (method.name == "StartApp") {
+                starts.push(i);
+            }
+        }
+        for (var j = 0; j < starts.length && !bDetected; j++) {
+            var rid = starts[j],
+                start = methods[rid],
+                at = start.codeOffset;
+            if (PE.readByte(at) == 0) at++;
+            if (at + 10 > start.codeOffset + start.codeSize || PE.readByte(at) != 0x72 ||
+                PE.getNetUserString(PE.readDword(at + 1)) != "A6C24BF5-3690-4982-887E-11E1B159B249" ||
+                PE.readByte(at + 5) != 0x28) continue;
+            var token = PE.readDword(at + 6);
+            if ((token >>> 24) != 6) continue;
+            var getter = methods[token & 0xffffff];
+            if (getter == null || !getter.hasBody || getter.owner != start.owner ||
+                getter.name != "GetResource" || getter.signature != "00011D050E" ||
+                !PE.isNetMethodCalledBy(token & 0xffffff, rid)) continue;
+            for (var k = 0; k < mains.length; k++) {
+                if (methods[mains[k]].owner == start.owner && PE.isNetMethodCalledBy(rid, mains[k])) {
+                    bDetected = true;
+                    break;
+                }
+            }
+        }
     }
 
     return result();
