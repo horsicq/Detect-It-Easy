@@ -1,22 +1,14 @@
 // Detect It Easy: detection rule file
 // https://github.com/bitmono-project/BitMono
-// The Balanced/Maximum presets inject a fixed set of decoy obfuscator
-// attributes (AntiDe4dot), while the default renamer builds "A B C.D" names.
 meta("protector", "BitMono");
 
 function detect() {
     if (!PE.isNet()) return result();
 
-    if (hasBitMonoDecoys()) {
-        sOptions = "AntiDe4dot";
-        bDetected = true;
-        return result();
-    }
-
     if (hasBitMonoRenamedMembers()) {
         sOptions = "FullRenamer";
         bDetected = true;
-        return result();
+        return;
     }
 
     if (PE.isNetObjectPresent("GetTypeFromHandle") &&
@@ -29,23 +21,14 @@ function detect() {
     return result();
 }
 
-function hasBitMonoDecoys() {
-    // AntiDe4dot always injects this contradictory set of producer markers.
-    return PE.isNetObjectPresent("ObfuscatedByGoliath") &&
-        PE.isNetObjectPresent("ObfuscatedByAgileDotNet") &&
-        PE.isNetObjectPresent("ObfuscatedByCliSecure") &&
-        PE.isNetObjectPresent("TrinityObfuscator") &&
-        PE.isNetObjectPresent("ZYXDNGuarder") &&
-        PE.isNetObjectPresent("EMyPID_8234_");
-}
-
 function hasBitMonoRenamedMembers() {
     // The default renamer joins its token list into "<a> <b> <c>.<d>".
     // Require both a renamed type and a renamed method to reject lookalikes.
     var count = PE.getNumberOfNetMethods();
     if (count < 1 || count > 0x10000) return false;
-    var renamedType = false;
-    var renamedMethod = false;
+    var renamedType = false,
+        renamedMethod = false;
+
     for (var i = 1; i <= count; i++) {
         var method = PE.getNetMethodInfo(i);
         if (method == null) continue;
@@ -80,5 +63,6 @@ function isBitMonoCalliPresent() {
             if (PE.findSignature(method.codeOffset, method.codeSize, prefix + tails[j]) != -1) return true;
         }
     }
+
     return false;
 }
