@@ -39,5 +39,16 @@ function detect() {
         }
     }
 
+    if (!bDetected && PE.isOverlayPresent() && PE.getOverlaySize() >= 0x2000) {
+        // A signed bootstrapper: the "ADVINSTSFX" footer sits before the
+        // Authenticode table, not at the file end (Hex Workshop 6.7, 2012).
+        var nTag = PE.findSignature(PE.getSize() - 0x2000, 0x2000, "'ADVINSTSFX'");
+
+        if (nTag != -1 && nTag >= 0x40 && PE.readDword(nTag - 0x34) == 100) {
+            sOptions = "bootstrapper, " + PE.readDword(nTag - 0x38) + " files";
+            bDetected = true;
+        }
+    }
+
     return result();
 }

@@ -21,8 +21,10 @@ function detect() {
         if (version > 1 || exponent < 12 || exponent > 29) return false;
         var dictionary = Math.pow(2, exponent) * (1 - (code >> 5) / 16);
         if (dictionary < 4096) return false;
-        // Version 1 stores the complete member length in its trailer.
-        if (version == 1 && (size < 36 || Binary.read_uint64(size - 8, _LE) != size)) return false;
+        // Version 1 stores each member's length in its trailer; a multi-member
+        // stream (tar.lz) ends with the LAST member's length, so only an
+        // overlong trailer value rejects the file.
+        if (version == 1 && (size < 36 || Binary.read_uint64(size - 8, _LE) > size || Binary.read_uint64(size - 8, _LE) < 36)) return false;
         sVersion = String(version);
         return Binary.readByte(6) == 0;
     }

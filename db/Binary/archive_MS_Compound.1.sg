@@ -8,8 +8,31 @@ function detect() {
         const // magic values
             nSub1 = Binary.readWord(0x200),
             nSub2 = Binary.readWord(0x1000);
+        // The root storage's CLSID names Windows Installer files in both the
+        // 512-byte (version 3) and 4 KiB (version 4) sector layouts:
+        // {000C108x-0000-0000-C000-000000000046}, x = 4 database, 6 patch, 2 transform.
+        var nSectorShift = Binary.readWord(0x1E);
+        var nDirectory = Binary.readDword(0x30);
+        var nRoot = -1;
 
-        if (nSub1 == 0 && nSub2 == 0xFFFD) {
+        if (nSectorShift >= 7 && nSectorShift <= 12 && nDirectory < 0xFFFFFFFA) {
+            nRoot = (1 << nSectorShift) * (nDirectory + 1);
+        }
+
+        if (nRoot > 0 && nRoot + 0x60 <= Binary.getSize() && Binary.compare("..100C0000000000C000000000000046", nRoot + 0x50)) {
+            var nKind = Binary.readByte(nRoot + 0x50);
+
+            sType = "installer";
+            sName = "Microsoft Installer (MSI)";
+
+            if (nKind == 0x86) {
+                sOptions = "patch";
+            } else if (nKind == 0x82) {
+                sOptions = "transform";
+            } else if (nKind != 0x84) {
+                sOptions = "variant " + nKind;
+            }
+        } else if (nSub1 == 0 && nSub2 == 0xFFFD) {
             sType = "installer";
             sName = "Microsoft Installer (MSI)";
         } else if (nSub1 == 0xA5EC) {
