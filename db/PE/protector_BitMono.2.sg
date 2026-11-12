@@ -1,9 +1,10 @@
 // Detect It Easy: detection rule file
+
 // https://github.com/bitmono-project/BitMono
 meta("protector", "BitMono");
 
 function detect() {
-    if (!PE.isNet()) return result();
+    if (!PE.isNet()) return;
 
     if (hasBitMonoRenamedMembers()) {
         sOptions = "FullRenamer";
@@ -13,7 +14,7 @@ function detect() {
     if (PE.isNetObjectPresent("GetTypeFromHandle") &&
         PE.isNetObjectPresent("ResolveMethod") && PE.isNetObjectPresent("get_MethodHandle") &&
         PE.isNetObjectPresent("GetFunctionPointer") && isBitMonoCalliPresent()) {
-        sOptions = "CallToCalli";
+        sOptions = sOptions.append("CallToCalli");
         bDetected = true;
     }
 
@@ -24,12 +25,14 @@ function hasBitMonoRenamedMembers() {
     // The default renamer joins its token list into "<a> <b> <c>.<d>".
     // Require both a renamed type and a renamed method to reject lookalikes.
     var count = PE.getNumberOfNetMethods();
+
     if (count < 1 || count > 0x10000) return false;
     var renamedType = false,
         renamedMethod = false;
 
     for (var i = 1; i <= count; i++) {
         var method = PE.getNetMethodInfo(i);
+
         if (method == null) continue;
         if (!method.nameTruncated && isBitMonoRenamedName(method.name)) renamedMethod = true;
         if (!method.typeNameTruncated && isBitMonoRenamedName(method.typeName)) renamedType = true;
@@ -53,8 +56,11 @@ function isBitMonoCalliPresent() {
         "13..12..28......0A29......11",
         "FE0E....FE0D....28......0A29......11"
     ];
+
     var count = PE.getNumberOfNetMethods();
+
     if (count > 0x10000) return false;
+
     for (var i = 1; i <= count; i++) {
         var method = PE.getNetMethodInfo(i);
         if (method == null || !method.hasBody) continue;
