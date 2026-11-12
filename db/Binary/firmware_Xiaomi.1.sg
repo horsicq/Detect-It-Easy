@@ -1,0 +1,28 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Xiaomi router firmware");
+
+function detect() {
+    var size = Binary.getSize(), header, offsets, version;
+    if (size < 320) return result();
+    if (Binary.compare("'HDR1'")) { header = 48; offsets = 16; version = "HDR1"; }
+    else if (Binary.compare("'HDR2'")) { header = 80; offsets = 48; version = "HDR2"; }
+    else return result();
+    var signature = Binary.read_uint32(4), count = 0;
+    if (signature < header || signature > size - 272 || Binary.read_uint32(offsets) == 0) return result();
+    for (var i = 0; i < 8; i++) {
+        var offset = Binary.read_uint32(offsets + i * 4);
+        if (offset == 0) break;
+        if (offset < header || offset > signature - 48) return result();
+        var length = Binary.read_uint32(offset + 8);
+        if (length == 0 || length > signature - offset - 48) return result();
+        count++;
+    }
+    if (count == 0 || ((Binary.calculateCRC32(12, signature + 260) ^ 0xFFFFFFFF) >>> 0) != Binary.read_uint32(8))
+        return result();
+    bDetected = true; sVersion = version;
+    return result();
+}

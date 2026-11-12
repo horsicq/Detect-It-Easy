@@ -1,12 +1,36 @@
 // Detect It Easy: detection rule file
 // Author: horsicq <horsicq@gmail.com>
-
 // https://github.com/Fody/Costura
 meta("library", "Costura.Fody");
 
 function detect() {
     if (PE.isNetGlobalCctorPresent() && (PE.isNetObjectPresent("costura.costura.dll.compressed") || PE.isNetUStringPresent("costura.costura.dll.compressed"))) {
         bDetected = true;
+    } else if (PE.isNet() && PE.isNetTypePresent("Costura", "AssemblyLoader") &&
+        PE.isNetFieldPresent("Costura", "AssemblyLoader", "assemblyNames") &&
+        PE.isNetFieldPresent("Costura", "AssemblyLoader", "symbolNames") &&
+        PE.isNetFieldPresent("Costura", "AssemblyLoader", "isAttached")) {
+        var count = PE.getNumberOfNetMethods(),
+            attach = 0,
+            cctor = 0;
+        if (count > 0x10000) return result();
+        for (var rid = 1; rid <= count; rid++) {
+            var method = PE.getNetMethodInfo(rid);
+            if (method == null || !method.hasBody || method.nameTruncated || method.typeNameTruncated) continue;
+            if (method.owner == 1 && method.name == ".cctor" && method.signature == "000001") cctor = rid;
+            if (method.namespace == "Costura" && method.typeName == "AssemblyLoader" && method.name == "Attach" &&
+                method.signature == "00010102" && method.codeSize == 0x3a && !method.hasExceptionHandlers &&
+                PE.findSignature(method.codeOffset, method.codeSize,
+                    "7F......041728......0A1733012A022C2728......0A0A067E......04252D132614FE06......0673......0A2580......046F......0A2A") == method.codeOffset) {
+                attach = rid;
+            }
+        }
+        // Modern producers inject the resolver directly. Both compressed and
+        // stored dependency resources use this attach code.
+        if (attach && cctor && PE.isNetMethodCalledBy(attach, cctor)) {
+            sOptions = "Dependency embedding";
+            bDetected = true;
+        }
     }
 
     return result();

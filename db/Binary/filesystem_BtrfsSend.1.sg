@@ -1,0 +1,23 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Btrfs send stream");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 27 || !Binary.compare("'btrfs-stream'00")) return result();
+    var version = Binary.read_uint32(13), length = Binary.read_uint32(17), command = Binary.read_uint16(21);
+    if (version < 1 || version > 3 || length == 0 || length > 65536 || length > size - 27 ||
+        (command != 1 && command != 2)) return result();
+    // The first command is SUBVOL or SNAPSHOT, with a CRC-32C and a bounded TLV payload.
+    var crc = 0;
+    for (var i = 17; i < 27 + length; i++) {
+        crc = crc ^ (i >= 23 && i < 27 ? 0 : Binary.readByte(i));
+        for (var bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0x82F63B78 : 0);
+    }
+    if ((crc >>> 0) != Binary.read_uint32(23)) return result();
+    bDetected = true; sVersion = version;
+    return result();
+}

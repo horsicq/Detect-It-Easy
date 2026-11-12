@@ -1,0 +1,31 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "QEMU Copy On Write disk image (QCOW2)");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 72 || !Binary.compare("514649FB")) return result();
+    var version = Binary.read_uint32(4, _BE);
+    var bits = Binary.read_uint32(20, _BE);
+    if ((version != 2 && version != 3) || bits < 9 || bits > 21) return result();
+    var cluster = Math.pow(2, bits);
+    var l1 = Binary.read_uint64(40, _BE), refs = Binary.read_uint64(48, _BE);
+    var entries = Binary.read_uint32(36, _BE);
+    var virtualSize = Binary.read_uint64(24, _BE);
+    if (virtualSize <= 0 || virtualSize > 17592186044416 || entries == 0 ||
+        l1 < cluster || l1 % cluster != 0 || l1 > size || entries > (size - l1) / 8 ||
+        refs < cluster || refs % cluster != 0 || refs > size - cluster ||
+        Binary.read_uint32(32, _BE) > 2) return result();
+    if (version == 3) {
+        if (size < 104) return result();
+        var length = Binary.read_uint32(100, _BE);
+        if (length < 104 || length % 8 != 0 || length > cluster || length > size ||
+            Binary.read_uint32(96, _BE) > 6) return result();
+    }
+    bDetected = true;
+    sVersion = version;
+    return result();
+}

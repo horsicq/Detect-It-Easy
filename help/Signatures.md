@@ -8,6 +8,7 @@ This document describes the signature pattern formats used in Detect-It-Easy for
 - [Special Signatures](#special-signatures)
 - [Text Matching](#text-matching)
 - [Advanced Patterns](#advanced-patterns)
+- [Searching Alternatives](#searching-alternatives)
 - [Examples](#examples)
 
 ## Basic Signature Format
@@ -157,6 +158,24 @@ if (Binary.compare("'PK'0304") ||
     sName = "ZIP archive";
 }
 ```
+
+## Searching Alternatives
+
+To check whether any of several signatures occurs in one section, pass an array to [`isAnySignatureInSectionPresent()`](Binary.md#isanysignatureinsectionpresent):
+
+```javascript
+if (PE.isNet() && PE.getNumberOfSections() > 0 &&
+    PE.isAnySignatureInSectionPresent(0, [
+        "558BEC B90F000000 6A00 6A00 49 75F9 51 53 56 57 B8........E8",
+        "'m_isReadOnly'"
+    ])) {
+    // At least one indicator is present; combine it with further evidence.
+}
+```
+
+Each array element is an ordinary signature. `||` is a JavaScript operator and is not part of the signature grammar; do not put `(pattern1)||(pattern2)` inside one string. The method returns a boolean, rather than the index or offset of the matching pattern. All patterns must be nonempty valid strings, otherwise the request returns `false` before searching. An empty array also returns `false`.
+
+Use [`findSignatures()`](Binary.md#findsignatures) when separate match offsets are needed. Keep cheap preconditions before either search and restrict the search to the relevant section or file range.
 
 ## Examples
 

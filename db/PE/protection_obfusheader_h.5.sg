@@ -1,23 +1,21 @@
 // Detect It Easy: detection rule file
-
 // Author: DosX
 // GitHub: https://github.com/DosX-dev
 // Website: https://dosx.su
 // Telegram: @DosX_dev
+// Updated by: sophiedacat
 
 // https://github.com/ac3ss0r/obfusheader.h
 meta("protection", "obfusheader.h");
 
 function detect() {
     const rdataSection = PE.section[".rdata"];
-
     if (rdataSection) {
         const decoyMessageOffset = PE.findSignature(rdataSection.FileOffset, rdataSection.FileSize, "'Stop reversing the binary'");
-
         if (decoyMessageOffset !== -1) {
-            const decoyMessagesSearchOffset = Math.max(rdataSection.FileOffset, decoyMessageOffset - 0x80),
-                decoyMessagesSearchEnd = Math.min(rdataSection.FileOffset + rdataSection.FileSize, decoyMessageOffset + 0x100),
-                decoyMessagesSearchSize = decoyMessagesSearchEnd - decoyMessagesSearchOffset;
+            const decoyMessagesSearchOffset = Math.max(rdataSection.FileOffset, decoyMessageOffset - 0x80);
+            const decoyMessagesSearchEnd = Math.min(rdataSection.FileOffset + rdataSection.FileSize, decoyMessageOffset + 0x100);
+            const decoyMessagesSearchSize = decoyMessagesSearchEnd - decoyMessagesSearchOffset;
 
             if (PE.isSignaturePresent(decoyMessagesSearchOffset, decoyMessagesSearchSize, "'Reconsider your life choices'") &&
                 PE.isSignaturePresent(decoyMessagesSearchOffset, decoyMessagesSearchSize, "'And go touch some grass'")) {
@@ -32,10 +30,46 @@ function detect() {
         bDetected = true;
     }
 
-    if (PE.section[".enigma1"] && PE.section[".vmp0"] && PE.section[".xtls"]) {
+    const hasFakeSigns = PE.section[".enigma1"] && PE.section[".vmp0"] && PE.section[".xtls"];
+
+    const textSection = PE.section[".text"];
+    if (textSection) {
+        const dtDebug = PE.findSignature(textSection.FileOffset, textSection.FileSize, "150000008B....08");
+        if (dtDebug !== -1) {
+            sOptions = sOptions.append("elf walk");
+            bDetected = true;
+        }
+
+        const predA = PE.findSignature(textSection.FileOffset, textSection.FileSize, "0F95C00F94C000C8");
+        if (predA !== -1) {
+            const predB = PE.findSignature(textSection.FileOffset, textSection.FileSize, "0F92C00F92C820C8");
+            if (predB !== -1 && Math.abs(predA - predB) < 0x400) {
+                sOptions = sOptions.append("opaque preds");
+                bDetected = true;
+            }
+        }
+
+        const retA = PE.findSignature(textSection.FileOffset, textSection.FileSize, "E8......3D......0074..EB..C3");
+        if (retA !== -1) {
+            const retB = PE.findSignature(retA + 1, textSection.FileOffset + textSection.FileSize - retA - 1, "E8......3D......0074..EB..C3");
+            if (retB !== -1) {
+                sOptions = sOptions.append("return mutation");
+                bDetected = true;
+            }
+        }
+
+        const forA = PE.findSignature(textSection.FileOffset, textSection.FileSize, "83F8017D..E8......FF83F8017C");
+        if (forA !== -1) {
+            const forB = PE.findSignature(forA + 1, textSection.FileOffset + textSection.FileSize - forA - 1, "83F8017D..E8......FF83F8017C");
+            if (forB !== -1) {
+                sOptions = sOptions.append("for mutation");
+                bDetected = true;
+            }
+        }
+    }
+
+    if (hasFakeSigns && bDetected) {
         sOptions = sOptions.append("fake signs");
-        bDetected = true;
-        _removeResult("protector", ["Enigma", "SecuROM", "Denuvo", "Themida/Winlicense"]);
     }
 
     sLang = "C++";

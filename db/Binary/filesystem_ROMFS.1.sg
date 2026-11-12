@@ -1,0 +1,23 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Linux ROMFS");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 48 || !Binary.compare("'-rom1fs-'")) return result();
+    var volume = Binary.read_uint32(8, _BE);
+    if (volume < 48 || volume > size || volume % 16 != 0) return result();
+    var sum = 0;
+    for (var i = 0; i < Math.min(volume, 512); i += 4) sum = (sum + Binary.read_uint32(i, _BE)) % 4294967296;
+    if (sum != 0) return result();
+    var nameEnd = 16;
+    while (nameEnd < Math.min(volume - 16, 256) && Binary.readByte(nameEnd) != 0) nameEnd++;
+    if (Binary.readByte(nameEnd) != 0) return result();
+    var root = Math.ceil((nameEnd + 1) / 16) * 16;
+    if (root > volume - 16 || (Binary.read_uint32(root, _BE) & 7) != 1) return result();
+    bDetected = true;
+    return result();
+}

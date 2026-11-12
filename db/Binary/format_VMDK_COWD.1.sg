@@ -1,0 +1,18 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "VMware COWD sparse disk image");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 512 || !Binary.compare("'COWD'01000000")) return result();
+    var capacity = Binary.read_uint32(12), grain = Binary.read_uint32(16);
+    var directory = Binary.read_uint32(20) * 512, entries = Binary.read_uint32(24);
+    if (capacity == 0 || grain == 0 || grain > 65536 || entries == 0 || entries > 1048576 ||
+        directory < 512 || directory > size || Math.ceil(capacity / (grain * 4096)) > entries ||
+        Math.ceil(capacity / (grain * 4096)) * 4 > size - directory) return result();
+    bDetected = true; sVersion = "1";
+    return result();
+}

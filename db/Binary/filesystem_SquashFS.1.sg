@@ -1,0 +1,38 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("archive", "SquashFS");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 96) return result();
+    var endian = _LE;
+    if (Binary.compare("'sqsh'") || Binary.compare("'tqsh'")) endian = _BE;
+    else if (!Binary.compare("'hsqs'") && !Binary.compare("'hsqt'") &&
+             !Binary.compare("'shsq'") && !Binary.compare("22111968")) return result();
+    var major = Binary.read_uint16(28, endian), minor = Binary.read_uint16(30, endian);
+    if (major < 1 || major > 4 || Binary.read_uint32(4, endian) == 0) return result();
+    var block, used, inode, directory;
+    if (major == 4) {
+        block = Binary.read_uint32(12, endian); used = Binary.read_uint64(40, endian);
+        inode = Binary.read_uint64(64, endian); directory = Binary.read_uint64(72, endian);
+        var compressor = Binary.read_uint16(20, endian);
+        if (minor != 0 || compressor < 1 || compressor > 6 || Binary.read_uint16(22, endian) < 12 ||
+            Math.pow(2, Binary.read_uint16(22, endian)) != block) return result();
+    } else if (major == 3) {
+        if (size < 119) return result();
+        block = Binary.read_uint32(51, endian); used = Binary.read_uint64(63, endian);
+        inode = Binary.read_uint64(87, endian); directory = Binary.read_uint64(95, endian);
+    } else {
+        block = major == 1 ? Binary.read_uint16(32, endian) : Binary.read_uint32(51, endian);
+        used = Binary.read_uint32(8, endian); inode = Binary.read_uint32(20, endian);
+        directory = Binary.read_uint32(24, endian);
+    }
+    if (block < 4096 || block > 1048576 || (block & (block - 1)) != 0 || used < 64 || used > size ||
+        inode < 64 || inode >= used || directory < inode || directory >= used) return result();
+    bDetected = true; sVersion = major + "." + minor;
+    sOptions = endian == _BE ? "big endian" : "little endian";
+    return result();
+}

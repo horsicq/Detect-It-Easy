@@ -1,0 +1,20 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "VMware SESparse disk image");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 1024 || !Binary.compare("BEBAFECA000000000100000002000000")) return result();
+    var capacity = Binary.read_uint64(16), vol = Binary.read_uint64(80) * 512;
+    var directory = Binary.read_uint64(128) * 512, count = Math.ceil(capacity / 32768);
+    if (capacity <= 0 || capacity > 17592186044416 || Binary.read_uint64(24) != 8 ||
+        Binary.read_uint64(32) != 64 || Binary.read_uint64(40) != 0 ||
+        vol < 512 || vol > size - 512 || !Binary.compare("FECAFECA00000000", vol) ||
+        Binary.read_uint64(vol + 24) != 0 || directory < 512 || directory > size ||
+        count * 8 > size - directory || Binary.read_uint64(136) * 64 < count) return result();
+    bDetected = true; sVersion = "2.1";
+    return result();
+}

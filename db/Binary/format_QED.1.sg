@@ -1,0 +1,20 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "QEMU Enhanced Disk (QED)");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 64 || !Binary.compare("'QED'00")) return result();
+    var cluster = Binary.read_uint32(4), tables = Binary.read_uint32(8);
+    var header = Binary.read_uint32(12), l1 = Binary.read_uint64(40), virtualSize = Binary.read_uint64(48);
+    if (cluster < 4096 || cluster > 67108864 || (cluster & (cluster - 1)) != 0 ||
+        tables < 1 || tables > 16 || (tables & (tables - 1)) != 0 || header == 0 ||
+        header * cluster > size || l1 < header * cluster || l1 % cluster != 0 || l1 > size ||
+        tables * cluster > size - l1 || virtualSize <= 0 || virtualSize % 512 != 0 ||
+        virtualSize > 17592186044416) return result();
+    bDetected = true;
+    return result();
+}

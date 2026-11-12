@@ -1,0 +1,301 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Sources: xxfclib src/formats/{xuiz,pirs,cgjp,pfpk,gta_img,pam_pak,px,
+// sbpak,hog,hog2,gob,volitionvpft,dpk,agis,bsn,krml,ptero_bigf} readers.
+// Match container bytes and bounded header/table fields, never file extensions.
+
+meta("archive", "");
+
+function detect() {
+    var size = Binary.getSize();
+
+    function span(offset, length) {
+        return offset >= 0 && length >= 0 && offset <= size && length <= size - offset;
+    }
+
+    function nameEnd(offset, end) {
+        var limit = Math.min(end, offset + 1025);
+        var start = offset;
+        while (offset < limit) {
+            var c = Binary.readByte(offset++);
+            if (!c) return offset > start + 1 ? offset : -1;
+            if (c < 32) return -1;
+        }
+        return -1;
+    }
+
+    function xuizTable(end, count, extra) {
+        var p = 22;
+        for (var i = 0; i < count; ++i) {
+            if (p + extra + 9 > end) return false;
+            var length = Binary.read_uint32(p + extra, _BE);
+            var at = Binary.read_uint32(p + extra + 4, _BE);
+            var units = Binary.readByte(p + extra + 8);
+            p += extra + 9;
+            if (!units || p + units * 2 > end || !span(end + at, length)) return false;
+            for (var j = 0; j < units; ++j) {
+                var c = Binary.read_uint16(p + j * 2, _BE);
+                if (!c || c < 32) return false;
+                if (c >= 0xd800 && c <= 0xdbff) {
+                    if (++j >= units) return false;
+                    c = Binary.read_uint16(p + j * 2, _BE);
+                    if (c < 0xdc00 || c > 0xdfff) return false;
+                } else if (c >= 0xdc00 && c <= 0xdfff) return false;
+            }
+            p += units * 2;
+        }
+        return p == end;
+    }
+
+    function pfpk() {
+        var count = Binary.read_uint32(4);
+        var p = 8;
+        var first = size;
+        if (!count || count > 100000 || count > (size - p) / 10) return false;
+        for (var i = 0; i < count; ++i) {
+            if (!span(p, 1)) return false;
+            var length = Binary.readByte(p++);
+            if (!length || !span(p, length + 8)) return false;
+            for (var j = 0; j < length; ++j) {
+                if (Binary.readByte(p + j) < 32) return false;
+            }
+            p += length;
+            var at = Binary.read_uint32(p);
+            var bytes = Binary.read_uint32(p + 4);
+            if (!span(at, bytes)) return false;
+            if (bytes) first = Math.min(first, at);
+            p += 8;
+        }
+        return first >= p;
+    }
+
+    function cgjp() {
+        var p = 4;
+        var chunks = 0;
+        var records = 0;
+        while (p < size && ++records <= 100000) {
+            if (!span(p, 4)) return false;
+            if (Binary.compare("'CGJP'", p)) {
+                if (!chunks) return false;
+                p += 4;
+                chunks = 0;
+                continue;
+            }
+            var unpacked = Binary.read_uint16(p);
+            var packed = Binary.read_uint16(p + 2);
+            p += 4;
+            if (!unpacked || unpacked > 32768 || packed > 32768 || !span(p, packed || unpacked)) return false;
+            if (packed && (packed < 6 || !Binary.compare("'DS'0001", p))) return false;
+            p += packed || unpacked;
+            ++chunks;
+        }
+        return chunks > 0 && p == size;
+    }
+
+    function agis() {
+        var p = 0;
+        var records = 0;
+        while (p < size && ++records <= 100000) {
+            if (!span(p, 32) || !Binary.compare("'AGIS'10", p)) return false;
+            var method = Binary.readByte(p + 5);
+            var unpacked = Binary.read_uint32(p + 10);
+            var length = Binary.read_uint32(p + 14);
+            var nameLength = Binary.readByte(p + 18);
+            if (length < 32 || !span(p, length) || !nameLength || nameLength > 12) return false;
+            if (method == 255) {
+                if (unpacked != length - 31) return false;
+            } else if ((method != 0 && method != 1) || length < 33 || Binary.readByte(p + 31) != method ||
+                    Binary.readByte(p + 32) < 4 || Binary.readByte(p + 32) > 6) return false;
+            p += length;
+        }
+        return records > 0 && p == size;
+    }
+
+    function masked32(at, key) {
+        return ((Binary.readByte(at) ^ key) + (Binary.readByte(at + 1) ^ key) * 256 +
+                (Binary.readByte(at + 2) ^ key) * 65536 + (Binary.readByte(at + 3) ^ key) * 16777216);
+    }
+
+    function bsn() {
+        var p = 6;
+        var records = 0;
+        while (span(p, 6) && ++records <= 100000) {
+            if (!Binary.compare("ff'BSA'", p)) return false;
+            var body = Binary.read_uint16(p + 4, _BE);
+            var end = p + 6 + body;
+            if (body < 22 || body > 281 || !span(p + 6, body + 4) || nameEnd(p + 14, end - 12) != end - 12) return false;
+            var packed = Binary.read_uint32(end - 8, _BE);
+            p = end + 4;
+            if (!span(p, packed)) return false;
+            p += packed;
+            if (p == size - 2 && Binary.compare("0000", p)) return true;
+        }
+        return false;
+    }
+
+    function safeLE64(at) {
+        var high = Binary.read_uint32(at + 4);
+        return high > 0x1fffff ? -1 : high * 4294967296 + Binary.read_uint32(at);
+    }
+
+    function pteroBigf() {
+        var archiveSize = safeLE64(8);
+        var count = Binary.read_uint32(16);
+        var directory = safeLE64(20);
+        var directorySize = safeLE64(28);
+        var dataOffset = safeLE64(36);
+        if (archiveSize < 64 || archiveSize > size || dataOffset < 64 || dataOffset > directory ||
+                directorySize < 0 || directorySize > 0x10000000 || directory + directorySize != archiveSize ||
+                !count || count > 100000 || directorySize < count * 42) return false;
+        var p = directory;
+        var blocks = 0;
+        for (var i = 0; i < count; ++i) {
+            if (p + 41 > archiveSize || Binary.read_uint32(p + 8) != 32) return false;
+            var at = safeLE64(p);
+            var plain = safeLE64(p + 20);
+            var packed = Binary.read_uint32(p + 28);
+            var flag = Binary.read_uint32(p + 32);
+            if (at < dataOffset || at > directory || plain < 0 || flag > 1) return false;
+            var bytes = flag ? packed : plain;
+            if (bytes > directory - at || (!flag && packed && packed != plain)) return false;
+            if (flag) {
+                if (packed < 12) return false;
+                var end = at + packed;
+                var produced = 0;
+                while (at < end && ++blocks <= 1000000) {
+                    if (end - at < 12 || !Binary.compare("'[..]'", at)) return false;
+                    var blockPacked = Binary.read_uint32(at + 4);
+                    var blockPlain = Binary.read_uint32(at + 8);
+                    if (blockPacked > 0x4000000 || blockPlain > 0x4000000 || blockPacked > end - at - 12 ||
+                            blockPlain > plain - produced) return false;
+                    produced += blockPlain;
+                    at += 12 + blockPacked;
+                }
+                if (at != end || produced != plain) return false;
+            }
+            p += 40;
+            var nameStart = p;
+            while (p < archiveSize && p - nameStart <= 65535 && Binary.readByte(p)) {
+                var c = Binary.readByte(p++);
+                if (c < 32 || c > 126) return false;
+            }
+            if (p == nameStart || p - nameStart > 65535 || p >= archiveSize) return false;
+            ++p;
+        }
+        return p == archiveSize;
+    }
+
+    var count, at, end;
+    if (size >= 64 && Binary.compare("'BIGF'00'ZBL'") && pteroBigf()) {
+        sName = "Ptero-Engine BIGF/ZBL archive";
+        sVersion = "0";
+        bDetected = true;
+    } else if (size >= 22 && Binary.compare("'XUIZ'00000001") && Binary.read_uint32(8, _BE) == size) {
+        count = Binary.read_uint16(20, _BE);
+        end = 22 + Binary.read_uint32(16, _BE);
+        if (count && count <= 100000 && end <= size && xuizTable(end, count, 0) != xuizTable(end, count, 10)) {
+            sName = "Xbox XUIZ resource archive";
+            sVersion = "1";
+            bDetected = true;
+        }
+    } else if (size >= 0x3ad && (Binary.compare("'PIRS'") || Binary.compare("'LIVE'") || Binary.compare("'CON '"))) {
+        at = Math.ceil(Binary.read_uint32(0x340, _BE) / 4096) * 4096;
+        count = Binary.read_uint32(0x395, _BE);
+        var tableBlocks = Binary.read_uint16(0x37c);
+        if (Binary.readByte(0x379) == 0x24 && Binary.readByte(0x37b) <= 3 && Binary.read_uint32(0x3a9, _BE) == 0 &&
+                at >= 0x3ad && at <= 0x1000000 && span(at, 8192) && count && count <= 1000000 && tableBlocks && tableBlocks <= count) {
+            sName = "Xbox STFS package";
+            sOptions = Binary.getString(0, 4).trim();
+            bDetected = true;
+        }
+    } else if (size >= 8 && Binary.compare("'CGJP'") && cgjp()) {
+        sName = "CGJP compressed resource archive";
+        bDetected = true;
+    } else if (size >= 18 && Binary.compare("'PFPK'") && pfpk()) {
+        sName = "PFPK resource archive";
+        bDetected = true;
+    } else if (size >= 40 && Binary.compare("'VER2'")) {
+        count = Binary.read_uint32(4);
+        end = 8 + 32 * count;
+        at = Binary.read_uint32(8) * 2048;
+        if (count && count <= 100000 && end <= size && Binary.read_uint16(14) == 0 && at >= end &&
+                span(at, Binary.read_uint16(12) * 2048) && nameEnd(16, 40) > 0) {
+            sName = "GTA IMG resource archive";
+            sVersion = "2";
+            bDetected = true;
+        }
+    } else if (size >= 36 && Binary.compare("'PAM_PAK'00")) {
+        count = Binary.read_uint16(8);
+        at = 36 + 32 * count;
+        if (count && Binary.read_uint32(12) && span(at, Binary.read_uint32(12))) {
+            sName = "PAM PAK resource archive";
+            bDetected = true;
+        }
+    } else if (size >= 62 && Binary.compare("'Photodex Presenter Stream'1a0a0d0a1a")) {
+        var version = Binary.read_uint16(34);
+        count = Binary.read_uint32(58);
+        if (version >= 1 && version <= 5 && count <= 100000 && span(62, 44 * count + 16)) {
+            sName = "Photodex PX named-resource package";
+            bDetected = true;
+        }
+    } else if (size >= 52 && Binary.compare("'SBPAK V 1.0'0d0a")) {
+        var key = Binary.readByte(28);
+        count = masked32(36, key);
+        at = masked32(44, key);
+        if (masked32(20, key) == 0x01020304 && masked32(24, key) == 0xffffffff && masked32(28, key) == 0x10000 &&
+                masked32(48, key) == size && count && count <= 100000 && at > 52 + count * 16 && at <= size) {
+            sName = "South Park SBPAK archive";
+            sVersion = "1.0";
+            bDetected = true;
+        }
+    } else if (size >= 8 && (Binary.compare("'GOB'0a") || Binary.compare("'GOB'20"))) {
+        at = Binary.read_uint32(4);
+        if (span(at, 4)) {
+            count = Binary.read_uint32(at);
+            if (count && count <= 100000 && span(at + 4, count * 21)) {
+                sName = "LucasArts GOB archive";
+                bDetected = true;
+            }
+        }
+    } else if (size >= 20 && Binary.compare("'DHF'") && nameEnd(3, 16) > 0 && span(20, Binary.read_uint32(16))) {
+        sName = "Descent HOG archive";
+        bDetected = true;
+    } else if (size >= 68 && Binary.compare("'HOG2'")) {
+        count = Binary.read_uint32(4);
+        if (count && count <= 100000 && Binary.read_uint32(8) == 68 + 48 * count && span(68, 48 * count)) {
+            sName = "Descent 3 HOG2 archive";
+            bDetected = true;
+        }
+    } else if (size >= 16 && Binary.compare("'VPVP'02000000")) {
+        at = Binary.read_uint32(8);
+        count = Binary.read_uint32(12);
+        if (at >= 16 && count && count <= 100000 && span(at, count * 44)) {
+            sName = "Volition VP archive";
+            sVersion = "2";
+            bDetected = true;
+        }
+    } else if (size >= 32 && Binary.compare("'DPK4'") && Binary.read_uint32(4) == size &&
+            Binary.read_uint32(12) && span(16, Binary.read_uint32(8)) &&
+            Binary.read_uint32(8) >= Binary.read_uint32(12) * 16) {
+        sName = "DPK resource archive";
+        sVersion = "4";
+        bDetected = true;
+    } else if (size >= 32 && Binary.compare("'AGIS'10") && agis()) {
+        sName = "AGIS resource archive";
+        bDetected = true;
+    } else if (size >= 40 && (Binary.compare("ff'BSG'0000") || Binary.compare("ff'BSG'0001")) && bsn()) {
+        sName = "BSN game archive";
+        sVersion = "" + Binary.read_uint16(4, _BE);
+        bDetected = true;
+    } else if (size >= 27 && Binary.compare("'KRML'")) {
+        count = Binary.read_uint16(4);
+        at = Binary.read_uint32(19);
+        if (count && span(6, count * 21) && at >= 6 + count * 21 && span(at, Binary.read_uint32(23)) && nameEnd(6, 19) > 0) {
+            sName = "KRML resource archive";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

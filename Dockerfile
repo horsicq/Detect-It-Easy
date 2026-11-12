@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 # Newest version of DIE, check https://github.com/horsicq/DIE-engine/releases .
-ARG DIE_VERSION=4.0.0
+ARG DIE_VERSION=4.1.0
 RUN apt update -qq && apt upgrade -y  && apt install -y wget && \
     wget https://github.com/horsicq/DIE-engine/releases/download/Beta/die_${DIE_VERSION}_noble_amd64.deb && \
     apt install -y ./die_${DIE_VERSION}_noble_amd64.deb && \

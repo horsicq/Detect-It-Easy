@@ -1,0 +1,39 @@
+// Detect It Easy: detection rule file
+// https://github.com/MiloszKrajewski/LibZ
+meta("library", "LibZ");
+
+function detect() {
+    if (!PE.isNet() || !PE.isNetTypePresent("LibZ.Injected", "LibZInitializer") ||
+        !PE.isNetTypePresent("LibZ.Injected", "AsmZResolver")) return result();
+    var count = PE.getNumberOfNetMethods(),
+        initializer = 0,
+        asmz = 0,
+        resolver = 0,
+        cctor = 0;
+    if (count > 0x10000) return result();
+    for (var rid = 1; rid <= count; rid++) {
+        var method = PE.getNetMethodInfo(rid);
+        if (method == null || !method.hasBody || method.nameTruncated || method.typeNameTruncated) continue;
+        if (method.owner == 1 && method.name == ".cctor" && method.signature == "000001") cctor = rid;
+        if (method.namespace != "LibZ.Injected") continue;
+        if (method.typeName == "AsmZResolver" && method.name == "Initialize" && method.signature == "000001") resolver = rid;
+        if (method.typeName != "LibZInitializer" || method.signature != "000001" || method.hasExceptionHandlers) continue;
+        if (method.name == "Initialize" && method.codeSize == 0x1f &&
+            PE.findSignature(method.codeOffset, method.codeSize,
+                "7F......04171628......0A2C012A28......0628......0628......062A") == method.codeOffset) {
+            initializer = rid;
+        } else if (method.name == "InitializeAsmZ" && method.codeSize == 6 &&
+            PE.findSignature(method.codeOffset, method.codeSize, "28......062A") == method.codeOffset) {
+            asmz = rid;
+        }
+    }
+    // Attribute the installed upstream resolver, including stored DLLs. This
+    // does not infer a producer version or claim the main assembly is compressed.
+    if (initializer && asmz && resolver && cctor && PE.isNetMethodCalledBy(initializer, cctor) &&
+        PE.isNetMethodCalledBy(asmz, initializer) && PE.isNetMethodCalledBy(resolver, asmz)) {
+        sOptions = "Dependency embedding";
+        bDetected = true;
+    }
+
+    return result();
+}

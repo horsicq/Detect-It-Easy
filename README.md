@@ -267,7 +267,7 @@ DiE byte signatures are a small pattern language embedded inside JavaScript stri
 
 Rules can inspect the scan mode with `isHeuristicScan()`, `isDeepScan()`, `isAggressiveScan()`, and `isVerbose()`. These calls reflect options selected by the user; they do not make an unnecessarily expensive rule acceptable. Even optional code must use cheap structural gates and antipatterns before bounded signature searches.
 
-Repository placement also carries a quality meaning. `db` is the reviewed main database. [`db_extra`](db_extra/about.txt) contains rules that were not approved for the main database and is explicitly not recommended as a quality or performance reference. `dbs_min` is generated output and must not be edited by hand.
+Repository placement also carries a quality meaning. `db` is the reviewed main database, with extra or unapproved rules tagged with the `extra` tag. `dbs_min` is generated output and must not be edited by hand.
 
 Finally, a rule that works on one private sample is not yet maintainable coverage. The [contribution requirements](CONTRIBUTING.md#new-detection-rule-pull-requests) require reproducible samples, expected DiE output, independently checkable sources, and relevant false-positive material. The same document explains the [performance requirements](CONTRIBUTING.md#detection-rule-performance-requirements) that are enforced during review.
 

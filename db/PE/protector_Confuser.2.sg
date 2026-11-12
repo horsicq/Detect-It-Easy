@@ -2,49 +2,64 @@
 // Author: Levis <levintaeyeon@live.com> http://ltops9.wordpress.com/
 
 // https://github.com/letiemble/confuser
+// https://github.com/yck1509/ConfuserEx
+// https://github.com/mkaring/ConfuserEx
 meta("protector", "Confuser");
-
-function getConfuserVersion() {
-    var sResult = String();
-
-    var nVersionOffset = PE.findString(PE.section[0].FileOffset, PE.section[0].FileSize, "Confuser v");
-    if (nVersionOffset !== -1) {
-        sResult = PE.getString(nVersionOffset + 10);
-    }
-
-    return sResult;
-}
 
 function detect() {
     if (PE.isNetObjectPresent("ConfusedByAttribute")) {
-        var sConfuserVersion = getConfuserVersion();
-        if (sConfuserVersion) {
-            sVersion = sConfuserVersion;
-        } else {
-            sVersion = "1.X";
+        var coreVersion = getConfuserWatermark("Confuser.Core ");
+        var exVersion = getConfuserWatermark("ConfuserEx v");
+        var classicVersion = getConfuserWatermark("Confuser v");
+        if (coreVersion || exVersion) {
+            sName = "ConfuserEx";
+            sVersion = coreVersion || exVersion;
+        } else if (classicVersion) {
+            sVersion = classicVersion;
         }
-
+        // An unversioned ConfusedByAttribute establishes the family only.
         bDetected = true;
-    } else if (PE.isNet()) {
-        if (PE.section.length >= 2) {
-            var nVersionOffset = PE.findString(PE.section[1].FileOffset, PE.section[1].FileSize, "ConfuserEx v");
-            if (nVersionOffset != -1) {
-                sVersion = PE.getString(nVersionOffset + 12, 7);
-                sName = "ConfuserEx";
-                bDetected = true;
-            }
+    } else if (PE.isNet() && PE.section.length >= 2) {
+        // Preserve the older detector's marker-only ConfuserEx path for
+        // files whose original marker type has been removed or renamed.
+        var offset = PE.findString(PE.section[1].FileOffset, PE.section[1].FileSize, "ConfuserEx v");
+        if (offset !== -1) {
+            sName = "ConfuserEx";
+            sVersion = readConfuserVersion(offset + 12);
+            bDetected = true;
         }
     }
 
-    if (PE.getNetAssemblyName().indexOf("вє∂ѕ ρяσтє¢тσя") == 0) {
+    if (PE.getNetAssemblyName().indexOf("вє∂ѕ ρяσтє¢тσя") === 0) {
         sName = "ConfuserEx";
         sVersion = "Bed's mod";
         bDetected = true;
     } else if (bDetected && PE.isNetObjectPresent("DotNetPatcherPackerAttribute")) {
         sName = "ConfuserEx";
         sVersion = "DotNetPatcher mod";
-        bDetected = true;
     }
 
     return result();
+}
+
+function readConfuserVersion(offset) {
+    var text = PE.getString(offset, 0x40), version = String();
+    for (var i = 0; i < text.length; i++) {
+        var c = text.charCodeAt(i);
+        if ((c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5a) ||
+            (c >= 0x61 && c <= 0x7a) || c === 0x2e || c === 0x2b || c === 0x2d) {
+            version += text.charAt(i);
+        } else {
+            break;
+        }
+    }
+    return version.length && version.charCodeAt(0) >= 0x30 &&
+        version.charCodeAt(0) <= 0x39 ? version : String();
+}
+
+function getConfuserWatermark(prefix) {
+    // The producer stores this serialized attribute argument in #Blob,
+    // rather than in application user strings or a fixed PE section.
+    var offset = PE.findSignatureInBlob_NET("'" + prefix + "'");
+    return offset !== -1 ? readConfuserVersion(offset + prefix.length) : String();
 }

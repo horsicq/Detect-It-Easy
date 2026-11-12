@@ -1,0 +1,41 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "MAME Compressed Hunks of Data (CHD)");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 76 || !Binary.compare("'MComprHD'")) return result();
+    var version = Binary.read_uint32(12, _BE);
+    var lengths = [0, 76, 80, 120, 108, 124];
+    if (version < 1 || version > 5 || Binary.read_uint32(8, _BE) != lengths[version] ||
+        size < lengths[version]) return result();
+    var hunk = 0, logical = 0, unit = 0, map = lengths[version];
+    if (version == 5) {
+        hunk = Binary.read_uint32(56, _BE); unit = Binary.read_uint32(60, _BE);
+        logical = Binary.read_uint64(32, _BE); map = Binary.read_uint64(40, _BE);
+        if (unit == 0 || unit > hunk || hunk % unit != 0) return result();
+        for (var i = 0; i < 4; i++) {
+            var codec = Binary.read_uint32(16 + i * 4, _BE);
+            if (codec != 0 && !Binary.compare("'zlib'",16+i*4) && !Binary.compare("'lzma'",16+i*4) &&
+                !Binary.compare("'huff'",16+i*4) && !Binary.compare("'flac'",16+i*4) &&
+                !Binary.compare("'zstd'",16+i*4) && !Binary.compare("'cdzl'",16+i*4) &&
+                !Binary.compare("'cdlz'",16+i*4) && !Binary.compare("'cdfl'",16+i*4) &&
+                !Binary.compare("'cdzs'",16+i*4) && !Binary.compare("'avhu'",16+i*4)) return result();
+        }
+    } else if (version >= 3) {
+        hunk = Binary.read_uint32(version == 3 ? 76 : 44, _BE);
+        logical = Binary.read_uint64(28, _BE);
+        if (Binary.read_uint32(20, _BE) > 3 || Binary.read_uint32(24, _BE) == 0) return result();
+    } else {
+        unit = version == 1 ? 512 : Binary.read_uint32(76, _BE);
+        hunk = Binary.read_uint32(24, _BE) * unit;
+        logical = Binary.read_uint32(28, _BE) * hunk;
+    }
+    if (hunk <= 0 || hunk > 16777216 || logical <= 0 || map < lengths[version] || map >= size)
+        return result();
+    bDetected = true; sVersion = version;
+    return result();
+}

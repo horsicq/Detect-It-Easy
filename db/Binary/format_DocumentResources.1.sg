@@ -1,0 +1,105 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Sources: xxfclib src/formats/{mskn1,mskn3,nvp,zoot1,binary_plist,
+// outlook_express_dbx_mailbox,pcxlib,tnef} readers.
+
+meta("format", "");
+
+function detect() {
+    var size = Binary.getSize();
+
+    function zlibHeader(at) {
+        if (size - at < 6) return false;
+        var cmf = Binary.readByte(at);
+        var flg = Binary.readByte(at + 1);
+        return (cmf & 15) == 8 && (cmf >> 4) <= 7 && !(flg & 32) && (cmf * 256 + flg) % 31 == 0;
+    }
+
+    function nvpRecords() {
+        var p = 4;
+        while (p < size && p <= 1028 && Binary.readByte(p)) ++p;
+        if (p > 1028 || size - ++p < 5) return false;
+        var count = Binary.read_uint16(p + 3);
+        p += 5;
+        if (!count || count > (size - p) / 8) return false;
+        for (var i = 0; i < count; ++i) {
+            if (size - p < 8) return false;
+            var length = Binary.read_uint32(p + 4) & 0x7fffffff;
+            p += 8;
+            if (length > size - p) return false;
+            p += length;
+        }
+        return p == size;
+    }
+
+    function safeBE64(at) {
+        var high = Binary.read_uint32(at, _BE);
+        return high > 0x1fffff ? -1 : high * 4294967296 + Binary.read_uint32(at + 4, _BE);
+    }
+
+    function pcxlibRecords() {
+        var p = 122;
+        var records = 0;
+        while (p < size && ++records <= 100000) {
+            if (size - p < 84 || Binary.readByte(p) != 1 || Binary.read_uint16(p + 22) != 0) return false;
+            var length = Binary.read_uint32(p + 14);
+            p += 84;
+            if (length > size - p) return false;
+            p += length;
+        }
+        return records > 0 && p == size;
+    }
+
+    if (size >= 10 && Binary.compare("'KSLZ'") && zlibHeader(4)) {
+        sName = "MediaMonkey MSKN skin";
+        sVersion = "1";
+        sOptions = "zlib";
+        bDetected = true;
+    } else if (size >= 13 && Binary.compare("'KSMSSTL'") && zlibHeader(7)) {
+        sName = "MediaMonkey MSKN skin";
+        sVersion = "3";
+        sOptions = "zlib";
+        bDetected = true;
+    } else if (size >= 10 && Binary.compare("'NVP'01") && nvpRecords()) {
+        sName = "NVP image/configuration container";
+        sVersion = "1";
+        bDetected = true;
+    } else if (size >= 12 && Binary.compare("'ZOT3'")) {
+        var length = Binary.read_uint32(4);
+        var version = Binary.read_uint16(8);
+        var dirs = Binary.read_uint16(10);
+        var dirSize = version == 0x272e ? 116 : 76;
+        var stride = version == 0x2739 ? 235 : 137;
+        if ((version == 0x272e || version == 0x2738 || version == 0x2739) && dirs &&
+                length <= size - 12 && length >= dirs * dirSize && (length - dirs * dirSize) % stride == 0) {
+            sName = "Zoot notes database";
+            bDetected = true;
+        }
+    } else if (size >= 40 && Binary.compare("'bplist00'") && Binary.compare("000000000000", size - 32)) {
+        var offsetWidth = Binary.readByte(size - 26);
+        var refWidth = Binary.readByte(size - 25);
+        var count = safeBE64(size - 24);
+        var root = safeBE64(size - 16);
+        var table = safeBE64(size - 8);
+        if (offsetWidth >= 1 && offsetWidth <= 8 && refWidth >= 1 && refWidth <= 8 && count > 0 &&
+                root >= 0 && root < count && table >= 8 && table <= size - 32 && count * offsetWidth == size - 32 - table) {
+            sName = "Apple binary property list";
+            sVersion = "00";
+            bDetected = true;
+        }
+    } else if (size >= 0x24bc && Binary.compare("cfad12fec5fd746f66e3d1119a4e00c04fd75e5b") &&
+            (!Binary.read_uint32(0xe4) || (Binary.read_uint32(0xe4) >= 0x24bc && Binary.read_uint32(0xe4) <= size - 0x27c))) {
+        sName = "Outlook Express DBX mailbox";
+        bDetected = true;
+    } else if (size >= 206 && Binary.compare("'pcxLib'00") && pcxlibRecords()) {
+        sName = "Genus PCXLib image library";
+        bDetected = true;
+    } else if (size >= 17 && Binary.compare("789f3e22") && (Binary.readByte(6) == 1 || Binary.readByte(6) == 2) &&
+            Binary.read_uint32(11) <= size - 17) {
+        sName = "Transport Neutral Encapsulation Format (TNEF)";
+        bDetected = true;
+    }
+
+    return result();
+}

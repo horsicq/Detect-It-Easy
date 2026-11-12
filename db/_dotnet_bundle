@@ -1,0 +1,27 @@
+// Shared .NET single-file apphost fingerprint for PE and ELF signatures.
+// https://github.com/dotnet/runtime/tree/main/src/installer/managed/Microsoft.NET.HostModel/Bundle
+
+function getDotNetSingleFileVersion() {
+    var size = Binary.getSize();
+    if (size < 0x40) return "";
+
+    var marker = Binary.findSignature(8, Math.min(size - 8, 0x10000000),
+        "8B1202B96A612038727B930214D7A03213F5B9E6EFAE3318EE3B2DCE24B36AAE");
+    if (marker < 8) return "";
+
+    var header = Binary.readQword(marker - 8);
+    if (header < marker + 0x20 || header > size - 0x10) return "";
+
+    var major = Binary.readDword(header), minor = Binary.readDword(header + 4);
+    var files = Binary.readDword(header + 8),
+        idSize = Binary.readByte(header + 0xc);
+    if ((major != 1 && major != 2 && major != 6) || minor != 0 ||
+        files < 1 || files > 0x1000 || idSize < 1 || idSize > 0x7f) return "";
+
+    var entries = header + 0xd + idSize + (major >= 2 ? 0x28 : 0);
+    var minimumEntry = major >= 6 ? 0x1a : 0x12;
+    if (entries > size || files > (size - entries) / minimumEntry) return "";
+
+    // A stock unbundled apphost contains this marker with a zero header offset.
+    return major + "." + minor;
+}

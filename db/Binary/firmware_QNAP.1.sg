@@ -1,0 +1,22 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "QNAP NAS firmware");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 78 || !Binary.compare("F57B4703") || !Binary.compare("'icpnas'", size - 74)) return result();
+    var footer = size - 74, encrypted = Binary.read_uint32(footer + 6);
+    if (encrypted < 4 || encrypted > footer) return result();
+    for (var field = 0; field < 4; field++) {
+        for (var i = 0; i < 16; i++) {
+            var c = Binary.readByte(footer + 10 + field * 16 + i);
+            if (c == 0) break;
+            if (c < 32 || c == 127) return result();
+        }
+    }
+    bDetected = true; sVersion = Binary.getString(footer + 26, 16);
+    return result();
+}

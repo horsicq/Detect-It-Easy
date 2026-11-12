@@ -1,0 +1,32 @@
+// Detect It Easy: detection rule file
+// https://github.com/TotalTechGeek/DotNetCompressor
+meta("packer", "DotNetCompressor");
+
+function detect() {
+    if (!PE.isNet() || !PE.isNetObjectPresent("ResourceManager") ||
+        !PE.isNetObjectPresent("GetObject") || !PE.isNetObjectPresent("get_EntryPoint") ||
+        !PE.isNetObjectPresent("Invoke") || !PE.isNetObjectPresent("GetExecutingAssembly")) return result();
+    var gzip = PE.isNetObjectPresent("GZipStream");
+    var lzma = PE.isNetObjectPresent("LZipStream") || PE.isNetObjectPresent("SevenZipExtractor");
+    if (!gzip && !lzma) return result();
+    var count = PE.getNumberOfNetMethods();
+    if (count > 0x10000) return result();
+    for (var rid = 1; rid <= count; rid++) {
+        var method = PE.getNetMethodInfo(rid);
+        if (!method || !method.hasBody || !method.hasExceptionHandlers || method.codeSize < 0x80 ||
+            method.codeSize > 0x1000 || method.namespace != "CompressedApp" || method.typeName != "Program" ||
+            method.name != "Main" || method.signature != "0001011D0E" || !(method.flags & 0x10)) continue;
+        var at = method.codeOffset;
+        // The producer's resource keys and emitted loader sequence are fixed;
+        // assembly tokens and the uncompressed application's size vary.
+        if (PE.findSignature(at, method.codeSize,
+            "72......7028......0A73......0A0A0672......706F......0A74......1B0B20........0C0773......0A0D09") != at ||
+            PE.getNetUserString(PE.readDword(at + 1)) != "resource" ||
+            PE.getNetUserString(PE.readDword(at + 0x12)) != "app") continue;
+        sOptions = gzip && lzma ? "Managed resource loader" : gzip ? "GZip loader" : "LZMA loader";
+        bDetected = true;
+        break;
+    }
+
+    return result();
+}

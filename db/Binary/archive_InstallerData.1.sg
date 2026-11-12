@@ -1,0 +1,266 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Layouts: xxfclib format readers finstall, finear, gst,
+// netware2, qip1/qip2, scf, smsipak, twrx and sfx_warpin_package;
+// sfx_hci_instalit data volumes; verified on the xxfc sample corpus.
+// These are data containers: executable installer stubs have separate rules.
+
+meta("archive", "");
+
+function detect() {
+    var size = Binary.getSize();
+    var offset, count, length, packed, unpacked, method, next, version, end;
+
+    function nameAt(at, maximum) {
+        var i, c;
+        if (at < 0 || maximum < 1 || at + maximum > size) return false;
+        for (i = 0; i < maximum; i++) {
+            c = Binary.readByte(at + i);
+            if (c === 0) return i > 0;
+            if (c < 0x20 || c === 0x7f) return false;
+        }
+        return true;
+    }
+
+    function dclAt(at, extent) {
+        return extent >= 3 && at + extent <= size &&
+            Binary.readByte(at) <= 1 && Binary.readByte(at + 1) >= 4 &&
+            Binary.readByte(at + 1) <= 6;
+    }
+
+    function instalitVolume() {
+        if (size < 82 || Binary.readByte(size - 29) !== 12 ||
+            !/^[0-9]{12}$/.test(Binary.getString(size - 28, 12)) ||
+            Binary.read_uint32(size - 8) !== 0) return false;
+        var catalog = Binary.read_uint32(size - 4);
+        var limit = Binary.read_uint32(size - 12);
+        if (catalog < 1 || catalog + 6 >= limit || limit > size - 29 ||
+            !Binary.compare("05'[PVM]'", catalog)) return false;
+        catalog += 6;
+        var tag = Binary.readByte(catalog);
+        var strides = tag === 0x1a ? [47] : tag === 0x1c ? [55, 59] : [];
+        for (var choice = 0; choice < strides.length; choice++) {
+            var stride = strides[choice];
+            if ((limit - catalog) % stride !== 0 || (limit - catalog) / stride > 4096) continue;
+            var firstDisk = Binary.readByte(catalog + (tag === 0x1a ? 30 : 32));
+            var valid = Binary.read_uint32(catalog + 1) === 0;
+            var membersHere = 0;
+            for (var at = catalog; valid && at < limit; at += stride) {
+                var data = Binary.read_uint32(at + 1);
+                var codec = Binary.readByte(at + 5);
+                var bytes = Binary.read_uint32(at + 20);
+                var nameLength = 0;
+                while (nameLength < 13 && Binary.readByte(at + 6 + nameLength) !== 0) nameLength++;
+                if (Binary.readByte(at) !== tag || !nameAt(at + 6, 13) ||
+                    nameLength === 13 ||
+                    (codec !== 0xc8 && codec !== 0xd0 && codec !== 0xe0 && codec !== 0xf0)) valid = false;
+                // The catalog also describes members on later disks and
+                // members continued in another volume. Check payloads only
+                // when wholly present here, as the native reader does.
+                if (Binary.readByte(at + (tag === 0x1a ? 30 : 32)) === firstDisk &&
+                    data <= catalog - 6 && bytes <= catalog - 6 - data) {
+                    if ((codec === 0xc8 && bytes !== Binary.read_uint32(at + (tag === 0x1a ? 33 : 35))) ||
+                        (codec === 0xf0 && !dclAt(data, bytes))) valid = false;
+                    membersHere++;
+                }
+            }
+            if (valid && membersHere > 0) return true;
+        }
+        return false;
+    }
+
+    if (size > 17 && Binary.compare("'FINEAR'dd88dd")) {
+        // CRC is CRC-16/ARC stored in a 32-bit field.
+        if (Binary.read_uint32(9) > 0xffff || Binary.read_uint32(13) === 0) return false;
+        sName = "FinEAR installer transport";
+        sOptions = "LZHUF";
+        bDetected = true;
+    } else if (size >= 42 && Binary.compare("01'F Install '")) {
+        version = Binary.readByte(11);
+        count = Binary.read_uint16(16);
+        end = 18 + count * 24;
+        if (version < 0x30 || version > 0x39 || count < 1 || count > 4096 || end > size) return false;
+        for (offset = 18; offset < 18 + count * 24; offset += 24) {
+            next = Binary.read_uint32(offset);
+            length = Binary.read_uint32(offset + 4);
+            if (next < end || next + length > size || !nameAt(offset + 8, 16)) return false;
+            if (offset === 18 && next !== end) return false;
+            end = next + length;
+        }
+        sName = "F Install disk data";
+        sVersion = String.fromCharCode(version);
+        bDetected = true;
+    } else if (size >= 35 && Binary.compare("2300000010'NetWareFileInfo'0a0a1a'__oU'0a0a1a00'VUuU'")) {
+        // Every named record must fit, and the chain must cover the file.
+        offset = 0;
+        count = 0;
+        var hasFile = false, hasData = false;
+        while (offset < size && count < 4096) {
+            if (offset + 5 > size) return false;
+            length = Binary.read_uint32(offset);
+            var nameLength = Binary.readByte(offset + 4);
+            if (nameLength < 2 || nameLength > 64 || length < 4 + nameLength ||
+                offset + length > size || !nameAt(offset + 5, nameLength - 1)) return false;
+            var tag = Binary.getString(offset + 5, nameLength - 1);
+            if (tag === "NetWareFile") hasFile = true;
+            if (tag === "PackedData") hasData = true;
+            offset += length;
+            count++;
+        }
+        if (offset !== size || !hasFile || !hasData) return false;
+        sName = "NetWare installation file";
+        bDetected = true;
+    } else if (size >= 32 && Binary.compare("'QD'0000")) {
+        offset = 0;
+        count = 0;
+        while (offset < size && count < 4096) {
+            if (offset + 32 > size || !Binary.compare("'QD'0000", offset) ||
+                !nameAt(offset + 19, 13)) return false;
+            packed = Binary.read_uint32(offset + 4);
+            unpacked = Binary.read_uint32(offset + 15);
+            if (packed > size - offset - 32 ||
+                (unpacked !== 0 && !dclAt(offset + 32, packed))) return false;
+            offset += 32 + packed;
+            count++;
+        }
+        if (offset !== size || count === 0) return false;
+        sName = "Quarterdeck QIP member stream";
+        bDetected = true;
+    } else if (size >= 67 && Binary.compare("'QP'")) {
+        count = Binary.read_uint16(2);
+        length = Binary.read_uint32(4);
+        version = Binary.read_uint32(8);
+        if (count < 1 || count > 4096 || length !== count * 16 ||
+            (version !== 1 && version !== 2) || Binary.read_uint32(12) !== 0 || 16 + length > size) return false;
+        var recordSize = version === 1 ? 32 : 36;
+        end = 16 + length;
+        for (offset = 16; offset < 16 + length; offset += 16) {
+            next = Binary.read_uint32(offset);
+            if (next < 16 + length || next + recordSize > size ||
+                !Binary.compare("'QD'0000", next)) return false;
+            packed = Binary.read_uint32(next + 4);
+            if (!dclAt(next + recordSize, packed) || !nameAt(offset + 4, 12)) return false;
+            if (version === 1 && next !== end) return false;
+            end = Math.max(end, next + recordSize + packed);
+        }
+        if (version === 1 && end !== size) return false;
+        sName = "Quarterdeck install archive";
+        sVersion = version.toString();
+        bDetected = true;
+    } else if (size >= 48 && Binary.compare("'SMSIPAK '071a")) {
+        end = Binary.read_uint32(10);
+        if (end < 48 || end > size) return false;
+        offset = 14;
+        count = 0;
+        while (offset < end && count < 4096) {
+            if (offset + 34 > end || !nameAt(offset, 12) || Binary.read_uint16(offset + 32) !== 0) return false;
+            method = Binary.readByte(offset + 23);
+            unpacked = Binary.read_uint32(offset + 24);
+            packed = Binary.read_uint32(offset + 28);
+            if (packed > end - offset - 34 || (method !== 1 && method !== 2) ||
+                (method === 2 && packed !== unpacked) ||
+                (method === 1 && !dclAt(offset + 34, packed))) return false;
+            offset += 34 + packed;
+            count++;
+        }
+        if (offset !== end || count === 0) return false;
+        sName = "SMSIPAK distribution archive";
+        bDetected = true;
+    } else if (size >= 30 && Binary.compare("'TWRX'0001")) {
+        offset = 0;
+        count = 0;
+        while (offset < size && count < 4096) {
+            if (offset + 30 > size || !Binary.compare("'TWRX'00010000", offset)) return false;
+            method = Binary.read_uint16(offset + 8);
+            packed = Binary.read_uint32(offset + 18);
+            unpacked = Binary.read_uint32(offset + 22);
+            length = Binary.read_uint32(offset + 26);
+            next = offset + 30 + length;
+            if (length < 1 || length > 4096 || next > size || packed > size - next ||
+                !nameAt(offset + 30, length) || (method !== 0 && method !== 6 && method !== 8) ||
+                (method === 0 && packed !== unpacked) ||
+                (method === 6 && !dclAt(next, packed)) ||
+                (method === 8 && (packed < 7 || Binary.read_uint16(next) !== 8 ||
+                    Binary.read_uint32(next + 2) !== packed - 6))) return false;
+            offset = next + packed;
+            count++;
+        }
+        if (offset !== size || count === 0) return false;
+        sName = "TWRX installer container";
+        bDetected = true;
+    } else if (size >= 0x361 && Binary.compare("770402be")) {
+        version = Binary.read_uint16(4);
+        count = Binary.read_uint16(0x20a);
+        packed = Binary.read_uint16(0x20e);
+        length = Binary.read_uint32(0x210);
+        offset = 0x214;
+        if (version > 4 || count < 1 || count > 4096) return false;
+        if (version === 4) {
+            next = Binary.read_uint32(offset);
+            if (next < 0x28 || next > 0x10000 || next > size - offset) return false;
+            offset += next;
+        }
+        if (packed !== 0) {
+            if (packed < 14 || offset + packed > size || !Binary.compare("'BZh'", offset) ||
+                Binary.readByte(offset + 3) < 0x31 || Binary.readByte(offset + 3) > 0x39 ||
+                (!Binary.compare("314159265359", offset + 4) && !Binary.compare("177245385090", offset + 4))) return false;
+        } else if (Binary.read_uint16(0x20c) !== 0) return false;
+        offset += packed + length;
+        end = offset + count * 48;
+        if (end > size) return false;
+        var hasMember = false;
+        for (; offset < end; offset += 48) {
+            var members = Binary.read_uint16(offset + 2);
+            next = Binary.read_uint32(offset + 4);
+            packed = Binary.read_uint32(offset + 12);
+            if (next < end || next + members * 0x11d + packed > size) return false;
+            if (members > 0) {
+                if (!Binary.compare("12f0", next) || Binary.readByte(next + 0x11c) !== 0 ||
+                    !nameAt(next + 0x14, 0x100) || Binary.read_uint32(next + 12) > packed) return false;
+                hasMember = true;
+            }
+        }
+        if (!hasMember) return false;
+        sName = "WarpIN installer package";
+        sVersion = version.toString();
+        bDetected = true;
+    } else if (size >= 32 && Binary.compare("e9c8")) {
+        // The two-byte marker alone is not a signature: validate every record.
+        offset = 0;
+        count = 0;
+        while (offset < size && count < 4096) {
+            if (offset + 32 > size || !Binary.compare("e9c8", offset) || !nameAt(offset + 16, 12)) return false;
+            method = Binary.readByte(offset + 7);
+            packed = Binary.read_uint32(offset + 12);
+            unpacked = Binary.read_uint32(offset + 8);
+            if (packed > size - offset - 32 || method > 1 ||
+                (method === 0 && packed !== unpacked) ||
+                (method === 1 && !dclAt(offset + 32, packed))) return false;
+            offset += 32 + packed;
+            count++;
+        }
+        if (offset !== size || count === 0) return false;
+        sName = "GST Software installer container";
+        bDetected = true;
+    } else if (size >= 33 && Binary.compare("04000000")) {
+        // SCF has weak magic; exact record chaining and DCL headers are required.
+        offset = 4;
+        count = 0;
+        while (offset < size && count < 4096) {
+            if (offset + 29 > size || !nameAt(offset, 14)) return false;
+            packed = Binary.read_uint32(offset + 14);
+            if (!dclAt(offset + 26, packed)) return false;
+            offset += 26 + packed;
+            count++;
+        }
+        if (offset !== size || count === 0) return false;
+        sName = "Hijaak/PrintPartner SCF setup container";
+        bDetected = true;
+    } else if (instalitVolume()) {
+        sName = "HCI Instalit data volume";
+        bDetected = true;
+    }
+
+    return result();
+}

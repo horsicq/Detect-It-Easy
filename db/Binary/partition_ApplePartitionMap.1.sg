@@ -1,0 +1,28 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Apple Partition Map");
+
+function apmValid(step, size) {
+    if (step > size - 512 || !Binary.compare("'PM'0000", step)) return false;
+    var count = Binary.read_uint32(step + 4, _BE), map = false;
+    if (count == 0 || count > 256 || count > Math.floor((size - 512) / step)) return false;
+    for (var i = 1; i <= count; i++) {
+        var offset = i * step;
+        if (!Binary.compare("'PM'0000", offset) || Binary.read_uint32(offset + 4, _BE) != count) return false;
+        if (Binary.getString(offset + 48, 32) == "Apple_partition_map") map = true;
+    }
+    return map;
+}
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 1024 || !Binary.compare("'ER'")) return result();
+    var block = Binary.read_uint16(2, _BE);
+    if ([512,1024,2048,4096].indexOf(block) == -1 || Binary.read_uint32(4, _BE) == 0) return result();
+    if (!apmValid(512, size) && (block == 512 || !apmValid(block, size))) return result();
+    bDetected = true; sOptions = "block size: " + block;
+    return result();
+}

@@ -1,0 +1,22 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "D-Link firmware package");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 40 || (!Binary.compare("'FPKG'01000000") && !Binary.compare("'CPKG'01000000"))) return result();
+    var offset = Binary.read_uint32(8, _BE);
+    if (offset < 12 || offset > size - 28 || Binary.read_uint32(offset, _BE) != 28) return result();
+    var type = Binary.read_uint16(offset + 4, _BE), length = Binary.read_uint32(offset + 8, _BE);
+    if (type < 256 || type > 259 || length > size - offset - 28) return result();
+    for (var i = 0; i < 16; i++) {
+        var c = Binary.readByte(offset + 12 + i);
+        if (c == 0) break;
+        if (c < 32 || c > 126) return result();
+    }
+    bDetected = true; sVersion = "1"; sOptions = Binary.getString(0, 4);
+    return result();
+}

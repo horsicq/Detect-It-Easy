@@ -1,0 +1,160 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Standalone compression wrappers; lengths and tables are checked before use.
+
+meta("archive", "");
+
+function detect() {
+    var size = Binary.getSize();
+
+    function zlibHeader(offset) {
+        if (offset + 2 > size) return false;
+        var cmf = Binary.readByte(offset), flg = Binary.readByte(offset + 1);
+        return (cmf & 15) == 8 && (cmf >> 4) <= 7 && ((cmf * 256 + flg) % 31) == 0;
+    }
+
+    function lzip() {
+        if (size < 28 || !Binary.compare("'LZIP'")) return false;
+        var version = Binary.readByte(4), code = Binary.readByte(5);
+        var exponent = code & 31;
+        if (version > 1 || exponent < 12 || exponent > 29) return false;
+        var dictionary = Math.pow(2, exponent) * (1 - (code >> 5) / 16);
+        if (dictionary < 4096) return false;
+        // Version 1 stores the complete member length in its trailer.
+        if (version == 1 && (size < 36 || Binary.read_uint64(size - 8, _LE) != size)) return false;
+        sVersion = String(version);
+        return Binary.readByte(6) == 0;
+    }
+
+    function lzdiet() {
+        if (size < 0x602 || !Binary.compare("'lZdIeT'")) return false;
+        var unpacked = Binary.readDword(6), end = 0x5fc, count = 0;
+        if (!unpacked || unpacked > 0x40000000 || Binary.readDword(0x20) != end) return false;
+        for (var i = 0; i < 250; i++) {
+            var offset = Binary.readDword(0x20 + i * 6);
+            if (offset == 0xffffffff) break;
+            var packed = Binary.readWord(0x24 + i * 6);
+            if (offset < end || packed < 6 || offset > size || packed > size - offset) return false;
+            end = offset + packed;
+            count++;
+        }
+        return count > 0 && end <= size;
+    }
+
+    function dcs() {
+        if (size < 21 || !Binary.compare("'DCS'01")) return false;
+        var count = Binary.readDword(4), total = Binary.readDword(8), end = 12, produced = 0;
+        if (!count || count > 65536 || !total) return false;
+        for (var i = 0; i < count; i++) {
+            if (end + 8 > size) return false;
+            var packed = Binary.readDword(end), unpacked = Binary.readDword(end + 4);
+            if (packed < 5 || !unpacked || packed + 4 > size - end || unpacked > total - produced) return false;
+            produced += unpacked;
+            end += packed + 4;
+        }
+        return end == size && produced == total;
+    }
+
+    function zisofs() {
+        if (size < 20 || !Binary.compare("37e45396c9dbd607")) return false;
+        var header = Binary.readByte(12) * 4, shift = Binary.readByte(13);
+        if (header < 16 || shift > 29 || Binary.readWord(14) != 0) return false;
+        var blocks = Math.ceil(Binary.readDword(8) / Math.pow(2, shift));
+        var end = header + (blocks + 1) * 4;
+        if (end > size || Binary.readDword(header) != end || Binary.readDword(header + blocks * 4) != size) return false;
+        // Limit the directory walk; larger valid tables still have their endpoints checked.
+        if (blocks <= 65536) {
+            for (var i = 1; i <= blocks; i++) {
+                var next = Binary.readDword(header + i * 4);
+                if (next < end || next > size) return false;
+                end = next;
+            }
+        }
+        return true;
+    }
+
+    function aldus() {
+        var header = 0, version = "";
+        if (Binary.compare("'ALDUS LZW   1.00'00")) { header = 100; version = "1.00 (LZW)"; }
+        else if (Binary.compare("'ALDUS PKZP  2.00'00")) { header = 200; version = "2.00 (PKZP)"; }
+        else if (Binary.compare("'ADOBE LZSH  3.00'00")) { header = 200; version = "3.00 (LZSH)"; }
+        if (!header || size < header + 22 || Binary.read_uint16(16, _BE) != header) return false;
+        sVersion = version;
+        return true;
+    }
+
+    function softronics() {
+        if (size < 57 || !Binary.compare("..00'Softronics Compressed File'00'Version 2.00'00")) return false;
+        var header = Binary.readByte(0), packed = Binary.readDword(0x2a);
+        if (header < 55 || header > 67 || !packed || packed != size - header) return false;
+        var nameEnd = header - 9;
+        return nameEnd >= 0x2e && Binary.readByte(nameEnd) == 0;
+    }
+
+    function cazipXP() {
+        if (size < 32 || !Binary.compare("'CAZIP'04")) return false;
+        var offset = 6;
+        function field(maximum, delimiter) {
+            var start = offset;
+            while (offset < size && offset - start <= maximum && Binary.readByte(offset) != delimiter) offset++;
+            if (offset >= size || offset - start > maximum) return null;
+            var value = Binary.getString(start, offset - start); offset++;
+            return value;
+        }
+        var archive = field(200, 0), trailer = field(20, 0);
+        if (archive === null || trailer === null || !/^ *[0-9]+( +[0-9]+)* *$/.test(archive) || !/^[0-9]+$/.test(trailer)) return false;
+        offset++; // Per-record flag, followed by a name delimited by 04.
+        var name = field(255, 4), metadata = field(200, 0);
+        if (!name || metadata === null || !/^[0-9]+( +[0-9]+){7}$/.test(metadata)) return false;
+        var values = metadata.split(/ +/), packed = Number(values[6]), unpacked = Number(values[2]);
+        if (packed > size - offset || packed < 0 || unpacked > 0x40000000) return false;
+        if (packed >= 3 && Binary.compare("1f9d", offset)) {
+            var bits = Binary.readByte(offset + 2) & 0x7f;
+            return bits >= 9 && bits <= 16;
+        }
+        return packed == unpacked;
+    }
+
+    if (lzip()) {
+        sName = "Lzip compressed data (.LZ)"; bDetected = true;
+    } else if (aldus()) {
+        sName = "Aldus/Adobe compressed data"; bDetected = true;
+    } else if (size > 26 && Binary.compare("'!<man database compressed>'0a")) {
+        sName = "DBZ compressed man-page database"; bDetected = true;
+    } else if (size > 29 && Binary.compare("'CPQ_LZH'") && Binary.readDword(25) > 0) {
+        sName = "Compaq LZH compressed data"; bDetected = true;
+    } else if (size >= 10 && Binary.compare("'EDILZSS1'")) {
+        sName = "EDI LZSS compressed data"; sVersion = "1"; bDetected = true;
+    } else if (size >= 27 && Binary.compare("'EDILZSS2'") && Binary.readDword(21) > 0 && Binary.readDword(21) <= 0x20000000) {
+        sName = "EDI LZSS compressed data"; sVersion = "2"; bDetected = true;
+    } else if (size >= 33 && Binary.compare("c0000000'GPFPACK'000100") && Binary.readDword(28) > 0) {
+        sName = "GPF PACK compressed data"; sVersion = "1"; bDetected = true;
+    } else if (lzdiet()) {
+        sName = "LZDIET compressed data"; bDetected = true;
+    } else if (size > 15 && Binary.compare("'.MCDCOMPRESSION'")) {
+        sName = "MathCAD compressed document"; bDetected = true;
+    } else if (size > 12 && Binary.compare("'MRNZ'88f02733") && Binary.readDword(8) <= size - 12) {
+        sName = "MRNZ obfuscated data"; bDetected = true;
+    } else if (size > 36 && Binary.compare("'PerFORM compressed database 1.00 '00")) {
+        sName = "PerFORM compressed database"; sVersion = "1.00"; bDetected = true;
+    } else if (size >= 66 && Binary.compare("'PSNcompress-Copyright'ae' 3M Company ALL RIGHTS RESERVED0001'") && /^[0-9A-F]{8}$/.test(Binary.getString(57, 8))) {
+        sName = "PSNCompress compressed data"; sVersion = "0001"; bDetected = true;
+    } else if (size >= 0x214 && Binary.compare("'OpenVMS DCX PCSI Compressed File'") && Binary.readDword(0x38) >= 20 && Binary.readDword(0x38) <= size - 0x200 && Binary.readDword(0x40) > 0 && Binary.readDword(0x40) <= 0x1000000 && Binary.readDword(0x208) == 0x5bf5a3a7) {
+        sName = "OpenVMS DCX PCSI compressed data"; bDetected = true;
+    } else if (dcs()) {
+        sName = "Windows DCS compressed data"; sVersion = "1"; sOptions = "LZMS"; bDetected = true;
+    } else if (zisofs()) {
+        sName = "zisofs compressed data"; bDetected = true;
+    } else if (size >= 20 && Binary.compare("'ZXML'") && Binary.readDword(4) == size - 12 && zlibHeader(12)) {
+        sName = "ZXML compressed XML"; sOptions = "zlib"; bDetected = true;
+    } else if (softronics()) {
+        sName = "Softronics compressed data"; sVersion = "2.00"; bDetected = true;
+    } else if (cazipXP()) {
+        sName = "CAZIP compressed data"; sVersion = "XP"; bDetected = true;
+    } else if (size >= 23 && Binary.compare("0d0a1a'CAZIP'....0100") && /^[0-9]{2}$/.test(Binary.getString(8, 2)) && (Binary.readWord(12) == 1 || Binary.readWord(12) == 2) && Binary.readWord(18) == 0 && Binary.readByte(20) <= 1 && Binary.readByte(21) >= 4 && Binary.readByte(21) <= 6) {
+        sName = "CAZIP compressed data"; sVersion = Binary.getString(8, 2); bDetected = true;
+    }
+
+    return result();
+}

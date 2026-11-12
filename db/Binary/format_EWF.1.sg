@@ -1,0 +1,20 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Expert Witness / EnCase image (EWF)");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 89 || !Binary.compare("455646090D0AFF0001") ||
+        Binary.read_uint16(9) == 0 || Binary.read_uint16(11) != 0) return result();
+    var next = Binary.read_uint64(29), section = Binary.read_uint64(37);
+    // Some EnCase writers leave descriptor sizes zero and use next offsets.
+    if (next < 89 || next > size || (section != 0 && (section < 76 || section > size - 13))) return result();
+    var a = 1, b = 0;
+    for (var i = 13; i < 85; i++) { a = (a + Binary.readByte(i)) % 65521; b = (b + a) % 65521; }
+    if ((b * 65536 + a) != Binary.read_uint32(85)) return result();
+    bDetected = true; sVersion = "1";
+    return result();
+}

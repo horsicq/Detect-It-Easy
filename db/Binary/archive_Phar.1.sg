@@ -1,0 +1,101 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Native Phar stub/manifest/member grammar: xxfclib's phar reader and
+// php.net/manual/en/phar.fileformat.phar.php. Signature trailers are checked
+// for their algorithm and exact extent; this is a format detector.
+
+meta("archive", "Phar");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 69 || Binary.getString(0, Math.min(size, 256)).toLowerCase().indexOf("<?php") < 0)
+        return result();
+
+    // Bound the PHP stub search as the native reader does. A halt token by
+    // itself is insufficient: the complete manifest must follow it.
+    var halt = Binary.findString(0, Math.min(size, 8 * 1024 * 1024), "__HALT_COMPILER();");
+    if (halt < 0) return result();
+    var offset = halt + 18;
+    var spaces = 0;
+    while (offset < size && spaces < 64 &&
+        (Binary.readByte(offset) === 0x20 || Binary.readByte(offset) === 9)) {
+        offset++;
+        spaces++;
+    }
+    if (offset + 2 <= size && Binary.compare("'?>'", offset)) offset += 2;
+    if (offset + 2 <= size && Binary.compare("0d0a", offset)) offset += 2;
+    else if (offset < size && Binary.readByte(offset) === 10) offset++;
+    if (offset + 22 > size) return result();
+
+    var manifestSize = Binary.read_uint32(offset);
+    var count = Binary.read_uint32(offset + 4);
+    // API versions use big-endian nibbles, unlike the remaining fields.
+    var api = Binary.read_uint16(offset + 8, true);
+    var flags = Binary.read_uint32(offset + 10);
+    var aliasSize = Binary.read_uint32(offset + 14);
+    if (manifestSize < 47 || manifestSize > 64 * 1024 * 1024 ||
+        manifestSize > size - offset - 4 || count < 1 || count > 1000000 ||
+        count > Math.floor((manifestSize - 18) / 29) ||
+        api < 0x1000 || api > 0x1110 || (api & 15) !== 0 ||
+        (flags & ~0x00013000) !== 0 || aliasSize > manifestSize - 18) return result();
+
+    var end = offset + 4 + manifestSize;
+    var cursor = offset + 18 + aliasSize;
+    if (cursor + 4 > end) return result();
+    var metadataSize = Binary.read_uint32(cursor);
+    cursor += 4;
+    if (metadataSize > end - cursor) return result();
+    cursor += metadataSize;
+    var dataEnd = end;
+
+    for (var i = 0; i < count; i++) {
+        if (cursor + 4 > end) return result();
+        var nameSize = Binary.read_uint32(cursor);
+        cursor += 4;
+        if (nameSize < 1 || nameSize > 4096 || nameSize > end - cursor) return result();
+        var name = Binary.getString(cursor, nameSize);
+        if (name.length !== nameSize || /[\x00-\x1f\x7f]/.test(name)) return result();
+        cursor += nameSize;
+        if (cursor + 24 > end) return result();
+        var unpacked = Binary.read_uint32(cursor);
+        var packed = Binary.read_uint32(cursor + 8);
+        var entryFlags = Binary.read_uint32(cursor + 16);
+        var entryMetadata = Binary.read_uint32(cursor + 20);
+        var method = entryFlags & 0xf000;
+        cursor += 24;
+        if (entryMetadata > end - cursor || unpacked > 256 * 1024 * 1024 ||
+            packed > size - dataEnd || (entryFlags & ~0x000031ff) !== 0 ||
+            (method !== 0 && method !== 0x1000 && method !== 0x2000) ||
+            (method === 0 && packed !== unpacked)) return result();
+        if (method === 0x1000 && (packed < 2 || ((Binary.readByte(dataEnd) >> 1) & 3) === 3))
+            return result();
+        if (method === 0x2000 && (packed < 14 || !Binary.compare("'BZh'", dataEnd) ||
+            Binary.readByte(dataEnd + 3) < 0x31 || Binary.readByte(dataEnd + 3) > 0x39)) return result();
+        cursor += entryMetadata;
+        dataEnd += packed;
+    }
+    if (cursor !== end) return result();
+
+    if ((flags & 0x10000) !== 0) {
+        if (size - dataEnd < 8 || !Binary.compare("'GBMB'", size - 4)) return result();
+        var signature = Binary.read_uint32(size - 8);
+        var signatureSize = signature === 1 ? 16 : signature === 2 ? 20 :
+            signature === 3 ? 32 : signature === 4 ? 64 : 0;
+        if (signatureSize !== 0) {
+            if (size - dataEnd !== signatureSize + 8 || (signature >= 3 && api < 0x1100))
+                return result();
+        } else if (signature === 0x10 || signature === 0x11 || signature === 0x12) {
+            // OpenSSL writes its signature length immediately before the
+            // algorithm/GBMB pair. Public-key verification is external.
+            if (size - dataEnd < 13) return result();
+            signatureSize = Binary.read_uint32(size - 12);
+            if (signatureSize < 1 || signatureSize > 1024 * 1024 ||
+                size - dataEnd !== signatureSize + 12) return result();
+        } else return result();
+    } else if (dataEnd !== size) return result();
+
+    bDetected = true;
+    sVersion = (api >> 12).toString() + "." + ((api >> 8) & 15).toString() + "." + ((api >> 4) & 15).toString();
+    return result();
+}

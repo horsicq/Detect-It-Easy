@@ -152,22 +152,48 @@ PE.isLibraryPresentExp = function (sLibraryPattern) {
 
 
 var PE_getExportFunctionName = PE.getExportFunctionName,
+    PE_getNextNamedExportFunctionIndex = PE.getNextNamedExportFunctionIndex,
     PE_numberOfExportFunctions = PE.getNumberOfExportFunctions(),
-    PE_exportFunctionNames = [],
+    PE_numberOfNamedExportFunctions = 0,
+    PE_exportFunctionNames = {},
+    PE_namedExportFunctionNames = [],
+    PE_namedExportFunctionIndexes = [],
     PE_exportFunctionIndexes = {},
     PE_exportFunctionSearchBufferParts = [],
     PE_exportFunctionSearchOffsets = {},
     PE_exportFunctionSearchBufferOffset = 1;
 
-for (var n = 0; n < PE_numberOfExportFunctions; n++) {
-    var sExportFunctionName = PE_getExportFunctionName(n),
+// Keep newer databases usable with engines that predate the native named-slot
+// iterator. Updated engines take the native path; this compatibility path is
+// intentionally equivalent to the former slot walk.
+if (PE_getNextNamedExportFunctionIndex === undefined) {
+    PE_getNextNamedExportFunctionIndex = function (nPreviousIndex) {
+        for (var nIndex = Math.max(-1, nPreviousIndex) + 1;
+            nIndex < PE_numberOfExportFunctions; nIndex++) {
+            if (PE_getExportFunctionName(nIndex)) {
+                return nIndex;
+            }
+        }
+
+        return -1;
+    }
+}
+
+var PE_namedExportFunctionIndex = PE_getNextNamedExportFunctionIndex(-1);
+
+while (PE_namedExportFunctionIndex !== -1) {
+    var sExportFunctionName = PE_getExportFunctionName(PE_namedExportFunctionIndex),
         sExportFunctionNameLowerCase = sExportFunctionName.toLowerCase();
 
-    PE_exportFunctionNames[n] = sExportFunctionName;
-    PE_exportFunctionIndexes["$" + sExportFunctionName] = n;
-    PE_exportFunctionSearchBufferParts[n] = sExportFunctionNameLowerCase;
-    PE_exportFunctionSearchOffsets["$" + PE_exportFunctionSearchBufferOffset] = n;
+    PE_exportFunctionNames[PE_namedExportFunctionIndex] = sExportFunctionName;
+    PE_namedExportFunctionNames[PE_numberOfNamedExportFunctions] = sExportFunctionName;
+    PE_namedExportFunctionIndexes[PE_numberOfNamedExportFunctions] = PE_namedExportFunctionIndex;
+    PE_exportFunctionIndexes["$" + sExportFunctionName] = PE_namedExportFunctionIndex;
+    PE_exportFunctionSearchBufferParts[PE_numberOfNamedExportFunctions] = sExportFunctionNameLowerCase;
+    PE_exportFunctionSearchOffsets["$" + PE_exportFunctionSearchBufferOffset] = PE_namedExportFunctionIndex;
     PE_exportFunctionSearchBufferOffset += sExportFunctionNameLowerCase.length + 1;
+    PE_numberOfNamedExportFunctions++;
+    PE_namedExportFunctionIndex = PE_getNextNamedExportFunctionIndex(PE_namedExportFunctionIndex);
 }
 
 var PE_exportFunctionSearchBuffer = "\0" + PE_exportFunctionSearchBufferParts.join("\0") + "\0";
@@ -179,7 +205,8 @@ PE_exportFunctionSearchBufferParts = undefined;
  */
 PE.getExportFunctionName = function (nNumber) {
     if (nNumber >= 0 && nNumber < PE_numberOfExportFunctions) {
-        return PE_exportFunctionNames[nNumber];
+        var sExportFunctionName = PE_exportFunctionNames[nNumber];
+        return sExportFunctionName !== undefined ? sExportFunctionName : "";
     }
 
     return PE_getExportFunctionName(nNumber);
@@ -192,6 +219,41 @@ PE.getExportFunctionName = function (nNumber) {
  */
 PE.getNumberOfExportFunctions = function () {
     return PE_numberOfExportFunctions;
+}
+
+
+/**
+ * Get the cached number of named export functions.
+ * @returns {Number}
+ */
+PE.getNumberOfNamedExportFunctions = function () {
+    return PE_numberOfNamedExportFunctions;
+}
+
+
+/**
+ * Get the original export slot index for a named-export index.
+ * @returns {Number} <code>-1</code> if the index is invalid.
+ */
+PE.getNamedExportFunctionIndex = function (nNumber) {
+    if (nNumber >= 0 && nNumber < PE_numberOfNamedExportFunctions) {
+        return PE_namedExportFunctionIndexes[nNumber];
+    }
+
+    return -1;
+}
+
+
+/**
+ * Get an export name from the compact named-export cache.
+ * @returns {String}
+ */
+PE.getNamedExportFunctionName = function (nNumber) {
+    if (nNumber >= 0 && nNumber < PE_numberOfNamedExportFunctions) {
+        return PE_namedExportFunctionNames[nNumber];
+    }
+
+    return "";
 }
 
 
@@ -254,12 +316,12 @@ PE.isExportFunctionPresentExpFastAnchor = function (sAnchor, sExportPattern) {
  */
 PE.isExportFunctionPresentExp = function (sExportPattern) {
     var aMatch = null;
-    for (var n = 0; n < PE_numberOfExportFunctions; n++) {
-        var sExportFunctionName = PE_exportFunctionNames[n];
+    for (var n = 0; n < PE_numberOfNamedExportFunctions; n++) {
+        var sExportFunctionName = PE_namedExportFunctionNames[n];
 
         aMatch = sExportFunctionName.match(sExportPattern);
         if (aMatch) {
-            aMatch[-1] = n;
+            aMatch[-1] = PE_namedExportFunctionIndexes[n];
             aMatch[0] = sExportFunctionName;
             break;
         }

@@ -1,0 +1,42 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Minix file system");
+
+function detect() {
+    var size = Binary.getSize(), sb = 1024;
+    if (size < 2048) return result();
+    var endian = _LE, magic = Binary.read_uint16(sb + 16), version = 0;
+    if ([0x137F,0x138F,0x2468,0x2478].indexOf(magic) == -1 && Binary.read_uint16(sb + 24) != 0x4D5A) {
+        endian = _BE; magic = Binary.read_uint16(sb + 16, endian);
+    }
+    if (magic == 0x137F || magic == 0x138F) version = 1;
+    else if (magic == 0x2468 || magic == 0x2478) version = 2;
+    else if (Binary.read_uint16(sb + 24, endian) == 0x4D5A) version = 3;
+    else return result();
+    var ninodes, imap, zmap, first, log, zones, block = 1024;
+    if (version < 3) {
+        ninodes = Binary.read_uint16(sb, endian); imap = Binary.read_uint16(sb + 4, endian);
+        zmap = Binary.read_uint16(sb + 6, endian); first = Binary.read_uint16(sb + 8, endian);
+        log = Binary.read_uint16(sb + 10, endian);
+        zones = version == 1 ? Binary.read_uint16(sb + 2, endian) : Binary.read_uint32(sb + 20, endian);
+        if (Binary.read_uint16(sb + 18, endian) > 3 || Binary.read_uint32(sb + 12, endian) == 0) return result();
+    } else {
+        ninodes = Binary.read_uint32(sb, endian); imap = Binary.read_uint16(sb + 6, endian);
+        zmap = Binary.read_uint16(sb + 8, endian); first = Binary.read_uint16(sb + 10, endian);
+        log = Binary.read_uint16(sb + 12, endian); zones = Binary.read_uint32(sb + 20, endian);
+        block = Binary.read_uint16(sb + 28, endian);
+        if (Binary.read_uint32(sb + 16, endian) == 0) return result();
+    }
+    if (ninodes == 0 || imap == 0 || zmap == 0 || log > 8 || block < 1024 || block > 32768 ||
+        (block & (block - 1)) != 0 || first >= zones || zones * block * Math.pow(2, log) > size) return result();
+    var inodeSize = version == 1 ? 32 : 64;
+    var expected = Math.ceil((2 + imap + zmap + Math.ceil(ninodes * inodeSize / block)) / Math.pow(2, log));
+    var inode = (2 + imap + zmap) * block;
+    if (first != expected || inode > size - inodeSize ||
+        (Binary.read_uint16(inode, endian) & 61440) != 16384) return result();
+    bDetected = true; sVersion = version;
+    return result();
+}

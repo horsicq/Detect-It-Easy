@@ -1,0 +1,32 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Expert Witness / EnCase image (EWF2)");
+
+function ewf2Descriptor(offset, size) {
+    if (offset < 32 || offset > size - 64 || Binary.read_uint32(offset + 24) != 64) return false;
+    var previous = Binary.read_uint64(offset + 8), data = Binary.read_uint64(offset + 16);
+    if ((previous != 0 && (previous < 32 || previous > offset - 64)) ||
+        data > offset - (previous == 0 ? 32 : previous + 64) ||
+        Binary.read_uint32(offset + 28) > data) return false;
+    var a = 1, b = 0;
+    for (var i = offset; i < offset + 60; i++) { a = (a + Binary.readByte(i)) % 65521; b = (b + a) % 65521; }
+    return b * 65536 + a == Binary.read_uint32(offset + 60);
+}
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 96 || !Binary.compare("455646320D0A810002") ||
+        Binary.read_uint16(10) > 2 || Binary.read_uint32(12) == 0) return result();
+    // Descriptors follow section data. A bounded prefix search also accepts
+    // images followed by an overlay, whose last descriptor is before EOF.
+    var found = ewf2Descriptor(size - 64, size);
+    for (var offset = 32; !found && offset <= Math.min(size - 64, 65536); offset++) {
+        if (Binary.read_uint64(offset + 8) == 0 && ewf2Descriptor(offset, size)) found = true;
+    }
+    if (!found) return result();
+    bDetected = true; sVersion = "2." + Binary.readByte(9);
+    return result();
+}

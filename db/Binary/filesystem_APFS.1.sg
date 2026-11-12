@@ -1,0 +1,22 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Apple File System (APFS)");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 4096 || !Binary.compare("'NXSB'", 32)) return result();
+    var block = Binary.read_uint32(36), count = Binary.read_uint64(40), volumes = Binary.read_uint32(180);
+    if (block < 4096 || block > 65536 || (block & (block - 1)) != 0 || block > size || count <= 0 ||
+        count > Math.floor(size / block) || volumes == 0 || volumes > 100 ||
+        (Binary.read_uint32(24) & 65535) != 1) return result();
+    // Fletcher-64 complements over the container superblock.
+    var a = 0, b = 0, modulus = 4294967295;
+    for (var i = 8; i < block; i += 4) { a = (a + Binary.read_uint32(i)) % modulus; b = (b + a) % modulus; }
+    var low = modulus - ((a + b) % modulus), high = modulus - ((a + low) % modulus);
+    if (Binary.read_uint32(0) != low || Binary.read_uint32(4) != high) return result();
+    bDetected = true;
+    return result();
+}

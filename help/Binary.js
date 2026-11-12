@@ -167,6 +167,17 @@ Binary.getSize = function() {}
      */
 Binary.getString = function(nOffset, nSize) {}
     /**
+     * Check whether any signature exists in a section, using the same section/overlay mapping
+     * and bounds as isSignatureInSectionPresent. All patterns are validated before searching.
+     * @param {UInt} nNumber - Zero-based section number.
+     * @param {String[]} signatures - Nonempty strings in the existing Binary.compare signature syntax.
+     * @returns {Bool} True if any pattern matches. False for no match, an invalid section,
+     * an empty/non-array input, or any non-string, empty or malformed pattern.
+     * @see Binary.compare
+     * @see Binary.findSignatures
+     */
+Binary.isAnySignatureInSectionPresent = function(nNumber, signatures) {}
+    /**
      * Check if a signature (see {@link Binary.compare compare}) exists in a region of the file.
      * @param {UInt} nOffset - The offset in the file.
      * @param {UInt} nSize - Number of bytes to check.

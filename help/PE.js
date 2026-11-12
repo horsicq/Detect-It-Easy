@@ -522,6 +522,19 @@ PE.isLibraryFunctionPresent = function(sLibraryName, sFunctionName) {}
      */
 PE.isLibraryPresent = function(sLibraryName) {}
     /**
+     * Check whether any signature in the array exists in a section.
+     * @param {UInt} nSection - Zero-based section number; uses isSignatureInSectionPresent bounds.
+     * @param {String[]} signatures - Nonempty signature strings; every entry must be valid.
+     * @returns {Bool} True if any pattern matches; false for no match or invalid input.
+     * @see Binary.isAnySignatureInSectionPresent
+     * @example
+     * if (PE.isNet() && PE.getNumberOfSections() > 0 &&
+     *     PE.isAnySignatureInSectionPresent(0, ["'m_isReadOnly'", "'m_useUserOverride'"])) {
+     *     // Verify further evidence before identifying a protector.
+     * }
+     */
+PE.isAnySignatureInSectionPresent = function(nSection, signatures) {}
+    /**
      * Check if a signature (see {@link Binary.compare}) exists in a section.
      * @param {Int} nSection - Section number (from 0).
      * @param {String} sSignature - Signature.
@@ -759,6 +772,30 @@ PE.isResourcesPresent = function() {}
      * @returns {Bool}
      */
 PE.isExportFunctionPresent = function() {}
+    /**
+     * Get the next original export-table slot that has a non-empty name.
+     * Start with -1; returns -1 after the last named export.
+     * @param {Number} nPrevious - Previous original export-table slot
+     * @returns {Number}
+     */
+PE.getNextNamedExportFunctionIndex = function(nPrevious) {}
+    /**
+     * Get the number of entries in the compact named-export cache.
+     * @returns {Number}
+     */
+PE.getNumberOfNamedExportFunctions = function() {}
+    /**
+     * Get the original export-table slot for a compact named-export index.
+     * @param {Number} nNumber - Compact named-export index
+     * @returns {Number}
+     */
+PE.getNamedExportFunctionIndex = function(nNumber) {}
+    /**
+     * Get the name for a compact named-export index.
+     * @param {Number} nNumber - Compact named-export index
+     * @returns {String}
+     */
+PE.getNamedExportFunctionName = function(nNumber) {}
     /**
      * Check if Export function matches a regular expression.
      * @param {String} sFunctionName - Function pattern

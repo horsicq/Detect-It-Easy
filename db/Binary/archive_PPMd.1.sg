@@ -1,0 +1,44 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// PPMd H/I standalone header, including the encoded model and filename fields.
+
+meta("archive", "PPMd");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize < 20 || !Binary.compare("8FAFAC84")) {
+        return result();
+    }
+
+    var nInfo = Binary.readWord(8);
+    var nVariant = nInfo >>> 12;
+    var nOrder = (nInfo & 15) + 1;
+    var nRawLength = Binary.readWord(10);
+    var nNameLength = nRawLength;
+    if (nVariant === 8) {
+        if ((nRawLength >>> 14) > 1) {
+            return result();
+        }
+        nNameLength = nRawLength & 0x3fff;
+    } else if (nVariant !== 7) {
+        return result();
+    }
+
+    if (nOrder < 2 || 16 + nNameLength + 4 > nSize) {
+        return result();
+    }
+    for (var i = 0; i < nNameLength; i++) {
+        var nChar = Binary.readByte(16 + i);
+        if (nChar < 32 || nChar === 127) {
+            return result();
+        }
+    }
+    if (Binary.readDword(16 + nNameLength) === 0xffffffff) {
+        return result();
+    }
+
+    sVersion = nVariant === 7 ? "H" : "I";
+    bDetected = true;
+    return result();
+}

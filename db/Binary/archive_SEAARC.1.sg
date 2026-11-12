@@ -1,0 +1,72 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// SEA ARC / PKARC / PAK member chain. There is no separate archive header.
+// Layout: xxfclib src/formats/seaarc/xx_seaarc.c; ARC 5.21 format.
+
+meta("archive", "SEA ARC archive");
+
+function detect() {
+    var size = Binary.getSize();
+    var at = 0, members = 0;
+    var method, header, packed, plain, data, i, c, date, time;
+    var nodes, child, flags;
+    if (size < 27 || Binary.read_uint8(0) != 0x1a) return result();
+
+    // An arbitrary 1A xx pair is insufficient: every member must fit, and
+    // the complete chain must reach an actual 1A 00 end record.
+    while (members <= 4096 && at + 2 <= size) {
+        if (Binary.read_uint8(at) != 0x1a) return result();
+        method = Binary.read_uint8(at + 1);
+        if (method == 0) {
+            if (members > 0) bDetected = true;
+            // PAK may append extended records; ARC writers also pad with 1A.
+            return result();
+        }
+        if (members == 4096 || !((method >= 1 && method <= 11) || method == 0x7f)) return result();
+        header = method == 1 ? 25 : 29;
+        if (header > size - at) return result();
+
+        // The name is a flat printable DOS field. Some writers leave bytes
+        // after its first NUL uninitialized, or use all thirteen bytes.
+        c = Binary.read_uint8(at + 2);
+        if (c < 0x21 || c > 0x7e) return result();
+        for (i = 0; i < 13; i++) {
+            c = Binary.read_uint8(at + 2 + i);
+            if (c == 0) break;
+            if (c < 0x20 || c > 0x7e || c == 0x2f || c == 0x5c || c == 0x3a) return result();
+        }
+        packed = Binary.read_uint32(at + 15);
+        plain = method == 1 ? packed : Binary.read_uint32(at + 25);
+        data = at + header;
+        if (packed > size - data - 2 || ((method == 1 || method == 2) && packed != plain)) return result();
+        if (plain > 0 && packed == 0) return result();
+
+        date = Binary.read_uint16(at + 19);
+        time = Binary.read_uint16(at + 21);
+        if (date != 0 && ((date & 31) == 0 || ((date >> 5) & 15) == 0 || ((date >> 5) & 15) > 12)) return result();
+        if ((time & 31) > 29 || ((time >> 5) & 63) > 59 || (time >> 11) > 23) return result();
+
+        if (method == 4) {
+            if (packed < 2) return result();
+            nodes = Binary.read_uint16(data);
+            if (nodes > 257 || 2 + nodes * 4 > packed || (nodes == 0 && plain != 0)) return result();
+            for (i = 0; i < nodes * 2; i++) {
+                child = Binary.read_uint16(data + 2 + i * 2);
+                if (child >= 0x8000) child -= 0x10000;
+                if (child >= nodes || child < -257) return result();
+            }
+        } else if (method == 8) {
+            if (packed < 1) return result();
+            flags = Binary.read_uint8(data);
+            if (flags < 9 || flags > 12) return result();
+        } else if (method == 0x7f) {
+            if (packed < 1) return result();
+            flags = Binary.read_uint8(data);
+            if ((flags & 0x60) != 0 || (flags & 31) < 9 || (flags & 31) > 16) return result();
+        }
+        at = data + packed;
+        members++;
+    }
+    return result();
+}

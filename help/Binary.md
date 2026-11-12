@@ -630,6 +630,28 @@ if (info) {
 ### Section-based Operations
 **`bool isSignatureInSectionPresent(quint32 nNumber, QString sSignature)`** - Check signature in specific section.
 
+### isAnySignatureInSectionPresent()
+**`bool isAnySignatureInSectionPresent(nNumber, signatures)`** - Check whether any signature in an array exists in the selected section.
+
+`nNumber` is a zero-based section index. Section and overlay selection uses the same mapping and bounds as `isSignatureInSectionPresent()`. Each element of `signatures` must be a nonempty string using the existing [signature syntax](Signatures.md), including quoted text, masks and special symbols. Pass alternatives as separate array elements, rather than joining them with `||` inside a signature string.
+
+**Returns:** `true` when at least one signature matches, otherwise `false`. An empty array, a non-array argument, a non-string element, an empty or malformed signature, or an invalid section returns `false`. All entries are validated before searching, so an invalid later entry makes the whole request fail even when an earlier signature would match. Malformed signature text uses the same diagnostics as the single-signature search.
+
+Use this method when only the existence of any match matters. Use [`findSignatures()`](#findsignatures) when the script needs an offset for each pattern. Apply inexpensive format and structural checks before scanning, and choose the smallest relevant section.
+
+Patterns with supported fixed-byte anchors share a bounded scanning pass. More complex patterns retain the existing matching behavior through the single-signature fallback.
+
+```javascript
+if (PE.isNet() && PE.getNumberOfSections() > 0 &&
+    PE.isAnySignatureInSectionPresent(0, [
+        "558BEC B90F000000 6A00 6A00 49 75F9 51 53 56 57 B8........E8",
+        "'m_isReadOnly'",
+        "'m_useUserOverride'"
+    ])) {
+    // Any one of these indicators is present; verify additional evidence here.
+}
+```
+
 ## Real-World Detection Examples
 
 This section contains practical examples from the DIE signature database showing how to use Binary class methods for file format detection.

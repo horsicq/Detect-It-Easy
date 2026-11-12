@@ -1,0 +1,83 @@
+// Detect It Easy: detection rule file
+// https://github.com/dr4k0nia/MurkyStrings
+meta("protector", "MurkyStrings");
+
+function detect() {
+    if (!PE.isNet() || !PE.isNetObjectPresent("Replace") ||
+        !PE.isSignatureInBlobPresent_NET("0520020E0E0E")) return result();
+    var methods = PE.getNumberOfNetMethods();
+    if (methods > 0x10000) return result();
+    var count = 0,
+        seen = {},
+        marker = "",
+        call = 0;
+    for (var i = 1; i <= methods; i++) {
+        var method = PE.getNetMethodInfo(i);
+        if (method == null || !method.hasBody) continue;
+        var at = method.codeOffset,
+            end = at + method.codeSize,
+            attempts = 0;
+        while (at <= end - 0x10 && attempts++ < 0x1000) {
+            var found = PE.findSignature(at, end - at, "72......7072......701428......0A");
+            if (found < 0 || found > end - 0x10) break;
+            at = found + 1;
+            var token = PE.readDword(found + 1),
+                pad = PE.getNetUserString(PE.readDword(found + 6));
+            if (pad == null) continue;
+            var unit = pad, target = PE.readDword(found + 12);
+            if ((unit != "\u115f" && unit != "\\") || (marker && marker != unit) || (call && call != target) ||
+                seen[token] || !murkyDensePadding(PE.getNetUserString(token), unit)) continue;
+            seen[token] = true;
+            marker = unit;
+            call = target;
+            count++;
+            if (count >= 2) {
+                sOptions = "replace[simple]";
+                bDetected = true;
+                return result();
+            }
+        }
+    }
+
+    return result();
+}
+
+function murkyDensePadding(text, marker) {
+    if (text == null || text.length < 4) return false;
+    var padding = 0,
+        ordinary = 0,
+        run = 0,
+        longest = 0,
+        units = 0;
+    // Qt uses UTF-16 indices; cdie uses UTF-8 bytes. Count both in UTF-16
+    // units, consuming a complete native UTF-8 sequence in the latter case.
+    var byteStrings = "\u115f".length == 3;
+    for (var i = 0; i < text.length;) {
+        if (text.substr(i, marker.length) == marker) {
+            padding++;
+            run++;
+            if (run > longest) longest = run;
+            units++;
+            i += marker.length;
+        } else {
+            var step = 1, width = 1;
+            if (byteStrings) {
+                var lead = text.charCodeAt(i);
+                if (lead >= 0xf0 && lead <= 0xf4) {
+                    step = 4;
+                    width = 2;
+                } else if (lead >= 0xe0 && lead <= 0xef) {
+                    step = 3;
+                } else if (lead >= 0xc2 && lead <= 0xdf) {
+                    step = 2;
+                }
+            }
+            ordinary += width;
+            units += width;
+            run = 0;
+            i += step;
+        }
+        if (units > 0x10000) return false;
+    }
+    return ordinary >= 2 && padding >= 0x10 && padding >= ordinary * 2 && longest >= 4;
+}

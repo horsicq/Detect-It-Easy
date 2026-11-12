@@ -1,0 +1,26 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Journalling Flash File System (JFFS2)");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 12) return result();
+    var endian;
+    if (Binary.compare("8519")) endian = _LE;
+    else if (Binary.compare("1985")) endian = _BE;
+    else return result();
+    var type = Binary.read_uint16(2, endian), length = Binary.read_uint32(4, endian);
+    if (length < 12 || length > size || (type & 8192) == 0 ||
+        [1,2,3,4,6,8,9].indexOf(type & 4095) == -1) return result();
+    var crc = 0;
+    for (var i = 0; i < 8; i++) {
+        crc = crc ^ Binary.readByte(i);
+        for (var bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xEDB88320 : 0);
+    }
+    if ((crc >>> 0) != Binary.read_uint32(8, endian)) return result();
+    bDetected = true; sOptions = endian == _BE ? "big endian" : "little endian";
+    return result();
+}

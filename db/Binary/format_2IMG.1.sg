@@ -1,0 +1,26 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Structural checks follow the corresponding xxfclib format reader.
+
+meta("format", "Apple II 2IMG disk image");
+
+function detect() {
+    var size = Binary.getSize();
+    if (size < 64 || !Binary.compare("'2IMG'")) return result();
+    var header = Binary.read_uint16(8), version = Binary.read_uint16(10);
+    var format = Binary.read_uint32(12), blocks = Binary.read_uint32(20);
+    var offset = Binary.read_uint32(24), length = Binary.read_uint32(28);
+    if (header < 64 || header > size || version > 1 || format > 2 || blocks == 0 ||
+        offset < header || offset > size) return result();
+    // Older writers omit data length; sector counts remain authoritative.
+    if (format < 2) length = blocks * 512;
+    if (length == 0 || length > size - offset) return result();
+    for (var i = 32; i <= 40; i += 8) {
+        var extra = Binary.read_uint32(i), count = Binary.read_uint32(i + 4);
+        if (count != 0 && (extra < header || extra > size || count > size - extra)) return result();
+    }
+    bDetected = true; sVersion = version;
+    sOptions = ["DOS sector order", "ProDOS sector order", "nibble data"][format];
+    return result();
+}
