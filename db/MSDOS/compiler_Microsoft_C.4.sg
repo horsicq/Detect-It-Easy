@@ -1,10 +1,48 @@
 // Detect It Easy: detection rule file
 // Author: Jason Hood <jadoxa@yahoo.com.au>
+// Author: Henglie <ebhenglie@gmail.com>
 
+// Runtime markers and trailing checksum bytes: https://github.com/horsicq/Detect-It-Easy/issues/309
 meta("compiler", "Microsoft");
 
 function detect() {
-    if (MSDOS.compareEP("b430cd213c..73..33c00650cbbf....8b36....2bf781fe....72..be....fa8ed781c4....fb73..161f")) {
+    var sRuntime = getMsCRuntimeVersion();
+
+    if (sRuntime === "C3") {
+        sName += " C/C++";
+        sVersion = "3.0";
+        sOptions = "1985";
+        bDetected = true;
+    } else if (sRuntime === "QC1") {
+        sName += " Quick C";
+        sVersion = "1.0";
+        sOptions = "1987";
+        bDetected = true;
+    } else if (sRuntime === "C51") {
+        sName += " C/C++";
+        sVersion = "5.1";
+        sOptions = "1988";
+        bDetected = true;
+    } else if (sRuntime === "QC2") {
+        sName += " Quick C";
+        sVersion = "2.00";
+        sOptions = "1989";
+        bDetected = true;
+    } else if (sRuntime === "QC251") {
+        sName += " Quick C";
+        sVersion = "2.51";
+        if (MSDOS.compareEP("fc8cc02ea3....8ed8a1....2ea3....2ea3....be....ac32e403f0c6....b8....8ec02680........75")) {
+            sVersion = "2.51a";
+        }
+
+        sOptions = "1990";
+        bDetected = true;
+    } else if (sRuntime === "C6") {
+        sName += " C/C++";
+        sVersion = "6.0";
+        sOptions = "1990";
+        bDetected = true;
+    } else if (MSDOS.compareEP("b430cd213c..73..33c00650cbbf....8b36....2bf781fe....72..be....fa8ed781c4....fb73..161f")) {
         sName += " Quick C";
         sVersion = "2.5X";
         sOptions = "1990";
@@ -57,4 +95,52 @@ function detect() {
     sLang = ("C" + (sName.indexOf("C++") > -1 ? "/C++" : String()));
 
     return result();
+}
+
+function getMsCRuntimeVersion() {
+    if (MSDOS.readWord(0) !== 0x5a4d) return "";
+    if (MSDOS.compareEP("b430cd213c..73..9a########558becb8....501eb8....50b8....509a")) return "";
+
+    var nBaseOffset = MSDOS.getBaseOffset(),
+        nSearchSize = MSDOS.getSize() - nBaseOffset;
+
+    if (nSearchSize < 44) return "";
+
+    var nOffset = nBaseOffset;
+
+    while (nOffset < nBaseOffset + nSearchSize) {
+        var nCorp = MSDOS.findSignature(nOffset, nBaseOffset + nSearchSize - nOffset, "'Microsoft Corp'");
+        if (nCorp === -1) return "";
+
+        if (nCorp >= 25 && nCorp + 19 <= MSDOS.getSize() &&
+            MSDOS.getString(nCorp - 25, 25) === "C Library - (C)Copyright " &&
+            MSDOS.getString(nCorp + 14, 5) === " 1985") {
+            return "C3";
+        }
+
+        if (nCorp >= 42 && nCorp + 15 <= MSDOS.getSize() &&
+            MSDOS.getString(nCorp - 42, 36) === "MS Run-Time Library - Copyright (c) " &&
+            MSDOS.getString(nCorp - 2, 2) === ", ") {
+            var sYear = MSDOS.getString(nCorp - 6, 4),
+                nChecksum = MSDOS.readByte(nCorp + 14);
+
+            if (sYear === "1987" && nChecksum === 0x1e) return "QC1";
+            if (sYear === "1988" && nChecksum === 0x11) return "C51";
+            if (sYear === "1989" && nChecksum === 0x10) return "QC2";
+            if (sYear === "1990" && nChecksum === 0x18) {
+                if (MSDOS.isNE() || MSDOS.isLE() || MSDOS.isLX() ||
+                    MSDOS.findSignature(nBaseOffset, nSearchSize, "'Microsoft C 6.0'") !== -1 ||
+                    MSDOS.findSignature(nBaseOffset, nSearchSize, "'C 6.00'") !== -1 ||
+                    MSDOS.findSignature(nBaseOffset, nSearchSize, "'6.00AX'") !== -1) {
+                    return "C6";
+                }
+
+                return "QC251";
+            }
+        }
+
+        nOffset = nCorp + 14;
+    }
+
+    return "";
 }
