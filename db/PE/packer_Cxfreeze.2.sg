@@ -1,25 +1,105 @@
 // Detect It Easy: detection rule file
-// Author: horsicq <horsicq@gmail.com>
-// Made by KDSS-Research <koffidev365supp@gmail.com>
+// Author: Henglie <ebhenglie@gmail.com>
 
-// Rewritten by: DosX
-
-// https://cx-freeze.readthedocs.io/en/stable/
+// Original rule by horsicq, KDSS-Research, and DosX.
+// https://github.com/marcelotduarte/cx_Freeze
 meta("packer", "CX_Freeze");
 
 function detect() {
-    var rdataSection = PE.section[".rdata"];
+    if (!PE.isNet() && !PE.isDll() && !PE.isDriver() && PE.isImportPresent()) {
+        var pythonDll = getPythonDllName();
 
-    if (rdataSection) {
+        if (pythonDll && isCxFreezePythonRuntime(pythonDll)) {
+            var rdataSection = PE.section[".rdata"];
 
-        bDetected = (PE.findString(rdataSection.FileOffset, rdataSection.FileSize, "Unable to change DLL search path!") !== -1 &&
-            PE.isSignaturePresent(rdataSection.FileOffset, rdataSection.FileSize, "25006C0073005C006C00690062005C006C006900620072006100720079002E007A00690070003B0025006C0073005C006C0069006200") &&
-            PE.findString(rdataSection.FileOffset, rdataSection.FileSize, "Out of memory creating sys.path!") !== -1 &&
-            PE.findString(rdataSection.FileOffset, rdataSection.FileSize, "Unable to calculate directory of executable!") !== -1);
-
+            if (rdataSection &&
+                hasCxFreezeStubMarkers(rdataSection.FileOffset, rdataSection.FileSize)) {
+                sOptions = getStubType();
+                bDetected = true;
+            }
+        }
     }
 
     sLang = "Python";
 
     return result();
+}
+
+/**
+ * Returns the imported CPython runtime DLL name, if present.
+ *
+ * @returns {string|null} Python DLL file name.
+ */
+function getPythonDllName() {
+    var numberOfImports = PE.getNumberOfImports();
+
+    for (var i = 0; i < numberOfImports; i++) {
+        var libraryName = PE.getImportLibraryName(i);
+
+        if (libraryName && /^python\d{2,3}\.dll$/i.test(libraryName)) {
+            return libraryName;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Checks for the CPython API set used by cx_Freeze base executables.
+ *
+ * @param {string} pythonDll - Imported Python DLL name.
+ * @returns {boolean} True when the expected runtime API is imported.
+ */
+function isCxFreezePythonRuntime(pythonDll) {
+    var hasInitializer = PE.isLibraryFunctionPresent(pythonDll, "Py_Initialize") ||
+        PE.isLibraryFunctionPresent(pythonDll, "Py_InitializeFromConfig");
+
+    if (!hasInitializer) {
+        return false;
+    }
+
+    return PE.isLibraryFunctionPresent(pythonDll, "PyImport_ImportModule") ||
+        PE.isLibraryFunctionPresent(pythonDll, "PyImport_ImportFrozenModule") ||
+        PE.isLibraryFunctionPresent(pythonDll, "PyImport_AddModule");
+}
+
+/**
+ * Checks the .rdata string table for cx_Freeze base-executable messages.
+ *
+ * @param {number} offset - Section file offset.
+ * @param {number} size - Section file size.
+ * @returns {boolean} True when the cx_Freeze markers are present.
+ */
+function hasCxFreezeStubMarkers(offset, size) {
+    if (PE.findString(offset, size, "Unable to calculate directory of executable!") === -1) {
+        return false;
+    }
+
+    if (PE.findString(offset, size, "__startup__") === -1) {
+        return false;
+    }
+
+    return PE.findString(offset, size, "Unable to change DLL search path!") !== -1 ||
+        PE.findString(offset, size, "Out of memory creating sys.path!") !== -1 ||
+        PE.findString(offset, size, "Out of memory creating lib_dir!") !== -1 ||
+        PE.findString(offset, size, "Out of memory creating platlib!") !== -1 ||
+        PE.findString(offset, size, "Out of memory creating executable!") !== -1;
+}
+
+/**
+ * Identifies the cx_Freeze base executable flavor.
+ *
+ * @returns {string} Base type.
+ */
+function getStubType() {
+    if (PE.isLibraryPresent("ADVAPI32.dll") &&
+        PE.isLibraryFunctionPresent("ADVAPI32.dll", "StartServiceCtrlDispatcherW")) {
+        return "service";
+    }
+
+    if (PE.isConsole()) {
+        return "console";
+    }
+
+    return "GUI";
 }
