@@ -1,0 +1,22 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Microsoft MS-MPI setup bootstrapper (msmpisetup.exe, winget Microsoft.msmpi):
+// the x86 and x64 .msi packages and the PurgeMsmpi helper executables are
+// appended after the sections as whole files, each behind a 512-byte marker
+// block of the u32 0x0FABFAB0 (little-endian bytes B0 FA AB 0F).
+meta("installer", "MS-MPI setup bootstrapper");
+
+function detect() {
+    if (PE.isOverlayPresent() && PE.getOverlaySize() >= 0x600) {
+        var nOverlay = PE.getOverlayOffset();
+
+        if (PE.compare("b0faab0fb0faab0fb0faab0fb0faab0f", nOverlay) &&
+            PE.compare("b0faab0fb0faab0fb0faab0fb0faab0f", nOverlay + 0x1F0)) {
+            sVersion = PE.getVersionStringInfo("ProductVersion");
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

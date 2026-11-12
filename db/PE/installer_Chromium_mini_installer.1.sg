@@ -1,0 +1,44 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Chromium's mini_installer (Google Chrome, Microsoft Edge, Brave, Vivaldi ...):
+// the setup archive is the large resource of type "B7" (7-Zip), "BL"
+// (LZMA-compressed 7-Zip), "BN" (stored) or "B" (Brave: LZMA), id 102.
+meta("installer", "Chromium mini_installer");
+
+function detect() {
+    if (PE.isResourceGroupNamePresent("B7") || PE.isResourceGroupNamePresent("BL") ||
+        PE.isResourceGroupNamePresent("BN") || PE.isResourceGroupNamePresent("B")) {
+        var nCount = PE.getNumberOfResources();
+
+        for (var i = 0; i < nCount && !bDetected; i++) {
+            var nOffset = PE.getResourceOffsetByNumber(i);
+            var nSize = PE.getResourceSizeByNumber(i);
+
+            if (nSize < 0x100000) {
+                continue;
+            }
+
+            if (PE.compare("'7z'bcaf271c", nOffset)) {
+                sOptions = "7z";
+                bDetected = true;
+            } else if (PE.compare("5d0000", nOffset)) {
+                sOptions = "lzma";
+                bDetected = true;
+            } else if (PE.isResourceGroupNamePresent("BN")) {
+                sOptions = "stored";
+                bDetected = true;
+            }
+        }
+
+        if (bDetected) {
+            var sCompany = PE.getVersionStringInfo("CompanyName");
+
+            if (sCompany) {
+                sOptions = sOptions + ", " + sCompany;
+            }
+        }
+    }
+
+    return result();
+}

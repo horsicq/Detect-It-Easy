@@ -1,0 +1,28 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Splashtop "unpackC" setup wrapper (Splashtop Personal / Streamer setup.exe):
+// the payload files follow the sections, each behind a 284-byte record
+// {u32 4, u32 item, u64 size, u64 cumulative size, char name[260]}; the first
+// record's cumulative size equals its size.
+meta("installer", "Splashtop unpackC setup");
+
+function detect() {
+    if (PE.isOverlayPresent() && PE.getOverlaySize() >= 0x240) {
+        var nOverlay = PE.getOverlayOffset();
+
+        if (PE.readDword(nOverlay) == 4 &&
+            PE.readDword(nOverlay + 8) == PE.readDword(nOverlay + 16) &&
+            PE.readDword(nOverlay + 12) == PE.readDword(nOverlay + 20) &&
+            (PE.readDword(nOverlay + 8) != 0 || PE.readDword(nOverlay + 12) != 0)) {
+            var sName = PE.getString(nOverlay + 24, 64);
+
+            if (sName != "") {
+                sOptions = sName;
+                bDetected = true;
+            }
+        }
+    }
+
+    return result();
+}

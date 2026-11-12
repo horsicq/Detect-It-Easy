@@ -1,0 +1,27 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Spear of Destiny installer volume (xxfclib archive/sod_installer, FormGen
+// 1992): a 32-byte member header of six date words (year 1980..2100, month,
+// day, hour, minute, second), the unpacked size, an attribute word whose
+// bits are within 0x27, and an 8.3 name of upper-case letters, digits and
+// _-$~; block chains of word-sized plain/packed lengths follow.
+meta("archive", "Spear of Destiny installer volume");
+
+function detect() {
+    if (Binary.getSize() >= 36) {
+        var nYear = Binary.readWord(0);
+        var nMonth = Binary.readWord(2);
+        var nDay = Binary.readWord(4);
+        if (nYear >= 1980 && nYear <= 2100 && nMonth >= 1 && nMonth <= 12 && nDay >= 1 && nDay <= 31 &&
+            Binary.readWord(6) <= 23 && Binary.readWord(8) <= 59 && Binary.readWord(10) <= 59 && (Binary.readWord(16) & 0xFFD8) == 0) {
+            var sName = Binary.getString(18, 13);
+            if (/^[A-Z0-9_$~-]{1,8}(\.[A-Z0-9_$~-]{1,3})?$/.test(sName.replace(/[ \x00].*$/, ""))) {
+                sOptions = sName.replace(/[ \x00].*$/, "");
+                bDetected = true;
+            }
+        }
+    }
+
+    return result();
+}

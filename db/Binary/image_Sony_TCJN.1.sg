@@ -1,0 +1,21 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Sony recovery image (xxfclib firmware/sony_image): "TCJN", a digest, a
+// zero word at 16, the payload size at 20 (file size minus the 512-byte
+// header), the volume mode at 24 (0 = initial image, else continuation) and
+// a flag byte at 25; the initial image carries a "ZLIB" stream at 512.
+meta("image", "Sony TCJN image");
+
+function detect() {
+    if (Binary.compare("'TCJN'") && Binary.getSize() >= 512 && Binary.readDword(16) == 0 &&
+        Binary.readDword(20) == Binary.getSize() - 512 && Binary.readByte(25) <= 1) {
+        sOptions = Binary.readByte(24) == 0 ? "initial" : "continuation";
+        if (Binary.compare("'ZLIB'", 512)) {
+            sOptions += ", zlib";
+        }
+        bDetected = true;
+    }
+
+    return result();
+}

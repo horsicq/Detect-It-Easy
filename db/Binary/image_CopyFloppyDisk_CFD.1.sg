@@ -1,0 +1,26 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// CopyFloppyDisk compressed floppy image (xxfclib filesystem/cfd): a 32-byte
+// header with zero reserved words, 512-byte sectors at 7, media type 2 at 12,
+// one or two sides at 22, zero at 24 and the stored/compressed flag word at 26
+// (0 = compressed stream, 0x800 = stored image); the tool version text follows.
+meta("image", "CopyFloppyDisk CFD");
+
+function detect() {
+    if (Binary.getSize() > 32 && Binary.readDword(0) == 0 && Binary.readWord(4) == 0 && Binary.readByte(6) == 0 &&
+        Binary.readWord(7) == 512 && Binary.readByte(12) == 2) {
+        var nSides = Binary.readWord(22);
+        var nMode = Binary.readWord(26);
+        if ((nSides == 1 || nSides == 2) && Binary.readWord(24) == 0 && (nMode == 0 || nMode == 0x800)) {
+            var sText = Binary.getString(28, 4);
+            if (/^V\d/.test(sText)) {
+                sVersion = sText.substring(1);
+            }
+            sOptions = nMode == 0x800 ? "stored" : "compressed";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

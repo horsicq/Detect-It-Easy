@@ -1,0 +1,36 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// 360 PalmInput (360 输入法) setup: the installed files travel in a resource
+// of the custom type "COMPRESSEDDATA" as a directory of LZMA groups (u32 group
+// count, u64 tag, then per group the LZMA properties, a UTF-16 wildcard name,
+// sizes and the member list) followed by the raw LZMA blobs.
+meta("installer", "360 PalmInput installer");
+
+function detect() {
+    if (PE.isResourceGroupNamePresent("COMPRESSEDDATA")) {
+        var nCount = PE.getNumberOfResources();
+
+        for (var i = 0; i < nCount && !bDetected; i++) {
+            var nOffset = PE.getResourceOffsetByNumber(i);
+            var nSize = PE.getResourceSizeByNumber(i);
+
+            if (nSize < 0x10000) {
+                continue;
+            }
+
+            var nGroups = PE.readDword(nOffset);
+
+            if (nGroups > 0 && nGroups < 4096 && PE.readByte(nOffset + 12) < 225 && PE.readDword(nOffset + 17) > 0 && PE.readDword(nOffset + 17) < 600) {
+                sOptions = "COMPRESSEDDATA, " + nGroups + " groups";
+                bDetected = true;
+            }
+        }
+
+        if (bDetected) {
+            sVersion = PE.getVersionStringInfo("ProductVersion");
+        }
+    }
+
+    return result();
+}

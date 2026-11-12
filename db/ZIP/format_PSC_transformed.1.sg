@@ -1,0 +1,26 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// PSC transformed ZIP (xxfclib archive/zip_psc): a ZIP whose bytes from
+// offset 12672 on are complemented, so the end-of-central-directory record is
+// found only as its complement (AF B4 FA F9) past that boundary.
+meta("format", "PSC transformed ZIP");
+
+function detect() {
+    var nSize = ZIP.getSize();
+    if (nSize > 12672 + 22) {
+        var nStop = nSize - 22;
+        var nLow = nSize - 22 - 4096;
+        if (nLow < 12672) {
+            nLow = 12672;
+        }
+        for (var nAt = nStop; nAt >= nLow; nAt--) {
+            if (ZIP.readDword(nAt) == 0xF9FAB4AF && (ZIP.readWord(nAt + 20) ^ 0xFFFF) == nSize - nAt - 22) {
+                bDetected = true;
+                break;
+            }
+        }
+    }
+
+    return result();
+}

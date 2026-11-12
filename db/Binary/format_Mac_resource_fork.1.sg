@@ -1,0 +1,27 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Macintosh resource fork (xxfclib executable/resourcefork): big-endian
+// data offset, map offset, data length and map length; the data block ends
+// where the map starts and the map (at least 30 bytes) ends at the file end.
+meta("format", "Macintosh resource fork");
+
+function be32(nAt) {
+    return ((Binary.readByte(nAt) << 24) | (Binary.readByte(nAt + 1) << 16) | (Binary.readByte(nAt + 2) << 8) | Binary.readByte(nAt + 3)) >>> 0;
+}
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize >= 286) {
+        var nData = be32(0);
+        var nMap = be32(4);
+        var nDataLen = be32(8);
+        var nMapLen = be32(12);
+        if (nData >= 16 && nData <= 0x10000 && nData + nDataLen == nMap && nMapLen >= 30 && nMap + nMapLen == nSize && be32(nMap) == nData) {
+            sOptions = nDataLen == 0 ? "empty" : nDataLen + " data bytes";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

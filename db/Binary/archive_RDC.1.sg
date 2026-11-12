@@ -1,0 +1,107 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// RDC compressed stream (xxfclib archive/rdc, the .DA_ files of DCP disk
+// sets): a chain of blocks, each introduced by a length word (high bit set =
+// stored, else an RDC-compressed block of at most 16 KiB output: a flag word
+// per 16 tokens, literal bytes, run tokens 0x0n/0x1n and match tokens with a
+// 4-bit length and a 12-bit distance). The first block (at least 64 packed
+// bytes) must decode exactly to at least 128 bytes with four or more matches.
+meta("archive", "RDC compressed stream");
+
+var nMatches = 0;
+
+function decodeBlock(nBase, nSize) {
+    var at = 0;
+    var out = 0;
+    var mask = 0;
+    var flags = 0;
+    var cap = 16384;
+    nMatches = 0;
+    while (at < nSize) {
+        mask >>= 1;
+        if (!mask) {
+            if (nSize - at < 2) {
+                return -1;
+            }
+            flags = Binary.readWord(nBase + at);
+            at += 2;
+            mask = 0x8000;
+        }
+        if (at == nSize) {
+            return -1;
+        }
+        var token = Binary.readByte(nBase + at);
+        at++;
+        if (!(mask & flags)) {
+            if (out == cap) {
+                return -1;
+            }
+            out++;
+            continue;
+        }
+        var kind = token >> 4;
+        var low = token & 15;
+        var length;
+        if (at == nSize) {
+            return -1;
+        }
+        if (kind < 2) {
+            if (kind == 0) {
+                length = low + 3;
+            } else {
+                length = low + Binary.readByte(nBase + at) * 16 + 19;
+                at++;
+                if (at == nSize) {
+                    return -1;
+                }
+            }
+            at++;
+            if (length > cap - out) {
+                return -1;
+            }
+            out += length;
+        } else {
+            var distance = low + 3 + Binary.readByte(nBase + at) * 16;
+            at++;
+            length = kind;
+            if (kind == 2) {
+                if (at == nSize) {
+                    return -1;
+                }
+                length = Binary.readByte(nBase + at) + 16;
+                at++;
+            }
+            if (distance > out || length > cap - out) {
+                return -1;
+            }
+            nMatches++;
+            out += length;
+        }
+    }
+    return out;
+}
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize >= 8) {
+        var nWord = Binary.readWord(0);
+        if (nWord >= 64 && !(nWord & 0x8000) && nWord <= nSize - 2) {
+            var nOut = decodeBlock(2, nWord);
+            if (nOut >= 128 && nMatches >= 4) {
+                var nNext = 2 + nWord;
+                if (nNext == nSize) {
+                    bDetected = true;
+                } else if (nNext + 2 <= nSize) {
+                    var nWord2 = Binary.readWord(nNext);
+                    var nLength2 = (nWord2 & 0x8000) ? 0x10000 - nWord2 : nWord2;
+                    if ((nWord2 == 0 && nNext + 2 == nSize) || (nWord2 != 0 && nLength2 <= nSize - nNext - 2)) {
+                        bDetected = true;
+                    }
+                }
+            }
+        }
+    }
+
+    return result();
+}

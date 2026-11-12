@@ -1,0 +1,22 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Nitroplus game data self-extractor: the overlay starts with "YS", a word
+// with the size of the YS header (32 or 160 in the corpus), a count word and
+// the readme path; a Microsoft cabinet (MSCF) with Shift-JIS names follows
+// at overlay offset header size.
+meta("sfx", "Nitroplus CAB");
+
+function detect() {
+    if (PE.isOverlayPresent() && PE.compareOverlay("'YS'")) {
+        var nOverlay = PE.getOverlayOffset();
+        var nHeader = PE.readWord(nOverlay + 2);
+        if (nHeader >= 8 && nHeader <= 4096 && PE.compare("'MSCF'00000000", nOverlay + nHeader) &&
+            PE.readDword(nOverlay + nHeader + 8) == PE.getOverlaySize() - nHeader) {
+            sOptions = "Shift-JIS";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

@@ -1,0 +1,37 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Knowledge Dynamics LIF/KD packed members (xxfclib installer/lifkd): a chain
+// of 54-byte headers, 34 ASCII-hex digits (DOS stamp, packed size, original
+// size, two CRC-16s, method 01 stored or 02 LZD) and a 20-byte NUL-padded
+// name, each followed by its packed bytes; the chain must end at the file end.
+meta("archive", "KDC LIF packed file");
+
+function detect() {
+    var nSize = Binary.getSize();
+    var nAt = 0;
+    var nCount = 0;
+    while (nAt + 54 < nSize && nCount < 4096) {
+        var sHead = Binary.getString(nAt, 34);
+        if (!/^[0-9a-fA-F]{32}0[12]$/.test(sHead)) {
+            break;
+        }
+        var nFirst = Binary.readByte(nAt + 34);
+        if (nFirst < 0x21 || nFirst > 0x7E) {
+            break;
+        }
+        var nPacked = parseInt(sHead.substring(8, 16), 16);
+        if (nPacked == 0 || nPacked > nSize - nAt - 54) {
+            break;
+        }
+        nAt += 54 + nPacked;
+        nCount++;
+        if (nAt == nSize) {
+            sOptions = nCount + " members";
+            bDetected = true;
+            break;
+        }
+    }
+
+    return result();
+}

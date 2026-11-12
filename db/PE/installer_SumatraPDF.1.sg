@@ -1,0 +1,37 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// SumatraPDF installer: the program carries its payload (libmupdf.dll,
+// PdfFilter.dll, PdfPreview.dll ...) in an RCDATA resource holding Sumatra's
+// own "LzSA" simple LZMA archive (src/utils/LzmaSimpleArchive.cpp).
+meta("installer", "SumatraPDF installer");
+
+function detect() {
+    if (PE.isResourceGroupIdPresent(10)) {
+        var nCount = PE.getNumberOfResources();
+
+        for (var i = 0; i < nCount && !bDetected; i++) {
+            var nOffset = PE.getResourceOffsetByNumber(i);
+            var nSize = PE.getResourceSizeByNumber(i);
+
+            if (nSize < 0x1000) {
+                continue;
+            }
+
+            if (PE.compare("'LzSA'", nOffset)) {
+                var nFiles = PE.readDword(nOffset + 4);
+
+                if (nFiles > 0 && nFiles < 1024) {
+                    sOptions = "LzSA, " + nFiles + " files";
+                    bDetected = true;
+                }
+            }
+        }
+
+        if (bDetected) {
+            sVersion = PE.getVersionStringInfo("ProductVersion");
+        }
+    }
+
+    return result();
+}

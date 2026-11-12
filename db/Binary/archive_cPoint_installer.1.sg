@@ -1,0 +1,29 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// cPoint installer stream (xxfclib installer/cpoint): no magic; type-0
+// setup records {u32 tag, u8 0, u32 size, u32 0, data} with the leading tags
+// 124, 125 and 126, then type-3 stored files.
+meta("archive", "cPoint installer stream");
+
+function detect() {
+    var nSize = Binary.getSize();
+    var nAt = 0;
+    var nFound = 0;
+    for (var i = 0; i < 3; i++) {
+        if (nAt + 13 > nSize || Binary.readDword(nAt) != 124 + i || Binary.readByte(nAt + 4) != 0 || Binary.readDword(nAt + 9) != 0) {
+            break;
+        }
+        var nLen = Binary.readDword(nAt + 5);
+        if (nLen > nSize - nAt - 13) {
+            break;
+        }
+        nAt += 13 + nLen;
+        nFound++;
+    }
+    if (nFound == 3) {
+        bDetected = true;
+    }
+
+    return result();
+}

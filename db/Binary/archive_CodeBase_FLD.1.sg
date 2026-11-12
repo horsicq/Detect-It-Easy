@@ -1,0 +1,38 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// CodeBase install file group (xxfclib archive/fld): no signature; a chain
+// of 27-byte records (name length 0x0C, 12-byte space-padded name, sizes,
+// DOS stamp, method 0 or 1, the marker '$' at 0x1A) and payloads that must
+// tile the file exactly, with an optional 5-byte trailer.
+meta("archive", "CodeBase FLD group");
+
+function detect() {
+    var nSize = Binary.getSize();
+    var nAt = 0;
+    var nCount = 0;
+    while (nAt + 27 <= nSize && nCount < 4096) {
+        if (Binary.readByte(nAt) != 0x0C || Binary.readByte(nAt + 0x1A) != 0x24 || Binary.readByte(nAt + 0x19) > 1) {
+            break;
+        }
+        var bName = true;
+        for (var i = 1; i <= 12; i++) {
+            if (Binary.readByte(nAt + i) < 0x20) {
+                bName = false;
+            }
+        }
+        var nPacked = Binary.readDword(nAt + 0x0D);
+        if (!bName || nPacked > nSize - nAt - 27) {
+            break;
+        }
+        nAt += 27 + nPacked;
+        nCount++;
+        if (nAt == nSize || nAt + 5 == nSize) {
+            sOptions = nCount + " files";
+            bDetected = true;
+            break;
+        }
+    }
+
+    return result();
+}

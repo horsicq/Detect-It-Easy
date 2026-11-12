@@ -1,0 +1,23 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// HA archive (xxfclib archive/ha, Harri Hirvola): "HA", the member count,
+// then members whose type byte holds the version in the high nibble and the
+// method (0 CPY, 1 ASC, 2 HSC, or the directory/special codes 0xE/0xF) in
+// the low one, followed by the packed size, original size, CRC and time.
+meta("archive", "HA");
+
+function detect() {
+    if (Binary.compare("'HA'") && Binary.getSize() >= 21) {
+        var nCount = Binary.readWord(2);
+        var nType = Binary.readByte(4);
+        var nMethod = nType & 0x0F;
+        var nPacked = Binary.readDword(5);
+        if (nCount >= 1 && (nType >> 4) <= 2 && (nMethod <= 2 || nMethod >= 0x0E) && nPacked <= Binary.getSize()) {
+            sOptions = nCount + " files";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

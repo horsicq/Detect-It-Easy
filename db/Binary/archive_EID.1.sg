@@ -1,0 +1,23 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// EID encrypted archive (xxfclib archive/eid): a 152-byte header that starts
+// with a length-prefixed archive name, then fixed words (4, 4, 0, 0x3FF00000,
+// 64) around the key-slot count at 104, the member count at 116 and the
+// directory size at 132; byte 136 is 8.
+meta("archive", "EID encrypted archive");
+
+function detect() {
+    if (Binary.getSize() >= 152 && Binary.readByte(0) < 104 && Binary.readDword(108) == 4 && Binary.readDword(112) == 4 &&
+        Binary.readDword(120) == 0 && Binary.readDword(124) == 0x3FF00000 && Binary.readDword(128) == 64 && Binary.readByte(136) == 8) {
+        var nSlots = Binary.readDword(104);
+        var nCount = Binary.readDword(116);
+        var nTail = Binary.readDword(132);
+        if (nSlots >= 1 && nSlots <= 65536 && nCount >= 1 && nCount <= 1000000 && nTail >= 50 && nCount <= nTail / 50) {
+            sOptions = nCount + " files";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

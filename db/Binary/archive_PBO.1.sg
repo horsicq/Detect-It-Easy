@@ -1,0 +1,100 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Bohemia Interactive PBO archive (xxfclib archive/pbo): NUL-terminated
+// entry names, each followed by five words (packing method 0, "Cprs" or
+// "Enco", original size, reserved, timestamp, data size); an optional
+// leading "Vers" property header with key/value strings; the list ends with
+// an empty name whose words are zero, and the data of every entry must fit
+// in the file after the headers; at least one entry carries data.
+meta("archive", "Bohemia PBO");
+
+function readName(nOffset, nLimit) {
+    var s = "";
+    for (var i = 0; i < 512; i++) {
+        if (nOffset + i >= nLimit) {
+            return null;
+        }
+        var c = Binary.readByte(nOffset + i);
+        if (c == 0) {
+            return s;
+        }
+        if (c < 0x20 || c > 0x7E) {
+            return null;
+        }
+        s += String.fromCharCode(c);
+    }
+    return null;
+}
+
+function detect() {
+    var nSize = Binary.getSize();
+    var nAt = 0;
+    var nCount = 0;
+    var nTotal = 0;
+    var bProperties = false;
+    var bOk = false;
+    while (nSize >= 42) {
+        var sName = readName(nAt, nSize);
+        if (sName === null || nAt + sName.length + 21 > nSize) {
+            break;
+        }
+        nAt += sName.length + 1;
+        var nMethod = Binary.readDword(nAt);
+        var nOriginal = Binary.readDword(nAt + 4);
+        var nReserved = Binary.readDword(nAt + 8);
+        var nTime = Binary.readDword(nAt + 12);
+        var nData = Binary.readDword(nAt + 16);
+        nAt += 20;
+        if (sName.length == 0) {
+            if (nMethod == 0x56657273 && nCount == 0 && !bProperties) {
+                if (nOriginal || nReserved || nTime || nData) {
+                    break;
+                }
+                bProperties = true;
+                var bClosed = false;
+                for (var i = 0; i < 256; i++) {
+                    var sKey = readName(nAt, nSize);
+                    if (sKey === null) {
+                        break;
+                    }
+                    nAt += sKey.length + 1;
+                    if (sKey.length == 0) {
+                        bClosed = true;
+                        break;
+                    }
+                    var sValue = readName(nAt, nSize);
+                    if (sValue === null) {
+                        break;
+                    }
+                    nAt += sValue.length + 1;
+                }
+                if (!bClosed) {
+                    break;
+                }
+                continue;
+            }
+            if ((nMethod == 0 || nMethod == 0x43707273) && !nOriginal && !nReserved && !nTime && !nData) {
+                bOk = nCount > 0 && nTotal > 0 && nTotal <= nSize - nAt;
+            }
+            break;
+        }
+        if (nMethod != 0 && nMethod != 0x43707273 && nMethod != 0x456E6372) {
+            break;
+        }
+        if (nData > nSize || nTotal + nData > nSize) {
+            break;
+        }
+        nTotal += nData;
+        nCount++;
+        if (nCount > 65536) {
+            break;
+        }
+    }
+    if (bOk) {
+        sOptions = nCount + " entries" + (bProperties ? ", properties" : "");
+        bDetected = true;
+    }
+
+    return result();
+}

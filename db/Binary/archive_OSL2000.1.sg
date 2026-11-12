@@ -1,0 +1,40 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// OSL2000 Boot Manager setup resources (xxfclib archive/osl2000): "CAB"
+// then scrambled 16-byte records. Each record byte v at index i decodes to
+// ror(prev ^ (rol(v) + i)) - i, XOR 90; the decoded record starts with "HI"
+// and holds the resource size at 2.
+meta("archive", "OSL2000 setup resources");
+
+function rol(v) {
+    return ((v << 1) | (v >> 7)) & 0xFF;
+}
+
+function ror(v) {
+    return ((v >> 1) | (v << 7)) & 0xFF;
+}
+
+function detect() {
+    if (Binary.compare("'CAB'") && Binary.getSize() >= 21) {
+        var p = [];
+        var i;
+        for (i = 0; i < 16; i++) {
+            p[i] = Binary.readByte(3 + i);
+        }
+        var d = [];
+        for (i = 15; i >= 0; i--) {
+            var v = p[i];
+            if (i) {
+                v = p[i - 1] ^ ((rol(v) + i) & 0xFF);
+            }
+            d[i] = ((ror(v) - i) & 0xFF) ^ 90;
+        }
+        var nSize = d[2] | (d[3] << 8) | (d[4] << 16) | (d[5] << 24);
+        if (d[0] == 0x48 && d[1] == 0x49 && nSize >= 0 && nSize <= Binary.getSize() - 21) {
+            bDetected = true;
+        }
+    }
+
+    return result();
+}
