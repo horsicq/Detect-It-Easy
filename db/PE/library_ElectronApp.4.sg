@@ -5,13 +5,66 @@
 // https://github.com/electron/electron/releases
 meta("library", "Electron package");
 
+/**
+ * Find the standalone "Chrome/<version> Electron/<version>" build string.
+ * Electron embeds it verbatim in the read-only data sections.
+ * @returns {Array|null} Match array with [full, chromeVersion, electronVersion].
+ */
+function findElectronVersionString() {
+    var sectionNames = [".rdata", ".data"];
+
+    for (var i = 0; i < sectionNames.length; i++) {
+        var section = PE.section[sectionNames[i]];
+
+        if (!section || !section.FileSize) {
+            continue;
+        }
+
+        var nSectionOffset = section.FileOffset;
+        var nSectionSize = section.FileSize;
+        var nOffset = nSectionOffset;
+
+        while (nOffset < nSectionOffset + nSectionSize) {
+            var nSearchSize = nSectionOffset + nSectionSize - nOffset;
+            var nFoundOffset = PE.findString(nOffset, nSearchSize, "Chrome/");
+
+            if (nFoundOffset === -1) {
+                break;
+            }
+
+            // The version banner is a C string; reject chunks of larger user agents.
+            if (nFoundOffset === 0 || PE.readByte(nFoundOffset - 1) === 0) {
+                var sVersionString = PE.read_ansiString(nFoundOffset, 64);
+                var aMatch = sVersionString.match(/^Chrome\/(\d+(?:\.\d+)+) Electron\/(\d+(?:\.\d+)+)$/);
+
+                if (aMatch) {
+                    return aMatch;
+                }
+            }
+
+            nOffset = nFoundOffset + 7;
+        }
+    }
+
+    return null;
+}
+
 function detect() {
     var cpadInfoSection = PE.section["CPADinfo"];
 
-    if (cpadInfoSection &&
-        PE.isSectionNamePresent(".00cfg")) {
+    if (cpadInfoSection) {
+        var aMatch = findElectronVersionString();
 
-        bDetected = PE.findString(cpadInfoSection.FileOffset, cpadInfoSection.FileSize, "daPC");
+        if (aMatch) {
+            sVersion = "Electron " + aMatch[2] + " / Chrome " + aMatch[1];
+            bDetected = true;
+        } else if (PE.isSectionNamePresent(".00cfg")) {
+            bDetected = PE.findString(
+                cpadInfoSection.FileOffset,
+                cpadInfoSection.FileSize,
+                "daPC"
+            ) !== -1;
+        }
     }
 
     return result();
