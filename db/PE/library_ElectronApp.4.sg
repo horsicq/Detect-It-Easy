@@ -5,6 +5,23 @@
 // https://github.com/electron/electron/releases
 meta("library", "Electron package");
 
+function detect() {
+    var cpadInfoSection = PE.section["CPADinfo"];
+
+    if (cpadInfoSection) {
+        var aMatch = findElectronVersionString();
+
+        if (aMatch) {
+            sVersion = "Electron " + aMatch[2] + " / Chrome " + aMatch[1];
+            bDetected = true;
+        } else if (PE.isSectionNamePresent(".00cfg")) {
+            bDetected = PE.findString(cpadInfoSection.FileOffset, cpadInfoSection.FileSize, "daPC") !== -1;
+        }
+    }
+
+    return result();
+}
+
 /**
  * Find the standalone "Chrome/<version> Electron/<version>" build string.
  * Electron embeds it verbatim in the read-only data sections.
@@ -47,25 +64,4 @@ function findElectronVersionString() {
     }
 
     return null;
-}
-
-function detect() {
-    var cpadInfoSection = PE.section["CPADinfo"];
-
-    if (cpadInfoSection) {
-        var aMatch = findElectronVersionString();
-
-        if (aMatch) {
-            sVersion = "Electron " + aMatch[2] + " / Chrome " + aMatch[1];
-            bDetected = true;
-        } else if (PE.isSectionNamePresent(".00cfg")) {
-            bDetected = PE.findString(
-                cpadInfoSection.FileOffset,
-                cpadInfoSection.FileSize,
-                "daPC"
-            ) !== -1;
-        }
-    }
-
-    return result();
 }
