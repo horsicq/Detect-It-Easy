@@ -11,9 +11,12 @@ function detect() {
 
         if (pythonDll && isCxFreezePythonRuntime(pythonDll)) {
             var rdataSection = PE.section[".rdata"];
+            var dataSection = PE.section[".data"];
 
-            if (rdataSection &&
-                hasCxFreezeStubMarkers(rdataSection.FileOffset, rdataSection.FileSize)) {
+            if ((rdataSection &&
+                hasCxFreezeStubMarkers(rdataSection.FileOffset, rdataSection.FileSize)) ||
+                (dataSection &&
+                    hasCxFreezeStubMarkers(dataSection.FileOffset, dataSection.FileSize))) {
                 sOptions = getStubType();
                 bDetected = true;
             }
@@ -58,7 +61,8 @@ function isCxFreezePythonRuntime(pythonDll) {
         return false;
     }
 
-    return PE.isLibraryFunctionPresent(pythonDll, "PyImport_ImportModule") ||
+    return PE.isLibraryFunctionPresent(pythonDll, "PyImport_Import") ||
+        PE.isLibraryFunctionPresent(pythonDll, "PyImport_ImportModule") ||
         PE.isLibraryFunctionPresent(pythonDll, "PyImport_ImportFrozenModule") ||
         PE.isLibraryFunctionPresent(pythonDll, "PyImport_AddModule");
 }
@@ -71,19 +75,19 @@ function isCxFreezePythonRuntime(pythonDll) {
  * @returns {boolean} True when the cx_Freeze markers are present.
  */
 function hasCxFreezeStubMarkers(offset, size) {
-    if (PE.findString(offset, size, "Unable to calculate directory of executable!") === -1) {
-        return false;
-    }
-
     if (PE.findString(offset, size, "__startup__") === -1) {
         return false;
     }
 
-    return PE.findString(offset, size, "Unable to change DLL search path!") !== -1 ||
-        PE.findString(offset, size, "Out of memory creating sys.path!") !== -1 ||
-        PE.findString(offset, size, "Out of memory creating lib_dir!") !== -1 ||
-        PE.findString(offset, size, "Out of memory creating platlib!") !== -1 ||
-        PE.findString(offset, size, "Out of memory creating executable!") !== -1;
+    if (PE.findString(offset, size, "Unable to calculate directory of executable!") !== -1 ||
+        PE.findString(offset, size, "Unable to change DLL search path!") !== -1) {
+        return PE.findString(offset, size, "Out of memory creating sys.path!") !== -1 ||
+            PE.findString(offset, size, "Out of memory creating lib_dir!") !== -1 ||
+            PE.findString(offset, size, "Out of memory creating platlib!") !== -1 ||
+            PE.findString(offset, size, "Out of memory creating executable!") !== -1;
+    }
+
+    return PE.findString(offset, size, "Out of memory creating sys.path!") !== -1;
 }
 
 /**
