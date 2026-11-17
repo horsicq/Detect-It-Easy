@@ -32,6 +32,36 @@ function detect() {
     var count = Binary.read_uint32(offset + 4);
     // API versions use big-endian nibbles, unlike the remaining fields.
     var api = Binary.read_uint16(offset + 8, true);
+
+    // PHP_Archive 0.8.0 (pre-1.0 PEAR builds such as go-pear.phar): no
+    // flags and no metadata; after the alias each entry is the name plus 17
+    // bytes (unpacked, time, packed, crc32, u8 flags).
+    if (api === 0x0800) {
+        if (manifestSize < 14 || manifestSize > 64 * 1024 * 1024 || manifestSize > size - offset - 4 ||
+            count < 1 || count > 1000000) return result();
+        var end08 = offset + 4 + manifestSize;
+        var alias08 = Binary.read_uint32(offset + 10);
+        var cursor08 = offset + 14 + alias08;
+        var data08 = end08;
+        if (alias08 > manifestSize - 10) return result();
+        for (var k = 0; k < count; k++) {
+            if (cursor08 + 4 > end08) return result();
+            var name08 = Binary.read_uint32(cursor08);
+            cursor08 += 4;
+            if (name08 < 1 || name08 > 4096 || name08 + 17 > end08 - cursor08 ||
+                /[\x00-\x1f\x7f]/.test(Binary.getString(cursor08, name08))) return result();
+            cursor08 += name08;
+            var unpacked08 = Binary.read_uint32(cursor08);
+            var packed08 = Binary.read_uint32(cursor08 + 8);
+            if (unpacked08 > 256 * 1024 * 1024 || packed08 > size - data08) return result();
+            data08 += packed08;
+            cursor08 += 17;
+        }
+        if (cursor08 !== end08 || data08 > size) return result();
+        bDetected = true;
+        sVersion = "0.8.0";
+        return result();
+    }
     var flags = Binary.read_uint32(offset + 10);
     var aliasSize = Binary.read_uint32(offset + 14);
     if (manifestSize < 47 || manifestSize > 64 * 1024 * 1024 ||

@@ -2,11 +2,17 @@
 // Author: hors <horsicq@gmail.com>
 
 // CPX install volume (xxfclib installer/cpx): one of three numeric magics
-// (28/2A/2C 16 27 93), then the member records with 8.3 names.
+// (28/2A/2C 16 27 93), then the member records with 8.3 names. The 29 stamp
+// is a version 1 volume with 8 extra header bytes (U3 accepts it); its first
+// record (8.3 name) then starts at +0x0E.
 meta("archive", "CPX install volume");
 
 function detect() {
     if (Binary.compare("28162793") || Binary.compare("2A162793") || Binary.compare("2C162793")) {
+        bDetected = true;
+    } else if (Binary.getSize() > 0x20 && Binary.compare("29162793") &&
+        /^[\x21-\x7E]{1,8}(\.[\x21-\x7E]{1,3})?$/.test(Binary.getString(0x0E, 12))) {
+        sVersion = "1";
         bDetected = true;
     }
 

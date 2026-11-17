@@ -15,18 +15,21 @@ function detect() {
     }
 
     function lzip() {
-        if (size < 28 || !Binary.compare("'LZIP'")) return false;
+        // "LZIP", version 0/1, the dictionary code and the LZMA range coder's
+        // first byte, which is always 0. Damaged dictionary codes and member
+        // trailers (lzip testsuite bad-* files, v1/v0 mixed members) still
+        // carry a decodable stream: they are reported, not rejected.
+        if (size < 26 || !Binary.compare("'LZIP'") || Binary.readByte(4) > 1 || Binary.readByte(6) != 0) return false;
         var version = Binary.readByte(4), code = Binary.readByte(5);
         var exponent = code & 31;
-        if (version > 1 || exponent < 12 || exponent > 29) return false;
-        var dictionary = Math.pow(2, exponent) * (1 - (code >> 5) / 16);
-        if (dictionary < 4096) return false;
+        var damage = "";
+        if (exponent < 12 || exponent > 29 || Math.pow(2, exponent) * (1 - (code >> 5) / 16) < 4096) damage = "bad dictionary size";
         // Version 1 stores each member's length in its trailer; a multi-member
-        // stream (tar.lz) ends with the LAST member's length, so only an
-        // overlong trailer value rejects the file.
-        if (version == 1 && (size < 36 || Binary.read_uint64(size - 8, _LE) > size || Binary.read_uint64(size - 8, _LE) < 36)) return false;
+        // stream (tar.lz) ends with the LAST member's length.
+        else if (version == 1 && (size < 36 || Binary.read_uint64(size - 8, _LE) > size || Binary.read_uint64(size - 8, _LE) < 36)) damage = "bad member trailer";
         sVersion = String(version);
-        return Binary.readByte(6) == 0;
+        if (damage) sOptions = damage;
+        return true;
     }
 
     function lzdiet() {
@@ -156,6 +159,10 @@ function detect() {
         sName = "CAZIP compressed data"; sVersion = "XP"; bDetected = true;
     } else if (size >= 23 && Binary.compare("0d0a1a'CAZIP'....0100") && /^[0-9]{2}$/.test(Binary.getString(8, 2)) && (Binary.readWord(12) == 1 || Binary.readWord(12) == 2) && Binary.readWord(18) == 0 && Binary.readByte(20) <= 1 && Binary.readByte(21) >= 4 && Binary.readByte(21) <= 6) {
         sName = "CAZIP compressed data"; sVersion = Binary.getString(8, 2); bDetected = true;
+    } else if (size >= 16 && Binary.compare("0d0a1a'CAZIP10'") && Binary.readByte(10) <= 1 && Binary.readByte(11) >= 4 && Binary.readByte(11) <= 6) {
+        // Version "10": a 10-byte header, the DCL implode stream starts at 0x0A
+        // with its literal mode (0/1) and dictionary bits (4..6).
+        sName = "CAZIP compressed data"; sVersion = "10"; sOptions = "DCL implode"; bDetected = true;
     }
 
     return result();

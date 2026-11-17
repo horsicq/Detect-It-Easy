@@ -412,6 +412,9 @@ function detect() {
     } else if (Binary.compare("5d00008000........000000000000")) {
         bDetected = true;
         sName = "LZMA";
+    } else if (isLzmaAlone()) {
+        bDetected = true;
+        sName = "LZMA";
     } else if (Binary.compare("1fa0")) {
         bDetected = true;
         sName = "SCO";
@@ -427,6 +430,49 @@ function detect() {
     } else if (Binary.compare("fd'7zXZ'00")) {
         bDetected = true;
         sName = "XZ";
+    }
+
+    // .lzma (LZMA-alone): properties byte 5D (lc 3, lp 0, pb 2), a dictionary
+    // of 2^n or 3*2^(n-1) bytes (4 KiB..1.5 GiB), the u64 unpacked size (all FF
+    // = unknown, otherwise below 2^40) and the range coder's first byte 0.
+    // The declared size may be wrong (lzip testsuite bad-*-size files).
+    function isLzmaAlone() {
+        var nSize = Binary.getSize();
+        if (nSize < 18 || Binary.readByte(0) != 0x5D || Binary.readByte(13) != 0) return false;
+        var nDict = Binary.readDword(1);
+        var bPow = false;
+        for (var n = 12; n <= 30 && !bPow; n++) {
+            if (nDict == Math.pow(2, n) || nDict == 3 * Math.pow(2, n - 1)) bPow = true;
+        }
+        if (!bPow) return false;
+        var nLow = Binary.readDword(5), nHigh = Binary.readDword(9);
+        if (nLow == 0xFFFFFFFF && nHigh == 0xFFFFFFFF) return true;
+        return nHigh < 0x100 && (nLow != 0 || nHigh != 0);
+    }
+
+    // MacBinary II/III: CRC-16/XMODEM over bytes 0..123 stored BE at 124,
+    // version written 129/130; byte 74 is not required to be 0 once the CRC
+    // verifies (Photoshop-written headers carry 08/0E there).
+    function isMacBinaryII() {
+        var nSize = Binary.getSize();
+        if (nSize < 128 || Binary.readByte(0) != 0 || Binary.readByte(82) != 0) return false;
+        var nName = Binary.readByte(1);
+        var nWritten = Binary.readByte(122), nNeeded = Binary.readByte(123);
+        if (nName < 1 || nName > 63 || Binary.readByte(2) < 0x20 || (nWritten != 129 && nWritten != 130) ||
+            nNeeded < 129 || nNeeded > nWritten) return false;
+        var nCrc = 0;
+        for (var i = 0; i < 124; i++) {
+            nCrc ^= Binary.readByte(i) << 8;
+            for (var j = 0; j < 8; j++) {
+                nCrc = (nCrc & 0x8000) ? ((nCrc << 1) ^ 0x1021) & 0xFFFF : (nCrc << 1) & 0xFFFF;
+            }
+        }
+        if (nCrc != Binary.read_uint16(124, _BE)) return false;
+        var nData = Binary.read_uint32(83, _BE), nRsrc = Binary.read_uint32(87, _BE);
+        if (nData > 0x7FFFFFFF || nRsrc > 0x7FFFFFFF || nData + nRsrc == 0) return false;
+        var nSecondary = Math.ceil(Binary.read_uint16(120, _BE) / 128) * 128;
+        var nEnd = 128 + nSecondary + Math.ceil(nData / 128) * 128 + nRsrc;
+        return nEnd <= nSize;
     }
 
     function isCompress() {
@@ -480,6 +526,11 @@ function detect() {
     } else if (Binary.compare("00'APPL'", 0x40) && Binary.compare("00008181", 0x78)) {
         bDetected = true;
         sName = "MacBinary";
+    } else if (isMacBinaryII()) {
+        bDetected = true;
+        sName = "MacBinary";
+        sVersion = Binary.readByte(122) == 130 ? "III" : "II";
+        sOptions = Binary.getString(65, 4) + "/" + Binary.getString(69, 4);
     }
 
     return result();
