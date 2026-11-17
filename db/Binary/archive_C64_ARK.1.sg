@@ -1,0 +1,56 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Commodore 64 ARK (xxfclib archive/cbm_ark): no magic. Byte 0 = entry
+// count, then 29-byte entries (type with bit 7 set, (type & 7) <= 4,
+// (type & 0x38) == 0; bytes used in the last block; a 16-byte PETSCII name
+// padded with A0; 9 REL bytes; u16 blocks). Data starts at the next 254-byte
+// boundary and members take blocks*254 bytes each; the last member's final
+// block may be unpadded, and at most one block of filler may follow.
+meta("archive", "C64 ARK");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize >= 30 && nSize <= 0x1000000) {
+        var nCount = Binary.readByte(0);
+        var nData = Math.ceil((1 + nCount * 29) / 254) * 254;
+        if (nCount > 0 && 1 + nCount * 29 <= nSize && nData <= nSize) {
+            var nUsed = 0;
+            var bValid = true;
+            for (var i = 0; i < nCount && bValid; i++) {
+                var nAt = 1 + i * 29;
+                var nType = Binary.readByte(nAt);
+                var nBlocks = Binary.readWord(nAt + 27);
+                if ((nType & 0x80) == 0 || (nType & 7) > 4 || (nType & 0x38) != 0 ||
+                    Binary.readByte(nAt + 1) == 0 || nBlocks == 0) {
+                    bValid = false;
+                    break;
+                }
+                // Name: at least one character, then only A0 padding.
+                var nLen = 0;
+                while (nLen < 16 && Binary.readByte(nAt + 2 + nLen) != 0xA0) {
+                    if (Binary.readByte(nAt + 2 + nLen) < 0x20) {
+                        bValid = false;
+                    }
+                    nLen++;
+                }
+                for (var j = nLen; j < 16 && bValid; j++) {
+                    if (Binary.readByte(nAt + 2 + j) != 0xA0) {
+                        bValid = false;
+                    }
+                }
+                if (nLen == 0) {
+                    bValid = false;
+                }
+                nUsed += nBlocks * 254;
+            }
+            var nAvail = nSize - nData;
+            if (bValid && nAvail > nUsed - 254 && nAvail - nUsed < 256) {
+                sOptions = nCount + " files";
+                bDetected = true;
+            }
+        }
+    }
+
+    return result();
+}

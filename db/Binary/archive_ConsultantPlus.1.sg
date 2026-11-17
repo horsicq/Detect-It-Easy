@@ -1,0 +1,50 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Consultant Plus database (.ANS): a stream of tag/length chunks (u16 tag,
+// u32 total size including the 8-byte header, u16 extra; 0xFF bytes pad
+// between chunks). Two forms (U3 FUN_006d6620): a 0x819A container whose
+// size field equals the file size, or a 0x00D2 envelope (size 0xD2) that
+// carries the volume file name and a CR LF at 0x28.
+meta("archive", "Consultant Plus DataBase");
+
+function detect() {
+    var nSize = Binary.getSize();
+
+    function walk(nAt) {
+        var nCount = 0;
+        while (nAt < nSize && nCount < 100000) {
+            if (Binary.readByte(nAt) == 0xFF) {
+                nAt++;
+                continue;
+            }
+            if (nAt + 8 > nSize) {
+                return 0;
+            }
+            var nChunk = Binary.readDword(nAt + 2);
+            if (nChunk < 8 || nChunk > nSize - nAt) {
+                return 0;
+            }
+            nAt += nChunk;
+            nCount++;
+        }
+        return nAt == nSize ? nCount : 0;
+    }
+
+    if (nSize >= 22 && Binary.readWord(0) == 0x819A && Binary.readDword(2) == nSize) {
+        var nInner = Binary.readDword(10);
+        if (nInner > 7 && nInner <= nSize - 8 && walk(8) > 0) {
+            sOptions = "container";
+            bDetected = true;
+        }
+    } else if (nSize >= 0xDA && Binary.compare("D200D2000000") && Binary.readWord(6) != 0 &&
+        Binary.compare("00000D0A", 0x26)) {
+        var sVolume = Binary.getString(8, 30);
+        if (/^[\x21-\x7E]{3,30}$/.test(sVolume) && sVolume.indexOf(".") > 0) {
+            sOptions = "envelope";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

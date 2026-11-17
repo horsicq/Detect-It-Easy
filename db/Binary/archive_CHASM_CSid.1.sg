@@ -1,0 +1,38 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Chasm: The Rift resource archive (CSM.BIN): "CSid", u16 count, then
+// 0x15-byte entries (u8 name length, name[12], u32 size, u32 absolute
+// offset); members are stored, lie past the directory and the last one ends
+// at the file end (U3 format 788, FUN_00643b00).
+meta("archive", "Chasm: The Rift resource archive (CSid)");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize > 6 + 0x15 && Binary.compare("'CSid'")) {
+        var nCount = Binary.readWord(4);
+        var nDirEnd = 6 + nCount * 0x15;
+        if (nCount > 0 && nDirEnd <= nSize) {
+            var nMax = 0;
+            var bValid = true;
+            for (var i = 0; i < nCount && bValid; i++) {
+                var nAt = 6 + i * 0x15;
+                var nLen = Binary.readByte(nAt);
+                var nLength = Binary.readDword(nAt + 0x0D);
+                var nOffset = Binary.readDword(nAt + 0x11);
+                if (nLen < 1 || nLen > 12 || nOffset < nDirEnd || nOffset > nSize || nLength > nSize - nOffset ||
+                    !/^[\x21-\x7E]+$/.test(Binary.getString(nAt + 1, nLen))) {
+                    bValid = false;
+                } else if (nOffset + nLength > nMax) {
+                    nMax = nOffset + nLength;
+                }
+            }
+            if (bValid && nMax == nSize) {
+                sOptions = nCount + " files";
+                bDetected = true;
+            }
+        }
+    }
+
+    return result();
+}

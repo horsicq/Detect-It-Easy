@@ -1,0 +1,36 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Amiga LZX archive (xxfclib archive/amigalzx): 10-byte info header "LZX",
+// then 31-byte entry headers (u32 unpacked +2, u32 packed +6 (0 = merged
+// with the next entry), method +0x0B 0 stored / 2 LZX, comment length +0x0E,
+// name length +0x1E), the name, the comment and the packed data; the chain
+// must end exactly at the file end. Directory entries (names ending in '/')
+// are ordinary zero-size entries here.
+meta("archive", "LZX (Amiga)");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize >= 10 + 31 + 1 && Binary.compare("'LZX'")) {
+        var nAt = 10;
+        var nCount = 0;
+        while (nAt + 31 <= nSize && nCount < 100000) {
+            var nMethod = Binary.readByte(nAt + 0x0B);
+            var nName = Binary.readByte(nAt + 0x1E);
+            var nComment = Binary.readByte(nAt + 0x0E);
+            var nPacked = Binary.readDword(nAt + 6);
+            var nData = nAt + 31 + nName + nComment;
+            if ((nMethod != 0 && nMethod != 2) || nName < 1 || nData > nSize || nPacked > nSize - nData) {
+                break;
+            }
+            nAt = nData + nPacked;
+            nCount++;
+        }
+        if (nCount > 0 && nAt == nSize) {
+            sOptions = nCount + " entries";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

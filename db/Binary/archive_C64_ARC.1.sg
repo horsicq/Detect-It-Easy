@@ -1,0 +1,82 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Commodore 64 ARC (ARC230/ARC250, lhav12-era; xxfclib archive/arc_cbm): no
+// magic, a chain of records on 254-byte block boundaries. Record header:
+// version 1/2, mode (<=2 for v1, <=5 for v2), u16 checksum, u24 length,
+// u16 block count, file type P/S/U (R for v2), name length 1..16, name
+// (v2 adds 3 bytes). Records advance by blocks*254; the chain must reach the
+// file end or stop within the last 8 blocks. Mode 5 (CAD30-style) records
+// store zero checksum/length/blocks; the next record is then the next valid
+// header on a 254-byte boundary.
+meta("archive", "C64 ARC");
+
+function detect() {
+    var nSize = Binary.getSize();
+
+    function header(nAt) {
+        if (nAt + 14 > nSize) {
+            return -1;
+        }
+        var nVersion = Binary.readByte(nAt);
+        var nMode = Binary.readByte(nAt + 1);
+        if ((nVersion != 1 && nVersion != 2) || nMode > (nVersion == 1 ? 2 : 5)) {
+            return -1;
+        }
+        var nType = Binary.readByte(nAt + 9);
+        var nName = Binary.readByte(nAt + 10);
+        if (!(nType == 0x50 || nType == 0x53 || nType == 0x55 || (nVersion == 2 && nType == 0x52)) ||
+            nName < 1 || nName > 16 || nAt + 11 + nName > nSize) {
+            return -1;
+        }
+        for (var i = 0; i < nName; i++) {
+            if (Binary.readByte(nAt + 11 + i) < 0x20) {
+                return -1;
+            }
+        }
+        var nBlocks = Binary.readWord(nAt + 7);
+        if (nMode == 5) {
+            // Streamed records keep no sizes.
+            return (Binary.readWord(nAt + 2) == 0 && Binary.readWord(nAt + 4) == 0 && Binary.readByte(nAt + 6) == 0 &&
+                nBlocks == 0) ? 0 : -1;
+        }
+        if (nBlocks == 0 || nBlocks * 254 > nSize - nAt || nBlocks * 254 < 11 + nName) {
+            return -1;
+        }
+        return nBlocks;
+    }
+
+    var nAt = 0;
+    var nCount = 0;
+    var nStreamed = 0;
+    var nSteps = 0;
+    while (nAt < nSize && nSteps < 65536) {
+        var nBlocks = header(nAt);
+        if (nBlocks < 0) {
+            break;
+        }
+        nCount++;
+        if (nBlocks == 0) {
+            nStreamed++;
+            var nNext = nAt + 254;
+            while (nNext < nSize && header(nNext) < 0 && nSteps < 65536) {
+                nNext += 254;
+                nSteps++;
+            }
+            nAt = nNext;
+        } else {
+            nAt += nBlocks * 254;
+        }
+        nSteps++;
+    }
+    var bEnd = nAt >= nSize || (nSize - nAt <= 8 * 254 && header(nAt) < 0);
+    if (bEnd && (nCount >= 2 || (nCount == 1 && nAt == nSize)) && (nStreamed == 0 || nCount >= 3)) {
+        sOptions = nCount + " files";
+        if (nStreamed) {
+            sOptions += ", mode 5";
+        }
+        bDetected = true;
+    }
+
+    return result();
+}

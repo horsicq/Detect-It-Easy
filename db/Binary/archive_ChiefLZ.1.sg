@@ -1,0 +1,50 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// ChiefLZ multiple-file archive (xxfclib archive/chieflzmulti; v1 per U3
+// FUN_0059e310).
+// v1: 0A 04 0D "ChfLZ" 05 06 08, 0x15-byte header, u16 count at 0x13, then
+//     0x28-byte entries (flag +0x0E, u32 packed +0x0F, u32 unpacked +0x13,
+//     name length +0x1B, name +0x1C); packed data follows the directory and
+//     ends at the file end.
+// v2: 0C 04 0D "ChfLZ_2" 05 06 04, u32 count at 0x17, u32 name bytes at 0x23,
+//     0x29-byte entries at 0x7E followed by the packed names.
+meta("archive", "ChiefLZ archive");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize > 0x15 + 0x28 && Binary.compare("0A040D'ChfLZ'050608")) {
+        var nCount = Binary.readWord(0x13);
+        var nData = 0x15 + nCount * 0x28;
+        if (nCount > 0 && nData <= nSize) {
+            var nTotal = 0;
+            var bValid = true;
+            for (var i = 0; i < nCount && bValid; i++) {
+                var nAt = 0x15 + i * 0x28;
+                var nLen = Binary.readByte(nAt + 0x1B);
+                var nPacked = Binary.readDword(nAt + 0x0F);
+                if (Binary.readByte(nAt + 0x0E) > 1 || nLen < 1 || nLen > 12 || nPacked > nSize - nData - nTotal ||
+                    !/^[\x21-\x7E]+$/.test(Binary.getString(nAt + 0x1C, nLen))) {
+                    bValid = false;
+                }
+                nTotal += nPacked;
+            }
+            if (bValid && nData + nTotal == nSize) {
+                sVersion = "1";
+                sOptions = nCount + " files";
+                bDetected = true;
+            }
+        }
+    } else if (nSize >= 0x7E && Binary.compare("0C040D'ChfLZ_2'050604")) {
+        var nCount2 = Binary.readDword(0x17);
+        var nNames = Binary.readDword(0x23);
+        if (nCount2 > 0 && nCount2 <= 0xFFFFF && nNames > 0 && nNames <= 0xFFFFFF &&
+            0x7E + nCount2 * 0x29 + nNames <= nSize) {
+            sVersion = "2";
+            sOptions = nCount2 + " files";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

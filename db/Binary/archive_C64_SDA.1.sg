@@ -1,0 +1,47 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Commodore 64 self-dissolving archive (SDA; U3 FUN_006ec020, spec and
+// extractor F:\ARC\re\u3gap\kimi_c64sda.*): a PRG with load address
+// $0401/$0801/$1C01 holding a one-line BASIC stub "<line> SYS(<addr>)",
+// line 10/13/15/17. Short stub: link = load + 0x0C, SYS "2063"/"7183"/"1039",
+// three zero bytes after ')', and for line 10 the machine code A9 F7 85 FD
+// at 0x10. Long stub: link = load + 0x21, SYS "7198", zero bytes at 0x1C.
+// The member records start at (line - 6) * 254 (minus 1 for the $1C01 line
+// 15 form); a file that ends there is only the stub.
+meta("archive", "C64 SDA");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize < 0x23) {
+        return result();
+    }
+    var nLoad = Binary.readWord(0);
+    var nLine = Binary.readWord(4);
+    if ((nLoad != 0x0401 && nLoad != 0x0801 && nLoad != 0x1C01) ||
+        (nLine != 10 && nLine != 13 && nLine != 15 && nLine != 17) ||
+        !Binary.compare("9E28", 6) || Binary.readByte(0x0C) != 0x29) {
+        return result();
+    }
+    var nLink = Binary.readWord(2);
+    var bValid = false;
+    if (nLink == nLoad + 0x0C) {
+        var sSys = Binary.getString(8, 4);
+        bValid = (sSys == "2063" || sSys == "7183" || sSys == "1039") && Binary.compare("000000", 0x0D) &&
+            (nLine != 10 || Binary.compare("A9F785FD", 0x10));
+    } else if (nLink == nLoad + 0x21) {
+        bValid = Binary.getString(8, 4) == "7198" && Binary.compare("000000", 0x1C);
+    }
+    if (bValid) {
+        var nData = (nLine - 6) * 254;
+        if (nLoad == 0x1C01 && nLink == 0x1C0D && nLine == 15) {
+            nData--;
+        }
+        if (nSize > nData) {
+            sOptions = "SYS " + Binary.getString(8, 4);
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

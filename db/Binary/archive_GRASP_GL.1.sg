@@ -1,0 +1,48 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// GRASP animation library (.GL, xxfclib video/grasp): u16 index size (a
+// multiple of 17), 17-byte index entries (u32 offset, name[13]); a zero
+// offset ends the list; members are contiguous, each a u32 length plus its
+// body. Libraries copied from disk often carry up to one sector-rounding
+// tail (seen: 64-733 bytes of 00/1A/junk), so a tail below 1 KiB is allowed.
+meta("archive", "GRASP library (.GL)");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize >= 23) {
+        var nIndex = Binary.readWord(0);
+        if (nIndex >= 17 && nIndex % 17 == 0 && nIndex <= nSize - 2) {
+            var nCursor = 2 + nIndex;
+            var nCount = 0;
+            var bValid = true;
+            for (var nAt = 2; nAt < 2 + nIndex && bValid; nAt += 17) {
+                var nOffset = Binary.readDword(nAt);
+                if (nOffset == 0) {
+                    break;
+                }
+                var c = Binary.readByte(nAt + 4);
+                if (nOffset != nCursor || nOffset > nSize - 4 || c < 0x21 || c > 0x7E) {
+                    bValid = false;
+                    break;
+                }
+                var nLength = Binary.readDword(nOffset);
+                if (nLength > nSize - nOffset - 4) {
+                    bValid = false;
+                    break;
+                }
+                nCursor = nOffset + 4 + nLength;
+                nCount++;
+            }
+            if (bValid && nCount > 0 && nCursor <= nSize && nSize - nCursor < 1024) {
+                sOptions = nCount + " files";
+                if (nCursor != nSize) {
+                    sOptions += ", " + (nSize - nCursor) + " bytes padding";
+                }
+                bDetected = true;
+            }
+        }
+    }
+
+    return result();
+}

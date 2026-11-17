@@ -1,0 +1,36 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// LMD Innovative resource container (xxfclib other/lmd_container): 08 +
+// "LMDSLL30" (string list), "LMDBML30" (bitmap list) or "LMDIML30" (image
+// list), u32 item count, a u32 offset table at 13, items back to back up to
+// the file end; every item starts with a flags byte using bits 0-3 only.
+// IML30 items carry a name, dimensions and then a u32-sized BMP blob.
+meta("archive", "LMD container");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize > 17 && Binary.readByte(0) == 8 &&
+        (Binary.compare("'LMDSLL30'", 1) || Binary.compare("'LMDBML30'", 1) || Binary.compare("'LMDIML30'", 1))) {
+        var nCount = Binary.readDword(9);
+        if (nCount >= 1 && nCount <= 4096 && nCount * 4 <= nSize - 13) {
+            var nPrevious = 13 + nCount * 4;
+            var bValid = Binary.readDword(13) == nPrevious;
+            for (var i = 0; i < nCount && bValid; i++) {
+                var nBegin = Binary.readDword(13 + i * 4);
+                var nStop = (i + 1 < nCount) ? Binary.readDword(17 + i * 4) : nSize;
+                if (nBegin < nPrevious || nStop <= nBegin || nStop > nSize || (Binary.readByte(nBegin) & 0xF0) != 0) {
+                    bValid = false;
+                }
+                nPrevious = nStop;
+            }
+            if (bValid) {
+                sVersion = Binary.getString(4, 5);
+                sOptions = nCount + " items";
+                bDetected = true;
+            }
+        }
+    }
+
+    return result();
+}

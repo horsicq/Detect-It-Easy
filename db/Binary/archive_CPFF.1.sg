@@ -1,0 +1,37 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// CP Setup package (.acp, "CPFFLZW "): records from offset 8, each an i32
+// original size, an i32 packed size and the LZW data; the dword at EOF-4 is
+// the directory offset, where the records end; the directory starts with the
+// record count (U3 0054b870).
+meta("archive", "CPFF (CP Setup)");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize >= 24 && Binary.compare("'CPFFLZW '")) {
+        var nDir = Binary.readDword(nSize - 4);
+        if (nDir >= 16 && nDir <= nSize - 12) {
+            var nAt = 8;
+            var nCount = 0;
+            while (nAt < nDir && nCount < 65536) {
+                var nPlain = Binary.readDword(nAt);
+                var nPacked = Binary.readDword(nAt + 4);
+                if (nPlain > 0x7FFFFFFF || nPacked == 0 || nPacked > nDir - nAt - 8) {
+                    break;
+                }
+                nAt += 8 + nPacked;
+                nCount++;
+            }
+            if (nAt == nDir && nCount > 0 && Binary.readDword(nDir) == nCount) {
+                var nName = Binary.readDword(nDir + 4);
+                if (nName > 0 && nName <= 0x400) {
+                    sOptions = nCount + " files";
+                    bDetected = true;
+                }
+            }
+        }
+    }
+
+    return result();
+}

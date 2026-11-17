@@ -1,0 +1,54 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// CreateInstall disk volume (DISK1.PAK). Three header forms (U3 FUN_00560d50):
+// 1: u32 >0, u32 header size, u16 1/1/1 at 8, two string offsets at 0x0E/0x12
+//    within the header;
+// 2: as 1, but u32 0 at 0x0E, FF at 0x12 and the offsets at 0x13/0x17;
+// 3: u32 file size, 0A 0A + FFFFFFFF + "xxx" at 0x33, four offsets below the
+//    u32 at 8.
+// All carry the CreateInstall runtime message table in the header, which is
+// required as well because the numeric checks alone are weak.
+meta("archive", "CreateInstall data volume");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize < 0x100) {
+        return result();
+    }
+    var nFirst = Binary.readDword(0);
+    var nSecond = Binary.readDword(4);
+    var nVariant = 0;
+
+    function within(nValue, nLimit) {
+        return nValue > 0 && nValue <= nLimit;
+    }
+
+    if (nFirst > 0 && nFirst < 0x80000000 && nSecond > 0 && nSecond < nSize &&
+        Binary.readWord(8) == 1 && Binary.readWord(10) == 1 && Binary.readWord(12) == 1) {
+        if (within(Binary.readDword(0x0E), nSecond) && within(Binary.readDword(0x12), nSecond)) {
+            nVariant = 1;
+        } else if (Binary.readDword(0x0E) == 0 && Binary.readByte(0x12) == 0xFF &&
+            within(Binary.readDword(0x13), nSecond) && within(Binary.readDword(0x17), nSecond)) {
+            nVariant = 2;
+        }
+    } else if (nFirst == nSize && nSecond > 0) {
+        var nLimit = Binary.readDword(8);
+        if (nLimit > 0 && nLimit < nSize && Binary.compare("0A0AFFFFFFFF'xxx'", 0x33) &&
+            Binary.readDword(0x3C) < nLimit && Binary.readDword(0x40) < nLimit &&
+            Binary.readDword(0x44) < nLimit && Binary.readDword(0x48) < nLimit) {
+            nVariant = 3;
+        }
+    }
+
+    if (nVariant) {
+        var nScan = nSize < 0x2000 ? nSize : 0x2000;
+        if (Binary.findString(0, nScan, "Can't read disk %s") != -1 &&
+            Binary.findString(0, nScan, "Can't open directory %s") != -1) {
+            sOptions = "header form " + nVariant;
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

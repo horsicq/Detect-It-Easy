@@ -1,0 +1,66 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Compaq diagnostics message library (MSGDATA): a fixed directory of
+// 34-byte entries (module[13], file[13], u32 offset, u32 size) or 32-byte
+// entries (u16 size); the first offset equals the directory size, used
+// entries come first and their slices are contiguous up to the file end
+// (zero-length entries are skipped whatever their offset)
+// (U3 FUN_0064f7e0 / FUN_0064f700).
+meta("archive", "Compaq MSGDATA");
+
+function detect() {
+    var nSize = Binary.getSize();
+
+    function isName(nAt) {
+        var nLen = 0;
+        while (nLen < 13 && Binary.readByte(nAt + nLen) != 0) {
+            var c = Binary.readByte(nAt + nLen);
+            if (c < 0x21 || c > 0x7E) {
+                return false;
+            }
+            nLen++;
+        }
+        return nLen > 0 && nLen < 13;
+    }
+
+    function check(nEntry) {
+        var nDir = Binary.readDword(26);
+        if (nDir < nEntry * 2 || nDir % nEntry != 0 || nDir >= nSize) {
+            return 0;
+        }
+        var nEnd = nDir;
+        var nCount = 0;
+        for (var nAt = 0; nAt < nDir && Binary.readByte(nAt) != 0; nAt += nEntry) {
+            var nOffset = Binary.readDword(nAt + 26);
+            var nLength = nEntry == 34 ? Binary.readDword(nAt + 30) : Binary.readWord(nAt + 30);
+            if (!isName(nAt) || !isName(nAt + 13)) {
+                return 0;
+            }
+            if (nLength == 0) {
+                // Empty modules may carry a stale offset (seen: MISC 0x5B1BF).
+                nCount++;
+                continue;
+            }
+            if (nOffset != nEnd || nLength > nSize - nOffset) {
+                return 0;
+            }
+            nEnd = nOffset + nLength;
+            nCount++;
+        }
+        return nEnd == nSize ? nCount : 0;
+    }
+
+    if (nSize > 64 && isName(0)) {
+        var nCount = check(34);
+        if (!nCount) {
+            nCount = check(32);
+        }
+        if (nCount > 0) {
+            sOptions = nCount + " modules";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

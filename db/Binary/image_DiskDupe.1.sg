@@ -1,0 +1,53 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// DiskDupe floppy image (xxfclib filesystem/diskdupe).
+// "IM" form: "IM" + 8 zero bytes, u32 disk type 1..4 at 10 (tracks 80/160/
+// 160/160, sectors 9/15/9/18), zero bytes 14..99, a 6-byte track table at
+// 100 (all zero = absent, else 01 loc 00 00 00 01); the header fills one
+// track, then the stored tracks. The last track may be cut a few bytes
+// short (decoders pad it with F6).
+// "MSD" form: "MSD Image Version 1" 1A banner.
+meta("image", "DiskDupe disk image");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize > 0x200 && Binary.compare("'IM'0000000000000000")) {
+        var nType = Binary.readDword(10);
+        if (nType >= 1 && nType <= 4) {
+            var nTracks = [80, 160, 160, 160][nType - 1];
+            var nTrack = 512 * [9, 15, 9, 18][nType - 1];
+            var bValid = nSize > nTrack;
+            for (var i = 14; i < 100 && bValid; i++) {
+                if (Binary.readByte(i) != 0) {
+                    bValid = false;
+                }
+            }
+            var nStored = 0;
+            for (var t = 0; t < nTracks && bValid; t++) {
+                var nAt = 100 + t * 6;
+                if (Binary.readByte(nAt) == 0) {
+                    bValid = Binary.readDword(nAt) == 0 && Binary.readWord(nAt + 4) == 0;
+                } else {
+                    bValid = Binary.readByte(nAt) == 1 && Binary.readByte(nAt + 5) == 1 &&
+                        Binary.readByte(nAt + 2) == 0 && Binary.readWord(nAt + 3) == 0 &&
+                        Binary.readByte(nAt + 1) <= nTracks;
+                    nStored++;
+                }
+            }
+            if (bValid && nStored > 0 && nSize <= (nStored + 1) * nTrack && nSize > nStored * nTrack) {
+                sVersion = "IM";
+                sOptions = nStored + " tracks";
+                if (nSize != (nStored + 1) * nTrack) {
+                    sOptions += ", last track short by " + ((nStored + 1) * nTrack - nSize) + " bytes";
+                }
+                bDetected = true;
+            }
+        }
+    } else if (nSize > 0x48 && Binary.compare("'MSD Image Version 1 '1A")) {
+        sVersion = "MSD";
+        bDetected = true;
+    }
+
+    return result();
+}
