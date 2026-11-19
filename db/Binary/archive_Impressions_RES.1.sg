@@ -1,0 +1,28 @@
+// Detect It Easy: detection rule file
+// Author: hors <horsicq@gmail.com>
+
+// Impressions .RES resource archive (extension .gob; Lords of the Realm and
+// other Impressions/Sierra titles). ".RES", a dword pointer to the member
+// table at the file tail, then count * 52-byte entries. The exact tail
+// relation (dirOffset + 4 + count*52 == fileSize) pins the short ".RES" magic.
+// xxfclib reader: game/impressions_res.
+meta("archive", "Impressions resource");
+
+function detect() {
+    if (Binary.getSize() >= 60) {
+        if (Binary.compare("'.RES'")) {
+            var nDirOffset = Binary.readDword(4);
+            if (nDirOffset >= 8 && nDirOffset + 4 < Binary.getSize()) {
+                var nCount = Binary.readDword(nDirOffset);
+                if (nCount > 0 && nCount < 4000000) {
+                    if (nDirOffset + 4 + nCount * 52 == Binary.getSize()) {
+                        sOptions = nCount + " files";
+                        bDetected = true;
+                    }
+                }
+            }
+        }
+    }
+
+    return result();
+}
