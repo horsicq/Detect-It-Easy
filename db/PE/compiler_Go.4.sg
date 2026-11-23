@@ -16,17 +16,23 @@ function getGoBuildInfoVersion() {
         return "";
     }
 
+    // The whole record must lie inside .data and the file, as Go's own reader requires
+    var nDataEnd = Math.min(dataSection.FileOffset + dataSection.FileSize, PE.getSize());
     var nOffset = PE.findSignature(dataSection.FileOffset, Math.min(dataSection.FileSize, 0x10000), "ff20'Go buildinf:'");
-    if (nOffset === -1 || (PE.readByte(nOffset + 15) & 0x02) === 0) { // flagsVersionInl
+    if (nOffset === -1 || nOffset + 33 > nDataEnd || (PE.readByte(nOffset + 15) & 0x02) === 0) { // flagsVersionInl
         return "";
     }
 
     var nLength = PE.readByte(nOffset + 32);
-    if (nLength < 4 || nLength > 0x7f) { // single-byte uvarint is enough for a version string
+    if (nLength < 4 || nLength > 0x7f || nOffset + 33 + nLength > nDataEnd) { // single-byte uvarint is enough for a version string
         return "";
     }
 
     var sVersionString = PE.getString(nOffset + 33, nLength);
+    if (sVersionString.length !== nLength) {
+        return "";
+    }
+
     var aMatch = /^go(\d+\.\d+(?:\.\d+)?(?:(?:rc|beta)\d+)?)/.exec(sVersionString);
     return aMatch ? aMatch[1] : "";
 }
