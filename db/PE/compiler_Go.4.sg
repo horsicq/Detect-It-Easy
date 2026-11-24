@@ -14,12 +14,15 @@ function detect() {
         // If it doesn't have, let's try a heuristic only, no pattern matching
         // Who knows if pattern matching is good enough
         if (PE.isSignatureInSectionPresent(0, "ff20'Go build ID: '")) {
-            sVersion = "1.15.0+";
+            sVersion = getGoBuildInfoVersion() || "1.15.0+";
             bDetected = true;
         }
     } else {
         bDetected = true;
-        if (PE.compareEP("488d742408488b3c24488d0510000000ffe0cccccccccccccccccccccccccccc") ||
+        var sBuildInfoVersion = getGoBuildInfoVersion();
+        if (sBuildInfoVersion) {
+            sVersion = sBuildInfoVersion;
+        } else if (PE.compareEP("488d742408488b3c24488d0510000000ffe0cccccccccccccccccccccccccccc") ||
             PE.compareEP("83ec0c8b44240c8d5c241089442404895c2408c70424ffffffffe901000000cc")) {
             sVersion = "1.7.X-1.9.X";
         } else if (PE.compareEP("e90bd8ffffcccccccccccccccccccccc8b5c240464c705340000000000000089") ||
@@ -51,7 +54,7 @@ function detect() {
             sVersion = "1.X";
         } else if (PE.compareEP("e9....ffffcccccccccccccccccccccc83ec28895c241c896c241089742414897c2418890424894c2404e8") ||
             PE.compareEP("e9$$$$$$$$488b3c24488d742408e9$$$$$$$$4889f84889f34883ec284883e4f0")) { // x86-64
-            sVersion = "1.18.X-1.24.0";
+            sVersion = "1.18.X+";
         } else if (PE.isSignatureInSectionPresent(0, "ff20'Go build ID: '")) {
             sVersion = "1.15.0+";
         } else {
@@ -62,4 +65,35 @@ function detect() {
     sLang = "Go";
 
     return result();
+}
+
+// Reads the exact toolchain version (e.g. "1.25.0") from the build info blob
+// that Go 1.18+ embeds at the start of the data section:
+//   "\xff Go buildinf:" | ptrSize (1) | flags (1) | padding | at +32: uvarint len + "go1.x.y"
+// Returns "" if the blob is absent or uses the pre-1.18 pointer layout.
+function getGoBuildInfoVersion() {
+    var dataSection = PE.section[".data"];
+    if (!dataSection) {
+        return "";
+    }
+
+    // The whole record must lie inside .data and the file, as Go's own reader requires
+    var nDataEnd = Math.min(dataSection.FileOffset + dataSection.FileSize, PE.getSize());
+    var nOffset = PE.findSignature(dataSection.FileOffset, Math.min(dataSection.FileSize, 0x10000), "ff20'Go buildinf:'");
+    if (nOffset === -1 || nOffset + 33 > nDataEnd || (PE.readByte(nOffset + 15) & 0x02) === 0) { // flagsVersionInl
+        return "";
+    }
+
+    var nLength = PE.readByte(nOffset + 32);
+    if (nLength < 4 || nLength > 0x7f || nOffset + 33 + nLength > nDataEnd) { // single-byte uvarint is enough for a version string
+        return "";
+    }
+
+    var sVersionString = PE.getString(nOffset + 33, nLength);
+    if (sVersionString.length !== nLength) {
+        return "";
+    }
+
+    var aMatch = /^go(\d+\.\d+(?:\.\d+)?(?:(?:rc|beta)\d+)?)/.exec(sVersionString);
+    return aMatch ? aMatch[1] : "";
 }
