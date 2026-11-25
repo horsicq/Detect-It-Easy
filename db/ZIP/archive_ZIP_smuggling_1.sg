@@ -1,4 +1,208 @@
 // Detect It Easy: detection rule file
+
+// Author: DevX-Cipher
+// GitHub: https://github.com/DevX-Cipher
+
+// ZIP smuggling: bytes hidden in a ZIP's structure that no entry accounts for
+// (gaps between entries, data after the end record, a long archive comment,
+// oversized extra fields, a lone .lnk entry), plus identification of the
+// hidden data (MSI/OLE, TAR, PE, ...). Used by Mustang Panda (TA416) to carry
+// the next stage inside a ZIP that a shortcut (.lnk) carves out at run time.
+// ZIP64 archives are skipped, not flagged.
+//
+
+meta("protection", "ZIP smuggling");
+
+function hex(n) {
+    var s = "", d = "0123456789ABCDEF";
+    if (n == 0) return "0";
+    while (n > 0) { s = d.charAt(n % 16) + s; n = Math.floor(n / 16); }
+    return s;
+}
+
+function add(s, t) {
+    if (s.length) return s + ", " + t;
+    return t;
+}
+
+// Name what a hidden region looks like.
+function payloadAt(nStart, nLen) {
+    if (nLen >= 8 && Binary.compare("D0CF11E0A1B11AE1", nStart)) return "MSI/OLE";
+    if (nLen >= 262 && Binary.compare("'ustar'", nStart + 257)) return "TAR";
+    if (nLen >= 2 && Binary.compare("'MZ'", nStart)) return "PE";
+    if (nLen >= 6 && Binary.compare("'7z'BCAF271C", nStart)) return "7z";
+    if (nLen >= 4 && Binary.compare("'Rar!'", nStart)) return "RAR";
+    if (nLen >= 2 && Binary.compare("1F8B", nStart)) return "GZIP";
+    if (nLen >= 4 && Binary.compare("'PK'0304", nStart)) return "ZIP";
+    if (nLen > 8 && typeof Binary.findSignature === "function") {
+        var nMax = nLen > 0x1000000 ? 0x1000000 : nLen;
+        var n = Binary.findSignature(nStart, nMax, "D0CF11E0A1B11AE1");
+        if (n != -1) return "MSI/OLE at 0x" + hex(n);
+        n = Binary.findSignature(nStart, nMax, "'ustar'");
+        if (n != -1 && n - 257 >= nStart) return "TAR at 0x" + hex(n - 257);
+    }
+    return "";
+}
+
+// An end-of-central-directory (EOCD) candidate is believed only if its
+// directory fields are consistent. A "PK\5\6" inside an archive comment or in
+// appended data therefore cannot replace the real record.
+function isEocd(p, nSize) {
+    if (p + 22 + Binary.readWord(p + 20) > nSize) return false; // comment must fit
+    var nEntries = Binary.readWord(p + 10);
+    var nCdSize = Binary.readDword(p + 12);
+    var nCdOff = Binary.readDword(p + 16);
+    // ZIP64 markers: genuine record, the caller skips these archives.
+    if (nEntries == 0xFFFF || nCdSize == 0xFFFFFFFF || nCdOff == 0xFFFFFFFF) return true;
+    // The file starts with a local header, so a real directory is not empty.
+    if (nEntries == 0 || nCdSize > p) return false;
+    var nCd = p - nCdSize;
+    return nCd >= nCdOff && Binary.compare("'PK'0102", nCd);
+}
+
+// Last valid EOCD. The comment length (max 65535) does not bound appended
+// data, so the search is not limited to the comment window. Work is capped:
+// 64 MB with findSignature, 1 MB byte-by-byte without it.
+function findEocd(nSize) {
+    var nBest = -1;
+    var bNative = typeof Binary.findSignature === "function";
+    if (bNative) {
+        var nFrom = nSize > 0x4000000 ? nSize - 0x4000000 : 0;
+        for (var i = 0; i < 100000 && nFrom <= nSize - 22; i++) {
+            var n = Binary.findSignature(nFrom, nSize - nFrom, "'PK'0506");
+            if (n == -1) break;
+            if (!Binary.compare("'PK'0506", n)) { bNative = false; break; } // unexpected result
+            if (isEocd(n, nSize)) nBest = n;
+            nFrom = n + 1;
+        }
+        if (bNative) return nBest;
+    }
+    var nLow = nSize > 0x100000 ? nSize - 0x100000 : 0;
+    for (var p = nSize - 22; p >= nLow; p--) {
+        if (Binary.compare("'PK'0506", p) && isEocd(p, nSize)) return p;
+    }
+    return -1;
+}
+
+function scan() {
+    var nSize = Binary.getSize();
+    if (nSize < 64 || !Binary.compare("'PK'0304", 0)) return "";
+
+    var nEocd = findEocd(nSize);
+    if (nEocd < 0) return "";
+
+    var nComment = Binary.readWord(nEocd + 20);
+    var nTrailing = nSize - (nEocd + 22 + nComment);
+    var nEntries = Binary.readWord(nEocd + 10);
+    var nCdSize = Binary.readDword(nEocd + 12);
+    var nCdOff = Binary.readDword(nEocd + 16);
+    if (nEntries == 0 || nEntries == 0xFFFF || nCdSize == 0xFFFFFFFF || nCdOff == 0xFFFFFFFF) return "";
+
+    // Central directory start, and bytes in front of the archive proper.
+    var nCd = nEocd - nCdSize;
+    if (nCd < nCdOff) return "";
+    var nBase = nCd - nCdOff;
+
+    // Entries beyond the limit are not traversed, so gaps cannot be judged.
+    var bPartial = nEntries > 5000;
+    var aS = [], aE = [];
+    var bBigExtra = false, bLnk = false;
+    var pos = nCd;
+
+    for (var e = 0; e < nEntries && e < 5000; e++) {
+        if (!Binary.compare("'PK'0102", pos)) break;
+        var nFlags = Binary.readWord(pos + 8);
+        var nPacked = Binary.readDword(pos + 20);
+        var nName = Binary.readWord(pos + 28);
+        var nExtra = Binary.readWord(pos + 30);
+        var nCmt = Binary.readWord(pos + 32);
+        var nLoc = Binary.readDword(pos + 42);
+        if (nPacked == 0xFFFFFFFF || nLoc == 0xFFFFFFFF || Binary.readDword(pos + 24) == 0xFFFFFFFF) return "";
+
+        if (nEntries == 1 && nName >= 4) {
+            var q = pos + 46 + nName - 4;
+            if ((Binary.readWord(q) | 0x2020) == 0x6C2E && (Binary.readWord(q + 2) | 0x2020) == 0x6B6E) bLnk = true;
+        }
+        pos += 46 + nName + nExtra + nCmt;
+
+        var nLh = nBase + nLoc;
+        if (!Binary.compare("'PK'0304", nLh)) continue;
+        var nLExtra = Binary.readWord(nLh + 28);
+        if (nLExtra > 1024) bBigExtra = true; // normal extra fields are a few dozen bytes
+        var nEnd = nLh + 30 + Binary.readWord(nLh + 26) + nLExtra + nPacked;
+        if (nFlags & 8) {
+            if (Binary.compare("'PK'0708", nEnd)) nEnd += 16; else nEnd += 12;
+        }
+        if (nEnd > nCd) continue;
+
+        // insert sorted by start
+        var k = aS.length;
+        aS.push(nLh); aE.push(nEnd);
+        while (k > 0 && aS[k - 1] > nLh) {
+            aS[k] = aS[k - 1]; aE[k] = aE[k - 1]; k--;
+        }
+        aS[k] = nLh; aE[k] = nEnd;
+    }
+
+    var nHidden = 0, nBig = 0, nBigAt = 0, nCursor = 0;
+    for (var i = 0; i < aS.length && !bPartial; i++) {
+        if (aS[i] > nCursor + 3) { // ignore up to 3 bytes of padding
+            var g = aS[i] - nCursor;
+            nHidden += g;
+            if (g > nBig) { nBig = g; nBigAt = nCursor; }
+        }
+        if (aE[i] > nCursor) nCursor = aE[i];
+    }
+    // Gap before the central directory. A genuine APK signing block (size
+    // fields at both ends match, magic last) is excluded; bytes in front of it
+    // still count. A bare "APK Sig Block 42" marker proves nothing.
+    if (aS.length && !bPartial && nCd > nCursor + 3) {
+        var nGapEnd = nCd;
+        if (nCd >= 24 && Binary.compare("'APK Sig Block 42'", nCd - 16)) {
+            var nSbSize = Binary.readDword(nCd - 24);       // 8-byte size, low dword
+            var nSbStart = nCd - nSbSize - 8;               // block start (first size field)
+            if (Binary.readDword(nCd - 20) == 0 && nSbSize >= 24 && nSbStart >= nCursor &&
+                Binary.readDword(nSbStart) == nSbSize && Binary.readDword(nSbStart + 4) == 0) {
+                nGapEnd = nSbStart;
+            }
+        }
+        if (nGapEnd > nCursor + 3) {
+            var g2 = nGapEnd - nCursor;
+            nHidden += g2;
+            if (g2 > nBig) { nBig = g2; nBigAt = nCursor; }
+        }
+    }
+
+    var out = "", what = "";
+    if (nHidden) {
+        out = add(out, nHidden + " bytes hidden between entries (largest at 0x" + hex(nBigAt) + ")");
+        what = payloadAt(nBigAt, nBig);
+    }
+    if (nTrailing >= 4) {
+        out = add(out, nTrailing + " bytes after the end of the archive");
+        if (!what) what = payloadAt(nEocd + 22 + nComment, nTrailing);
+    }
+    if (nComment >= 64) // long archive comment out = add(out, "archive comment of " + nComment + " bytes");
+    if (bBigExtra) out = add(out, "oversized extra field");
+    if (bLnk) out = add(out, "only entry is a .lnk shortcut");
+    if (out.length && what) out = add(out, "hidden data looks like " + what);
+    return out;
+}
+
+function detect() {
+    try {
+        var sFound = scan();
+        if (sFound.length) {
+            sOptions = sFound;
+            bDetected = true;
+        }
+    } catch (e) {
+        // Malformed archive: report nothing.
+    }
+
+    return result();
+}
+// Detect It Easy: detection rule file
 // ZIP smuggling: bytes hidden in a ZIP's structure that no entry accounts for
 // (gaps between entries, data after the end record, long comment, oversized
 // extra fields, a lone .lnk entry), plus identification of what is hidden.
