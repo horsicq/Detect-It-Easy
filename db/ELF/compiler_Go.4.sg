@@ -154,7 +154,48 @@ function detect() {
         bDetected = true;
     }
 
+    // The exact version from the build info overrides the EP-based guess
+    if (bDetected) {
+        var sBuildInfoVersion = getGoBuildInfoVersion();
+        if (sBuildInfoVersion) {
+            sVersion = sBuildInfoVersion;
+        }
+    }
+
     sLang = "Go";
 
     return result();
+}
+
+// Reads the exact toolchain version (e.g. "1.25.0") from the .go.buildinfo section
+// that Go 1.18+ writes at the start of the section:
+//   "\xff Go buildinf:" | ptrSize (1) | flags (1) | padding | at +32: uvarint len + "go1.x.y"
+// Returns "" if the section is absent or uses the pre-1.18 pointer layout.
+function getGoBuildInfoVersion() {
+    var nSection = ELF.getSectionNumber(".go.buildinfo");
+    if (nSection === -1) {
+        return "";
+    }
+
+    // The whole record must lie inside the section and the file, as Go's own reader requires
+    var nOffset = ELF.getSectionFileOffset(nSection);
+    var nSectionEnd = Math.min(nOffset + ELF.getSectionFileSize(nSection), ELF.getSize());
+    if (nOffset + 33 > nSectionEnd ||
+        !ELF.compare("ff20'Go buildinf:'", nOffset) ||
+        (ELF.readByte(nOffset + 15) & 0x02) === 0) { // flagsVersionInl
+        return "";
+    }
+
+    var nLength = ELF.readByte(nOffset + 32);
+    if (nLength < 4 || nLength > 0x7f || nOffset + 33 + nLength > nSectionEnd) { // single-byte uvarint is enough for a version string
+        return "";
+    }
+
+    var sVersionString = ELF.getString(nOffset + 33, nLength);
+    if (sVersionString.length !== nLength) {
+        return "";
+    }
+
+    var aMatch = /^go(\d+\.\d+(?:\.\d+)?(?:(?:rc|beta)\d+)?)/.exec(sVersionString);
+    return aMatch ? aMatch[1] : "";
 }
