@@ -1,0 +1,105 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:5669-5760, Rich records nfd_msdos.cpp:507, 540, 621, 653-663)
+// Also MASM (Rich MASM records) when no C/C++-slot compiler record exists (NFD nfd_pe.cpp:5763-5767);
+// _Microsoft.6.sg drops Rich MASM when Visual C/C++ was found by the entry point.
+// Rich product IDs that _Microsoft.6.sg does not know: Microsoft Phoenix (0x7f, 0x9f-0xa9), ILAsm (0x2e) and the
+// Visual Basic 6.0 object record (0x0d). NFD keeps the compiler record with the greatest version string among
+// these and the Visual C/C++ records; this rule reports the winner when it is one of these three.
+// _FixDetects.9.sg then drops "Microsoft Visual C/C++" when another compiler is present, as NFD shows one compiler.
+
+
+
+function getVCMajor(nId) {
+    if (nId == 0x08) return "11.00";
+    if (nId == 0x0a || nId == 0x0b || (nId >= 0x15 && nId <= 0x18)) return "12.00";
+    if (nId == 0x23 || nId == 0x24) return "12.10";
+    if (nId >= 0x30 && nId <= 0x35) return "12.20";
+    if (nId == 0x1c || nId == 0x1d || nId == 0x2b || nId == 0x2c || nId == 0x39 || nId == 0x3a || (nId >= 0x41 && nId <= 0x44)) return "13.00";
+    if (nId >= 0x4c && nId <= 0x55) return "13.10p";
+    if (nId >= 0x5f && nId <= 0x68) return "13.10";
+    if ((nId >= 0x6d && nId <= 0x76) || (nId >= 0x80 && nId <= 0x82)) return "14.00";
+    if (nId >= 0x83 && nId <= 0x8f) return "15.00";
+    if (nId >= 0xaa && nId <= 0xb4) return "16.00";
+    if (nId >= 0xbc && nId <= 0xc6) return "16.10";
+    if (nId >= 0xce && nId <= 0xd8) return "17.00";
+    if (nId >= 0xe0 && nId <= 0xea) return "18.00";
+    if (nId >= 0xf2 && nId <= 0xfc) return "18.10";
+    if (nId >= 0x104 && nId <= 0x10e) return "19.00";
+    return "";
+}
+
+function detect() {
+    var nNumberOfRichIDs = PE.getNumberOfRichIDs();
+
+    if (!nNumberOfRichIDs) {
+        return;
+    }
+
+    var mapPhoenixOptions = {
+        0x9f: "C", 0xa0: "C++", 0xa1: "CVTCIL/C", 0xa2: "CVTCIL/C++", 0xa3: "LTCG/C", 0xa4: "LTCG/C++",
+        0xa5: "LTCG/MSIL", 0xa6: "POGO_I_C", 0xa7: "POGO_I_CPP", 0xa8: "POGO_O_C", 0xa9: "POGO_O_CPP"
+    };
+
+    var mapMasmVersions = {
+        0x0e: "6.13", 0x0f: "7.01", 0x12: "6.14", 0x2a: "6.15", 0x2d: "6.20", 0x40: "7.00", 0x4b: "7.10p", 0x7d: "8.00",
+        0x95: "9.00", 0x9e: "10.00", 0xbb: "10.10", 0xcd: "11.00", 0xdf: "12.00", 0xf1: "12.10", 0x103: "14.00"
+    };
+
+    var sMasmVersion = String();
+
+    var sBestName = String(),
+        sBestVersion = String(),
+        sBestOptions = String();
+
+    for (var i = nNumberOfRichIDs - 1; i >= 0; i--) {
+        var nId = PE.getRichID(i),
+            sBuild = String(PE.getRichVersion(i)),
+            sName = String(),
+            sVersion_ = String(),
+            sOptions_ = String();
+
+        if (nId == 0x7f) {
+            sName = "Microsoft Phoenix";
+            sVersion_ = "Prerelease." + sBuild;
+        } else if (nId >= 0x9f && nId <= 0xa9) {
+            sName = "Microsoft Phoenix";
+            sVersion_ = "16.00." + sBuild;
+            sOptions_ = mapPhoenixOptions[nId];
+        } else if (nId == 0x2e) {
+            sName = "ILAsm";
+            sVersion_ = "1.00." + sBuild;
+        } else if (nId == 0x0d) {
+            sName = "Visual Basic";
+            sVersion_ = "6.00." + sBuild;
+        } else if (mapMasmVersions[nId]) {
+            if ((mapMasmVersions[nId] + "." + sBuild) > sMasmVersion) {
+                sMasmVersion = mapMasmVersions[nId] + "." + sBuild;
+            }
+        } else if (getVCMajor(nId)) {
+            sName = "Microsoft Visual C/C++";
+            sVersion_ = getVCMajor(nId) + "." + sBuild;
+        }
+
+        if (sName && sVersion_ > sBestVersion) {
+            sBestName = sName;
+            sBestVersion = sVersion_;
+            sBestOptions = sOptions_;
+        }
+    }
+
+    if (!sBestName && sMasmVersion) {
+        if (!_isResultPresent("compiler", "MASM")) {
+            _setLang("ASMx" + (PE.is64() ? "64" : "86"));
+            _setResult("compiler", "MASM", sMasmVersion, String());
+        }
+    } else if (sBestName == "Microsoft Phoenix" || sBestName == "ILAsm") {
+        if (!_isResultPresent("compiler", sBestName)) {
+            _setResult("compiler", sBestName, sBestVersion, sBestOptions);
+        }
+    } else if (sBestName == "Visual Basic") {
+        if (!_isResultPresent("compiler", "Visual Basic") && !_isResultPresent("compiler", "Microsoft Visual Basic")) {
+            _setLang("VB");
+            _setResult("compiler", sBestName, sBestVersion, sBestOptions);
+        }
+    }
+}

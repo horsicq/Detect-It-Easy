@@ -1,0 +1,25 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:5600-5606, header records nfd_msdos.cpp:135-140)
+// NFD reports Visual C# for a .NET image whose DOS header/stub is the plain Microsoft one with e_lfanew 0x80
+// (no Rich header; RECORD_NAME_GENERICLINKER) or the 0x78 variant.
+// Difference from NFD: not reported when another .NET compiler (VB.NET, JScript, Delphi .NET, ...) is already
+// detected; NFD then reports both, which is wrong for VB.NET images.
+
+meta("compiler", "Visual C#");
+
+function detect() {
+    if (!PE.isNet()) {
+        return;
+    }
+
+    if (_getNumberOfResults("compiler") > 0) {
+        return;
+    }
+
+    if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000") ||
+        PE.compare("'MZ'78000100000004000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000780000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.$'0000'PE'0000")) {
+        bDetected = true;
+    }
+
+    return result();
+}

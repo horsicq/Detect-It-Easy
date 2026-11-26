@@ -1,0 +1,103 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:6264-6420 and 6561-6576, NFD_PE::handle_Borland)
+// C++ Builder by CodeGear/Embarcadero: copyright string in the data section or the __CPPdebugHook export.
+// Borland-branded builds are already reported by compiler_Borland_C++.6.sg as "Borland C++ (Builder)";
+// when that result is present only the vendor tool record is added (no second compiler record).
+
+includeScript("Borland");
+
+function getDataSectionNumber() {
+    var nNumberOfSections = PE.getNumberOfSections(),
+        i;
+
+    for (i = 1; i < nNumberOfSections; i++) {
+        var sName = PE.getSectionName(i);
+
+        if ((sName == "DATA" || sName == ".data") && ((PE.getSectionCharacteristics(i) & 0xFF0000FF) >>> 0) == 0xC0000040 && PE.getSectionFileSize(i)) {
+            return i;
+        }
+    }
+
+    for (i = 1; i < nNumberOfSections; i++) {
+        var nCharacteristics = PE.getSectionCharacteristics(i) >>> 0;
+
+        if (PE.getSectionFileSize(i) && nCharacteristics != 0x60000020 && nCharacteristics != 0x40000040) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+function detect() {
+    if (PE.isNet()) {
+        return;
+    }
+
+    var sCompany = String(),
+        sCppVersion = String(),
+        bCpp = false;
+
+    var nDataSection = getDataSectionNumber();
+
+    if (nDataSection != -1) {
+        var nOffset = PE.getSectionFileOffset(nDataSection),
+            nSize = PE.getSectionFileSize(nDataSection),
+            nFound = PE.findString(nOffset, nSize, "Borland C++ - Copyright ");
+
+        if (nFound != -1) {
+            sCompany = "Borland";
+            sCppVersion = PE.getString(nFound + 24, 4);
+        } else if ((nFound = PE.findString(nOffset, nSize, "CodeGear C++ - Copyright ")) != -1) {
+            sCompany = "CodeGear";
+            sCppVersion = PE.getString(nFound + 25, 4);
+        } else if ((nFound = PE.findString(nOffset, nSize, "Embarcadero RAD Studio - Copyright ")) != -1) {
+            sCompany = "Embarcadero";
+            sCppVersion = PE.getString(nFound + 35, 4);
+        } else if ((nFound = PE.findString(nOffset, nSize, "Embarcadero RAD Studio 27.0 - Copyright 2020 Embarcadero Technologies, Inc.")) != -1) {
+            sCompany = "Embarcadero";
+            sCppVersion = PE.getString(nFound + 40, 4);
+        }
+    }
+
+    if (sCompany) {
+        bCpp = true;
+    } else if (PE.isExportFunctionPresent("__CPPdebugHook") || PE.isExportFunctionPresent("___CPPdebugHook")) {
+        sCompany = "Embarcadero";
+        bCpp = true;
+    }
+
+    // PACKAGEINFO producer flags (NFD_PE::getVCLPackageInfo): 3 = Pascal
+    var packageInfoResource = PE.resource["PACKAGEINFO"];
+
+    if (bCpp && packageInfoResource) {
+        var nFlags = PE.readDword(packageInfoResource.Offset);
+
+        if ((nFlags & 0xFF00) == 0 && ((nFlags >>> 26) & 0x3) == 3) {
+            bCpp = false;
+        }
+    }
+
+    if (!bCpp || sCompany == "Borland") {
+        return;
+    }
+
+    var sBuilderVersion = String();
+
+    if (sCppVersion == "2009") {
+        sBuilderVersion = "2009";
+    } else if (sCppVersion == "2015") {
+        sBuilderVersion = "2015";
+    } else if (sCppVersion == "2020") {
+        sBuilderVersion = "10.4";
+    }
+
+    if (!_isResultPresent("compiler", "Borland C++") && !_isResultPresent("compiler", sCompany + " C++")) {
+        _setLang("C++");
+        _setResult("compiler", sCompany + " C++", sCppVersion, String());
+    }
+
+    if (!_isResultPresent("tool", sCompany + " C++ Builder")) {
+        _setResult("tool", sCompany + " C++ Builder", sBuilderVersion, String());
+    }
+}

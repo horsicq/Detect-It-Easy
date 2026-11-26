@@ -1,0 +1,25 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:7509-7530, NFD_Binary::get_DWRAF_vi)
+// PE debug sections: DWARF (.debug_info, version = int16 at +4, 0..7) and STABS (.stab + .stabstr).
+// DWARF uses the name DIE already reports for DWARF data in Binary/debug_data_debugData.1.sg.
+
+function detect() {
+    var nSection = PE.getSectionNumber(".debug_info");
+
+    if (nSection != -1) {
+        var nOffset = PE.getSectionFileOffset(nSection),
+            nSize = PE.getSectionFileSize(nSection);
+
+        if (nOffset && nSize > 8) {
+            var nVersion = PE.readWord(nOffset + 4);
+
+            if (nVersion <= 7) {
+                _setResult("debug data", "DWARF", nVersion + ".0", String());
+            }
+        }
+    }
+
+    if (PE.isSectionNamePresent(".stab") && PE.isSectionNamePresent(".stabstr")) {
+        _setResult("debug data", "STABS Debug Info", String(), String());
+    }
+}

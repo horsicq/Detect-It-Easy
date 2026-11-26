@@ -1,0 +1,24 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:3658-3662)
+// NFD reports GNU ld (version = PE header linker version) for GCC/MinGW/Cygwin images with the generic
+// Microsoft-style DOS stub at e_lfanew 0x80. _linkers.6.sg only reports the binutils versions it knows;
+// this rule covers the others, with DIE's name for the product.
+
+meta("linker", "GNU Linker ld (GNU Binutils)");
+
+function detect() {
+    if (_getNumberOfResults("linker") > 0) {
+        return;
+    }
+
+    if (!_isResultPresent("compiler", "MinGW") && !_isResultPresent("compiler", "GCC") && !_isResultPresent("compiler", "Cygwin32")) {
+        return;
+    }
+
+    if (PE.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000")) {
+        sVersion = PE.getMajorLinkerVersion() + "." + PE.getMinorLinkerVersion();
+        bDetected = true;
+    }
+
+    return result();
+}

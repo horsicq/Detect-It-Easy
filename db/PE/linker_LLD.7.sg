@@ -1,0 +1,27 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:6809-6830)
+// LLVM lld: a ".buildid" section (lld --build-id) or the "LLD PDB." CodeView PDB path in the constant data.
+
+meta("linker", "LLD");
+
+function detect() {
+    if (_isResultPresent("linker", "LLD")) {
+        return;
+    }
+
+    if (PE.isSectionNamePresent(".buildid")) {
+        bDetected = true;
+    } else {
+        var rdataSection = PE.section[".rdata"];
+
+        if (rdataSection && PE.findString(rdataSection.FileOffset, rdataSection.FileSize, "LLD PDB.") != -1) {
+            bDetected = true;
+        }
+    }
+
+    if (bDetected) {
+        sVersion = PE.getMajorLinkerVersion() + "." + PE.getMinorLinkerVersion();
+    }
+
+    return result();
+}

@@ -1,0 +1,123 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:5907-5960)
+// NFD reports Microsoft Visual Studio for every image it attributes to Visual C/C++. _Microsoft.6.sg reports the
+// tool only when the linker version maps to a release; this rule adds it when it is still missing:
+// version from the Rich compiler build (NFD table for compilers before 19.00), else from the PE header
+// linker version (the _Microsoft.6.sg map), else without a version.
+
+meta("tool", "Microsoft Visual Studio");
+
+// Rich product ID -> compiler major.minor (C/C++ compiler records only)
+function getRichCompilerMajor(nId) {
+    if (nId == 0x08) return "11.00";
+    if (nId == 0x0a || nId == 0x0b || (nId >= 0x15 && nId <= 0x18)) return "12.00";
+    if (nId == 0x23 || nId == 0x24) return "12.10";
+    if (nId >= 0x30 && nId <= 0x35) return "12.20";
+    if (nId == 0x1c || nId == 0x1d || nId == 0x2b || nId == 0x2c || nId == 0x39 || nId == 0x3a || (nId >= 0x41 && nId <= 0x44)) return "13.00";
+    if (nId >= 0x4c && nId <= 0x55) return "13.10p";
+    if (nId >= 0x5f && nId <= 0x68) return "13.10";
+    if ((nId >= 0x6d && nId <= 0x76) || (nId >= 0x80 && nId <= 0x82)) return "14.00";
+    if (nId >= 0x83 && nId <= 0x8f) return "15.00";
+    if (nId >= 0xaa && nId <= 0xb4) return "16.00";
+    if (nId >= 0xbc && nId <= 0xc6) return "16.10";
+    if (nId >= 0xce && nId <= 0xd8) return "17.00";
+    if (nId >= 0xe0 && nId <= 0xea) return "18.00";
+    if (nId >= 0xf2 && nId <= 0xfc) return "18.10";
+    if (nId >= 0x104 && nId <= 0x10e) return "19.00";
+    return "";
+}
+
+function detect() {
+    if (!_isResultPresent("compiler", "Microsoft Visual C/C++") || _isResultPresent("tool", "Microsoft Visual Studio")) {
+        return;
+    }
+
+    var mapCompilerVersions = {
+        "12.00.8168": "6.0",
+        "12.00.8804": "6.0 SP5-SP6",
+        "12.00.8447": "6.0 SP5",
+        "13.00.9176": "Windows XP SP1 DDK",
+        "13.00.9466": "2002(.NET) 7.0.9466",
+        "13.10.3052": "2003",
+        "13.10.3077": "2003(.NET) 7.0.1.3088",
+        "13.10.4035": "Windows Server 2003 SP1 DDK",
+        "13.10.6030": "2003(.NET) SP1 (kb918007)",
+        "14.00.40310": "Windows Server 2003 SP1 DDK (for AMD64)",
+        "14.00.40607": "2005 Beta 1 [8.0]",
+        "14.00.50215": "2005 Beta 2 [8.0]",
+        "14.00.50320": "2005 [8.0]",
+        "14.00.50727": "2005 SP1",
+        "15.00.20706": "2008 Beta 2 [9.0]",
+        "15.00.21022": "2008 (9.0.21022.8 RTM)",
+        "15.00.30411": "2008 with Feature Pack",
+        "15.00.30729": "2008 SP1 (9.0.30729.1 SP)",
+        "16.00.20506": "2010 Beta 1",
+        "16.00.21003": "2010 Beta 2",
+        "16.00.30319": "2010 (10.0.30319.1 RTMRel)",
+        "16.00.40219": "2010 SP1 kb 983509 (10.0.40219.1 SP1Rel)",
+        "17.00.50727": "2012 Premium (11.0.50727.1 RTMREL)",
+        "17.00.51025": "2012 November CTP [11.0]",
+        "17.00.51106": "2012 Update 1 (17.00.51106.1 Update 1)",
+        "17.00.60315": "2012 Update 2 (17.00.60315.1 Update 2)",
+        "17.00.60610": "2012 Update 3 (17.00.60610.1 Update 3)",
+        "17.00.61030": "2012 Premium Update 4 (11.0.61030.00 Update 4)",
+        "18.00.20617": "2013 Preview [12.0]",
+        "18.00.20827": "2013 RC [12.0]",
+        "18.00.21005": "2013 RTM",
+        "18.00.21114": "2013 November CTP [12.0]",
+        "18.00.30324": "2013 Update2 RC [12.0]",
+        "18.00.30501": "2013 12.0.30501.00 Update 2",
+        "18.00.30723": "2013 12.0.30723.00 Update 3",
+        "18.00.31101": "2013 12.0.31101.00 Update 4",
+        "18.00.40629": "2013 12.0.40629.00 Update 5"
+    };
+
+    var sCompilerVersion = String();
+
+    for (var i = 0; i < PE.getNumberOfRichIDs(); i++) {
+        var sMajor = getRichCompilerMajor(PE.getRichID(i));
+
+        if (sMajor) {
+            var sBuild = String(PE.getRichVersion(i));
+
+            while (sBuild.length < 4) {
+                sBuild = "0" + sBuild;
+            }
+
+            var _sVersion = sMajor + "." + sBuild;
+
+            if (_sVersion > sCompilerVersion) {
+                sCompilerVersion = _sVersion;
+            }
+        }
+    }
+
+    if (sCompilerVersion && mapCompilerVersions[sCompilerVersion]) {
+        sVersion = mapCompilerVersions[sCompilerVersion];
+    } else {
+        var nMajorLinkerVersion = PE.getMajorLinkerVersion(),
+            nMinorLinkerVersion = PE.getMinorLinkerVersion(),
+            sLinkerVersion = nMajorLinkerVersion + "." + (nMinorLinkerVersion < 10 ? "0" : "") + nMinorLinkerVersion;
+
+        var mapLinkerVersions = {
+            "6.00": "6.0", "7.00": "2002", "7.10": "2003", "8.00": "2005", "9.00": "2008", "10.00": "2010",
+            "11.00": "2012", "12.00": "2013", "14.00": "2015",
+            "14.10": "2017, 15.0-15.2", "14.11": "2017, 15.3", "14.12": "2017, 15.5", "14.13": "2017, 15.6",
+            "14.14": "2017, 15.7", "14.15": "2017, 15.8", "14.16": "2017, 15.9",
+            "14.20": "2019, 16.0", "14.21": "2019, 16.1", "14.22": "2019, 16.2", "14.23": "2019, 16.3",
+            "14.24": "2019, 16.4", "14.25": "2019, 16.5", "14.26": "2019, 16.6", "14.27": "2019, 16.7-16.8",
+            "14.28": "2019, 16.9-16.10", "14.29": "2019, 16.11",
+            "14.30": "2022, 17.0", "14.31": "2022, 17.1", "14.32": "2022, 17.2", "14.33": "2022, 17.3",
+            "14.34": "2022, 17.4", "14.35": "2022, 17.5", "14.36": "2022, 17.6", "14.37": "2022, 17.7",
+            "14.38": "2022, 17.8", "14.39": "2022, 17.9.1", "14.40": "2022, 17.10", "14.41": "2022, 17.11",
+            "14.42": "2022, 17.12", "14.43": "2022, 17.13", "14.44": "2022, 17.14",
+            "14.50": "2026, 18.0-18.3", "14.51": "2026, 18.4"
+        };
+
+        sVersion = mapLinkerVersions[sLinkerVersion] || String();
+    }
+
+    bDetected = true;
+
+    return result();
+}

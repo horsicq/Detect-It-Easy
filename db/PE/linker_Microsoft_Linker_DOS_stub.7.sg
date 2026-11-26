@@ -1,0 +1,39 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:5584-5587 and 5883-5885, header records nfd_msdos.cpp:132-143,
+// RLPack/Backdoor PE removal nfd_pe.cpp:7739-7744)
+// NFD reports the Microsoft linker for the Microsoft DOS header/stub when e_lfanew is not 0x80 (0x80 = the
+// generic stub that other linkers also write), and for the same header with a zeroed stub ("Patched").
+// Only used when no other rule reported a linker; the version is the PE header linker version.
+
+meta("linker", "Microsoft Linker");
+
+function detect() {
+    if (_getNumberOfResults("linker") > 0) {
+        return;
+    }
+
+    if (_isResultPresent("packer", "RLPack") || _isResultPresent("protector", "Backdoor PE Compress Protector")) {
+        return;
+    }
+
+    var sHeader = "'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000";
+
+    if (PE.compare(sHeader + "....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000")) {
+        if (PE.readDword(0x3C) != 0x80) {
+            bDetected = true;
+        }
+    } else if (PE.compare(sHeader + "....000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")) {
+        bDetected = true;
+    }
+
+    if (bDetected) {
+        var nMajorLinkerVersion = PE.getMajorLinkerVersion(),
+            nMinorLinkerVersion = PE.getMinorLinkerVersion();
+
+        if (nMajorLinkerVersion || nMinorLinkerVersion) {
+            sVersion = nMajorLinkerVersion + "." + (nMinorLinkerVersion < 10 ? "0" : "") + nMinorLinkerVersion;
+        }
+    }
+
+    return result();
+}

@@ -1,0 +1,589 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_mach.cpp:70-366, NFD_MACH::handle_Tools; tables from
+// Formats/exec/xmach.cpp: _TABLE_XCODE_VERSIONS, _TABLE_XCODE_TOOLCHAINS_5, _TABLE_FOUNDATION_VERSIONS,
+// _TABLE_IOS_FOUNDATION_VERSIONS)
+// Results: sign tool codesign (LC_CODE_SIGNATURE), library Foundation, tool macOS/iOS/tvOS/watchOS SDK or
+// bridgeOS (LC_BUILD_VERSION / LC_VERSION_MIN_* / Foundation version), tool Xcode, linker Xcode ld and compilers
+// clang / Swift (LC_BUILD_VERSION tools, Xcode toolchain table). clang is the default compiler when gcc
+// (libgcc_s.1.dylib) is not linked, as in NFD.
+
+function readU32(nOffset, bBE) {
+    if (bBE) {
+        return ((MACH.readByte(nOffset) << 24) | (MACH.readByte(nOffset + 1) << 16) | (MACH.readByte(nOffset + 2) << 8) | MACH.readByte(nOffset + 3)) >>> 0;
+    }
+
+    return ((MACH.readByte(nOffset + 3) << 24) | (MACH.readByte(nOffset + 2) << 16) | (MACH.readByte(nOffset + 1) << 8) | MACH.readByte(nOffset)) >>> 0;
+}
+
+// XBinary::get_uint32_full_version
+function getFullVersion(nValue) {
+    return ((nValue >>> 16) & 0xFFFF) + "." + ((nValue >>> 8) & 0xFF) + "." + (nValue & 0xFF);
+}
+
+// "1.0.0" == "1.0" == "1" (XMACH::getXcodeVersionFromSDK)
+function normalizeVersion(sVersion) {
+    while (sVersion.length > 2 && sVersion.substr(sVersion.length - 2) == ".0") {
+        sVersion = sVersion.substr(0, sVersion.length - 2);
+    }
+
+    return sVersion;
+}
+
+// 0: macOS, 1: iOS, 2: watchOS, 3: tvOS, -1: other
+function getOSColumn(sOSName) {
+    if (sOSName == "macOS" || sOSName == "OS X" || sOSName == "Mac OS X") return 0;
+    if (sOSName == "iOS" || sOSName == "iPhoneOS" || sOSName == "iPhone OS" || sOSName == "iPadOS") return 1;
+    if (sOSName == "watchOS") return 2;
+    if (sOSName == "tvOS") return 3;
+    return -1;
+}
+
+function getXcodeVersionFromSDK(sSDKVersion, nColumn) {
+    // [Xcode, macOS SDK, iOS SDK, watchOS SDK, tvOS SDK]
+    var listXcode = [
+        ["1.0", "10.3", "", "", ""],
+        ["1.5", "10.3.7", "", "", ""],
+        ["2.0", "10.4", "", "", ""],
+        ["2.1", "10.4.1", "", "", ""],
+        ["2.2", "10.4.3", "", "", ""],
+        ["2.2.1", "10.4.3", "", "", ""],
+        ["2.3", "10.4.6", "", "", ""],
+        ["2.4", "10.4.7", "", "", ""],
+        ["2.4.1", "10.4.8", "", "", ""],
+        ["2.5", "10.4.10", "", "", ""],
+        ["3.0", "10.5", "", "", ""],
+        ["3.1", "10.5.4", "2.0", "", ""],
+        ["3.1.1", "10.5.5", "2.1", "", ""],
+        ["3.1.2", "10.5.6", "2.2.1", "", ""],
+        ["3.1.3", "10.5.7", "3.0", "", ""],
+        ["3.1.4", "10.5.8", "3.1", "", ""],
+        ["3.2", "10.6", "3.0", "", ""],
+        ["3.2.1", "10.6.2", "3.1.2", "", ""],
+        ["3.2.2", "10.6.2", "3.2", "", ""],
+        ["3.2.3", "10.6.4", "4.0", "", ""],
+        ["3.2.4", "10.6.4", "4.1", "", ""],
+        ["3.2.5", "10.6.5", "4.2", "", ""],
+        ["3.2.6", "10.6.7", "4.3", "", ""],
+        ["4.0", "10.6.7", "4.3", "", ""],
+        ["4.0.1", "10.6.7", "4.3", "", ""],
+        ["4.1", "10.7", "5.0", "", ""],
+        ["4.2", "10.7.2", "5.0", "", ""],
+        ["4.2.1", "10.7.2", "5.0", "", ""],
+        ["4.3", "10.7.3", "5.1", "", ""],
+        ["4.3.1", "10.7.3", "5.1", "", ""],
+        ["4.3.2", "10.7.3", "5.1", "", ""],
+        ["4.3.3", "10.7.4", "5.1", "", ""],
+        ["4.4", "10.8", "6.0", "", ""],
+        ["4.4.1", "10.8", "6.0", "", ""],
+        ["4.5", "10.8", "6.0", "", ""],
+        ["4.5.1", "10.8", "6.0", "", ""],
+        ["4.5.2", "10.8", "6.0", "", ""],
+        ["4.6", "10.8", "6.1", "", ""],
+        ["4.6.1", "10.8", "6.1", "", ""],
+        ["4.6.2", "10.8", "6.1", "", ""],
+        ["4.6.3", "10.8", "6.1", "", ""],
+        ["5.0", "10.8.5", "7.0", "", ""],
+        ["5.0.1", "10.9", "7.0", "", ""],
+        ["5.0.2", "10.9", "7.0", "", ""],
+        ["5.1", "10.9.2", "7.1", "", ""],
+        ["5.1.1", "10.9.2", "7.1", "", ""],
+        ["6.0", "10.10", "8.0", "", ""],
+        ["6.0.1", "10.10", "8.0", "", ""],
+        ["6.1", "10.10.1", "8.1", "", ""],
+        ["6.1.1", "10.10.1", "8.1", "", ""],
+        ["6.2", "10.10.2", "8.2", "1.0", ""],
+        ["6.3", "10.10.3", "8.3", "1.0", ""],
+        ["6.3.1", "10.10.3", "8.3", "1.0", ""],
+        ["6.3.2", "10.10.3", "8.3", "1.0", ""],
+        ["6.4", "10.10.4", "8.4", "1.0.1", ""],
+        ["7.0", "10.11", "9.0", "2.0", "9.0"],
+        ["7.0.1", "10.11", "9.0", "2.0", "9.0"],
+        ["7.1", "10.11", "9.1", "2.0", "9.0"],
+        ["7.1.1", "10.11.1", "9.1", "2.0.1", "9.0.1"],
+        ["7.2", "10.11.2", "9.2", "2.1", "9.1"],
+        ["7.2.1", "10.11.2", "9.2", "2.1", "9.1"],
+        ["7.3", "10.11.4", "9.3", "2.2", "9.2"],
+        ["7.3.1", "10.11.4", "9.3", "2.2", "9.2"],
+        ["8.0", "10.12", "10.0", "3.0", "10.0"],
+        ["8.1", "10.12.1", "10.1", "3.1", "10.0.1"],
+        ["8.2", "10.12.2", "10.2", "3.1.1", "10.1"],
+        ["8.2.1", "10.12.2", "10.2", "3.1.1", "10.1"],
+        ["8.3", "10.12.4", "10.3", "3.2", "10.2"],
+        ["8.3.1", "10.12.4", "10.3", "3.2", "10.2"],
+        ["8.3.2", "10.12.4", "10.3.1", "3.2", "10.2"],
+        ["8.3.3", "10.12.4", "10.3.1", "3.2", "10.2"],
+        ["9.0", "10.13", "11.0", "4.0", "11.0"],
+        ["9.0.1", "10.13", "11.0.1", "4.0", "11.0.1"],
+        ["9.1", "10.13.1", "11.1", "4.1", "11.1"],
+        ["9.2", "10.13.2", "11.2", "4.2", "11.2"],
+        ["9.3", "10.13.4", "11.3", "4.3", "11.3"],
+        ["9.3.1", "10.13.4", "11.3.1", "4.3", "11.3"],
+        ["9.4", "10.13.6", "11.4", "4.3.1", "11.4"],
+        ["9.4.1", "10.13.6", "11.4.1", "4.3.1", "11.4.1"],
+        ["10.0", "10.14", "12.0", "5.0", "12.0"],
+        ["10.1", "10.14.1", "12.1", "5.1", "12.1"],
+        ["10.2", "10.14.4", "12.2", "5.2", "12.2"],
+        ["10.2.1", "10.14.4", "12.2", "5.2", "12.2"],
+        ["10.3", "10.14.6", "12.4", "5.3", "12.4"],
+        ["11.0", "10.15", "13.0", "6.0", "13.0"],
+        ["11.1", "10.15", "13.1", "6.0", "13.0"],
+        ["11.2", "10.15.1", "13.2", "6.1", "13.2"],
+        ["11.2.1", "10.15.1", "13.2.2", "6.1", "13.2"],
+        ["11.3", "10.15.2", "13.3", "6.1.1", "13.3"],
+        ["11.3.1", "10.15.2", "13.3", "6.1.1", "13.3"],
+        ["11.4", "10.15.4", "13.4", "6.2", "13.4"],
+        ["11.4.1", "10.15.4", "13.4.1", "6.2", "13.4"],
+        ["11.5", "10.15.4", "13.5", "6.2.5", "13.4.5"],
+        ["11.6", "10.15.6", "13.6", "6.2.8", "13.4.8"],
+        ["11.7", "10.15.6", "13.7", "6.2.9", "13.4.8"],
+        ["12.0", "11.0", "14.0", "7.0", "14.0"],
+        ["12.0.1", "11.0", "14.0", "7.0", "14.0"],
+        ["12.1", "11.0", "14.1", "7.0.1", "14.0.1"],
+        ["12.2", "11.0.1", "14.2", "7.1", "14.2"],
+        ["12.3", "11.1", "14.3", "7.2", "14.3"],
+        ["12.4", "11.1", "14.4", "7.3", "14.4"],
+        ["12.5", "11.3", "14.5", "7.4", "14.5"],
+        ["12.5.1", "11.3", "14.5", "7.4", "14.5"],
+        ["13.0", "12.0", "15.0", "8.0", "15.0"],
+        ["13.1", "12.0.1", "15.0", "8.0", "15.0"],
+        ["13.2", "12.1", "15.2", "8.3", "15.2"],
+        ["13.2.1", "12.1", "15.2", "8.3", "15.2"],
+        ["13.3", "12.3", "15.4", "8.5", "15.4"],
+        ["13.3.1", "12.3", "15.4", "8.5", "15.4"],
+        ["13.4", "12.3", "15.5", "8.5", "15.5"],
+        ["13.4.1", "12.3", "15.5", "8.5", "15.5"],
+        ["14.0", "13.0", "16.0", "9.0", "16.0"],
+        ["14.0.1", "13.0", "16.0", "9.0", "16.0"],
+        ["14.1", "13.1", "16.1", "9.1", "16.1"],
+        ["14.2", "13.1", "16.2", "9.1", "16.1"],
+        ["14.3", "13.3", "16.4", "9.4", "16.4"],
+        ["14.3.1", "13.3", "16.4", "9.4", "16.4"],
+        ["15.0", "14.0", "17.0", "10.0", "17.0"],
+        ["15.0.1", "14.0", "17.0", "10.0", "17.0"],
+        ["15.1", "14.2", "17.2", "10.2", "17.2"],
+        ["15.2", "14.2", "17.2", "10.2", "17.2"],
+        ["15.3", "14.4", "17.4", "10.4", "17.4"],
+        ["15.4", "14.5", "17.5", "10.5", "17.5"],
+        ["16.0", "15.0", "18.0", "11.0", "18.0"],
+        ["16.1", "15.1", "18.1", "11.1", "18.1"],
+        ["16.2", "15.2", "18.2", "11.2", "18.2"],
+        ["16.3", "15.4", "18.4", "11.4", "18.4"],
+        ["16.4", "15.5", "18.5", "11.5", "18.5"],
+        ["26.0", "26.0", "26.0", "26.0", "26.0"],
+        ["26.0.1", "26.0", "26.0", "26.0", "26.0"],
+        ["26.1", "26.1", "26.1", "26.1", "26.1"],
+        ["26.1.1", "26.1", "26.1", "26.1", "26.1"],
+        ["26.2", "26.2", "26.2", "26.2", "26.2"]
+    ];
+
+    if (nColumn < 0) {
+        return String();
+    }
+
+    var sInput = normalizeVersion(sSDKVersion);
+
+    for (var i = 0; i < listXcode.length; i++) {
+        if (normalizeVersion(listXcode[i][nColumn + 1]) == sInput) {
+            return listXcode[i][0];
+        }
+    }
+
+    return String();
+}
+
+// returns [clang, Swift] for an Xcode version
+function getToolchain(sXcodeVersion) {
+    // [Xcode, clang, Swift]
+    var listToolchains = [
+        ["5.0", "5.0", ""],
+        ["5.0.1", "5.0", ""],
+        ["5.0.2", "5.0", ""],
+        ["5.1", "5.1", ""],
+        ["5.1.1", "5.1", ""],
+        ["6.0", "6.0", "1.0"],
+        ["6.0.1", "6.0", "1.0"],
+        ["6.1", "6.0", "1.1"],
+        ["6.1.1", "6.0", "1.1"],
+        ["6.2", "6.0", "1.2"],
+        ["6.3", "6.1", "1.2"],
+        ["6.3.1", "6.1", "1.2"],
+        ["6.3.2", "6.1", "1.2"],
+        ["6.4", "6.1", "1.2"],
+        ["7.0", "7.0.0", "2.0"],
+        ["7.0.1", "7.0.0", "2.0"],
+        ["7.1", "7.0.0", "2.1"],
+        ["7.1.1", "7.0.0", "2.1"],
+        ["7.2", "7.0.2", "2.1.1"],
+        ["7.2.1", "7.0.2", "2.1.1"],
+        ["7.3", "7.3.0", "2.2"],
+        ["7.3.1", "7.3.0", "2.2"],
+        ["8.0", "8.0.0", "3.0"],
+        ["8.1", "8.0.0", "3.0.1"],
+        ["8.2", "8.0.0", "3.0.2"],
+        ["8.2.1", "8.0.0", "3.0.2"],
+        ["8.3", "8.1.0", "3.1"],
+        ["8.3.1", "8.1.0", "3.1"],
+        ["8.3.2", "8.1.0", "3.1"],
+        ["8.3.3", "8.1.0", "3.1"],
+        ["9.0", "9.0.0", "4.0"],
+        ["9.0.1", "9.0.0", "4.0"],
+        ["9.1", "9.0.0", "4.0.2"],
+        ["9.2", "9.0.0", "4.0.3"],
+        ["9.3", "9.1.0", "4.1"],
+        ["9.3.1", "9.1.0", "4.1"],
+        ["9.4", "9.1.0", "4.1.2"],
+        ["9.4.1", "9.1.0", "4.1.2"],
+        ["10.0", "10.0.0", "4.2"],
+        ["10.1", "10.0.0", "4.2.1"],
+        ["10.2", "10.0.1", "5.0"],
+        ["10.2.1", "10.0.1", "5.0"],
+        ["10.3", "10.0.1", "5.0.1"],
+        ["11.0", "11.0.0", "5.1"],
+        ["11.1", "11.0.0", "5.1"],
+        ["11.2", "11.0.0", "5.1"],
+        ["11.2.1", "11.0.0", "5.1.2"],
+        ["11.3", "11.0.0", "5.1.3"],
+        ["11.3.1", "11.0.0", "5.1.3"],
+        ["11.4", "11.0.3", "5.2"],
+        ["11.4.1", "11.0.3", "5.2.2"],
+        ["11.5", "11.0.3", "5.2.4"],
+        ["11.6", "11.0.3", "5.2.4"],
+        ["11.7", "11.0.3", "5.2.4"],
+        ["12.0", "12.0.0", "5.3"],
+        ["12.0.1", "12.0.0", "5.3"],
+        ["12.1", "12.0.0", "5.3"],
+        ["12.1.1", "12.0.0", "5.3.1"],
+        ["12.2", "12.0.0", "5.3.1"],
+        ["12.3", "12.0.0", "5.3.2"],
+        ["12.4", "12.0.0", "5.3.2"],
+        ["12.5", "12.0.5", "5.4"],
+        ["12.5.1", "12.0.5", "5.4.2"],
+        ["13.0", "13.0.0", "5.5"],
+        ["13.1", "13.0.0", "5.5.1"],
+        ["13.2", "13.0.0", "5.5.2"],
+        ["13.2.1", "13.0.0", "5.5.2"],
+        ["13.3", "13.1.6", "5.6"],
+        ["13.3.1", "13.1.6", "5.6"],
+        ["13.4", "13.1.6", "5.6.1"],
+        ["13.4.1", "13.1.6", "5.6.1"],
+        ["14.0", "14.0.0", "5.7"],
+        ["14.0.1", "14.0.0", "5.7"],
+        ["14.1", "14.0.0", "5.7.1"],
+        ["14.2", "14.0.0", "5.7.2"],
+        ["14.3", "14.0.3", "5.8"],
+        ["14.3.1", "14.0.3", "5.8.1"],
+        ["15.0", "15.0.0", "5.9"],
+        ["15.0.1", "15.0.0", "5.9"],
+        ["15.1", "15.0.0", "5.9.2"],
+        ["15.2", "15.0.0", "5.9.2"],
+        ["15.3", "15.0.0", "5.10"],
+        ["15.4", "15.0.0", "5.10"],
+        ["16.0", "16.0.0", "6.0"],
+        ["16.1", "16.0.0", "6.0.2"],
+        ["16.2", "16.0.0", "6.0.3"],
+        ["16.3", "16.0.0", "6.1"],
+        ["16.4", "16.0.0", "6.1.2"],
+        ["26.0", "17.0.0", "6.2"],
+        ["26.0.1", "17.0.0", "6.2"],
+        ["26.1", "17.0.0", "6.2.1"],
+        ["26.1.1", "17.0.0", "6.2.1"],
+        ["26.2", "17.0.0", "6.2.3"]
+    ];
+
+    for (var i = 0; i < listToolchains.length; i++) {
+        if (listToolchains[i][0] == sXcodeVersion) {
+            return [listToolchains[i][1], listToolchains[i][2]];
+        }
+    }
+
+    return [String(), String()];
+}
+
+function getSDKVersionFromFoundation(nVersion, nColumn) {
+    // [major, minor, patch, version]: upper bounds (exclusive)
+    var listMacOS = [
+        [425, 0, 0, "10.0.0"],
+        [462, 0, 0, "10.1.0"],
+        [462, 70, 0, "10.2.0"],
+        [500, 0, 0, "10.2.7"],
+        [500, 30, 0, "10.3.0"],
+        [500, 54, 0, "10.3.2"],
+        [500, 56, 0, "10.3.3"],
+        [500, 58, 0, "10.3.4"],
+        [567, 0, 0, "10.3.9"],
+        [567, 12, 0, "10.4.0"],
+        [567, 21, 0, "10.4.2"],
+        [567, 25, 0, "10.4.4"],
+        [567, 26, 0, "10.4.5"],
+        [567, 27, 0, "10.4.6"],
+        [567, 28, 0, "10.4.7"],
+        [567, 29, 0, "10.4.8"],
+        [567, 36, 0, "10.4.9"],
+        [677, 0, 0, "10.4.11"],
+        [677, 10, 0, "10.5.0"],
+        [677, 15, 0, "10.5.1"],
+        [677, 19, 0, "10.5.2"],
+        [677, 21, 0, "10.5.3"],
+        [677, 22, 0, "10.5.5"],
+        [677, 24, 0, "10.5.6"],
+        [677, 26, 0, "10.5.7"],
+        [751, 0, 0, "10.5.8"],
+        [751, 14, 0, "10.6.0"],
+        [751, 21, 0, "10.6.2"],
+        [751, 29, 0, "10.6.3"],
+        [751, 42, 0, "10.6.4"],
+        [751, 53, 0, "10.6.5"],
+        [751, 62, 0, "10.6.6"],
+        [751, 63, 0, "10.6.7"],
+        [833, 10, 0, "10.6.8"],
+        [833, 20, 0, "10.7.0"],
+        [833, 24, 0, "10.7.1"],
+        [833, 25, 0, "10.7.2"],
+        [945, 0, 0, "10.7.4"],
+        [945, 11, 0, "10.8.0"],
+        [945, 16, 0, "10.8.2"],
+        [945, 18, 0, "10.8.3"],
+        [1056, 0, 0, "10.8.4"],
+        [1056, 13, 0, "10.9.0"],
+        [1151, 16, 0, "10.9.2"],
+        [1152, 14, 0, "10.10.0"],
+        [1153, 20, 0, "10.10.2"],
+        [1154, 0, 0, "10.10.3"],
+        [1199, 0, 0, "10.10.5"],
+        [1252, 0, 0, "10.10.5"],
+        [1255, 10, 0, "10.11.0"],
+        [1256, 10, 0, "10.11.1"],
+        [1258, 0, 0, "10.11.3"],
+        [1299, 0, 0, "10.11.4"],
+        [1400, 10, 0, "10.11.4"]
+    ];
+    var listIOS = [
+        [678, 24, 0, "1.0.0"],
+        [678, 26, 0, "2.0.0"],
+        [678, 29, 0, "2.1.0"],
+        [678, 47, 0, "2.2.0"],
+        [678, 51, 0, "3.0.0"],
+        [678, 60, 0, "3.1.0"],
+        [751, 32, 0, "3.2.0"],
+        [751, 37, 0, "4.0.0"],
+        [751, 49, 0, "4.1.0"],
+        [881, 0, 0, "4.2.0"],
+        [890, 10, 0, "5.0.0"],
+        [992, 0, 0, "5.1.0"],
+        [993, 0, 0, "6.0.0"],
+        [1047, 20, 0, "6.1.0"],
+        [1047, 25, 0, "7.0.0"],
+        [1140, 11, 0, "7.1.0"],
+        [1141, 1, 0, "8.0.0"],
+        [1142, 14, 0, "8.1.0"],
+        [1144, 17, 0, "8.2.0"],
+        [1145, 15, 0, "8.3.0"],
+        [1144, 50, 0, "8.4.0"],
+        [1200, 0, 0, "8.4.1"],
+        [1240, 1, 0, "9.0.0"],
+        [1241, 14, 0, "9.1.0"],
+        [1242, 12, 0, "9.2.0"],
+        [1242, 13, 0, "9.3.0"],
+        [1280, 25, 0, "9.4.0"],
+        [1300, 0, 0, "9.4.0"]
+    ];
+
+    var list = (nColumn == 0) ? listMacOS : ((nColumn == 1) ? listIOS : []);
+
+    for (var i = 0; i < list.length; i++) {
+        var nThreshold = ((list[i][0] << 16) | (list[i][1] << 8) | list[i][2]) >>> 0;
+
+        if (nVersion < nThreshold) {
+            return list[i][3];
+        }
+    }
+
+    return String();
+}
+
+function detect() {
+    var nMagic = readU32(0, false),
+        bBE = false,
+        bIs64 = false;
+
+    if (nMagic == 0xFEEDFACE) {
+        bIs64 = false;
+    } else if (nMagic == 0xFEEDFACF) {
+        bIs64 = true;
+    } else if (nMagic == 0xCEFAEDFE) {
+        bBE = true;
+    } else if (nMagic == 0xCFFAEDFE) {
+        bBE = true;
+        bIs64 = true;
+    } else {
+        return;
+    }
+
+    var nNumberOfCommands = readU32(0x10, bBE),
+        nSizeOfCommands = readU32(0x14, bBE),
+        nOffset = bIs64 ? 0x20 : 0x1C,
+        nEnd = Math.min(nOffset + nSizeOfCommands, MACH.getSize()),
+        bCodeSignature = false,
+        nBuildVersionOffset = -1,
+        nVersionMinOffset = -1,
+        nVersionMinCommand = 0,
+        bObjCSegment = false;
+
+    for (var i = 0; (i < nNumberOfCommands) && (i < 0x10000) && (nOffset + 8 <= nEnd); i++) {
+        var nCommand = readU32(nOffset, bBE),
+            nCommandSize = readU32(nOffset + 4, bBE);
+
+        if (nCommand == 0x1D) {
+            bCodeSignature = true;
+        } else if (nCommand == 0x32) {
+            if (nBuildVersionOffset == -1) nBuildVersionOffset = nOffset;
+        } else if (nCommand == 0x25 || nCommand == 0x24 || nCommand == 0x2F || nCommand == 0x30) {
+            if (nVersionMinOffset == -1) {
+                nVersionMinOffset = nOffset;
+                nVersionMinCommand = nCommand;
+            }
+        } else if (nCommand == 0x1 || nCommand == 0x19) {
+            if (MACH.getString(nOffset + 8, 16) == "__OBJC") bObjCSegment = true;
+        }
+
+        if (nCommandSize < 8) {
+            break;
+        }
+
+        nOffset += nCommandSize;
+    }
+
+    var nOSColumn = getOSColumn(MACH.getOperationSystemName()),
+        sSDKName = String(),
+        sSDKVersion = String(),
+        sXcodeVersion = String(),
+        bGCC = MACH.isLibraryPresent("libgcc_s.1.dylib"),
+        bClang = false,
+        sClangVersion = String(),
+        bSwift = false,
+        sSwiftVersion = String(),
+        bLinker = false,
+        sLinkerVersion = String(),
+        sObjC = String();
+
+    if (bCodeSignature) {
+        _setResult("sign tool", "codesign", String(), String());
+    }
+
+    if (MACH.isLibraryPresent("Foundation")) {
+        var nFoundationVersion = MACH.getLibraryCurrentVersion("Foundation") >>> 0;
+
+        if (nOSColumn == 0) {
+            sSDKName = "macOS SDK";
+            sSDKVersion = getSDKVersionFromFoundation(nFoundationVersion, 0);
+        } else if (nOSColumn == 1) {
+            sSDKName = "iOS SDK";
+            sSDKVersion = getSDKVersionFromFoundation(nFoundationVersion, 1);
+        }
+
+        _setResult("library", "Foundation", getFullVersion(nFoundationVersion), String());
+    }
+
+    if (MACH.isSectionNamePresent("__swift5_proto") || MACH.isSectionNamePresent("__swift5_types") ||
+        MACH.isSectionNamePresent("__swift2_proto") || MACH.isLibraryPresent("libswiftCore.dylib")) {
+        bSwift = true;
+    }
+
+    if (MACH.isSectionNamePresent("__objc_selrefs") || bObjCSegment || MACH.isLibraryPresent("libobjc.A.dylib")) {
+        sObjC = "Objective-C";
+    }
+
+    var listTools = [];
+
+    if (nBuildVersionOffset != -1) {
+        var nPlatform = readU32(nBuildVersionOffset + 8, bBE),
+            nSDK = readU32(nBuildVersionOffset + 16, bBE),
+            nTools = readU32(nBuildVersionOffset + 20, bBE),
+            nCmdSize = readU32(nBuildVersionOffset + 4, bBE);
+
+        if (nPlatform == 1) sSDKName = "macOS SDK";
+        else if (nPlatform == 5) sSDKName = "bridgeOS";
+        else if (nPlatform == 2 || nPlatform == 7) sSDKName = "iOS SDK";
+        else if (nPlatform == 3 || nPlatform == 8) sSDKName = "tvOS SDK";
+        else if (nPlatform == 4 || nPlatform == 9) sSDKName = "watchOS SDK";
+
+        if (nSDK) {
+            sSDKVersion = getFullVersion(nSDK);
+        }
+
+        if (nCmdSize > 24) {
+            nTools = Math.min(nTools, 64);
+
+            for (var j = 0; j < nTools; j++) {
+                listTools.push([readU32(nBuildVersionOffset + 24 + j * 8, bBE), readU32(nBuildVersionOffset + 28 + j * 8, bBE)]);
+            }
+        }
+    } else if (nVersionMinOffset != -1) {
+        if (nVersionMinCommand == 0x25) sSDKName = "iOS SDK";
+        else if (nVersionMinCommand == 0x24) sSDKName = "macOS SDK";
+        else if (nVersionMinCommand == 0x2F) sSDKName = "tvOS SDK";
+        else if (nVersionMinCommand == 0x30) sSDKName = "watchOS SDK";
+
+        var nVersionMinSDK = readU32(nVersionMinOffset + 12, bBE);
+
+        if (nVersionMinSDK) {
+            sSDKVersion = getFullVersion(nVersionMinSDK);
+        }
+    }
+
+    if (sSDKName && sSDKVersion) {
+        sXcodeVersion = getXcodeVersionFromSDK(sSDKVersion, nOSColumn);
+
+        if (sXcodeVersion) {
+            var listToolchain = getToolchain(sXcodeVersion);
+
+            if (listToolchain[0]) {
+                bClang = true;
+                sClangVersion = listToolchain[0];
+            }
+
+            if (listToolchain[1]) {
+                bSwift = true;
+                sSwiftVersion = listToolchain[1];
+            }
+        }
+    }
+
+    for (var k = 0; k < listTools.length; k++) {
+        var sToolVersion = getFullVersion(listTools[k][1]);
+
+        if (listTools[k][0] == 2) {
+            bSwift = true;
+            sSwiftVersion = sToolVersion;
+        } else if (listTools[k][0] == 1) {
+            bClang = true;
+            sClangVersion = sToolVersion;
+        } else if (listTools[k][0] == 3) {
+            bLinker = true;
+            sLinkerVersion = sToolVersion;
+        }
+    }
+
+    if (bLinker) {
+        _setResult("linker", "Xcode ld", sLinkerVersion, String());
+    }
+
+    if (!bGCC && !bClang) {
+        bClang = true;
+    }
+
+    if (bClang && !_isResultPresent("compiler", "clang")) {
+        _setLang("C/C++");
+        _setResult("compiler", "clang", sClangVersion, sObjC);
+    }
+
+    if (bSwift && !_isResultPresent("compiler", "Swift")) {
+        _setLang("Swift");
+        _setResult("compiler", "Swift", sSwiftVersion, String());
+    }
+
+    if (sSDKName) {
+        _setResult("tool", sSDKName, sSDKVersion, String());
+        _setResult("tool", "Xcode", sXcodeVersion, String());
+    }
+}

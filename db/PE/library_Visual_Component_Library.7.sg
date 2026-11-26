@@ -1,0 +1,78 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:6321-6586, NFD_PE::getVCLstruct nfd_pe.cpp:7321)
+// Delphi/C++ Builder Visual Component Library: PACKAGEINFO resource, or a TControl class record in the code
+// section (only searched when the TObject and Boolean/string type names are present, as NFD does).
+
+meta("library", "Visual Component Library");
+
+function isVCLClassPresent(nSectionOffset, nSectionSize) {
+    var nAddressSize = PE.is64() ? 8 : 4,
+        nOffset = nSectionOffset,
+        nSize = nSectionSize,
+        nCount = 0;
+
+    while (nSize > 0 && nCount < 64) {
+        nOffset = PE.findSignature(nOffset, nSize, "0708'TControl'");
+
+        if (nOffset == -1) {
+            break;
+        }
+
+        nCount++;
+
+        var nClassOffset = PE.VAToOffset(PE.readDword(nOffset + 10));
+
+        if (nClassOffset != -1) {
+            for (var i = 0; i < 20; i++) {
+                if (PE.readDword(nClassOffset - nAddressSize * (i + 1)) <= 0xFFFF) {
+                    return true;
+                }
+            }
+        }
+
+        nOffset++;
+        nSize = nSectionSize - (nOffset - nSectionOffset);
+    }
+
+    return false;
+}
+
+// XPE::getNormalCodeSection: "CODE"/".text" with characteristics 0x60000020 among the first two sections, else section 0
+function getCodeSectionNumber() {
+    var nNumberOfSections = Math.min(PE.getNumberOfSections(), 2);
+
+    for (var i = 0; i < nNumberOfSections; i++) {
+        var sName = PE.getSectionName(i);
+
+        if ((sName == "CODE" || sName == ".text") && ((PE.getSectionCharacteristics(i) & 0xFF0000FF) >>> 0) == 0x60000020 && PE.getSectionFileSize(i)) {
+            return i;
+        }
+    }
+
+    return (nNumberOfSections > 0 && PE.getSectionFileSize(0)) ? 0 : -1;
+}
+
+function detect() {
+    if (PE.isNet()) {
+        return;
+    }
+
+    if (PE.resource["PACKAGEINFO"]) {
+        bDetected = true;
+    } else if (getCodeSectionNumber() != -1) {
+        var nCodeSection = getCodeSectionNumber(),
+            nSectionOffset = PE.getSectionFileOffset(nCodeSection),
+            nSectionSize = PE.getSectionFileSize(nCodeSection);
+
+        if (PE.findSignature(nSectionOffset, nSectionSize, "07'TObject'") != -1) {
+            if ((PE.findSignature(nSectionOffset, nSectionSize, "07'Boolean'") != -1) ||
+                (PE.findSignature(nSectionOffset, nSectionSize, "06'string'") != -1)) {
+                if (isVCLClassPresent(nSectionOffset, nSectionSize)) {
+                    bDetected = true;
+                }
+            }
+        }
+    }
+
+    return result();
+}

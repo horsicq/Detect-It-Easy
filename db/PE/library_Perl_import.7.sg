@@ -1,0 +1,33 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_pe.cpp:7076-7093)
+// A program importing perlNNN.dll (PerlApp, perl2exe, embedded interpreters). library_Perl.3.sg covers
+// Perl XS extension DLLs ("Perl5 xs"); this rule covers the other importers. Version = NNN / 100.
+
+meta("library", "Perl");
+
+function detect() {
+    if (_isResultPresent("library", "Perl5 xs") || _isResultPresent("library", "Perl Runtime")) {
+        return;
+    }
+
+    var nNumberOfImports = PE.getNumberOfImports();
+
+    for (var i = 0; i < nNumberOfImports; i++) {
+        var sName = PE.getImportLibraryName(i).toUpperCase();
+
+        if (sName.indexOf("PERL") == 0) {
+            var aMatch = sName.match(/(\d+)/);
+
+            if (aMatch && Number(aMatch[1])) {
+                sVersion = (Number(aMatch[1]) / 100).toFixed(2);
+                bDetected = true;
+            }
+
+            break;
+        }
+    }
+
+    sLang = "Perl";
+
+    return result();
+}
