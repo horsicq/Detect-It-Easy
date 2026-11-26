@@ -167,3 +167,510 @@ ELF.isLibraryPresent = function (sLibraryName) {
 
     return ELF_librarySearchResults[sCacheKey];
 }
+
+
+// ---------------------------------------------------------------------------
+// APKiD port helpers (APKiD 3.2.0, RedNaga, GPL-3.0; used by the ELF rules
+// ported from APKiD elf/*.yara). They reproduce the YARA string semantics the
+// rules need over the whole file: text strings are case-sensitive byte
+// strings, hex strings support "??", nibble wildcards ("0?", "?8"), fixed and
+// bounded jumps ("[4]", "[4-32]", "[-]" = up to 4096 bytes) and "(a|b)"
+// alternatives. Counts are numbers of distinct match start offsets (YARA "#").
+// Results are cached per file because several rules share strings.
+// ---------------------------------------------------------------------------
+
+var APKiD_cache = {};
+
+/**
+ * Convert an ASCII/latin1 text string to a hex byte string.
+ * @param {String} sText
+ * @returns {String}
+ */
+function APKiD_textToHex(sText) {
+    var sResult = "";
+    for (var i = 0; i < sText.length; i++) {
+        var sByte = (sText.charCodeAt(i) & 0xFF).toString(16);
+        sResult += (sByte.length < 2 ? "0" : "") + sByte;
+    }
+    return sResult;
+}
+
+/**
+ * Parse a YARA hex string body into the list of its expanded variants
+ * (alternatives are expanded). Each variant is an array of tokens:
+ * {k: 0, v: value, m: mask} for a byte, {k: 1, lo: n, hi: m} for a jump.
+ * @param {String} sPattern
+ * @returns {Array}
+ */
+function APKiD_parseHex(sPattern) {
+    var s = sPattern.replace(/\s+/g, "").toLowerCase();
+    var nPos = 0;
+
+    function hexValue(c) {
+        return "0123456789abcdef".indexOf(c);
+    }
+
+    function parseSequence() {
+        var listVariants = [[]];
+        while (nPos < s.length) {
+            var c = s.charAt(nPos);
+            if (c === ")" || c === "|") {
+                break;
+            }
+            var listItems;
+            if (c === "(") {
+                nPos++;
+                listItems = [];
+                while (true) {
+                    var listAlt = parseSequence();
+                    for (var a = 0; a < listAlt.length; a++) {
+                        listItems.push(listAlt[a]);
+                    }
+                    if (s.charAt(nPos) === "|") {
+                        nPos++;
+                        continue;
+                    }
+                    nPos++; // ")"
+                    break;
+                }
+            } else if (c === "[") {
+                var nEnd = s.indexOf("]", nPos);
+                var sRange = s.substring(nPos + 1, nEnd);
+                var nLo, nHi;
+                nPos = nEnd + 1;
+                if (sRange === "-") {
+                    nLo = 0;
+                    nHi = 4096;
+                } else if (sRange.indexOf("-") !== -1) {
+                    var listParts = sRange.split("-");
+                    nLo = parseInt(listParts[0], 10);
+                    nHi = listParts[1] === "" ? 4096 : parseInt(listParts[1], 10);
+                } else {
+                    nLo = nHi = parseInt(sRange, 10);
+                }
+                listItems = [[{k: 1, lo: nLo, hi: nHi}]];
+            } else {
+                var c1 = s.charAt(nPos), c2 = s.charAt(nPos + 1);
+                var nValue = 0, nMask = 0;
+                nPos += 2;
+                if (c1 !== "?") {
+                    nValue |= hexValue(c1) << 4;
+                    nMask |= 0xF0;
+                }
+                if (c2 !== "?") {
+                    nValue |= hexValue(c2);
+                    nMask |= 0x0F;
+                }
+                listItems = [[{k: 0, v: nValue, m: nMask}]];
+            }
+            var listNew = [];
+            for (var i = 0; i < listVariants.length; i++) {
+                for (var j = 0; j < listItems.length; j++) {
+                    listNew.push(listVariants[i].concat(listItems[j]));
+                }
+            }
+            listVariants = listNew;
+        }
+        return listVariants;
+    }
+
+    return parseSequence();
+}
+
+/**
+ * Prepare a variant: choose the longest run of fixed bytes as search anchor.
+ * @returns {Object}
+ */
+function APKiD_prepareVariant(listTokens) {
+    var nBestStart = -1, nBestLen = 0, nRunStart = -1;
+    var nMin = 0, nMax = 0, nBestMin = 0, nBestMax = 0, nRunMin = 0, nRunMax = 0;
+    for (var i = 0; i <= listTokens.length; i++) {
+        var t = listTokens[i];
+        var bFixed = (i < listTokens.length) && (t.k === 0) && (t.m === 0xFF);
+        if (bFixed) {
+            if (nRunStart === -1) {
+                nRunStart = i;
+                nRunMin = nMin;
+                nRunMax = nMax;
+            }
+        } else if (nRunStart !== -1) {
+            if (i - nRunStart > nBestLen) {
+                nBestLen = i - nRunStart;
+                nBestStart = nRunStart;
+                nBestMin = nRunMin;
+                nBestMax = nRunMax;
+            }
+            nRunStart = -1;
+        }
+        if (i < listTokens.length) {
+            if (t.k === 0) {
+                nMin++;
+                nMax++;
+            } else {
+                nMin += t.lo;
+                nMax += t.hi;
+            }
+        }
+    }
+    var sAnchor = "";
+    for (var j = nBestStart; j < nBestStart + nBestLen; j++) {
+        var sByte = listTokens[j].v.toString(16);
+        sAnchor += (sByte.length < 2 ? "0" : "") + sByte;
+    }
+    return {tokens: listTokens, anchor: sAnchor, anchorMin: nBestMin, anchorMax: nBestMax, maxLen: nMax};
+}
+
+/**
+ * Match tokens (from index nIndex) at position nPos of the byte array.
+ * @returns {Boolean}
+ */
+function APKiD_matchTokens(listTokens, nIndex, listBytes, nPos) {
+    for (var i = nIndex; i < listTokens.length; i++) {
+        var t = listTokens[i];
+        if (t.k === 0) {
+            if (nPos >= listBytes.length || (listBytes[nPos] & t.m) !== t.v) {
+                return false;
+            }
+            nPos++;
+        } else {
+            for (var j = t.lo; j <= t.hi; j++) {
+                if (APKiD_matchTokens(listTokens, i + 1, listBytes, nPos + j)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Count the distinct start offsets of a YARA hex string inside
+ * [nOffset, nOffset + nSize), stopping at nLimit.
+ * @param {String} sPattern YARA hex string body
+ * @param {Number} nLimit stop counting at this number (default 1)
+ * @param {Number} [nOffset]
+ * @param {Number} [nSize]
+ * @returns {Number}
+ */
+function APKiD_count(sPattern, nLimit, nOffset, nSize) {
+    var nFileSize = File.getSize();
+    if (nLimit === undefined) {
+        nLimit = 1;
+    }
+    if (nOffset === undefined) {
+        nOffset = 0;
+        nSize = nFileSize;
+    }
+    var nEnd = Math.min(nFileSize, nOffset + nSize);
+    var sKey = sPattern + "|" + nOffset + "|" + nEnd;
+    var oCache = APKiD_cache[sKey];
+    if (oCache !== undefined && (oCache.count < oCache.limit || oCache.limit >= nLimit)) {
+        return Math.min(oCache.count, nLimit);
+    }
+
+    var listVariants = APKiD_parseHex(sPattern);
+    var oStarts = {};
+    var nCount = 0;
+
+    for (var v = 0; v < listVariants.length && nCount < nLimit; v++) {
+        var oVariant = APKiD_prepareVariant(listVariants[v]);
+        var nNextStart = nOffset;
+        var nSearch = nOffset + oVariant.anchorMin;
+        var nAnchorSize = oVariant.anchor.length / 2;
+        var bSimple = (nAnchorSize === oVariant.tokens.length);
+        while (nCount < nLimit && nSearch < nEnd) {
+            var nHit = File.findSignature(nSearch, nEnd - nSearch, oVariant.anchor);
+            if (nHit < 0) {
+                break;
+            }
+            nSearch = nHit + 1;
+            if (bSimple) {
+                if (nHit + nAnchorSize <= nEnd && !oStarts[nHit]) {
+                    oStarts[nHit] = true;
+                    nCount++;
+                }
+                continue;
+            }
+            var nFirst = Math.max(nNextStart, nHit - oVariant.anchorMax);
+            var nLast = nHit - oVariant.anchorMin;
+            if (nFirst > nLast) {
+                continue;
+            }
+            var nBufSize = Math.min(nEnd, nLast + oVariant.maxLen) - nFirst;
+            var listBytes = File.readBytes(nFirst, nBufSize);
+            for (var s = nFirst; s <= nLast && nCount < nLimit; s++) {
+                if (!oStarts[s] && APKiD_matchTokens(oVariant.tokens, 0, listBytes, s - nFirst)) {
+                    oStarts[s] = true;
+                    nCount++;
+                }
+            }
+            nNextStart = nLast + 1;
+        }
+    }
+
+    APKiD_cache[sKey] = {count: nCount, limit: nLimit};
+    return nCount;
+}
+
+/**
+ * Is a YARA hex string present (whole file or a range)?
+ * @returns {Boolean}
+ */
+function APKiD_hex(sPattern, nOffset, nSize) {
+    return APKiD_count(sPattern, 1, nOffset, nSize) > 0;
+}
+
+/**
+ * Is a text string (YARA plain string, case-sensitive) present?
+ * @returns {Boolean}
+ */
+function APKiD_str(sText, nOffset, nSize) {
+    return APKiD_count(APKiD_textToHex(sText), 1, nOffset, nSize) > 0;
+}
+
+/**
+ * Count of a text string (YARA "#"), stopping at nLimit.
+ * @returns {Number}
+ */
+function APKiD_strCount(sText, nLimit) {
+    return APKiD_count(APKiD_textToHex(sText), nLimit);
+}
+
+/**
+ * Is a text string present at an offset (YARA "at")?
+ * @returns {Boolean}
+ */
+function APKiD_strAt(sText, nOffset) {
+    return APKiD_count(APKiD_textToHex(sText), 1, nOffset, sText.length) > 0;
+}
+
+/**
+ * Read up to nSize bytes at nOffset as a latin1 string, stopped before the
+ * first LF (YARA "." does not match a newline; no rule regex matches one).
+ * @returns {String}
+ */
+function APKiD_readLine(nOffset, nSize) {
+    var nFileSize = File.getSize();
+    if (nOffset < 0 || nOffset >= nFileSize) {
+        return "";
+    }
+    nSize = Math.min(nSize, nFileSize - nOffset);
+    var listBytes = File.readBytes(nOffset, nSize);
+    var sResult = "";
+    for (var i = 0; i < listBytes.length; i++) {
+        if (listBytes[i] === 10) {
+            break;
+        }
+        sResult += String.fromCharCode(listBytes[i]);
+    }
+    return sResult;
+}
+
+/**
+ * Count YARA regex matches (distinct start offsets, stopping at nLimit). The
+ * regex is evaluated at every occurrence of a literal anchor that every match
+ * contains: listBacks are the possible distances from the match start to the
+ * anchor, rRegExp must be anchored with "^" and must not match a newline.
+ * YARA limits a regex match to 4096 bytes; nWindow (default 4096) is the
+ * number of bytes read at each candidate start.
+ * @param {String} sAnchor literal text
+ * @param {Array} listBacks distances from match start to the anchor
+ * @param {RegExp} rRegExp
+ * @param {Number} [nLimit]
+ * @param {Number} [nWindow]
+ * @param {Number} [nOffset]
+ * @param {Number} [nSize]
+ * @returns {Number}
+ */
+function APKiD_reCount(sAnchor, listBacks, rRegExp, nLimit, nWindow, nOffset, nSize) {
+    var nFileSize = File.getSize();
+    if (nLimit === undefined) {
+        nLimit = 1;
+    }
+    if (nWindow === undefined) {
+        nWindow = 4096;
+    }
+    if (nOffset === undefined) {
+        nOffset = 0;
+        nSize = nFileSize;
+    }
+    var nEnd = Math.min(nFileSize, nOffset + nSize);
+    var sKey = "re|" + sAnchor + "|" + listBacks.join(",") + "|" + rRegExp.source + "|" + nOffset + "|" + nEnd + "|" + nWindow;
+    var oCache = APKiD_cache[sKey];
+    if (oCache !== undefined && (oCache.count < oCache.limit || oCache.limit >= nLimit)) {
+        return Math.min(oCache.count, nLimit);
+    }
+
+    var sHex = APKiD_textToHex(sAnchor);
+    var oStarts = {};
+    var nCount = 0;
+    var nSearch = nOffset;
+    while (nCount < nLimit && nSearch < nEnd) {
+        var nHit = File.findSignature(nSearch, nEnd - nSearch, sHex);
+        if (nHit < 0) {
+            break;
+        }
+        nSearch = nHit + 1;
+        for (var i = 0; i < listBacks.length && nCount < nLimit; i++) {
+            var nStart = nHit - listBacks[i];
+            if (nStart < nOffset || oStarts[nStart]) {
+                continue;
+            }
+            var sLine = APKiD_readLine(nStart, Math.min(nWindow, nEnd - nStart));
+            if (rRegExp.test(sLine)) {
+                oStarts[nStart] = true;
+                nCount++;
+            }
+        }
+    }
+
+    APKiD_cache[sKey] = {count: nCount, limit: nLimit};
+    return nCount;
+}
+
+/**
+ * Is a YARA regex present (see APKiD_reCount)?
+ * @returns {Boolean}
+ */
+function APKiD_re(sAnchor, listBacks, rRegExp, nWindow, nOffset, nSize) {
+    return APKiD_reCount(sAnchor, listBacks, rRegExp, 1, nWindow, nOffset, nSize) > 0;
+}
+
+/**
+ * ELF e_machine values used by the rules (elf.EM_ARM, elf.EM_AARCH64).
+ */
+var APKiD_EM_ARM = 40,
+    APKiD_EM_AARCH64 = 183;
+
+/**
+ * Is the ELF big-endian (EI_DATA == ELFDATA2MSB)?
+ * @returns {Boolean}
+ */
+function APKiD_isBigEndian() {
+    return ELF.readByte(5) === 2;
+}
+
+/**
+ * Is the ELF 64-bit (EI_CLASS == ELFCLASS64)?
+ * @returns {Boolean}
+ */
+function APKiD_isElf64() {
+    return ELF.readByte(4) === 2;
+}
+
+/**
+ * Raw ELF header field, read like the YARA elf module does (independent of
+ * the engine's ELF parser, which rejects some packed files): "type",
+ * "machine", "phoff", "phentsize", "phnum", "shoff", "shentsize".
+ * @returns {Number}
+ */
+function APKiD_elfHeader(sField) {
+    var sKey = "hdr|" + sField;
+    if (APKiD_cache[sKey] === undefined) {
+        var bBE = APKiD_isBigEndian();
+        var b64 = APKiD_isElf64();
+        var oOffsets = b64 ? {type: 0x10, machine: 0x12, phoff: 0x20, shoff: 0x28, phentsize: 0x36, phnum: 0x38, shentsize: 0x3A} :
+                             {type: 0x10, machine: 0x12, phoff: 0x1C, shoff: 0x20, phentsize: 0x2A, phnum: 0x2C, shentsize: 0x2E};
+        var nOffset = oOffsets[sField];
+        var nValue = 0;
+        if (sField === "phoff" || sField === "shoff") {
+            nValue = b64 ? ELF.read_uint64(nOffset, bBE) : ELF.read_uint32(nOffset, bBE);
+        } else {
+            nValue = ELF.read_uint16(nOffset, bBE);
+        }
+        APKiD_cache[sKey] = nValue;
+    }
+    return APKiD_cache[sKey];
+}
+
+/**
+ * Raw program header fields (YARA elf.segments[i]): {type, flags, offset},
+ * or undefined for an index outside the header table.
+ * @returns {Object}
+ */
+function APKiD_getSegment(nIndex) {
+    var sKey = "seg|" + nIndex;
+    if (APKiD_cache[sKey] !== undefined) {
+        return APKiD_cache[sKey];
+    }
+    var oResult;
+    var nPhnum = APKiD_elfHeader("phnum");
+    if (nIndex >= 0 && nIndex < nPhnum) {
+        var bBE = APKiD_isBigEndian();
+        var b64 = APKiD_isElf64();
+        var nHeader = APKiD_elfHeader("phoff") + nIndex * APKiD_elfHeader("phentsize");
+        if (nHeader + (b64 ? 56 : 32) <= File.getSize()) {
+            oResult = {
+                type: ELF.read_uint32(nHeader, bBE),
+                flags: ELF.read_uint32(nHeader + (b64 ? 4 : 24), bBE),
+                offset: b64 ? ELF.read_uint64(nHeader + 8, bBE) : ELF.read_uint32(nHeader + 4, bBE)
+            };
+        }
+    }
+    APKiD_cache[sKey] = oResult;
+    return oResult;
+}
+
+/**
+ * Is there a segment with this p_type (YARA "for any i in
+ * (0..elf.number_of_segments): (elf.segments[i].type == X)")?
+ * @returns {Boolean}
+ */
+function APKiD_isSegmentTypePresent(nType) {
+    var nPhnum = APKiD_elfHeader("phnum");
+    for (var i = 0; i < nPhnum; i++) {
+        var oSegment = APKiD_getSegment(i);
+        if (oSegment && oSegment.type === nType) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Number of sections whose name matches rRegExp (YARA "for N i in
+ * (0..elf.number_of_sections): (elf.sections[i].name matches /re/)").
+ * @returns {Number}
+ */
+function APKiD_countSectionNames(rRegExp) {
+    var nResult = 0;
+    var nNumberOfSections = ELF.getNumberOfSections();
+    for (var i = 0; i < nNumberOfSections; i++) {
+        if (rRegExp.test(ELF.getSectionName(i))) {
+            nResult++;
+        }
+    }
+    return nResult;
+}
+
+/**
+ * Does a static symbol name (YARA elf.symtab[i].name) match rRegExp? The names
+ * are searched in the string tables linked (sh_link) from SHT_SYMTAB sections,
+ * with the literal anchor sAnchor (see APKiD_reCount).
+ * @returns {Boolean}
+ */
+function APKiD_isSymtabNamePresent(sAnchor, listBacks, rRegExp) {
+    var nNumberOfSections = ELF.getNumberOfSections();
+    var bBE = APKiD_isBigEndian();
+    var b64 = APKiD_isElf64();
+    var nShoff = APKiD_elfHeader("shoff");
+    var nShentsize = APKiD_elfHeader("shentsize");
+    for (var i = 0; i < nNumberOfSections; i++) {
+        var nHeader = nShoff + i * nShentsize;
+        if (nHeader + (b64 ? 64 : 40) > File.getSize()) {
+            break;
+        }
+        if (ELF.read_uint32(nHeader + 4, bBE) === 2) { // SHT_SYMTAB
+            var nLink = ELF.read_uint32(nHeader + (b64 ? 40 : 24), bBE);
+            if (nLink < nNumberOfSections) {
+                var nOffset = ELF.getSectionFileOffset(nLink);
+                var nSize = ELF.getSectionFileSize(nLink);
+                if (nSize > 0 && APKiD_re(sAnchor, listBacks, rRegExp, 4096, nOffset, nSize)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}

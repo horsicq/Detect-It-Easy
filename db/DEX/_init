@@ -38,3 +38,562 @@ DEX.isDexStringPresent = function (sString) {
 
     return DEX_stringSearchResults[sCacheKey];
 }
+
+
+// ---------------------------------------------------------------------------
+// APKiD port helpers.
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rules/dex/*.yara. The helpers
+// evaluate YARA string patterns over the raw DEX bytes the way YARA does
+// (hex strings with ??, nibble wildcards, (a|b) alternatives and [n-m] jumps)
+// and the dex module values the rules use. Results are cached per scan.
+// ---------------------------------------------------------------------------
+
+var APKiD = {
+    size: DEX.getSize(),
+    cache: {}
+};
+
+/** YARA hex string -> token list. Tokens: {t:"b", v, m} byte with mask,
+ * {t:"j", a, b} jump, {t:"o", o:[seq, ...]} alternatives,
+ * {t:"c", f} byte class (predicate), {t:"r", k, a, b} repeated token. */
+APKiD.parseHex = function (sPattern) {
+    var s = sPattern.replace(/\s+/g, "").toLowerCase(),
+        i = 0;
+
+    function nib(c) {
+        return "0123456789abcdef".indexOf(c);
+    }
+
+    function seq() {
+        var aResult = [];
+
+        while (i < s.length) {
+            var c = s.charAt(i);
+
+            if (c === "|" || c === ")") {
+                break;
+            } else if (c === "(") {
+                var aOpts = [];
+                i++;
+                for (;;) {
+                    aOpts.push(seq());
+                    if (s.charAt(i) === "|") {
+                        i++;
+                    } else {
+                        i++; // ")"
+                        break;
+                    }
+                }
+                aResult.push({ t: "o", o: aOpts });
+            } else if (c === "[") {
+                var nEnd = s.indexOf("]", i),
+                    sJump = s.substring(i + 1, nEnd),
+                    nDash = sJump.indexOf("-"),
+                    nA = 0,
+                    nB = 0;
+                if (nDash < 0) {
+                    nA = nB = parseInt(sJump, 10);
+                } else {
+                    nA = parseInt(sJump.substring(0, nDash), 10);
+                    nB = parseInt(sJump.substring(nDash + 1), 10);
+                }
+                aResult.push({ t: "j", a: nA, b: nB });
+                i = nEnd + 1;
+            } else {
+                var c1 = s.charAt(i),
+                    c2 = s.charAt(i + 1),
+                    nV = 0,
+                    nM = 0;
+                if (c1 !== "?") {
+                    nV |= nib(c1) << 4;
+                    nM |= 0xF0;
+                }
+                if (c2 !== "?") {
+                    nV |= nib(c2);
+                    nM |= 0x0F;
+                }
+                aResult.push({ t: "b", v: nV, m: nM });
+                i += 2;
+            }
+        }
+
+        return aResult;
+    }
+
+    return seq();
+};
+
+/** Literal text -> byte tokens. */
+APKiD.textTokens = function (sText) {
+    var aResult = [];
+
+    for (var i = 0; i < sText.length; i++) {
+        aResult.push({ t: "b", v: sText.charCodeAt(i) & 0xFF, m: 0xFF });
+    }
+
+    return aResult;
+};
+
+APKiD.tokenLength = function (aSeq, bMax) {
+    var nResult = 0;
+
+    for (var i = 0; i < aSeq.length; i++) {
+        var oTok = aSeq[i];
+
+        if (oTok.t === "b" || oTok.t === "c") {
+            nResult += 1;
+        } else if (oTok.t === "j") {
+            nResult += bMax ? oTok.b : oTok.a;
+        } else if (oTok.t === "r") {
+            nResult += bMax ? oTok.b : oTok.a;
+        } else {
+            var nBest = -1;
+            for (var j = 0; j < oTok.o.length; j++) {
+                var nLen = APKiD.tokenLength(oTok.o[j], bMax);
+                if (nBest < 0 || (bMax ? (nLen > nBest) : (nLen < nBest))) nBest = nLen;
+            }
+            nResult += nBest;
+        }
+    }
+
+    return nResult;
+};
+
+/** Backtracking match of aSeq[nIndex..] at aBuf[nPos], then fnNext(pos). */
+APKiD.matchSeq = function (aSeq, nIndex, aBuf, nPos, fnNext) {
+    if (nIndex >= aSeq.length) return fnNext(nPos);
+
+    var oTok = aSeq[nIndex], i;
+
+    if (oTok.t === "b") {
+        if (nPos < aBuf.length && (aBuf[nPos] & oTok.m) === oTok.v) {
+            return APKiD.matchSeq(aSeq, nIndex + 1, aBuf, nPos + 1, fnNext);
+        }
+        return false;
+    }
+
+    if (oTok.t === "c") {
+        if (nPos < aBuf.length && oTok.f(aBuf[nPos])) {
+            return APKiD.matchSeq(aSeq, nIndex + 1, aBuf, nPos + 1, fnNext);
+        }
+        return false;
+    }
+
+    if (oTok.t === "j") {
+        for (i = oTok.a; i <= oTok.b && nPos + i <= aBuf.length; i++) {
+            if (APKiD.matchSeq(aSeq, nIndex + 1, aBuf, nPos + i, fnNext)) return true;
+        }
+        return false;
+    }
+
+    if (oTok.t === "r") {
+        // greedy: count how many bytes the class takes, then back off
+        var nMax = 0;
+        while (nMax < oTok.b && nPos + nMax < aBuf.length && oTok.f(aBuf[nPos + nMax])) nMax++;
+        for (i = nMax; i >= oTok.a; i--) {
+            if (APKiD.matchSeq(aSeq, nIndex + 1, aBuf, nPos + i, fnNext)) return true;
+        }
+        return false;
+    }
+
+    for (i = 0; i < oTok.o.length; i++) {
+        if (APKiD.matchSeq(oTok.o[i], 0, aBuf, nPos, function (nAfter) {
+            return APKiD.matchSeq(aSeq, nIndex + 1, aBuf, nAfter, fnNext);
+        })) return true;
+    }
+
+    return false;
+};
+
+/** Compiled pattern: tokens, lengths and the search anchor: the stretch of
+ * top-level whole bytes and ?? wildcards with the most fixed bytes, searched
+ * natively with DEX.findSignature ("..": any byte). */
+APKiD.compile = function (aSeq) {
+    var oResult = { seq: aSeq, minLen: APKiD.tokenLength(aSeq, false), maxLen: APKiD.tokenLength(aSeq, true) },
+        nMinPre = 0,
+        nMaxPre = 0,
+        nBest = 0,
+        i = 0;
+
+    function isPlain(oTok) {
+        return oTok.t === "b" && (oTok.m === 0xFF || oTok.m === 0);
+    }
+
+    while (i < aSeq.length) {
+        if (isPlain(aSeq[i])) {
+            var nStart = i;
+            while (i < aSeq.length && isPlain(aSeq[i])) i++;
+            var nEnd = i;
+            // trim the wildcards at both ends
+            var nFirst = nStart, nLast = nEnd - 1;
+            while (nFirst <= nLast && aSeq[nFirst].m === 0) nFirst++;
+            while (nLast >= nFirst && aSeq[nLast].m === 0) nLast--;
+            var nFixed = 0, sHex = "";
+            for (var k = nFirst; k <= nLast; k++) {
+                if (aSeq[k].m === 0) {
+                    sHex += "..";
+                } else {
+                    var nV = aSeq[k].v;
+                    sHex += (nV < 16 ? "0" : "") + nV.toString(16);
+                    nFixed++;
+                }
+            }
+            if (nFixed > nBest) {
+                nBest = nFixed;
+                oResult.anchor = sHex;
+                oResult.minPre = nMinPre + (nFirst - nStart);
+                oResult.maxPre = nMaxPre + (nFirst - nStart);
+            }
+            nMinPre += nEnd - nStart;
+            nMaxPre += nEnd - nStart;
+        } else {
+            nMinPre += APKiD.tokenLength([aSeq[i]], false);
+            nMaxPre += APKiD.tokenLength([aSeq[i]], true);
+            i++;
+        }
+    }
+
+    return oResult;
+};
+
+/** Distinct match start offsets of a compiled pattern, at most nLimit. */
+APKiD.scan = function (oPattern, nLimit) {
+    var aResult = [],
+        oSeen = {},
+        nSize = APKiD.size,
+        nFrom = 0,
+        fnTrue = function () { return true; };
+
+    if (!oPattern.anchor) {
+        // no fixed byte outside alternatives: try every offset, block by block
+        var nBlock = 0x4000;
+        for (var nPos = 0; nPos < nSize && aResult.length < nLimit; nPos += nBlock) {
+            var nLen = nBlock + oPattern.maxLen;
+            if (nPos + nLen > nSize) nLen = nSize - nPos;
+            var aBlock = DEX.readBytes(nPos, nLen);
+            for (var j = 0; j < nBlock && j < aBlock.length && aResult.length < nLimit; j++) {
+                if (APKiD.matchSeq(oPattern.seq, 0, aBlock, j, fnTrue)) aResult.push(nPos + j);
+            }
+        }
+        return aResult;
+    }
+
+    while (nFrom < nSize && aResult.length < nLimit) {
+        var nHit = DEX.findSignature(nFrom, nSize - nFrom, oPattern.anchor);
+
+        if (nHit < 0) break;
+
+        var nFirst = nHit - oPattern.maxPre,
+            nLast = nHit - oPattern.minPre;
+        if (nFirst < 0) nFirst = 0;
+
+        if (nLast >= 0) {
+            var nRead = (nLast - nFirst) + oPattern.maxLen;
+            if (nFirst + nRead > nSize) nRead = nSize - nFirst;
+            var aBuf = DEX.readBytes(nFirst, nRead);
+
+            for (var nStart = nFirst; nStart <= nLast && aResult.length < nLimit; nStart++) {
+                if (!oSeen[nStart] && APKiD.matchSeq(oPattern.seq, 0, aBuf, nStart - nFirst, fnTrue)) {
+                    oSeen[nStart] = true;
+                    aResult.push(nStart);
+                }
+            }
+        }
+
+        nFrom = nHit + 1;
+    }
+
+    return aResult;
+};
+
+/** Number of matches (YARA #id) of a YARA hex string, counted up to nLimit. */
+APKiD.hexCount = function (sPattern, nLimit) {
+    var sKey = "h" + nLimit + ":" + sPattern;
+
+    if (APKiD.cache[sKey] === undefined) {
+        APKiD.cache[sKey] = APKiD.scan(APKiD.compile(APKiD.parseHex(sPattern)), nLimit).length;
+    }
+
+    return APKiD.cache[sKey];
+};
+
+/** YARA hex string present (YARA $id). */
+APKiD.hex = function (sPattern) {
+    return APKiD.hexCount(sPattern, 1) > 0;
+};
+
+/** Token pattern (built from textTokens/class tokens) count, cached by key. */
+APKiD.tokCount = function (sKey, aSeq, nLimit) {
+    sKey = "t" + nLimit + ":" + sKey;
+
+    if (APKiD.cache[sKey] === undefined) {
+        APKiD.cache[sKey] = APKiD.scan(APKiD.compile(aSeq), nLimit).length;
+    }
+
+    return APKiD.cache[sKey];
+};
+
+/** At least n of the lazily evaluated conditions (YARA "n of (...)"). */
+APKiD.nOf = function (n, aConditions) {
+    var nCount = 0;
+
+    for (var i = 0; i < aConditions.length && nCount < n; i++) {
+        if (aConditions[i]()) nCount++;
+    }
+
+    return nCount >= n;
+};
+
+/** Raw text present anywhere (YARA "text" string). */
+APKiD.text = function (sText) {
+    var sKey = "s:" + sText;
+
+    if (APKiD.cache[sKey] === undefined) {
+        APKiD.cache[sKey] = (DEX.findString(0, APKiD.size, sText) !== -1);
+    }
+
+    return APKiD.cache[sKey];
+};
+
+/** Number of raw occurrences of a text (YARA #id), counted up to nLimit. */
+APKiD.textCount = function (sText, nLimit) {
+    return APKiD.tokCount("s:" + sText, APKiD.textTokens(sText), nLimit);
+};
+
+/** { 00 LEN text 00 }: a whole DEX string (ASCII text, LEN < 0x80). The
+ * string table lookup is tried first; the raw byte pattern decides otherwise,
+ * since a string_ids table that is not in order defeats the table lookup. */
+APKiD.str = function (sText) {
+    var sKey = "x:" + sText;
+
+    if (APKiD.cache[sKey] === undefined) {
+        var bResult = DEX.isDexStringPresent(sText);
+
+        if (!bResult) {
+            var sHex = "00 " + ((sText.length < 16) ? "0" : "") + sText.length.toString(16);
+            for (var i = 0; i < sText.length; i++) {
+                var nC = sText.charCodeAt(i);
+                sHex += " " + ((nC < 16) ? "0" : "") + nC.toString(16);
+            }
+            bResult = APKiD.hex(sHex + " 00");
+        }
+
+        APKiD.cache[sKey] = bResult;
+    }
+
+    return APKiD.cache[sKey];
+};
+
+/** { 00 ?? text }: a DEX string with a one-byte size that starts with text. */
+APKiD.strPrefix = function (sText) {
+    var sKey = "p:" + sText;
+
+    if (APKiD.cache[sKey] === undefined) {
+        var nFrom = 2, bResult = false;
+
+        while (!bResult && nFrom < APKiD.size) {
+            var nHit = DEX.findString(nFrom, APKiD.size - nFrom, sText);
+            if (nHit < 0) break;
+            bResult = (nHit >= 2) && (DEX.readByte(nHit - 2) === 0);
+            nFrom = nHit + 1;
+        }
+
+        APKiD.cache[sKey] = bResult;
+    }
+
+    return APKiD.cache[sKey];
+};
+
+/** common.yara#is_dex: dex\n03?\0 or dey\n03?\0 at 0. */
+APKiD.isDex = function () {
+    if (APKiD.cache.isDex === undefined) {
+        APKiD.cache.isDex = (APKiD.size >= 8) && (DEX.compare("'dex'0a'03'..00") || DEX.compare("'dey'0a'03'..00"));
+    }
+
+    return APKiD.cache.isDex;
+};
+
+/** dex.* is defined: CXAPKiD hands APKiD's rules the YARA-X dex module only
+ * where YARA 3.11's module would parse (magic dex 035..038 and a whole
+ * header), and YARA-X's dex module accepts the header (file_size, offsets
+ * within the file, header_size 112, a known endian tag, 16-bit type/proto
+ * counts). Otherwise every dex.* value is undefined. */
+APKiD.isYaraDex = function () {
+    if (APKiD.cache.isYaraDex === undefined) {
+        var bResult = (APKiD.size >= 0x70) && DEX.compare("'dex'0a'03'..00") &&
+            (DEX.readByte(6) >= 0x35) && (DEX.readByte(6) <= 0x38);
+
+        if (bResult) {
+            var nEndian = APKiD.u32(0x28),
+                aOffsets = [0x30, 0x34, 0x3C, 0x44, 0x4C, 0x54, 0x5C, 0x64, 0x6C];
+            bResult = (APKiD.u32(0x20) <= APKiD.size) && (APKiD.u32(0x24) === 0x70) &&
+                (nEndian === 0x12345678 || nEndian === 0x78563412) &&
+                (APKiD.u32(0x40) <= 0xFFFF) && (APKiD.u32(0x48) <= 0xFFFF);
+            for (var i = 0; bResult && i < aOffsets.length; i++) {
+                bResult = (APKiD.u32(aOffsets[i]) <= APKiD.size);
+            }
+        }
+
+        APKiD.cache.isYaraDex = bResult;
+    }
+
+    return APKiD.cache.isYaraDex;
+};
+
+APKiD.u32 = function (nOffset) {
+    if (nOffset < 0 || nOffset + 4 > APKiD.size) return -1;
+    return DEX.read_uint32(nOffset, false);
+};
+
+/** dex.map_list.size, -1 when undefined. */
+APKiD.mapCount = function () {
+    if (APKiD.cache.mapCount === undefined) {
+        var nResult = -1;
+
+        if (APKiD.isYaraDex()) {
+            var nMap = APKiD.u32(0x34);
+            if (nMap >= 0 && nMap + 4 <= APKiD.size) nResult = APKiD.u32(nMap); // YARA-X reads map_off 0 too
+        }
+
+        APKiD.cache.mapCount = nResult;
+    }
+
+    return APKiD.cache.mapCount;
+};
+
+/** dex.map_list.items[i].type, -1 when undefined: YARA-X reads the items
+ * that fit in the file, up to the declared size. */
+APKiD.mapType = function (nIndex) {
+    var nCount = APKiD.mapCount();
+
+    if (nIndex < 0 || nIndex >= nCount) return -1;
+
+    var nMap = APKiD.u32(0x34);
+    if (nIndex >= Math.floor((APKiD.size - nMap - 4) / 12)) return -1;
+
+    return DEX.read_uint16(nMap + 4 + 12 * nIndex, false);
+};
+
+/** map_list types from index nFirst on equal the given list. */
+APKiD.mapOrder = function (nFirst, aTypes) {
+    for (var i = 0; i < aTypes.length; i++) {
+        if (APKiD.mapType(nFirst + i) !== aTypes[i]) return false;
+    }
+
+    return true;
+};
+
+/** compilers.yara: every compiler rule, evaluated once. */
+APKiD.compilers = function () {
+    if (APKiD.cache.compilers !== undefined) return APKiD.cache.compilers;
+
+    var o = {},
+        M = APKiD.mapOrder,
+        bDex = APKiD.isDex();
+
+    // unsorted_string_pool: CXAPKiD's YARA 3.11 string_ids order test over the header's table
+    o.dexlib1 = APKiD.isYaraDex() && !DEX.isStringPoolSortedByHeader();
+    o.dexlib2beta = false; // null_interfaces is always false in APKiD
+    o.dexlib2 = !o.dexlib1 && (M(7, [0x2002, 0x1001]) || M(6, [0x2002, 0x1001]));
+
+    var bDxOrder = M(7, [0x2001, 0x1001]) || M(7, [0x2001, 0x2002]) ||
+        M(7, [0x1002, 0x1003, 0x2001, 0x2006, 0x1001]) || M(7, [0x1003, 0x2001, 0x2006, 0x1001]) ||
+        M(7, [0x2001, 0x2006, 0x1001]) || M(7, [0x1003, 0x2001, 0x1001]) ||
+        M(7, [0x1002, 0x2001, 0x2006, 0x1001]) || M(7, [0x1002, 0x2001, 0x1001]) ||
+        M(7, [0x1002, 0x1003, 0x2001, 0x1001]) || M(1, [0x0001, 0x0002, 0x0006, 0x2002, 0x1000]) ||
+        M(6, [0x1003, 0x2006, 0x1001, 0x2002]);
+    var bTinyOrder = M(1, [0x0001, 0x0002, 0x0006, 0x2002, 0x1003, 0x1000]);
+    var bR8Order = M(7, [0x2001, 0x2003, 0x1001]) || M(7, [0x2001, 0x1001, 0x2002]) ||
+        M(7, [0x0007, 0x0008, 0x2001, 0x2003, 0x1001]) || M(7, [0x0008, 0x2001, 0x2003, 0x1001]) ||
+        M(7, [0x0007, 0x2001, 0x2003, 0x1001]) || M(6, [0x1001, 0x2002, 0x2004, 0x2000, 0x1003]);
+    var bMergeOrder = (APKiD.mapType(7) === 0x1000);
+    var bMarker = APKiD.hex("00 [1-2] 7E 7E ( 44 | 52 | 4C ) 38 7B 22 [0-16] 63 6F 6D 70 69 6C 61 74 69 6F 6E 2D 6D 6F 64 65 22 3A 22");
+
+    o.dx = bDxOrder && !o.dexlib1 && !o.dexlib2 && !o.dexlib2beta && !bMarker;
+    o.dx_merged = bMergeOrder && !o.dexlib1 && !o.dexlib2 && !o.dexlib2beta && !bMarker;
+    o.r8 = bMarker && (bR8Order || bTinyOrder);
+    o.r8_merged = bMarker && bMergeOrder;
+    o.r8_no_marker = !bMarker && bR8Order;
+    o.dexmerge = bMergeOrder;
+
+    o.jack_4_12 = bDex && APKiD.hex("00 12 65 6D 69 74 74 65 72 3A 20 6A 61 63 6B 2D 34 2E 31 32 00");
+    o.jack_3x = bDex && APKiD.hex("00 1? 65 6D 69 74 74 65 72 3A 20 6A 61 63 6B 2D 33 2E [1-3] 00");
+    o.jack_4x = bDex && !o.jack_4_12 && APKiD.hex("00 1? 65 6D 69 74 74 65 72 3A 20 6A 61 63 6B 2D 34 2E [1-3] 00");
+    o.jack_5x = bDex && APKiD.hex("00 1? 65 6D 69 74 74 65 72 3A 20 6A 61 63 6B 2D 35 2E [1-3] 00");
+
+    var bJack = !o.jack_3x && !o.jack_4x && !o.jack_5x && !o.jack_4_12;
+    o.jack_generic = false;
+    if (bDex && bJack) {
+        var nAnon = (APKiD.hex("00 05 2D 73 65 74 30 00") ? 1 : 0) + (APKiD.hex("00 05 2D 67 65 74 30 00") ? 1 : 0) +
+            (APKiD.hex("00 06 2D 77 72 61 70 30 00") ? 1 : 0);
+        o.jack_generic = (nAnon >= 2) || APKiD.hex("00 1? 65 6D 69 74 74 65 72 3A 20 6A 61 63 6B 2D ?? 2E [1-3] 00");
+    }
+
+    o.unknown = bDex && !(o.dexlib1 || o.dexlib2 || o.dexlib2beta || o.dx || o.dx_merged || o.r8 || o.r8_merged ||
+        o.r8_no_marker || o.jack_generic || o.jack_3x || o.jack_4x || o.jack_4_12 || o.jack_5x || o.dexmerge);
+
+    APKiD.cache.compilers = o;
+
+    return o;
+};
+
+/** obfuscators.yara short_unicode_*_names: CXAPKiD's YARA 3.11 counters. */
+APKiD.shortUnicodeFields = function () {
+    return APKiD.isDex() && (DEX.getUnicodeMemberNameCount("field") >= 3);
+};
+
+APKiD.shortUnicodeMethods = function () {
+    return APKiD.isDex() && (DEX.getUnicodeMemberNameCount("method") >= 3);
+};
+
+/** obfuscators.yara dexguard_a / dexguard_b / dexguard_c. */
+APKiD.dexguard = function () {
+    if (APKiD.cache.dexguard !== undefined) return APKiD.cache.dexguard;
+
+    var o = { a: false, b: false, c: false };
+
+    if (APKiD.isDex() && APKiD.text("getClass") && APKiD.text("getDeclaredMethod") && APKiD.text("invoke") && APKiD.isYaraDex()) {
+        var nEnd = APKiD.u32(0x6C) + APKiD.u32(0x68) - 4;
+        if (APKiD.u32(0x6C) >= 0 && APKiD.u32(0x68) >= 0 && APKiD.u32(nEnd) === 0) {
+            o.a = APKiD.hex("00 06 00 01 00 03 00 00 00 00 00 00 00 [20-65] 0c 01 12 12 23 22 ?? ?? 1c 03 ?? ?? 12 04 4d 03 02 04 " +
+                "6e 3? ?? ?? 10 02 0c 00 62 01 ?? ?? 12 12 23 22 ?? ?? 12 03 4d 05 02 03 6e 3? ?? ?? 10 02 0c 00 1f 00 ?? ?? 11 00");
+        }
+    }
+
+    var bShort = APKiD.shortUnicodeFields() || APKiD.shortUnicodeMethods();
+    var nA = 0;
+    if (APKiD.hex("00 07 4C 6F 2F (41|61) (55|75) (58|78) 3B 00")) nA++;
+    if (APKiD.hex("00 07 4C 6F 2F (43|63) (4F|6F) (4E|6E) 3B 00")) nA++;
+    var nIf = APKiD.hexCount("00 ?? 4C 6F 2F [1-4] 24 (49|69) (46|66) 3B 00", 3);
+    if (nIf > 0) nA++;
+    if (nA < 2) {
+        // $a_inner_unicode = /Lo\/([\x30-\x75]{1,4}|[^\x30-\x75]{1,4})\$[^\x30-\x75]{1,4};\x00/
+        var fIn = function (b) { return b >= 0x30 && b <= 0x75; },
+            fOut = function (b) { return b < 0x30 || b > 0x75; };
+        var aInner = APKiD.textTokens("Lo/").concat([
+            { t: "o", o: [[{ t: "r", f: fIn, a: 1, b: 4 }], [{ t: "r", f: fOut, a: 1, b: 4 }]] },
+            { t: "b", v: 0x24, m: 0xFF }, { t: "r", f: fOut, a: 1, b: 4 }, { t: "b", v: 0x3B, m: 0xFF }, { t: "b", v: 0x00, m: 0xFF }]);
+        if (APKiD.tokCount("dexguard_inner_unicode", aInner, 1) > 0) nA++;
+    }
+    o.b = (nA >= 2) ||
+        (bShort && (nIf >= 3 || APKiD.hexCount("00 07 4C 6F 2F ?? ?? ?? 3B 00", 3) >= 3));
+
+    if (APKiD.isDex()) {
+        o.c = APKiD.str("Ldexguard/util/TamperDetection;") || APKiD.text("guardsquare/dexguard/runtime/") ||
+            APKiD.str("Ldexguard/util/TamperDetector;") || APKiD.str("Ldexguard/util/CertificateChecker;") ||
+            APKiD.text("com/guardsquare/dexguard/") ||
+            APKiD.hex("12 01 39 ?? ?? ?? 71 ?? ?? ?? ?? ?? 01 10 35 ?? ?? ?? 44 ?? ?? ?? B7 ?? 71 ?? ?? ?? ?? ?? 0A ?? 97 ?? ?? ?? " +
+                "D8 00 00 01 01 ?? 28 F2 21 80 D8 00 00 FE 44 ?? ?? ?? B7 ?? 21 ?? D8 ?? ?? ?? 44 ?? ?? ?? B7 ??");
+    }
+
+    APKiD.cache.dexguard = o;
+
+    return o;
+};
+
+/** obfuscators.yara unreadable_field_names / unreadable_method_names. */
+APKiD.unreadable = function (bMethods) {
+    var o = APKiD.dexguard();
+
+    return (bMethods ? APKiD.shortUnicodeMethods() : APKiD.shortUnicodeFields()) && !o.a && !o.b && !o.c;
+};

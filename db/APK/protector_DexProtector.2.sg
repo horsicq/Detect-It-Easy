@@ -5,21 +5,46 @@
 // Website: https://dosx.su
 // Telegram: @DosX_dev
 
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule apk/packers.yara#dexprotector, #dexprotector_a..d, #dexpro_aide_a, #dexpro_aide_b
+
 meta("protector", "DexProtector");
 
 function detect() {
-    bDetected =
-        APK.isArchiveRecordPresent("assets/classes.dex.dat") ||
-        APK.isArchiveRecordPresent("assets/dp.arm-v7.so.dat") ||
-        APK.isArchiveRecordPresent("assets/dp.arm-v8.so.dat") ||
-        APK.isArchiveRecordPresent("assets/dp.arm.so.dat") ||
-        APK.isArchiveRecordPresent("assets/dp.mp3") ||
-        APK.isArchiveRecordPresent("assets/dp.x86.so.dat") ||
-        APK.isArchiveRecordPresent("assets/dp.x86_64.so.dat") ||
-        APK.isArchiveRecordPresent("lib/armeabi-v7a/libdexprotector.so") ||
-        APK.isArchiveRecordPresent("lib/armeabi/libdexprotector.so") ||
-        APK.isArchiveRecordPresent("assets/dp-lib/dp.kotlin-v1.lua.mph") ||
-        APK.isArchiveRecordPresent("assets/dexprotect/classes.dex.dat");
+    var bDexProtector = APK_isRecordExp("assets/dp\\.(arm|arm-v7|arm-v8|x86|x86_64)\\.so\\.dat") &&
+        APK_isRecordExp("assets/(classes|classes1|classes2|classes3)\\.dex\\.dat|assets/resources\\.dat|assets/dp\\.mp3");
+    var bDexProtectorA = APK_countRecordExp([
+        "assets/dp\\.arm-v7\\.art\\.kk\\.so", "assets/dp\\.arm-v7\\.art\\.l\\.so", "assets/dp\\.arm-v7\\.dvm\\.so",
+        "assets/dp\\.arm\\.art\\.kk\\.so", "assets/dp\\.arm\\.art\\.l\\.so", "assets/dp\\.arm\\.dvm\\.so",
+        "assets/dp\\.x86\\.art\\.kk\\.so", "assets/dp\\.x86\\.art\\.l\\.so", "assets/dp\\.x86\\.dvm\\.so",
+        "assets/dp\\.mp3"]) >= 2;
+    var bDexProtectorB = APK_isRecordExp("assets/[A-Za-z0-9.]{2,50}\\.(arm-v7\\.so|arm-v8\\.so|arm\\.so|dex|x86\\.so|x86_64\\.so)\\.dat") &&
+        APK_isRecordExp("assets/[A-Za-z0-9.]{2,50}\\.(mp3|dat)");
+    var bDexProtectorC = APK_isRecordExp("assets/dp\\.(arm-v7|arm-v8|x86|x86_64)\\.so\\.[A-Za-z0-9]{2,8}\\.mp3") &&
+        APK_isRecordExp("assets/[A-Za-z0-9]{2,8}\\.mp3");
+    var bDexProtectorD = APK_isRecordExp("assets/[A-Za-z0-9]{3,64}\\.(mp3|dat)") &&
+        APK_isRecordExp("lib/(arm.*|x86.*)/libdexprotector\\.[A-Za-z0-9.]{2,16}\\.so|lib/(arm.*|x86.*)/libalice\\.so");
+
+    if (bDexProtector || bDexProtectorA || bDexProtectorB || bDexProtectorC || bDexProtectorD || (APK.isArchiveRecordPresent("assets/classes.dex.dat") ||
+            APK.isArchiveRecordPresent("assets/dp.arm-v7.so.dat") ||
+            APK.isArchiveRecordPresent("assets/dp.arm-v8.so.dat") ||
+            APK.isArchiveRecordPresent("assets/dp.arm.so.dat") ||
+            APK.isArchiveRecordPresent("assets/dp.mp3") ||
+            APK.isArchiveRecordPresent("assets/dp.x86.so.dat") ||
+            APK.isArchiveRecordPresent("assets/dp.x86_64.so.dat") ||
+            APK.isArchiveRecordPresent("lib/armeabi-v7a/libdexprotector.so") ||
+            APK.isArchiveRecordPresent("lib/armeabi/libdexprotector.so") ||
+            APK.isArchiveRecordPresent("assets/dp-lib/dp.kotlin-v1.lua.mph") ||
+            APK.isArchiveRecordPresent("assets/dexprotect/classes.dex.dat"))) {
+        bDetected = true;
+    }
+
+    if ((APK_isRecordExp("assets/classes\\.dex\\.dat") && APK_isRecordExp("assets/dp-lib/dp\\.kotlin-v1\\.lua\\.mph")) ||
+        (APK_isRecordExp("assets/dexprotect/classes\\.dex\\.dat") && APK_isRecordExp("assets/eprotect\\.dat") &&
+            APK_isRecordExp("dexpro-build\\.properties"))) {
+        // dexpro_aide_a, dexpro_aide_b
+        sOptions = "for AIDE";
+        bDetected = true;
+    }
 
     return result();
 }

@@ -55,5 +55,76 @@ function detect() {
         bDetected = true;
     }
 
+    detectAPKiD(nSize);
+
     return result();
+}
+
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rules elf/packers.yara#upx_sharedlib_unmodifed, upx_elf_3_94 ..
+// upx_elf_3_01, upx_elf_bangcle_secneo, upx_elf_bangcle_secneo_newer, upx_elf_ijiami, upx_elf_joker,
+// upx_embedded_inside_elf, upx_unknown_version_modified, upx_unknown_version_unmodified (ARM UPX stub rules).
+// upx_compressed_apk needs is_apk ("PK" at 0) on an ELF buffer and cannot match an ELF.
+function detectAPKiD(nSize) {
+    // YARA "$s in (filesize - 50 .. filesize)": a match starting in the last 50 bytes
+    function inTail(sHex) {
+        return APKiD_hex(sHex, Math.max(0, nSize - 50), 50);
+    }
+    // YARA "$s in (0..200)" for a 4-byte string
+    function inHead(sHex) {
+        return APKiD_hex(sHex, 0, 204);
+    }
+
+    var bJokerRename1 = inTail("5a485348"); // "ZHSH"
+    // private rule upx_elf32_arm_stub / upx_stub
+    var bStub = APKiD_elfHeader("machine") === APKiD_EM_ARM &&
+        APKiD_hex("1E20A0E3 14108FE2 0200A0E3 0470A0E3 000000EF 7F00A0E3 0170A0E3 000000EF");
+    if (!bStub && !bJokerRename1) {
+        return;
+    }
+
+    var bUpxHead = bStub && inHead("55505821"); // "UPX!"
+    var bUpxTail = bStub && inTail("55505821");
+    var bUnmodified = bUpxHead && bUpxTail;
+    var bSharedlib = bStub && APKiD_elfHeader("type") === 3 && bUpxTail; // ET_DYN
+    var sCopyrightVersion = "";
+    if (bUnmodified) {
+        var listVersions = ["3.94", "3.93", "3.92", "3.91", "3.09", "3.08", "3.07", "3.04", "3.03", "3.02", "3.01"];
+        for (var i = 0; i < listVersions.length; i++) {
+            if (APKiD_str("UPX " + listVersions[i] + " Copyright")) {
+                sCopyrightVersion = listVersions[i];
+                break;
+            }
+        }
+    }
+    var bBangcle = bStub && inHead("53454321") && inTail("53454321"); // "SEC!"
+    var bBangcleNewer = bStub && inTail("03020100");
+    var bIjiami = bStub && inTail("414a4d21"); // "AJM!"
+    var bJoker = bJokerRename1 || (bStub && inTail("544957b0")); // ($rename1 in ..) or ($rename2 in .. and upx_stub)
+    var bUnknownVersion = bStub && !sCopyrightVersion && !bIjiami && !bJoker && !bBangcle && !bBangcleNewer;
+    var bEmbedded = bUnknownVersion && !bUnmodified && !bSharedlib &&
+        APKiD_hex("7f454c46", 0, 4) && APKiD_hex("7f454c46", 256, nSize - 256);
+    var bUnknownModified = bUnknownVersion && !bUnmodified && !bBangcle && !bBangcleNewer && !bIjiami && !bJoker &&
+        !bSharedlib && !bEmbedded;
+    var bUnknownUnmodified = bUnknownVersion && bUnmodified;
+
+    var listOptions = [];
+    if (bSharedlib) listOptions.push("sharelib");
+    if (sCopyrightVersion) {
+        sVersion = sCopyrightVersion;
+        listOptions.push("unmodified");
+    }
+    if (bBangcle) listOptions.push("Bangcle/SecNeo");
+    if (bBangcleNewer) listOptions.push("newer-style Bangcle/SecNeo");
+    if (bIjiami) listOptions.push("Ijiami");
+    if (bJoker) listOptions.push("Joker");
+    if (bEmbedded) listOptions.push("embedded inside ELF");
+    if (bUnknownModified) listOptions.push("unknown, modified");
+    if (bUnknownUnmodified) listOptions.push("unknown, unmodified");
+
+    if (listOptions.length) {
+        for (var j = 0; j < listOptions.length; j++) {
+            sOptions = sOptions.append(listOptions[j]);
+        }
+        bDetected = true;
+    }
 }

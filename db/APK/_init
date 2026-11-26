@@ -21,3 +21,64 @@ APK.isArchiveRecordPresent = function (sRecordName) {
 
     return APK_archiveRecordSearchResults[sCacheKey];
 }
+
+var APK_archiveRecordExpResults = {};
+
+/**
+ * Cached APK.isArchiveRecordPresentExp: true when any record name matches the
+ * regular expression (unanchored, like a raw YARA string on the APK bytes).
+ * @returns {Boolean}
+ */
+function APK_isRecordExp(sRegExp) {
+    var sCacheKey = "$" + sRegExp;
+
+    if (APK_archiveRecordExpResults[sCacheKey] === undefined) {
+        APK_archiveRecordExpResults[sCacheKey] = APK.isArchiveRecordPresentExp(sRegExp);
+    }
+
+    return APK_archiveRecordExpResults[sCacheKey];
+}
+
+/**
+ * Number of regular expressions in the list that match a record name
+ * (YARA "N of ($a*)" over record names).
+ * @returns {Number}
+ */
+function APK_countRecordExp(aRegExps) {
+    var nResult = 0;
+
+    for (var i = 0; i < aRegExps.length; i++) {
+        if (APK_isRecordExp(aRegExps[i])) {
+            nResult++;
+        }
+    }
+
+    return nResult;
+}
+
+/**
+ * Number of raw occurrences of a string in the whole file (YARA "#s"),
+ * counted up to nLimit. fnCheck(nOffset), when given, must accept a hit.
+ * @returns {Number}
+ */
+function APK_countRawString(sString, nLimit, fnCheck) {
+    var nSize = APK.getSize(),
+        nOffset = 0,
+        nResult = 0;
+
+    while ((nResult < nLimit) && (nOffset < nSize)) {
+        var nFound = APK.findString(nOffset, nSize - nOffset, sString);
+
+        if (nFound < 0) {
+            break;
+        }
+
+        if ((fnCheck === undefined) || fnCheck(nFound)) {
+            nResult++;
+        }
+
+        nOffset = nFound + 1;
+    }
+
+    return nResult;
+}
