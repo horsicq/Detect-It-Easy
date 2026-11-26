@@ -4,10 +4,23 @@
 meta("archive", "7-Zip");
 
 function detect() {
-    if (Binary.getSize() >= 64) {
+    function calcCrc32(nOff, nLen) {
+        var nCrc = 0xFFFFFFFF;
+        for (var i = 0; i < nLen; i++) {
+            nCrc ^= Binary.read_uint8(nOff + i);
+            for (var j = 0; j < 8; j++) {
+                nCrc = (nCrc & 1) ? ((nCrc >>> 1) ^ 0xEDB88320) : (nCrc >>> 1);
+            }
+        }
+        return (nCrc ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    if (Binary.getSize() >= 32) {
         if (Binary.compare("'7z'BCAF271C")) {
-            sVersion = Binary.readByte(6) + "." + Binary.readByte(7);
-            bDetected = true;
+            if (calcCrc32(12, 20) === Binary.read_uint32(8, _LE)) {
+                sVersion = Binary.readByte(6) + "." + Binary.readByte(7);
+                bDetected = true;
+            }
         }
     }
 

@@ -48,11 +48,23 @@ function detect() {
         }
     }
 
+    function get_DWRAF_vi(nOffset, nSize) {
+        var res = { bIsValid: false, sVersion: "" };
+        if (nSize > 8) {
+            var nVersion = Binary.read_int16(nOffset + 4, _LE);
+            if (nVersion >= 0 && nVersion <= 7) {
+                res.sVersion = nVersion + ".0";
+                res.bIsValid = true;
+            }
+        }
+        return res;
+    }
+
     // DWARF debug info
     if (size > 16 && Binary.readDword(size - 16) === 0x534954) {
         if (Binary.readDword(size - 12) === 0 && Binary.readDword(size - 8) === 0) {
 
-            var debugOffset = size - debugSize;
+            var debugOffset = size - 16 - debugSize;
 
             if (debugOffset >= 0) {
                 var viStruct = get_DWRAF_vi(debugOffset, size - debugOffset);
@@ -62,6 +74,11 @@ function detect() {
                 return true;
             }
         }
+    }
+
+    if (Binary.isOverlay() && Binary.compare("'.file'000000")) {
+        _setResult(sType, "MinGW", "", "");
+        return true;
     }
 
     if (Binary.isDebugData()) {

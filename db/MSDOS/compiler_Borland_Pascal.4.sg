@@ -52,7 +52,7 @@ function detect() {
         sName = "Turbo Pascal";
         sVersion = "6.0-7.0";
         bDetected = true;
-    } else if (MSDOS.compareEP("31ed9a########2e8e1e....b451cd21891e....803e......74..f706........74..e8")) {
+    } else if (!MSDOS.compareEP("31ED9A..00..005589E5") && MSDOS.compareEP("31ed9a########2e8e1e....b451cd21891e....803e......74..f706........74..e8")) {
         sName = "Turbo Pascal";
         sVersion = "6.0-7.0";
         bDetected = true;
@@ -65,7 +65,7 @@ function detect() {
         var nDataSeg = MSDOS.readWord(MSDOS.getEntryPointOffset(3));
         var nOffset = MSDOS.addressToOffset(nDataSeg);
         nOffset = MSDOS.findSignature(nOffset, Math.min(1024, MSDOS.getSize() - nOffset),
-            "'Portions Copyr    ight (c) 1983,9'..' Borland'");
+            "'Portions Copyright (c) 1983,9'..' Borland'");
         if (nOffset != -1) {
             switch (MSDOS.getString(nOffset + 29, 1)) {
                 case "0":
@@ -79,6 +79,25 @@ function detect() {
                 case "2":
                     sVersion = "7.0";
                     break;
+            }
+            bDetected = true;
+        }
+    }
+
+    if (!bDetected && MSDOS.isDeepScan()) {
+        var nLimit = MSDOS.isOverlayPresent() ? MSDOS.getOverlayOffset() : MSDOS.getSize();
+        var nOffsetTP = MSDOS.findSignature(0, nLimit, "'Runtime error '00' at '002E0D0A00");
+        if (nOffsetTP !== -1) {
+            var nTail = nOffsetTP + 24;
+            sName = "Turbo Pascal";
+            if (MSDOS.compare("'Portions Copyright (c) 1983,92 Borland'", nTail)) {
+                sVersion = "7.0";
+            } else if (MSDOS.compare("'Portions Copyright (c) 1983,90 Borland'", nTail)) {
+                sVersion = "6.0";
+            } else if (MSDOS.compare("FB83C4065881E71F0081C79600", nTail)) {
+                sVersion = "4.0";
+            } else if (MSDOS.compare("33C08706....CB833E....007501CBA1....E9B5FE", nTail)) {
+                sVersion = "5.0-5.5";
             }
             bDetected = true;
         }

@@ -81,7 +81,47 @@ function detect() {
         bDetected = true;
     }
 
-    sLang = sName.indexOf("C++") !== -1 ? "C" : "C++";
+    if (!bDetected && MSDOS.isDeepScan()) {
+        var nLimit = MSDOS.isOverlayPresent() ? MSDOS.getOverlayOffset() : MSDOS.getSize();
+        var nOffBanner = MSDOS.findString(0, nLimit, "Turbo-C - Copyright ");
+        if (nOffBanner !== -1) {
+            sName = "Turbo C";
+            var sBanner = MSDOS.read_ansiString(nOffBanner, 48);
+            if (sBanner === "Turbo-C - Copyright (c) 1987 Borland Intl.") {
+                sVersion = "1987";
+            } else if (sBanner === "Turbo-C - Copyright (c) 1988 Borland Intl.") {
+                sVersion = "1988";
+            }
+            bDetected = true;
+        } else {
+            nOffBanner = MSDOS.findString(0, nLimit, "Turbo C++ - Copyright ");
+            if (nOffBanner !== -1) {
+                sName = "Turbo C++";
+                if (MSDOS.read_ansiString(nOffBanner, 48) === "Turbo C++ - Copyright 1990 Borland Intl.") {
+                    sVersion = "1990";
+                }
+                bDetected = true;
+            } else {
+                nOffBanner = MSDOS.findString(0, nLimit, "Borland C++ - Copyright ");
+                if (nOffBanner !== -1) {
+                    sName = "Borland C++";
+                    var sBCPP = MSDOS.read_ansiString(nOffBanner, 48);
+                    if (sBCPP === "Borland C++ - Copyright 1991 Borland Intl.") {
+                        sVersion = "1991";
+                    } else if (sBCPP === "Borland C++ - Copyright 1993 Borland Intl.") {
+                        sVersion = "1993";
+                    } else if (sBCPP === "Borland C++ - Copyright 1994 Borland Intl.") {
+                        sVersion = "1994";
+                    } else if (sBCPP === "Borland C++ - Copyright 1995 Borland Intl.") {
+                        sVersion = "1995";
+                    }
+                    bDetected = true;
+                }
+            }
+        }
+    }
+
+    sLang = (sName.indexOf("C/C++") !== -1) ? "C/C++" : (sName.indexOf("C++") !== -1 ? "C++" : "C");
 
     return result();
 }

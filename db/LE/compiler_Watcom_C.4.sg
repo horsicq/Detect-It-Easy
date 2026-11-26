@@ -16,6 +16,26 @@ function detect() {
         sName = "Open Watcom C/C++";
         sOptions = "1988-1995";
         bDetected = true;
+    } else {
+        var nEP = LE.getEntryPointOffset();
+        if (nEP >= 0 && nEP < LE.getSize()) {
+            var nScan = Math.min(0x100, LE.getSize() - nEP);
+            var nOff = LE.findString(nEP, nScan, "Open Watcom");
+            if (nOff !== -1) {
+                sName = "Open Watcom C/C++";
+                var nYr = LE.findString(nOff, Math.min(128, LE.getSize() - nOff), " 2002-");
+                sVersion = (nYr !== -1) ? LE.read_ansiString(nYr + 6, 4) : "2002";
+                bDetected = true;
+            } else {
+                nOff = LE.findString(nEP, nScan, "WATCOM");
+                if (nOff !== -1) {
+                    sName = "Watcom C/C++";
+                    var nYr = LE.findString(nOff, Math.min(128, LE.getSize() - nOff), ". 1988-");
+                    sVersion = (nYr !== -1) ? LE.read_ansiString(nYr + 7, 4) : "1988";
+                    bDetected = true;
+                }
+            }
+        }
     }
 
     sLang = "C/C++";

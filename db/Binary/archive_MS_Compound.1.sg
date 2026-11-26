@@ -37,13 +37,28 @@ function detect() {
             sName = "Microsoft Installer (MSI)";
         } else if (nSub1 == 0xA5EC) {
             sType = "format";
-            sName = "Microsoft Office";
-            sVersion = "1997-2003";
+            sName = "Microsoft Office Word";
+            sVersion = "97-2003";
         } else {
             sVersion = "Office, 1997-2003";
         }
 
         bDetected = true;
+
+        if (Binary.isDeepScan()) {
+            var nAIOffset = Binary.findString(0, Binary.getSize(), "AI_PACKAGING_TOOL");
+            if (nAIOffset !== -1) {
+                var sAIVer = "";
+                var sAITail = Binary.read_ansiString(nAIOffset + 17, 64);
+                if (sAITail.indexOf("Advanced Installer") === 0) {
+                    var aAIParts = sAITail.split(" ");
+                    if (aAIParts.length >= 3) {
+                        sAIVer = aAIParts[2];
+                    }
+                }
+                _setResult("installer", "Advanced Installer", sAIVer, "");
+            }
+        }
     }
 
     return result();

@@ -3,11 +3,55 @@
 
 meta("operation system", "MS-DOS");
 
+function isCPM() {
+    var nSize = COM.getSize();
+    if (nSize >= 4 && nSize <= 0x10000) {
+        var nBdosCount = 0;
+        var nInt21Count = 0;
+        var nMaxStart = nSize - 4;
+        var nPos = 0;
+
+        while (nPos <= nMaxStart) {
+            nPos = COM.findSignature(nPos, nSize - nPos, "CD0500");
+            if (nPos === -1 || nPos > nMaxStart) {
+                break;
+            }
+            nBdosCount++;
+            nPos++;
+        }
+
+        nPos = 0;
+        while (nPos <= nMaxStart) {
+            nPos = COM.findSignature(nPos, nSize - nPos, "CD21");
+            if (nPos === -1 || nPos > nMaxStart) {
+                break;
+            }
+            nInt21Count++;
+            nPos++;
+        }
+
+        var b0 = COM.readByte(0);
+        if ((nBdosCount > 0 && nBdosCount >= nInt21Count) ||
+            (b0 === 0xC3 && nInt21Count === 0) ||
+            (b0 === 0x2A && COM.readByte(1) === 0x06 && COM.readByte(2) === 0x00 && COM.readByte(3) === 0xF9)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function detect() {
     if (COM.isVerbose()) {
-        sName = COM.getOperationSystemName();
-        sVersion = COM.getOperationSystemVersion();
-        sOptions = COM.getOperationSystemOptions();
+        if (isCPM()) {
+            sName = "CP/M";
+            sVersion = "";
+            sOptions = "8080/Z80";
+        } else {
+            sName = COM.getOperationSystemName();
+            sVersion = COM.getOperationSystemVersion();
+            sOptions = COM.getOperationSystemOptions();
+        }
 
         bDetected = true;
     }

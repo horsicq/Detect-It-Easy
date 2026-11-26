@@ -176,6 +176,28 @@ function detect() {
         return true;
     }
 
+    function isStuffIt5() {
+        var nSize = Binary.getSize();
+        var sSuffix = " Aladdin Systems, Inc., http://www.aladdinsys.com/StuffIt/\r\n";
+        if (nSize < 100 || !Binary.compare("'StuffIt (c)1997-'")) return false;
+        if (Binary.read_ansiString(20, sSuffix.length) !== sSuffix) return false;
+        if (Binary.read_uint8(82) !== 5 || Binary.read_uint32(84, _BE) !== nSize || Binary.read_uint16(92, _BE) === 0) return false;
+        var nPos = Binary.read_uint32(94, _BE);
+        if (nPos < 100 || nPos + 34 > nSize || Binary.read_uint32(nPos, _BE) !== 0xA5A5A5A5) return false;
+        var nLen = Binary.read_uint16(nPos + 6, _BE);
+        if (nLen < 48 || nPos + nLen > nSize) return false;
+        var nStored = Binary.read_uint16(nPos + 32, _BE);
+        var nCrc = 0;
+        for (var i = 0; i < nLen; i++) {
+            var b = (i === 32 || i === 33) ? 0 : Binary.read_uint8(nPos + i);
+            nCrc ^= b;
+            for (var j = 0; j < 8; j++) {
+                nCrc = (nCrc & 1) ? ((nCrc >>> 1) ^ 0xA001) : (nCrc >>> 1);
+            }
+        }
+        return (nCrc & 0xFFFF) === nStored;
+    }
+
     if (Binary.compare("a596fdff")) {
         bDetected = true;
         sName = "FTCOMP";
@@ -194,6 +216,11 @@ function detect() {
     } else if (Binary.compare("'SIT!'")) {
         bDetected = true;
         sName = "SIT";
+    } else if (isStuffIt5()) {
+        bDetected = true;
+        sName = "SIT";
+        sVersion = "5";
+        sOptions = "Archive format; header CRC verified";
     } else if (Binary.compare("06'SKF3.0'") || isSKF2()) {
         bDetected = true;
         sName = "SKF";
@@ -248,8 +275,8 @@ function detect() {
                 sName = "LHA ";
                 sOptions = "LArc ext (.LZS)";
                 break;
-                case "lz7":
             case "pm0":
+            case "pm1":
             case "pm2":
                 sName = "LHA archive, PMarc ext (.PMA)";
                 break;
@@ -475,6 +502,49 @@ function detect() {
         return nEnd <= nSize;
     }
 
+    function isMacBinaryI() {
+        var nSize = Binary.getSize();
+        if (nSize < 128 || Binary.read_uint8(0) !== 0 || Binary.read_uint8(74) !== 0 || Binary.read_uint8(82) !== 0) return false;
+        var nName = Binary.read_uint8(1);
+        if (nName < 1 || nName > 63 || Binary.read_uint8(122) !== 0 || Binary.read_uint8(123) !== 0 || Binary.read_uint16(124, _BE) !== 0) return false;
+        var i;
+        for (i = 2 + nName; i < 65; i++) {
+            if (Binary.read_uint8(i) !== 0) return false;
+        }
+        for (i = 101; i < 128; i++) {
+            if (Binary.read_uint8(i) !== 0) return false;
+        }
+        var nData = Binary.read_uint32(83, _BE);
+        var nRsrc = Binary.read_uint32(87, _BE);
+        var nComment = Binary.read_uint16(99, _BE);
+        var nSecondary = Binary.read_uint16(120, _BE);
+        if (nData === 0 && nRsrc === 0 && nComment === 0) return false;
+        function pad128(v) { return Math.ceil(v / 128) * 128; }
+        var nEnd = 128 + pad128(nSecondary) + pad128(nData) + pad128(nRsrc) + pad128(nComment);
+        return nEnd === nSize;
+    }
+
+    function isTar() {
+        if (Binary.getSize() < 512 || Binary.read_uint8(0) === 0) return false;
+        var sCsum = "";
+        for (var i = 148; i < 156; i++) {
+            var ch = Binary.read_uint8(i);
+            sCsum += (ch === 0) ? " " : String.fromCharCode(ch);
+        }
+        sCsum = sCsum.replace(/^\s+|\s+$/g, "");
+        if (!/^[0-7]+$/.test(sCsum)) return false;
+        var nExpected = parseInt(sCsum, 8);
+        var nSum = 0, nSigned = 0;
+        for (var j = 0; j < 512; j++) {
+            var b = (j >= 148 && j < 156) ? 32 : Binary.read_uint8(j);
+            nSum += b;
+            nSigned += (b < 128) ? b : (b - 256);
+        }
+        if (nExpected !== nSum && (nSigned < 0 || nExpected !== nSigned)) return false;
+        if (Binary.compare("'ustar'00", 257) || Binary.compare("'ustar '", 257)) return true;
+        return Binary.compare("000000000000", 257);
+    }
+
     function isCompress() {
         if (File.getSize() < 3 || !File.compare("1F9D")) return false;
         t = File.read_uint8(2);
@@ -497,7 +567,7 @@ function detect() {
     } else if (Binary.compare("'TPWM'")) {
         bDetected = true;
         sName = "TPWM (BlueByte)";
-    } else if ((Binary.getSize() >= 500) && (Binary.compare("00'ustar'", 0x100))) {
+    } else if (isTar()) {
         bDetected = true;
         sName = "tar";
     } else if (Binary.compare("'LB'0100")) {
@@ -530,6 +600,11 @@ function detect() {
         bDetected = true;
         sName = "MacBinary";
         sVersion = Binary.readByte(122) == 130 ? "III" : "II";
+        sOptions = Binary.getString(65, 4) + "/" + Binary.getString(69, 4);
+    } else if (isMacBinaryI()) {
+        bDetected = true;
+        sName = "MacBinary";
+        sVersion = "I";
         sOptions = Binary.getString(65, 4) + "/" + Binary.getString(69, 4);
     }
 
