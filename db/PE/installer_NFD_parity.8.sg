@@ -1,0 +1,393 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:3717 handle_Installers, :4280 handle_SFX,
+// :1490 and :1620 handle_Protection; overlay records nfd_binary.cpp:2299 g_PE_overlay_records)
+//
+// NFD parity for installers and SFX modules that have their own DIE rule: this file runs after those rules
+// (priority 8) and adds a product only when NFD's predicate holds and no rule has reported it yet.
+// The result keeps DIE's type and name and carries NFD's version/info.
+
+meta("installer", "NFD parity (installers, sfx)");
+
+function detect() {
+    var bNet = PE.isNet(),
+        bDeep = PE.isDeepScan(),
+        sManifest = PE.getManifest(),
+        aTypes = ["installer", "sfx"],
+        sVer, sInfo, nOffset, sText, aMatch, i;
+
+    function isReported(aNames) {
+        for (var i = 0; i < aNames.length; i++) {
+            for (var j = 0; j < aTypes.length; j++) {
+                if (_isResultPresent(aTypes[j], aNames[i])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    function vi(sKey) {
+        return PE.getVersionStringInfo(sKey);
+    }
+
+    // A resource of a numeric type, found by its numeric id or by its name
+    function isResource(nType, vIdOrName) {
+        for (var i = 0; i < PE.resource.length; i++) {
+            if (PE.resource[i].Type == nType) {
+                if (typeof vIdOrName == "string") {
+                    if (PE.resource[i].Name == vIdOrName) {
+                        return true;
+                    }
+                } else if (PE.resource[i].Id == vIdOrName && !PE.resource[i].Name) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // XPE::getConstDataSection / getNormalDataSection (section index or -1)
+    function getConstDataSection() {
+        for (var i = 1; i < PE.section.length; i++) {
+            if (PE.section[i].Name == ".rdata" && ((PE.section[i].Characteristics & 0xFF0000FF) >>> 0) == 0x40000040 && PE.section[i].FileSize) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    function getDataSection() {
+        var nImportSection = PE.getImportSection(),
+            i;
+
+        for (i = 1; i < PE.section.length; i++) {
+            if ((PE.section[i].Name == "DATA" || PE.section[i].Name == ".data") && ((PE.section[i].Characteristics & 0xFF0000FF) >>> 0) == 0xC0000040 &&
+                PE.section[i].FileSize && nImportSection != i) {
+                return i;
+            }
+        }
+
+        for (i = 1; i < PE.section.length; i++) {
+            if (PE.section[i].FileSize && nImportSection != i && (PE.section[i].Characteristics >>> 0) != 0x60000020 &&
+                (PE.section[i].Characteristics >>> 0) != 0x40000040) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    // ---- Any PE (nfd_pe.cpp handle_Protection) ----
+
+    // Advanced Installer 23.x bootstrapper: the vendor's registry key in .rdata (deep scan), :1490
+    if (bDeep && !isReported(["Advanced Installer"])) {
+        i = getConstDataSection();
+        if (i != -1 && PE.findString(PE.section[i].FileOffset, PE.section[i].FileSize, "Software\\Caphyon\\Advanced Installer") != -1) {
+            _setResult("installer", "Advanced Installer", "", "");
+        }
+    }
+
+    // Tarma InstallMate: payload section, :1620
+    if (!isReported(["Tarma Installer", "Tarma InstallMate"])) {
+        if (PE.isSectionNamePresent(".tsuarch") || PE.isSectionNamePresent(".tsustub")) {
+            _setResult("installer", "Tarma Installer", "", "");
+        }
+    }
+
+    if (bNet) {
+        return;
+    }
+
+    // ---- Native PE only (handle_Installers) ----
+
+    // Inno Setup, :3724 (the version is refined by DIE's own rule; here only NFD's base values)
+    if (!isReported(["Inno Setup Module"])) {
+        var bInnoHeaderInstall = !PE.is64() && PE.compare("'Inno'", 0x30),
+            bInnoHeaderUninstall = !PE.is64() && PE.compare("'InUn'", 0x30),
+            bInnoMessages = PE.compareOverlay("'Inno Setup Messages'");
+
+        if (bInnoHeaderInstall || bInnoHeaderUninstall || bInnoMessages || PE.compareOverlay("'Inno Setup Setup Data'") ||
+            PE.compareOverlay("'idska32'1A") || PE.compareOverlay("'zlb'1A")) {
+            sVer = "";
+            sInfo = "";
+
+            if (PE.compare("'InUn'", 0x30)) {
+                sInfo = "Uninstall";
+            } else if (bInnoMessages && !PE.compareOverlay("'Inno Setup Setup Data'")) {
+                sInfo = "Uninstall";
+                nOffset = PE.findString(PE.getOverlayOffset(), PE.getOverlaySize(), "Inno Setup Messages (");
+                if (nOffset != -1) {
+                    sText = PE.getString(nOffset + 21, 256);
+                    sVer = sText.split(" ")[0].replace(/\)/g, "");
+                    if (sText.split(" ")[1] == "(a))") {
+                        sInfo += ", ANSI";
+                    } else if (sText.split(" ")[1] == "(u))") {
+                        sInfo += ", Unicode";
+                    }
+                }
+            } else {
+                var nLdrTableOffset = -1;
+
+                if (PE.compare("'Inno'", 0x30)) {
+                    sVer = "1.XX-5.1.X";
+                    sInfo = "Install";
+                    nLdrTableOffset = PE.readDword(0x34);
+                } else {
+                    for (i = 0; i < PE.resource.length; i++) {
+                        if (PE.resource[i].Type == 10 && PE.resource[i].Id == 11111 && !PE.resource[i].Name) {
+                            sVer = "5.1.X-X.X.X";
+                            sInfo = "Install";
+                            nLdrTableOffset = PE.resource[i].Offset;
+                            break;
+                        }
+                    }
+                }
+
+                // The loader table ('rDlPtS') points to the setup data, whose banner reads "... (5.5.7) (u)"
+                if (nLdrTableOffset > 0 && nLdrTableOffset + 44 <= PE.getSize() && PE.compare("'rDlPtS'", nLdrTableOffset)) {
+                    sText = PE.getString(PE.readDword(nLdrTableOffset + 32), 256);
+                    if (sText.indexOf("(") == -1) {
+                        sText = PE.getString(PE.readDword(nLdrTableOffset + 36), 256);
+                    }
+
+                    aMatch = sText.match(/\((.*?)\)/);
+                    if (aMatch && aMatch[1] != "") {
+                        sVer = aMatch[1];
+                    }
+
+                    aMatch = sText.match(/\) \((.*?)\)/);
+                    if (aMatch && aMatch[1] == "a") {
+                        sInfo += ", ANSI";
+                    } else if (aMatch && aMatch[1] == "u") {
+                        sInfo += ", Unicode";
+                    }
+                }
+            }
+
+            _setResult("installer", "Inno Setup Module", sVer, sInfo);
+        }
+    }
+
+    // WiX Toolset, :3835
+    if (!isReported(["WiX Toolset Installer"]) && PE.compareOverlay("'MSCF'00000000") && PE.isSectionNamePresent(".wixburn")) {
+        _setResult("installer", "WiX Toolset Installer", "3.X", "");
+    }
+
+    // CAB SFX, :3854 (version: the second VS_FIXEDFILEINFO before the end of the resource section, deep scan)
+    if (!isReported(["Microsoft Cabinet"]) && sManifest.indexOf("sfxcab.exe") != -1) {
+        sVer = "";
+        i = PE.getResourceSection();
+        if (bDeep && i >= 0 && PE.section[i] && PE.section[i].FileSize > 0) {
+            nOffset = PE.section[i].FileOffset + PE.section[i].VirtualSize;
+            if (nOffset >= 0x600) {
+                nOffset = PE.findSignature(nOffset - 0x600, 0x600, "BD04EFFE00000100");
+                if (nOffset != -1) {
+                    sVer = PE.readWord(nOffset + 18) + "." + PE.readWord(nOffset + 16) + "." + PE.readWord(nOffset + 22) + "." + PE.readWord(nOffset + 20);
+                }
+            }
+        }
+        _setResult("sfx", "Microsoft Cabinet", sVer, "");
+    }
+
+    // InstallAnywhere, :3876
+    if (!isReported(["InstallAnywhere"]) && PE.compareOverlay("5B3E") && vi("ProductName") == "InstallAnywhere") {
+        _setResult("installer", "InstallAnywhere", vi("ProductVersion"), "");
+    }
+
+    // Ghost Installer, :3885
+    if (!isReported(["Ghost Installer"]) && PE.compareOverlay("C0DECECB8D8D8D8D")) {
+        _setResult("installer", "Ghost Installer", "1.0", "");
+    }
+
+    // Qt Installer, :3891
+    if (!isReported(["QT installer"]) && PE.compareOverlay("'qres'")) {
+        _setResult("installer", "QT installer", "", "");
+    }
+
+    // Smart Install Maker, :3902 (seven characters after "Smart Install Maker v" + 2)
+    if (!isReported(["Smart Install Maker"]) && PE.compareOverlay("'Smart Install Maker v'")) {
+        _setResult("installer", "Smart Install Maker", PE.getString(PE.getOverlayOffset() + 23, 7), "");
+    }
+
+    // Tarma Installer, :3909
+    if (!isReported(["Tarma Installer", "Tarma InstallMate"]) && PE.compareOverlay("'tiz1'........78DA")) {
+        _setResult("installer", "Tarma Installer", "", "");
+    }
+
+    // ClickTeam, :3915
+    if (!isReported(["ClickTeam"]) && (PE.compareOverlay("'wwgT)'") || PE.compareOverlay("..120100....0000"))) {
+        _setResult("installer", "ClickTeam", "", "");
+    }
+
+    // NSIS, :3922
+    if (!isReported(["Nullsoft Scriptable Install System"])) {
+        if (PE.compareOverlay("EFBEADDE'Null'..'oftInst'") || PE.compareOverlay("..000000EFBEADDE'NullsoftInst'") ||
+            PE.compareOverlay("EFBEADDE'nsisinstall'") || sManifest.indexOf("Nullsoft.NSIS") != -1) {
+            aMatch = sManifest.match(/Null[sS]oft Install System v?(.*?)</);
+            _setResult("installer", "Nullsoft Scriptable Install System", aMatch ? aMatch[1] : "", "");
+        }
+    }
+
+    // InstallShield, :3951
+    if (!isReported(["InstallShield"])) {
+        if (vi("ProductName").indexOf("InstallShield") != -1) {
+            _setResult("installer", "InstallShield", vi("FileVersion").trim().replace(/, /g, "."), "");
+        } else if (sManifest.indexOf("InstallShield") != -1) {
+            sVer = "";
+            i = getDataSection();
+            if (bDeep && i != -1) {
+                nOffset = PE.findString(PE.section[i].FileOffset, PE.section[i].FileSize, "SOFTWARE\\InstallShield\\1");
+                if (nOffset != -1) {
+                    sText = PE.getString(nOffset, 256).split("\\");
+                    if (sText.length > 2) {
+                        sVer = sText[2];
+                    }
+                }
+            }
+            if (sVer == "") {
+                sVer = vi("ISInternalVersion");
+            }
+            _setResult("installer", "InstallShield", sVer, "");
+        } else if (PE.compareOverlay("'ISSetupStream'") || PE.compareOverlay("....0000dcedbd") || PE.compareOverlay("....0000322124")) {
+            _setResult("installer", "InstallShield", "", "PackageForTheWeb");
+        } else if (vi("CompanyName").indexOf("InstallShield") != -1) {
+            _setResult("installer", "InstallShield", vi("FileVersion"), vi("CompanyName").indexOf("PackageForTheWeb") != -1 ? "PackageForTheWeb" : "");
+        }
+    }
+
+    // Advanced Installer, :4002
+    if (!isReported(["Advanced Installer"]) && sManifest.indexOf("AdvancedInstallerSetup") != -1) {
+        sVer = "";
+        if (bDeep && PE.getOverlaySize() > 0) {
+            nOffset = PE.findString(PE.getOverlayOffset(), PE.getOverlaySize(), "Advanced Installer ");
+            if (nOffset != -1) {
+                sText = PE.getString(nOffset, 256).split(" ");
+                if (sText.length > 2) {
+                    sVer = sText[2];
+                }
+            }
+        }
+        _setResult("installer", "Advanced Installer", sVer, "");
+    }
+
+    // Spoon Installer, :4022
+    if (!isReported(["Spoon Installer"]) && sManifest.indexOf("Illustrate.Spoon.Installer") != -1) {
+        _setResult("installer", "Spoon Installer", "", "");
+    }
+
+    // DeployMaster, :4028
+    if (!isReported(["DeployMaster"]) && sManifest.indexOf("DeployMaster Installer") != -1) {
+        _setResult("installer", "DeployMaster", "", "");
+    }
+
+    // Gentee Installer, :4034
+    if (!isReported(["Gentee Installer"])) {
+        if (sManifest.indexOf("Gentee.Installer.Install") != -1 || sManifest.indexOf("name=\"gentee\"") != -1) {
+            _setResult("installer", "Gentee Installer", "", "");
+        } else if (PE.isSectionNamePresent(".gentee") && isResource(10, "SETUP_TEMP")) {
+            _setResult("installer", "Gentee Installer", "", "");
+        }
+    }
+
+    // BitRock Installer, :4050
+    if (!isReported(["BitRock Installer"]) && sManifest.indexOf("BitRock Installer") != -1) {
+        _setResult("installer", "BitRock Installer", "", "");
+    }
+
+    // GP-Install, :4057
+    if (!isReported(["GPInstall"]) && vi("FileDescription").indexOf("GP-Install") != -1 && vi("FileDescription").indexOf("TASPro6-Install") != -1) {
+        _setResult("installer", "GPInstall", vi("FileVersion").trim().replace(/, /g, "."), "");
+    }
+
+    // Setup Factory, :4136
+    if (!isReported(["Setup Factory"]) && vi("LegalTrademarks").indexOf("Setup Factory") != -1) {
+        sVer = vi("ProductVersion").trim();
+        if (sVer.indexOf(",") != -1) {
+            sVer = sVer.replace(/ /g, "").replace(/,/g, ".");
+        }
+        _setResult("installer", "Setup Factory", sVer, "");
+    }
+
+    // InstallAware, :4148
+    if (!isReported(["InstallAware"]) && vi("Comments").indexOf("This installation was built with InstallAware") != -1) {
+        _setResult("installer", "InstallAware", vi("FileVersion").trim(), "");
+    }
+
+    // Squirrel, :4172
+    if (!isReported(["Squirrel"]) && vi("SquirrelAwareVersion") != "") {
+        sVer = vi("SquirrelAwareVersion").trim();
+        _setResult("installer", "Squirrel", sVer == "1" ? "1.0.0-1.9.1" : sVer, "");
+    }
+
+    // VMware, :4190
+    if (!isReported(["VMWare"]) && (PE.compareOverlay("'RWMV'") || vi("FileDescription").indexOf("VMware installation") != -1)) {
+        _setResult("installer", "VMWare", vi("FileVersion").trim(), "");
+    }
+
+    // Alchemy Mindworks, :4216
+    if (!isReported(["Alchemy Mindworks installer"]) && isResource(10, 4001) && isResource(10, 5001)) {
+        _setResult("installer", "Alchemy Mindworks installer", "", "");
+    }
+
+    // Wise, :4256 (export table of STUB32.EXE)
+    if (!isReported(["Wise Installer"]) && (PE.getNumberOfExportFunctions() == 2 || PE.getNumberOfExportFunctions() == 6)) {
+        var nHeaderOffset = PE.readDword(0x3c),
+            nExportRVA = PE.readDword(nHeaderOffset + 24 + (PE.is64() ? 112 : 96)),
+            nExportOffset = nExportRVA ? PE.RVAToOffset(nExportRVA) : -1,
+            sExportName = "",
+            nFunctions = PE.getNumberOfExportFunctions();
+
+        if (nExportOffset > 0) {
+            nOffset = PE.RVAToOffset(PE.readDword(nExportOffset + 12));
+            if (nOffset > 0) {
+                sExportName = PE.getString(nOffset, 64);
+            }
+        }
+
+        if (sExportName == "STUB32.EXE") {
+            if (nFunctions == 2) {
+                if (PE.getExportFunctionName(0) == "_MainWndProc@16" || PE.getExportFunctionName(1) == "_StubFileWrite@12") {
+                    _setResult("installer", "Wise Installer", "", "");
+                }
+            } else if (PE.getExportFunctionName(0) == "_LanguageDlg@16" || PE.getExportFunctionName(1) == "_PasswordDlg@16" ||
+                PE.getExportFunctionName(2) == "_ProgressDlg@16" || PE.getExportFunctionName(3) == "_UpdateCRC@8" ||
+                PE.getExportFunctionName(4) == "_t1@40" || PE.getExportFunctionName(5) == "_t2@12") {
+                _setResult("installer", "Wise Installer", "", "");
+            }
+        }
+    }
+
+    // ---- SFX (handle_SFX) ----
+
+    // WinRAR, :4289 (the manifest branch lives in sfx_WinRAR.1.sg)
+    if (!isReported(["WinRAR"])) {
+        if ((PE.compareOverlay("'RE~^'") || PE.compareOverlay("'Rar!'1A0700")) && isResource(5, "STARTDLG") && isResource(5, "LICENSEDLG")) {
+            _setResult("sfx", "WinRAR", "", "");
+        }
+    }
+
+    // WinACE, :4345
+    if (!isReported(["WinACE"])) {
+        sText = vi("InternalName");
+        if (sText.indexOf("WinACE") != -1 || sText.indexOf("WinAce") != -1 || sText.indexOf("UNACE") != -1) {
+            _setResult("sfx", "WinACE", vi("ProductVersion"), "");
+        }
+    }
+
+    // WinZip, :4353
+    if (!isReported(["WinZip"]) && (sManifest.indexOf("WinZipComputing.WinZip") != -1 || PE.isSectionNamePresent("_winzip_"))) {
+        sText = sManifest.split("assemblyIdentity");
+        aMatch = sText.length > 1 ? sText[1].match(/version="(.*?)"/) : null;
+        _setResult("sfx", "WinZip", aMatch ? aMatch[1] : "", "");
+    }
+
+    // GkSetup SFX, :4369
+    if (!isReported(["GkSetup SFX"]) && vi("ProductName").indexOf("GkSetup Self extractor") != -1) {
+        _setResult("sfx", "GkSetup SFX", vi("ProductVersion"), "");
+    }
+
+    return;
+}

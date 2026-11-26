@@ -1,0 +1,73 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_elf.cpp:914-949; nfd_binary.cpp:2130-2148; Formats xelf.cpp:4453-4495)
+
+meta("debug data", "NFD");
+
+function detect() {
+    var bBE = APKiD_isBigEndian(),
+        b64 = APKiD_isElf64(),
+        nSection = ELF.getSectionNumber(".symtab");
+
+    // Symbol Table: XELF::getNumberOfSymbols starts at sizeof(ElfXX_Sym) (24/16, as NFD does) and counts
+    // the entries after the first while st_info != 0 and st_other == 0.
+    if (nSection != -1) {
+        var nOffset = ELF.getSectionFileOffset(nSection);
+
+        if (nOffset > 0) {
+            var nEntrySize = b64 ? 24 : 16,
+                nInfo = b64 ? 4 : 12,
+                nCount = nEntrySize,
+                nFileSize = ELF.getSize(),
+                nPos = nOffset + nEntrySize,
+                bStop = false;
+
+            while (!bStop && (nPos + nEntrySize <= nFileSize)) {
+                var nChunk = Math.min(0x8000, Math.floor((nFileSize - nPos) / nEntrySize) * nEntrySize),
+                    aBytes = ELF.readBytes(nPos, nChunk);
+
+                for (var i = 0; i + nEntrySize <= aBytes.length; i += nEntrySize) {
+                    if ((aBytes[i + nInfo] == 0) || (aBytes[i + nInfo + 1] != 0)) {
+                        bStop = true;
+                        break;
+                    }
+
+                    nCount++;
+                }
+
+                nPos += nChunk;
+
+                if (nChunk == 0) {
+                    break;
+                }
+            }
+
+            _setResult("debug data", "Symbol Table", "", ELF.getSectionName(nSection) + ", " + nCount + " symbols");
+        }
+    }
+
+    if (ELF.isSectionNamePresent(".stab") && ELF.isSectionNamePresent(".stabstr")) {
+        _setResult("debug data", "STABS Debug Info", "", "");
+    }
+
+    // DWARF: signed 16-bit version at offset 4 of .debug_info, accepted when 0..7.
+    var nDebug = ELF.getSectionNumber(".debug_info");
+
+    if (nDebug != -1) {
+        var nDebugOffset = ELF.getSectionFileOffset(nDebug),
+            nDebugSize = ELF.getSectionFileSize(nDebug);
+
+        if ((nDebugOffset > 0) && (nDebugSize > 8)) {
+            var nVersion = ELF.readWord(nDebugOffset + 4); // NFD reads it little-endian
+
+            if (nVersion > 0x7FFF) {
+                nVersion -= 0x10000;
+            }
+
+            if ((nVersion >= 0) && (nVersion <= 7)) {
+                _setResult("debug data", "DWARF Debug Info", nVersion + ".0", "");
+            }
+        }
+    }
+
+    return result();
+}

@@ -1,0 +1,62 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:1510 InstallForge, :4063-4190 handle_Installers)
+// Installers that NFD names from the version resource alone. Native PE only, except InstallForge (as in NFD).
+
+meta("installer", "NFD version resource installers");
+
+function detect() {
+    var sComments = PE.getVersionStringInfo("Comments"),
+        sFileDescription = PE.getVersionStringInfo("FileDescription"),
+        sProductName = PE.getVersionStringInfo("ProductName"),
+        sInternalName = PE.getVersionStringInfo("InternalName"),
+        sFileVersion = PE.getVersionStringInfo("FileVersion").trim();
+
+    if (sComments.indexOf("InstallForge") != -1) {
+        // "Created with InstallForge 1.6.1": the text between the first and the second "InstallForge"
+        _setResult("installer", "InstallForge", sComments.split("InstallForge")[1].trim(), "");
+    }
+
+    if (PE.isNet()) {
+        return;
+    }
+
+    if (sFileDescription.indexOf("Total Commander Installer") != -1) {
+        _setResult("installer", "Total Commander Installer", sFileVersion, "");
+    }
+
+    if (sProductName.indexOf("Opera Installer") != -1) {
+        _setResult("installer", "Opera", sFileVersion, "");
+    }
+
+    if (sProductName.indexOf("Yandex Installer") != -1) {
+        _setResult("installer", "Yandex", sFileVersion, "");
+    }
+
+    if (sFileDescription.indexOf("Visual Studio Installer") != -1) {
+        _setResult("installer", "Microsoft Visual Studio", sFileVersion, "");
+    }
+
+    if (sInternalName.indexOf("Dropbox Update Setup") != -1) {
+        _setResult("installer", "Dropbox", sFileVersion, "");
+    }
+
+    if (sFileDescription.indexOf("Microsoft .NET Framework") != -1) {
+        _setResult("installer", "Microsoft .NET Framework", sFileVersion, "");
+    }
+
+    if (sFileDescription.indexOf("Microsoft Office") != -1 && sInternalName.indexOf("Bootstrapper.exe") != -1) {
+        var sOfficeVersion = PE.getVersionStringInfo("ProductVersion").trim();
+
+        if (sOfficeVersion.indexOf(",") != -1) {
+            sOfficeVersion = sOfficeVersion.replace(/ /g, "").replace(/,/g, ".");
+        }
+
+        _setResult("installer", "Microsoft Office", sOfficeVersion, "");
+    }
+
+    if (sFileDescription.indexOf("Java") != -1 && sInternalName.indexOf("Setup Launcher") != -1) {
+        _setResult("installer", "Java", sFileVersion, "");
+    }
+
+    return;
+}

@@ -1,0 +1,46 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:7448 handle_Joiners; records :524 import hash, :131 entry point)
+//
+// NFD parity for joiners that have their own DIE rule (entry point only): this file runs after those rules
+// (priority 8) and adds a joiner when NFD's predicate holds and no rule has reported it yet.
+// Celesty File Binder and N-Joiner need no entry point match in NFD: the import hash and the payload resource type.
+
+meta("joiner", "NFD parity (joiners)");
+
+function detect() {
+    if (PE.is64()) {
+        return;
+    }
+
+    var nHash64 = PE.getImportHash64(),
+        nHash32 = PE.getImportHash32();
+
+    // Blade Joiner, :7454: import hash, entry point, an overlay
+    if (!_isResultPresent("joiner", "Blade Joiner") && nHash64 === 0x1a905fabfb && nHash32 === 0x05877992 &&
+        PE.compareEP("558BEC81C4E4FEFFFF53565733C08945F08985") && PE.getOverlaySize() > 0) {
+        _setResult("joiner", "Blade Joiner", "1.5", "");
+    }
+
+    // ExeJoiner, :7464
+    if (!_isResultPresent("joiner", "ExeJoiner") && nHash64 === 0x6704c9452 && nHash32 === 0x29aaa397 &&
+        PE.compareEP("68........6804010000E83903000005........C6005C680401000068") && PE.getOverlaySize() > 0) {
+        _setResult("joiner", "ExeJoiner", "1.0", "");
+    }
+
+    // Celesty File Binder, :7474: import hash and a resource of type "RBIND"
+    if (!_isResultPresent("joiner", "Celesty File Binder") && PE.isResourceGroupNamePresent("RBIND")) {
+        if (nHash64 === 0x2625a9db1f && nHash32 === 0x7c76448a) {
+            _setResult("joiner", "Celesty File Binder", "1.0", "C++ Dynamic library");
+        } else if (nHash64 === 0x245138f5a4 && nHash32 === 0x8a50a75e) {
+            _setResult("joiner", "Celesty File Binder", "1.0", "C++ Static library");
+        }
+    }
+
+    // N-Joiner, :7482: import hash and a resource of type "NJ" or "NJOY"
+    if (!_isResultPresent("joiner", "N-Joiner") && nHash64 === 0x76b28c3da && nHash32 === 0x8c42943c &&
+        (PE.isResourceGroupNamePresent("NJ") || PE.isResourceGroupNamePresent("NJOY"))) {
+        _setResult("joiner", "N-Joiner", "0.1", "");
+    }
+
+    return;
+}

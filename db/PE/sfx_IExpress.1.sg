@@ -1,0 +1,22 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:6800 handle_Tools)
+// IExpress / wextract: the stub keeps its SED directive names in .rdata. NFD reports it in deep scan only.
+
+meta("sfx", "IExpress");
+
+function detect() {
+    if (PE.isDeepScan()) {
+        // XPE::getConstDataSection: the first ".rdata" after section 0 that is readable initialized data with raw bytes
+        for (var i = 1; i < PE.section.length; i++) {
+            if (PE.section[i].Name == ".rdata" && ((PE.section[i].Characteristics & 0xFF0000FF) >>> 0) == 0x40000040 && PE.section[i].FileSize) {
+                if (PE.findString(PE.section[i].FileOffset, PE.section[i].FileSize, "POSTRUNPROGRAM") != -1) {
+                    bDetected = true;
+                }
+
+                break;
+            }
+        }
+    }
+
+    return result();
+}

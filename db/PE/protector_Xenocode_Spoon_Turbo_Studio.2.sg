@@ -1,0 +1,53 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:1516-1565 handle_Protection; overlay records nfd_binary.cpp:2341-2343)
+// Application virtualizers of the Xenocode / Spoon / Turbo family: the version resource names the packager.
+// The chain is exclusive, as in NFD: one result at most.
+
+meta("protector", "Xenocode");
+
+function detect() {
+    var sPackager = PE.getVersionStringInfo("Packager"),
+        sPackagerVersion = PE.getVersionStringInfo("PackagerVersion").trim(),
+        aNames = [
+            "Xenocode Virtual Application Studio 2009",
+            "Xenocode Virtual Application Studio 2010 ISV Edition",
+            "Xenocode Virtual Application Studio 2010",
+            "Xenocode Virtual Application Studio 2012 ISV Edition",
+            "Xenocode Virtual Application Studio 2013 ISV Edition",
+            "Turbo Studio"
+        ];
+
+    if (sPackager.indexOf("Spoon Studio 2011") != -1) {
+        sName = "Spoon Studio 2011";
+        sVersion = sPackagerVersion.replace(/, /g, ".");
+        bDetected = true;
+    } else if (sPackager.indexOf("Spoon Studio") != -1) {
+        sName = "Spoon Studio";
+        sVersion = sPackagerVersion.replace(/, /g, ".");
+        bDetected = true;
+    } else {
+        for (var i = 0; i < aNames.length; i++) {
+            if (sPackager.indexOf(aNames[i]) != -1) {
+                sName = aNames[i];
+                sVersion = sPackagerVersion;
+                bDetected = true;
+                break;
+            }
+        }
+
+        if (!bDetected) {
+            if (PE.compareOverlay("'xvm'0003")) {
+                sName = "Spoon Studio";
+                bDetected = true;
+            } else if (PE.compareOverlay("'xvm'0001")) {
+                // protector_Xenocode_Postbuild.2.sg already reports this overlay when the .xcpad section is present.
+                if (!PE.isSectionNamePresent(".xcpad")) {
+                    sName = "Xenocode";
+                    bDetected = true;
+                }
+            }
+        }
+    }
+
+    return result();
+}

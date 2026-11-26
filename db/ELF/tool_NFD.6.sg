@@ -1,0 +1,57 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_elf.cpp:613-633, 669-677, 818-855, 1121-1126; nfd_binary.cpp:1975-2003)
+
+meta("tool", "NFD");
+
+function getAndroidVersionFromApi(nApi) {
+    var aVersions = ["", "1.0", "1.1", "1.5", "1.6", "2.0", "2.0.1", "2.1", "2.2.X", "2.3-2.3.2", "2.3.3-2.3.7", "3.0", "3.1", "3.2.X",
+        "4.0.1-4.0.2", "4.0.3-4.0.4", "4.1.X", "4.2.X", "4.3.X", "4.4-4.4.4", "4.4W", "5.0", "5.1", "6.0", "7.0", "7.1", "8.0", "8.1", "9.0",
+        "10.0", "11.0", "12.0", "12.1", "13.0", "14.0", "15.0", "16.0"];
+
+    return ((nApi >= 1) && (nApi < aVersions.length)) ? aVersions[nApi] : "Unknown";
+}
+
+function getDelphiVersionFromCompiler(sCompilerVersion) {
+    var sFirst = ELF_NFD_section(sCompilerVersion, " ", 0, 0),
+        oVersions = { "28.0": "XE7", "29.0": "XE8", "30.0": "10 Seattle", "31.0": "10.1 Berlin", "32.0": "10.2 Tokyo", "33.0": "10.3 Rio",
+            "34.0": "10.4 Sydney", "35.0": "11.0 Alexandria", "36.0": "12.0 Athens" };
+
+    if (sFirst == "") {
+        return "";
+    }
+
+    return oVersions.hasOwnProperty(sFirst) ? oVersions[sFirst] : "12.x Athens++";
+}
+
+function detect() {
+    // Android note: API level (uint32) then NDK version and build strings (char[64] each).
+    var oNote = ELF_NFD_getNote("Android");
+
+    if (oNote) {
+        var nApi = ELF.readDword(oNote.dataOffset) >>> 0,
+            sNdk = "";
+
+        if (oNote.size >= 4 + 64 * 2) {
+            sNdk = ELF.getString(oNote.dataOffset + 4, 256) + "(" + ELF.getString(oNote.dataOffset + 4 + 64, 256) + ")";
+        }
+
+        _setResult("tool", "Android SDK", "API " + nApi + "(Android " + getAndroidVersionFromApi(nApi) + ")", "");
+        _setResult("tool", "Android NDK", sNdk, "");
+    }
+
+    var oDetects = ELF_NFD_getCommentDetects();
+
+    if (oDetects.SourceryCodeBench) {
+        _setResult("tool", "Sourcery CodeBench", oDetects.SourceryCodeBench.version, "");
+    } else if (oDetects.SourceryCodeBenchLite) {
+        _setResult("tool", "Sourcery CodeBench Lite", oDetects.SourceryCodeBenchLite.version, "");
+    }
+
+    if (oDetects.Delphi) {
+        _setResult("tool", "Embarcadero Delphi", getDelphiVersionFromCompiler(oDetects.Delphi.version), "");
+    }
+
+    ELF_NFD_emitCommentDetects(["SunWorkShop", "SunWorkShopCompilers", "AppImage"]);
+
+    return result();
+}

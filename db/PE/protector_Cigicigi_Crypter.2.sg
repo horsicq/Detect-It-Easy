@@ -1,0 +1,37 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:709, 4854)
+
+meta("protector", "Cigicigi Crypter");
+
+function detect() {
+    // NFD: PE32; import hashes (getImportHash64, getImportHash32) and RT_RCDATA resource "AYARLAR"
+    if (!PE.is64()) {
+        var nHash64 = PE.getImportHash64(),
+            nHash32 = PE.getImportHash32(),
+            bHash = false;
+
+        if (nHash64 == 0x12998dbdd9 && nHash32 == 0xf75643a6) {
+            sVersion = "1.0";
+            bHash = true;
+        }
+
+        if (bHash && isRcDataPresent("AYARLAR")) {
+            bDetected = true;
+        } else {
+            sVersion = sOptions = "";
+        }
+    }
+
+    return result();
+}
+
+// NFD: XPE::isResourcePresent(S_RT_RCDATA, sName)
+function isRcDataPresent(sName) {
+    for (var i = 0; i < PE.resource.length; i++) {
+        if (PE.resource[i].Type == 10 && PE.resource[i].Name == sName) {
+            return true;
+        }
+    }
+
+    return false;
+}

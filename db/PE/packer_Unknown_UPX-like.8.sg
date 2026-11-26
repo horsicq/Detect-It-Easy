@@ -1,0 +1,44 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:7557 handle_UnknownProtection;
+// records :811-819 import position hash of UPX)
+// Heuristic scan only, as in NFD: nothing else was recognised, the first section has no raw data
+// and the first import library is laid out the way UPX builds it.
+
+meta("packer", "(Unknown)UPX-like");
+
+function detect() {
+    if (PE.isHeuristicScan()) {
+        var aTypes = ["packer", "protector", "cryptor", "sfx", "installer", "dongle protection"],
+            bProtectionPresent = false,
+            i;
+
+        for (i = 0; i < aTypes.length; i++) {
+            if (_getNumberOfResults(aTypes[i]) > 0) {
+                bProtectionPresent = true;
+            }
+        }
+
+        if (!bProtectionPresent && PE.section.length > 0 && PE.section[0].FileSize == 0) {
+            var aHashes32 = [0xd4fdcab1, 0x1d51299a, 0xb3318086, 0x3778aab9, 0xf375ee03, 0xf737d853],
+                aHashesAny = [0x82a048fc, 0x554a1748],
+                nNumberOfImports = PE.getNumberOfImports(),
+                j;
+
+            if (PE.is64()) {
+                bDetected = PE.isImportPositionHashPresent(0, 0xf737d853);
+            } else {
+                for (i = 0; i < aHashes32.length && !bDetected; i++) {
+                    bDetected = PE.isImportPositionHashPresent(0, aHashes32[i]);
+                }
+            }
+
+            for (i = 0; i < nNumberOfImports && !bDetected; i++) {
+                for (j = 0; j < aHashesAny.length && !bDetected; j++) {
+                    bDetected = PE.isImportPositionHashPresent(i, aHashesAny[j]);
+                }
+            }
+        }
+    }
+
+    return result();
+}

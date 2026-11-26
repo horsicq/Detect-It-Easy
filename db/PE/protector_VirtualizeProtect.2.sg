@@ -1,0 +1,32 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:3114 handle_VProtect)
+// NFD reports it in deep scan only: it searches the entry point section for the marker strings.
+
+meta("protector", "VirtualizeProtect");
+
+function detect() {
+    if (!PE.isNet() && PE.isDeepScan()) {
+        var nEPSection = PE.getEntryPointSection();
+
+        if (nEPSection > 0 && PE.section[nEPSection] && PE.section[nEPSection].Name == "VProtect") {
+            var nOffset = PE.section[nEPSection].FileOffset,
+                nSize = PE.section[nEPSection].FileSize;
+
+            if (nSize > 0 && PE.findString(nOffset, nSize, "VProtect") != -1) {
+                var nVersionOffset = PE.findString(nOffset, nSize, "VProtect Ultimate v");
+
+                if (nVersionOffset != -1) {
+                    var aParts = PE.getString(nVersionOffset, 256).split(" v");
+
+                    if (aParts.length > 1) {
+                        sVersion = aParts[1];
+                    }
+                }
+
+                bDetected = true;
+            }
+        }
+    }
+
+    return result();
+}

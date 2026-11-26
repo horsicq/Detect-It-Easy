@@ -1,0 +1,27 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_elf.cpp:641-657, 797-841; nfd_binary.cpp:2178-2194)
+
+meta("linker", "NFD");
+
+function detect() {
+    // gold: ".note.gnu.gold-version" section, version = word after "gold ".
+    var nSection = ELF.getSectionNumber(".note.gnu.gold-version");
+
+    if (nSection != -1) {
+        var nOffset = ELF.getSectionFileOffset(nSection),
+            nSize = ELF.getSectionFileSize(nSection),
+            sVersionGold = "",
+            nFound = ELF.findString(nOffset, nSize, "gold ");
+
+        if (nFound != -1) {
+            sVersionGold = ELF_NFD_section(ELF.getString(nFound, nSize - (nFound - nOffset)), " ", 1, 1);
+        }
+
+        _setResult("linker", "gold", sVersionGold, "");
+    }
+
+    // Linkers named in the .comment section ("mold" is recognised by NFD but never reported).
+    ELF_NFD_emitCommentDetects(["ARMLinker", "LLD", "OracleSolarisLinkEditors"]);
+
+    return result();
+}
