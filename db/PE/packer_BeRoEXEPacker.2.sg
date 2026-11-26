@@ -36,5 +36,66 @@ function detect() {
 
     bDetected = bDetected || Boolean(sVersion) || Boolean(sOptions);
 
+    // Ported from Nauz File Detector "BeRoEXEPacker" (SpecAbstract modules/nfd_pe.cpp:98, 185, 186, 187, 189, 191, 193, 542, 923, 924, 2144):
+    // PE32, not .NET; import hash and (header marker, or generic tiny header with entry point signature).
+    // Also used to fill in the version when the rule above found the product without one.
+    if ((!bDetected || (!sVersion && !sOptions)) && !PE.is64() && !PE.isNet()) {
+        var nNfdHash64 = PE.getImportHash64(),
+            nNfdHash32 = PE.getImportHash32();
+
+        if ((nNfdHash64 == 0x13e215a53 && nNfdHash32 == 0xdf3c1e0)) {
+            if (PE.compare("'MZ'52C3'(C)BeRo!PE'0000")) {
+                sVersion = "1.00";
+                sOptions = "";
+                if (PE.compareEP("60BE........BF........FCB28033DBA4B302E8")) {
+                    sVersion = "1.00";
+                    sOptions = "LZBRR";
+                } else if (PE.compareEP("60BE........BF........FCAD8D1C07B0803BFB733BE8")) {
+                    sVersion = "1.00";
+                    sOptions = "LZBRS";
+                } else if (PE.compareEP("6068........68........68........E8........BE........B9")) {
+                    sVersion = "1.00";
+                    sOptions = "LZMA";
+                } else if (PE.compareEP("837C2408010F85........60BE........BF........FCB28033DBA4B302E8")) {
+                    sVersion = "1.00";
+                    sOptions = "LZBRR/dll";
+                } else if (PE.compareEP("837C2408010F85........60BE........BF........FCAD8D1C07B0803BFB733BE8")) {
+                    sVersion = "1.00";
+                    sOptions = "LZBRS/dll";
+                } else if (PE.compareEP("837C2408010F85........6068........68........68........E8........BE........B9")) {
+                    sVersion = "1.00";
+                    sOptions = "LZMA/dll";
+                }
+                bDetected = true;
+            } else if (PE.compare("'MZ'....................'PE'0000")) {
+                if (PE.compareEP("60BE........BF........FCB28033DBA4B302E8")) {
+                    sVersion = "1.00";
+                    sOptions = "LZBRR";
+                    bDetected = true;
+                } else if (PE.compareEP("60BE........BF........FCAD8D1C07B0803BFB733BE8")) {
+                    sVersion = "1.00";
+                    sOptions = "LZBRS";
+                    bDetected = true;
+                } else if (PE.compareEP("6068........68........68........E8........BE........B9")) {
+                    sVersion = "1.00";
+                    sOptions = "LZMA";
+                    bDetected = true;
+                } else if (PE.compareEP("837C2408010F85........60BE........BF........FCB28033DBA4B302E8")) {
+                    sVersion = "1.00";
+                    sOptions = "LZBRR/dll";
+                    bDetected = true;
+                } else if (PE.compareEP("837C2408010F85........60BE........BF........FCAD8D1C07B0803BFB733BE8")) {
+                    sVersion = "1.00";
+                    sOptions = "LZBRS/dll";
+                    bDetected = true;
+                } else if (PE.compareEP("837C2408010F85........6068........68........68........E8........BE........B9")) {
+                    sVersion = "1.00";
+                    sOptions = "LZMA/dll";
+                    bDetected = true;
+                }
+            }
+        }
+    }
+
     return result();
 }

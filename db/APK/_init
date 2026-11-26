@@ -82,3 +82,496 @@ function APK_countRawString(sString, nLimit, fnCheck) {
 
     return nResult;
 }
+
+
+
+// ---------------------------------------------------------------------------
+// Ported from Nauz File Detector (SpecAbstract nfd_apk.cpp; Formats xapk.cpp,
+// xzip.cpp) - package D helpers. Bounded ZIP readers for the APK Signing Block,
+// one small archive member (stored or deflated) and the raw inflate they need.
+// Prefix: APK_NFD_. Nothing above this block depends on it.
+// ---------------------------------------------------------------------------
+
+var APK_NFD_cache = {};
+
+/**
+ * Unsigned 32-bit read; 0 outside the file.
+ * @returns {Number}
+ */
+function APK_NFD_u32(nOffset) {
+    if ((nOffset < 0) || (nOffset + 4 > APK.getSize())) {
+        return 0;
+    }
+
+    return APK.readDword(nOffset) >>> 0;
+}
+
+/**
+ * Unsigned 64-bit read as a Number (exact below 2^53); 0 outside the file.
+ * @returns {Number}
+ */
+function APK_NFD_u64(nOffset) {
+    if ((nOffset < 0) || (nOffset + 8 > APK.getSize())) {
+        return 0;
+    }
+
+    return APK_NFD_u32(nOffset) + APK_NFD_u32(nOffset + 4) * 4294967296;
+}
+
+/**
+ * End of central directory offset: the last plausible "PK\5\6" in the last 64 KiB + 22 bytes
+ * (like XZip::findECDOffset, ZIP64 sentinels rejected).
+ * @returns {Number} offset or -1
+ */
+function APK_NFD_getECDOffset() {
+    if (APK_NFD_cache.ecd !== undefined) {
+        return APK_NFD_cache.ecd;
+    }
+
+    var nSize = APK.getSize(),
+        nResult = -1;
+
+    if (nSize >= 22) {
+        var nOffset = Math.max(0, nSize - (0xFFFF + 22)),
+            aCandidates = [];
+
+        while (nOffset <= nSize - 22) {
+            var nFound = APK.findSignature(nOffset, nSize - nOffset, "504B0506");
+
+            if (nFound < 0) {
+                break;
+            }
+
+            aCandidates.push(nFound);
+            nOffset = nFound + 1;
+        }
+
+        for (var i = aCandidates.length - 1; i >= 0; i--) {
+            var nCurrent = aCandidates[i];
+
+            if ((nSize - nCurrent) < 22) {
+                continue;
+            }
+
+            if (APK.readWord(nCurrent + 20) > (nSize - nCurrent - 22)) {
+                continue;
+            }
+
+            if ((APK_NFD_u32(nCurrent + 12) == 0xFFFFFFFF) || (APK_NFD_u32(nCurrent + 16) == 0xFFFFFFFF)) {
+                continue;
+            }
+
+            nResult = nCurrent;
+            break;
+        }
+    }
+
+    APK_NFD_cache.ecd = nResult;
+
+    return nResult;
+}
+
+/**
+ * IDs of the APK Signing Block records, read exactly like XAPK::getAPKSignaturesBlockRecordsList
+ * (uint32 ID, uint32 size, data; stops after 0x42726577 or ID 0). The last "APK Sig Block 42"
+ * from 0x100 bytes before the central directory is used (XAPK::findAPKSignBlockOffset).
+ * @returns {Number[]}
+ */
+function APK_NFD_getSigBlockIDs() {
+    if (APK_NFD_cache.sigIDs !== undefined) {
+        return APK_NFD_cache.sigIDs;
+    }
+
+    var aResult = [],
+        nECD = APK_NFD_getECDOffset();
+
+    if (nECD != -1) {
+        var nSize = APK.getSize(),
+            nOffset = Math.max(0, APK_NFD_u32(nECD + 16) - 0x100),
+            nMagic = -1;
+
+        while (nOffset < nSize) {
+            var nFound = APK.findString(nOffset, nSize - nOffset, "APK Sig Block 42");
+
+            if (nFound < 0) {
+                break;
+            }
+
+            nMagic = nFound;
+            nOffset = nFound + 8;
+        }
+
+        if (nMagic != -1) {
+            var nBlockSize1 = APK_NFD_u64(nMagic - 8),
+                nBlockSize2 = APK_NFD_u64(nMagic - nBlockSize1 + 8);
+
+            if (nBlockSize1 && (nBlockSize1 == nBlockSize2)) {
+                var nEnd = nMagic - 8;
+
+                nOffset = nMagic - nBlockSize1 + 16;
+
+                while ((nOffset < nEnd) && (aResult.length < 4096)) {
+                    var nID = APK_NFD_u32(nOffset);
+
+                    nOffset += 4;
+
+                    var nDataSize = APK_NFD_u32(nOffset);
+
+                    aResult.push(nID);
+
+                    nOffset += 4;
+                    nOffset += nDataSize;
+
+                    if ((nID == 0x42726577) || (nID == 0)) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    APK_NFD_cache.sigIDs = aResult;
+
+    return aResult;
+}
+
+/**
+ * @returns {Boolean} true when the APK Signing Block holds a record with this ID.
+ */
+function APK_NFD_isSigBlockIDPresent(nID) {
+    var aIDs = APK_NFD_getSigBlockIDs();
+
+    for (var i = 0; i < aIDs.length; i++) {
+        if (aIDs[i] == nID) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Raw DEFLATE decoder (stored, fixed and dynamic Huffman blocks; after zlib's contrib/puff).
+ * @param {Number[]} aInput - compressed bytes
+ * @param {Number} nMaxOutput - output limit
+ * @returns {Number[]|null} decoded bytes, or null on error or when the limit is exceeded
+ */
+function APK_NFD_inflate(aInput, nMaxOutput) {
+    var aOutput = [],
+        nPos = 0,
+        nBitBuffer = 0,
+        nBitCount = 0,
+        aLengthBase = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258],
+        aLengthExtra = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0],
+        aDistBase = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577],
+        aDistExtra = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13],
+        aOrder = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+
+    function bits(nNeed) {
+        while (nBitCount < nNeed) {
+            if (nPos >= aInput.length) {
+                throw "eof";
+            }
+
+            nBitBuffer |= (aInput[nPos++] & 0xFF) << nBitCount;
+            nBitCount += 8;
+        }
+
+        var nValue = nBitBuffer & ((1 << nNeed) - 1);
+
+        nBitBuffer >>>= nNeed;
+        nBitCount -= nNeed;
+
+        return nValue;
+    }
+
+    function build(aLengths, nNumber) {
+        var aCount = [],
+            aSymbol = [],
+            aOffsets = [],
+            i;
+
+        for (i = 0; i < 16; i++) {
+            aCount[i] = 0;
+        }
+
+        for (i = 0; i < nNumber; i++) {
+            aCount[aLengths[i]]++;
+        }
+
+        aOffsets[1] = 0;
+
+        for (i = 1; i < 16; i++) {
+            aOffsets[i + 1] = aOffsets[i] + aCount[i];
+        }
+
+        for (i = 0; i < nNumber; i++) {
+            if (aLengths[i]) {
+                aSymbol[aOffsets[aLengths[i]]++] = i;
+            }
+        }
+
+        return { count: aCount, symbol: aSymbol };
+    }
+
+    function decode(oTable) {
+        var nCode = 0,
+            nFirst = 0,
+            nIndex = 0;
+
+        for (var nLength = 1; nLength < 16; nLength++) {
+            nCode |= bits(1);
+
+            var nCount = oTable.count[nLength];
+
+            if (nCode - nCount < nFirst) {
+                return oTable.symbol[nIndex + (nCode - nFirst)];
+            }
+
+            nIndex += nCount;
+            nFirst += nCount;
+            nFirst <<= 1;
+            nCode <<= 1;
+        }
+
+        throw "code";
+    }
+
+    function codes(oLength, oDist) {
+        while (true) {
+            var nSymbol = decode(oLength);
+
+            if (nSymbol < 256) {
+                if (aOutput.length >= nMaxOutput) {
+                    throw "limit";
+                }
+
+                aOutput.push(nSymbol);
+            } else if (nSymbol == 256) {
+                return;
+            } else {
+                nSymbol -= 257;
+
+                if (nSymbol >= 29) {
+                    throw "symbol";
+                }
+
+                var nLength = aLengthBase[nSymbol] + bits(aLengthExtra[nSymbol]),
+                    nDistSymbol = decode(oDist);
+
+                if (nDistSymbol >= 30) {
+                    throw "distance";
+                }
+
+                var nDist = aDistBase[nDistSymbol] + bits(aDistExtra[nDistSymbol]);
+
+                if ((nDist > aOutput.length) || (aOutput.length + nLength > nMaxOutput)) {
+                    throw "copy";
+                }
+
+                for (var k = 0; k < nLength; k++) {
+                    aOutput.push(aOutput[aOutput.length - nDist]);
+                }
+            }
+        }
+    }
+
+    try {
+        var nLast = 0;
+
+        do {
+            nLast = bits(1);
+
+            var nType = bits(2),
+                i;
+
+            if (nType == 0) {
+                nBitBuffer = 0;
+                nBitCount = 0;
+
+                if (nPos + 4 > aInput.length) {
+                    return null;
+                }
+
+                var nLen = (aInput[nPos] & 0xFF) | ((aInput[nPos + 1] & 0xFF) << 8),
+                    nNLen = (aInput[nPos + 2] & 0xFF) | ((aInput[nPos + 3] & 0xFF) << 8);
+
+                nPos += 4;
+
+                if (((nLen ^ 0xFFFF) != nNLen) || (nPos + nLen > aInput.length) || (aOutput.length + nLen > nMaxOutput)) {
+                    return null;
+                }
+
+                for (i = 0; i < nLen; i++) {
+                    aOutput.push(aInput[nPos++] & 0xFF);
+                }
+            } else if (nType == 1) {
+                if (APK_NFD_cache.fixedTables === undefined) {
+                    var aLengths = [],
+                        aDist = [];
+
+                    for (i = 0; i < 144; i++) aLengths[i] = 8;
+                    for (; i < 256; i++) aLengths[i] = 9;
+                    for (; i < 280; i++) aLengths[i] = 7;
+                    for (; i < 288; i++) aLengths[i] = 8;
+                    for (i = 0; i < 30; i++) aDist[i] = 5;
+
+                    APK_NFD_cache.fixedTables = [build(aLengths, 288), build(aDist, 30)];
+                }
+
+                codes(APK_NFD_cache.fixedTables[0], APK_NFD_cache.fixedTables[1]);
+            } else if (nType == 2) {
+                var nLit = bits(5) + 257,
+                    nDistCodes = bits(5) + 1,
+                    nCodeLengths = bits(4) + 4,
+                    aCodeLengths = [],
+                    aAll = [];
+
+                if ((nLit > 286) || (nDistCodes > 30)) {
+                    return null;
+                }
+
+                for (i = 0; i < 19; i++) aCodeLengths[i] = 0;
+                for (i = 0; i < nCodeLengths; i++) aCodeLengths[aOrder[i]] = bits(3);
+
+                var oCodeLengths = build(aCodeLengths, 19);
+
+                while (aAll.length < nLit + nDistCodes) {
+                    var nSym = decode(oCodeLengths),
+                        nRepeat = 0,
+                        nValue = 0;
+
+                    if (nSym < 16) {
+                        aAll.push(nSym);
+                        continue;
+                    } else if (nSym == 16) {
+                        if (aAll.length == 0) {
+                            return null;
+                        }
+
+                        nValue = aAll[aAll.length - 1];
+                        nRepeat = 3 + bits(2);
+                    } else if (nSym == 17) {
+                        nRepeat = 3 + bits(3);
+                    } else {
+                        nRepeat = 11 + bits(7);
+                    }
+
+                    if (aAll.length + nRepeat > nLit + nDistCodes) {
+                        return null;
+                    }
+
+                    while (nRepeat--) {
+                        aAll.push(nValue);
+                    }
+                }
+
+                codes(build(aAll.slice(0, nLit), nLit), build(aAll.slice(nLit), nDistCodes));
+            } else {
+                return null;
+            }
+        } while (!nLast);
+    } catch (e) {
+        return null;
+    }
+
+    return aOutput;
+}
+
+/**
+ * Bytes of one archive member found by exact name in the central directory (first match),
+ * stored or deflated, at most nMaxSize bytes packed and unpacked.
+ * @returns {Number[]|null} member bytes, or null when absent, unsupported or too large
+ */
+function APK_NFD_readMember(sName, nMaxSize) {
+    var sCacheKey = "member$" + sName;
+
+    if (APK_NFD_cache[sCacheKey] !== undefined) {
+        return APK_NFD_cache[sCacheKey];
+    }
+
+    var aResult = null,
+        nECD = APK_NFD_getECDOffset();
+
+    if ((nECD != -1) && APK.isArchiveRecordPresent(sName)) {
+        var nCDOffset = APK_NFD_u32(nECD + 16),
+            nCDEnd = Math.min(APK.getSize(), nCDOffset + APK_NFD_u32(nECD + 12)),
+            nOffset = nCDOffset,
+            nHeader = -1;
+
+        while (nOffset < nCDEnd) {
+            var nFound = APK.findString(nOffset, nCDEnd - nOffset, sName);
+
+            if (nFound < 0) {
+                break;
+            }
+
+            if ((nFound - 46 >= nCDOffset) && (APK_NFD_u32(nFound - 46) == 0x02014B50) && (APK.readWord(nFound - 46 + 28) == sName.length)) {
+                nHeader = nFound - 46;
+                break;
+            }
+
+            nOffset = nFound + 1;
+        }
+
+        if (nHeader != -1) {
+            var nMethod = APK.readWord(nHeader + 10),
+                nPacked = APK_NFD_u32(nHeader + 20),
+                nUnpacked = APK_NFD_u32(nHeader + 24),
+                nLocal = APK_NFD_u32(nHeader + 42);
+
+            if ((nPacked <= nMaxSize) && (nUnpacked <= nMaxSize) && (APK_NFD_u32(nLocal) == 0x04034B50)) {
+                var nData = nLocal + 30 + APK.readWord(nLocal + 26) + APK.readWord(nLocal + 28);
+
+                if (nData + nPacked <= APK.getSize()) {
+                    var aPacked = (nPacked > 0) ? APK.readBytes(nData, nPacked) : [];
+
+                    if (nMethod == 0) {
+                        aResult = aPacked;
+                    } else if (nMethod == 8) {
+                        aResult = APK_NFD_inflate(aPacked, nMaxSize);
+                    }
+                }
+            }
+        }
+    }
+
+    APK_NFD_cache[sCacheKey] = aResult;
+
+    return aResult;
+}
+
+/**
+ * Member text up to the first NUL (QByteArray::data() semantics), Latin-1; "" when unreadable.
+ * @returns {String}
+ */
+function APK_NFD_readMemberText(sName, nMaxSize) {
+    var aBytes = APK_NFD_readMember(sName, nMaxSize),
+        sResult = "";
+
+    if (aBytes) {
+        for (var i = 0; i < aBytes.length; i++) {
+            if (aBytes[i] == 0) {
+                break;
+            }
+
+            sResult += String.fromCharCode(aBytes[i] & 0xFF);
+        }
+    }
+
+    return sResult;
+}
+
+/**
+ * QString::toUInt range check used by NFD (XBinary::checkStringNumber).
+ * @returns {Boolean}
+ */
+function APK_NFD_checkStringNumber(sString, nMin, nMax) {
+    if (!/^\s*\+?[0-9]+\s*$/.test(sString)) {
+        return false;
+    }
+
+    var nValue = parseInt(sString, 10);
+
+    return (nValue >= nMin) && (nValue <= nMax);
+}

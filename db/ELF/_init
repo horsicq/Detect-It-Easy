@@ -674,3 +674,366 @@ function APKiD_isSymtabNamePresent(sAnchor, listBacks, rRegExp) {
     }
     return false;
 }
+
+
+
+// ---------------------------------------------------------------------------
+// Ported from Nauz File Detector (SpecAbstract nfd_elf.cpp, nfd_binary.cpp
+// _get_*_string; Formats xelf.cpp) - package D helpers: .comment strings and
+// their NFD classification, notes, symbol table count. Prefix: ELF_NFD_.
+// Nothing above this block depends on it.
+// ---------------------------------------------------------------------------
+
+var ELF_NFD_cache = {};
+
+/**
+ * QString::section(sSep, nStart, nEnd) with SectionDefault flags.
+ * @returns {String}
+ */
+function ELF_NFD_section(sString, sSep, nStart, nEnd) {
+    var aParts = sString.split(sSep),
+        nCount = aParts.length;
+
+    if (nEnd === undefined) nEnd = -1;
+    if (nStart < 0) nStart += nCount;
+    if (nEnd < 0) nEnd += nCount;
+
+    if ((nStart >= nCount) || (nEnd < 0) || (nStart > nEnd)) {
+        return "";
+    }
+
+    return aParts.slice(Math.max(0, nStart), nEnd + 1).join(sSep);
+}
+
+function ELF_NFD_has(sString, sPart) {
+    return sString.indexOf(sPart) != -1;
+}
+
+/**
+ * Non-empty NUL-separated strings of the first ".comment" section, in file order
+ * (XELF::getStringsFromSection). At most 1 MiB is read.
+ * @returns {String[]}
+ */
+function ELF_NFD_getComments() {
+    if (ELF_NFD_cache.comments !== undefined) {
+        return ELF_NFD_cache.comments;
+    }
+
+    var aResult = [],
+        nSection = ELF.getSectionNumber(".comment");
+
+    if (nSection != -1) {
+        var nOffset = ELF.getSectionFileOffset(nSection),
+            nSize = Math.min(ELF.getSectionFileSize(nSection), 0x100000, Math.max(0, ELF.getSize() - nOffset)),
+            sCurrent = "";
+
+        for (var nPos = 0; nPos < nSize; nPos += 0x10000) {
+            var aBytes = ELF.readBytes(nOffset + nPos, Math.min(0x10000, nSize - nPos));
+
+            for (var i = 0; i < aBytes.length; i++) {
+                if (aBytes[i] == 0) {
+                    if (sCurrent.length) {
+                        aResult.push(sCurrent);
+                    }
+
+                    sCurrent = "";
+                } else {
+                    sCurrent += String.fromCharCode(aBytes[i] & 0xFF);
+                }
+            }
+        }
+
+        if (sCurrent.length) {
+            aResult.push(sCurrent);
+        }
+    }
+
+    ELF_NFD_cache.comments = aResult;
+
+    return aResult;
+}
+
+/**
+ * NFD's .comment classification (nfd_elf.cpp:57-554 with nfd_binary.cpp _get_*_string): the same
+ * first-match chain and the same unconditional checks per string. Keyed by NFD record name; a later
+ * string with the same record replaces the earlier one (QMap::insert).
+ * @returns {Object} key -> {type, name, version, info}
+ */
+function ELF_NFD_getCommentDetects() {
+    if (ELF_NFD_cache.commentDetects !== undefined) {
+        return ELF_NFD_cache.commentDetects;
+    }
+
+    var oResult = {},
+        aComments = ELF_NFD_getComments(),
+        S = ELF_NFD_section,
+        H = ELF_NFD_has;
+
+    function clangWord(s) {
+        return S(s, " ", 3, 3);
+    }
+
+    var aChain = [
+        // [key, type, name, test(s) -> version string or null, conditional]
+        ["ByteGuard", "protector", "ByteGuard", function (s) {
+            if (H(s, "ByteGuard")) return S(S(S(s, "ByteGuard ", 1, 1), "-", 0, 0), ")", 0, 0);
+            if (H(s, "Byteguard")) return S(S(S(s, "Byteguard ", 1, 1), "-", 0, 0), ")", 0, 0);
+            return null;
+        }, true],
+        ["GCC", "compiler", "GCC", function (s) {
+            return H(s, "GCC:") ? ELF_NFD_getGCCVersion(s) : null;
+        }, true],
+        ["AppleLLVM", "compiler", "Apple LLVM", function (s) {
+            return H(s, "Apple LLVM version") ? S(S(s, "Apple LLVM version ", 1, 1), " ", 0, 0) : null;
+        }, true],
+        ["AndroidClang", "compiler", "Android clang", function (s) {
+            if (H(s, "Android clang")) return S(s, " ", 3, 3);
+            if (H(s, "Android (") && H(s, " clang version ")) return S(S(s, " clang version ", 1, 1), " ", 0, 0);
+            return null;
+        }, true],
+        ["AlipayClang", "compiler", "Alipay clang", function (s) { return H(s, "Alipay clang") ? clangWord(s) : null; }, true],
+        ["AlpineClang", "compiler", "Alpine clang", function (s) { return H(s, "Alpine clang") ? clangWord(s) : null; }, true],
+        ["AlibabaClang", "compiler", "Alibaba clang", function (s) { return H(s, "Alibaba clang") ? clangWord(s) : null; }, true],
+        ["PlexClang", "compiler", "Plex clang", function (s) { return H(s, "Plex clang") ? clangWord(s) : null; }, true],
+        ["UbuntuClang", "compiler", "Ubuntu clang", function (s) { return H(s, "Ubuntu clang") ? clangWord(s) : null; }, true],
+        ["DebianClang", "compiler", "Debian clang", function (s) { return H(s, "Debian clang") ? clangWord(s) : null; }, true],
+        ["ApportableClang", "compiler", "Apportable clang", function (s) { return H(s, "Apportable clang version") ? clangWord(s) : null; }, true],
+        ["ARMAssembler", "compiler", "ARM Assembler", function (s) { return H(s, "ARM Assembler,") ? S(s, ", ", 1, -1) : null; }, true],
+        ["ARMLinker", "linker", "ARM Linker", function (s) { return H(s, "ARM Linker,") ? S(S(s, ", ", 1, -1), "]", 0, 0) + "]" : null; }, true],
+        ["ARMC", "compiler", "ARM C", function (s) { return H(s, "ARM C Compiler,") ? S(s, ", ", 1, -1) : null; }, true],
+        ["ARMCCPP", "compiler", "ARM C/C++", function (s) { return H(s, "ARM C/C++ Compiler,") ? S(s, ", ", 1, -1) : null; }, true],
+        ["ARMNEONCCPP", "compiler", "ARM NEON C/C++", function (s) { return H(s, "ARM NEON C/C++ Compiler,") ? S(s, ", ", 1, -1) : null; }, true],
+        ["ARMThumbCCPP", "compiler", "ARM/Thumb C/C++", function (s) { return H(s, "ARM/Thumb C/C++ Compiler,") ? S(s, ", ", 1, -1) : null; }, true],
+        ["ARMThumbMacroAssembler", "compiler", "ARM/Thumb Macro Assembler", function (s) {
+            if (!H(s, "ARM/Thumb Macro Assembler")) return null;
+            return H(s, "vsn ") ? S(s, "vsn ", 1, -1) : S(s, ", ", 1, -1);
+        }, true],
+        ["ThumbC", "compiler", "Thumb C", function (s) { return H(s, "Thumb C Compiler,") ? S(s, ", ", 1, -1) : null; }, true],
+        ["clang", "compiler", "clang", function (s) { return /^clang version/.test(s) ? S(s, " ", 2, 2) : null; }, true],
+        ["DynASM", "compiler", "DynASM", function (s) { return H(s, "DynASM") ? S(s, " ", 1, 1) : null; }, true],
+        ["Delphi", "compiler", "Embarcadero Delphi", function (s) { return /^Embarcadero Delphi for/.test(s) ? S(s, "version ", 1, 1) : null; }, true],
+        ["LLD", "linker", "LLD", function (s) { return /^Linker: LLD/.test(s) ? S(S(s, "Linker: LLD ", 1, 1), "(", 0, 0) : null; }, true],
+        ["mold", "linker", "mold", function (s) { return /^mold /.test(s) ? "" : null; }, true],
+        ["OracleSolarisLinkEditors", "linker", "Oracle Solaris Link Editors", function (s) {
+            return /^ld: Software Generation Utilities - Solaris Link Editors:/.test(s) ? S(s, "Solaris Link Editors: ", 1, 1) : null;
+        }, true],
+        ["SunWorkShop", "tool", "Sun WorkShop", function (s) {
+            return /Sun WorkShop/.test(s) ? S(S(S(S(s, "Sun WorkShop ", 1, 1), " ", 0, 1), "\r", 0, 0), "\n", 0, 0) : null;
+        }, true],
+        ["SunWorkShopCompilers", "tool", "Sun WorkShop Compilers", function (s) {
+            return /WorkShop Compilers/.test(s) ? S(S(S(s, "WorkShop Compilers ", 1, 1), "\r", 0, 0), "\n", 0, 0) : null;
+        }, true],
+        ["SnapdragonLLVMARM", "compiler", "Snapdragon LLVM ARM", function (s) { return /^Snapdragon LLVM ARM Compiler/.test(s) ? S(s, " ", 4, 4) : null; }, true],
+        ["NASM", "compiler", "NASM", function (s) { return /^The Netwide Assembler/.test(s) ? S(s, "The Netwide Assembler ", 1, 1) : null; }, true],
+        ["TencentLegu", "protector", "Tencent Legu", function (s) { return /^legu/.test(s) ? "" : null; }, true],
+        ["AlipayObfuscator", "protector", "Alipay Obfuscator", function (s) { return H(s, "Alipay") ? S(s, " ", 3, 3) : null; }, false],
+        ["wangzehuaLLVM", "protector", "wangzehua LLVM", function (s) { return H(s, "wangzehua  clang version") ? S(s, "wangzehua  clang version", 1, 1) : null; }, true],
+        ["ObfuscatorLLVM", "protector", "Obfuscator-LLVM", function (s) {
+            if (H(s, "Obfuscator-clang version") || H(s, "Obfuscator- clang version") || H(s, "Obfuscator-LLVM clang version")) {
+                return S(S(S(s, "version ", 1, 1), "(", 0, 0), " ", 0, 0);
+            }
+            return null;
+        }, true],
+        ["NagainLLVM", "protector", "Nagain LLVM", function (s) { return H(s, "Nagain-LLVM clang version") ? clangWord(s) : null; }, true],
+        ["iJiamiLLVM", "protector", "iJiami LLVM", function (s) { return H(s, "ijiami LLVM Compiler- clang version") ? S(s, " ", 5, 5) : null; }, true],
+        ["SafengineLLVM", "protector", "Safengine LLVM", function (s) { return H(s, "Safengine clang version") ? clangWord(s) : null; }, true],
+        ["TencentProtection", "protector", "TencentProtection", function (s) { return H(s, "Tencent-Obfuscation Compiler") ? "" : null; }, true],
+        ["AppImage", "tool", "AppImage", function (s) { return H(s, "AppImage by Simon Peter, http://appimage.org/") ? "" : null; }, true],
+        ["HikariObfuscator", "protector", "HikariObfuscator", function (s) {
+            return (H(s, "HikariObfuscator") || H(s, "_Hikari") || H(s, "Hikari.git")) ? "" : null;
+        }, false],
+        ["SnapProtect", "protector", "SnapProtect", function (s) {
+            return H(s, "snap.protect version ") ? S(S(s, "snap.protect version ", 1, 1), " ", 0, 0) : null;
+        }, false],
+        ["ByteDanceSecCompiler", "protector", "ByteDance-SecCompiler", function (s) { return H(s, "ByteDance-SecCompiler") ? "" : null; }, false],
+        ["DingbaozengNativeObfuscator", "protector", "Dingbaozeng native obfuscator", function (s) {
+            return H(s, "dingbaozeng/native_obfuscator.git") ? "" : null;
+        }, false],
+        ["OllvmTll", "protector", "OLLVM-TLL", function (s) { return H(s, "ollvm-tll.git") ? "" : null; }, false],
+        ["SourceryCodeBench", "tool", "Sourcery CodeBench", function (s) {
+            if (/Sourcery CodeBench Lite /.test(s)) return { lite: true, version: S(S(s, "Sourcery CodeBench Lite ", 1, 1), ")", 0, 0) };
+            if (/Sourcery CodeBench /.test(s)) return S(S(s, "Sourcery CodeBench ", 1, 1), ")", 0, 0);
+            return null;
+        }, false],
+        ["Rust", "compiler", "Rust", function (s) { return /^rustc /.test(s) ? S(S(s, "rustc version ", 1, 1), " ", 0, 0) : null; }, false]
+    ];
+
+    for (var i = 0; i < aComments.length; i++) {
+        var sComment = aComments[i],
+            bValid = false;
+
+        for (var j = 0; j < aChain.length; j++) {
+            var aEntry = aChain[j];
+
+            if (aEntry[4] && bValid) {
+                continue;
+            }
+
+            var vResult = aEntry[3](sComment);
+
+            bValid = (vResult !== null);
+
+            if (bValid) {
+                var sKey = aEntry[0],
+                    sName = aEntry[2],
+                    sVersion = vResult;
+
+                if (typeof vResult === "object") {
+                    sKey = "SourceryCodeBenchLite";
+                    sName = "Sourcery CodeBench Lite";
+                    sVersion = vResult.version;
+                }
+
+                oResult[sKey] = { type: aEntry[1], name: sName, version: sVersion, info: "" };
+            }
+        }
+    }
+
+    ELF_NFD_cache.commentDetects = oResult;
+
+    return oResult;
+}
+
+/**
+ * GCC version from one "GCC:" comment string (NFD_Binary::_get_GCC_string).
+ * @returns {String}
+ */
+function ELF_NFD_getGCCVersion(sString) {
+    var S = ELF_NFD_section,
+        H = ELF_NFD_has;
+
+    if (H(sString, "(experimental)") || H(sString, "(prerelease)")) return S(sString, " ", -3, -1);
+    if (H(sString, "(GNU) c ")) return S(sString, "(GNU) c ", 1, -1);
+    if (H(sString, "GNU")) return S(sString, " ", 2, -1);
+    if (H(sString, "Rev1, Built by MSYS2 project")) return S(sString, " ", -2, -1);
+    if (H(sString, "(Ubuntu ")) return S(S(sString, ") ", 1, 1), " ", 0, 0);
+    if (H(sString, "StartOS)")) return S(S(sString, ")", 1, 1), " ", 0, 0);
+    if (H(sString, "GCC: (c) ")) return S(sString, "GCC: (c) ", 1, 1);
+
+    return S(sString, " ", -1, -1);
+}
+
+/**
+ * Emit the comment detections of the given keys in this order (NFD handle_Tools/handle_Protection order).
+ * fnLang(oRecord) may return a language for _setLang.
+ */
+function ELF_NFD_emitCommentDetects(aKeys, fnLang) {
+    var oDetects = ELF_NFD_getCommentDetects();
+
+    for (var i = 0; i < aKeys.length; i++) {
+        var oRecord = oDetects[aKeys[i]];
+
+        if (oRecord) {
+            _setResult(oRecord.type, oRecord.name, oRecord.version, oRecord.info);
+
+            if (fnLang) {
+                var sLanguage = fnLang(aKeys[i]);
+
+                if (sLanguage) {
+                    _setLang(sLanguage);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ELF notes like XELF::getNotes: PT_NOTE segments, or SHT_NOTE sections when the segments hold none.
+ * @returns {Object[]} {name, type, offset (note start), size (whole note), dataOffset}
+ */
+function ELF_NFD_getNotes() {
+    if (ELF_NFD_cache.notes !== undefined) {
+        return ELF_NFD_cache.notes;
+    }
+
+    var bBE = APKiD_isBigEndian(),
+        b64 = APKiD_isElf64(),
+        nFileSize = ELF.getSize();
+
+    function parse(nOffset, nSize, aList) {
+        var nRecords = 0;
+
+        while ((nSize >= 6) && (nOffset + 12 <= nFileSize)) {
+            var nNameLength = ELF.read_uint32(nOffset, bBE) >>> 0,
+                nDescLength = ELF.read_uint32(nOffset + 4, bBE) >>> 0,
+                nType = ELF.read_uint32(nOffset + 8, bBE) >>> 0,
+                nNoteSize = 12 + (Math.ceil(nNameLength / 4) * 4) + (Math.ceil(nDescLength / 4) * 4);
+
+            if ((nNoteSize > 0x7FFFFFFF) || (nSize < nNoteSize)) {
+                break;
+            }
+
+            var sName = "";
+
+            if (nNameLength >= 1) {
+                sName = ELF.getString(nOffset + 12, nNameLength - 1);
+            }
+
+            aList.push({ name: sName, type: nType, offset: nOffset, size: nNoteSize, dataOffset: nOffset + 12 + Math.ceil(nNameLength / 4) * 4 });
+
+            nOffset += nNoteSize;
+            nSize -= nNoteSize;
+
+            if (++nRecords > 1000) {
+                break;
+            }
+        }
+    }
+
+    var aResult = [],
+        nPhnum = Math.min(APKiD_elfHeader("phnum"), 100),
+        i;
+
+    for (i = 0; i < nPhnum; i++) {
+        var nHeader = APKiD_elfHeader("phoff") + i * APKiD_elfHeader("phentsize");
+
+        if (nHeader + (b64 ? 56 : 32) > nFileSize) {
+            break;
+        }
+
+        if ((ELF.read_uint32(nHeader, bBE) >>> 0) == 4) { // PT_NOTE
+            var nOffset = b64 ? ELF.read_uint64(nHeader + 8, bBE) : (ELF.read_uint32(nHeader + 4, bBE) >>> 0),
+                nSize = b64 ? ELF.read_uint64(nHeader + 32, bBE) : (ELF.read_uint32(nHeader + 16, bBE) >>> 0);
+
+            parse(nOffset, nSize, aResult);
+        }
+    }
+
+    if (aResult.length == 0) {
+        var nShnum = Math.min(ELF.getNumberOfSections(), 100),
+            nShoff = APKiD_elfHeader("shoff"),
+            nShentsize = APKiD_elfHeader("shentsize");
+
+        for (i = 0; i < nShnum; i++) {
+            var nSHeader = nShoff + i * nShentsize;
+
+            if (nSHeader + (b64 ? 64 : 40) > nFileSize) {
+                break;
+            }
+
+            if ((ELF.read_uint32(nSHeader + 4, bBE) >>> 0) == 7) { // SHT_NOTE
+                parse(ELF.getSectionFileOffset(i), ELF.getSectionFileSize(i), aResult);
+            }
+        }
+    }
+
+    ELF_NFD_cache.notes = aResult;
+
+    return aResult;
+}
+
+/**
+ * First note with this name (XELF::getNote), or null.
+ * @returns {Object|null}
+ */
+function ELF_NFD_getNote(sName) {
+    var aNotes = ELF_NFD_getNotes();
+
+    for (var i = 0; i < aNotes.length; i++) {
+        if (aNotes[i].name == sName) {
+            return aNotes[i];
+        }
+    }
+
+    return null;
+}

@@ -16,5 +16,35 @@ function detect() {
         bDetected = true;
     }
 
+    // Ported from Nauz File Detector "ASDPack" (SpecAbstract modules/nfd_pe.cpp:146, 536, 537, 2234):
+    // PE32, not .NET; import hash and (two sections with TLS, or entry point signature).
+    if (!bDetected && !PE.is64() && !PE.isNet()) {
+        var nNfdHash64 = PE.getImportHash64(),
+            nNfdHash32 = PE.getImportHash32();
+
+        if ((nNfdHash64 == 0x55706e12 && nNfdHash32 == 0xc7af1b6)) {
+            sVersion = "1.00";
+            sOptions = "";
+            bDetected = (PE.getNumberOfSections() == 2 && PE.isTLSPresent());
+        } else if ((nNfdHash64 == 0xc3068d5e && nNfdHash32 == 0x3f603725)) {
+            sVersion = "2.00";
+            sOptions = "";
+            bDetected = (PE.getNumberOfSections() == 2 && PE.isTLSPresent());
+        }
+
+        if (((nNfdHash64 == 0x55706e12 && nNfdHash32 == 0xc7af1b6) ||
+            (nNfdHash64 == 0xc3068d5e && nNfdHash32 == 0x3f603725))) {
+            if (PE.compareEP("8B442404565753E8CD010000C3")) {
+                sVersion = "2.0";
+                sOptions = "";
+                bDetected = true;
+            }
+        }
+
+        if (!bDetected) {
+            sVersion = sOptions = "";
+        }
+    }
+
     return result();
 }

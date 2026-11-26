@@ -21,6 +21,30 @@ function detect() {
         bDetected = true;
     }
 
+    // Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:2043-2078): PE32, not .NET.
+    if (!bDetected && !PE.is64() && !PE.isNet()) {
+        var bNoStub = PE.compare("40000000'PE'0000", 0x3c);
+
+        if (PE.getNumberOfImports() >= 1 && PE.getImportLibraryName(0).toUpperCase() == "KERNEL32.DLL" && PE.getNumberOfImportThunks(0) == 2 &&
+            PE.getImportFunctionName(0, 0) == "GetProcAddress" && PE.getImportFunctionName(0, 1) == "LoadLibraryA") {
+            if (bNoStub && PE.section.length >= 2 && PE.compare("'kernel32.dll'00000000'VirtualAlloc'00000000", PE.section[1].FileOffset)) {
+                sVersion = "1.3-1.4.4";
+                bDetected = true;
+            }
+        } else if (PE.compareEP("E8$$$$$$$$87..248D..........87..24E9") || PE.compareEP("E9$$$$$$$$E8$$$$$$$$87..248D..........87..24E9")) {
+            bDetected = true;
+        }
+
+        if (!bDetected && bNoStub && PE.section.length >= 3) {
+            if (PE.getSectionFileOffset(0) == 0 && PE.getSectionFileSize(0) == 0 && (PE.getSectionCharacteristics(0) >>> 0) == 0xe00000a0) {
+                if (PE.getEntryPointSection() == 1 || PE.calculateEntropy(PE.section[2].FileOffset, PE.section[2].FileSize) > 7.6) {
+                    sVersion = "1.XX";
+                    bDetected = true;
+                }
+            }
+        }
+    }
+
     // TODO EP NFD
 
     return result();

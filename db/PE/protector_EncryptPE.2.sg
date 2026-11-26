@@ -27,5 +27,34 @@ function detect() {
     //        bDetected = true;
     //    }
 
+    // Ported from Nauz File Detector "EncryptPE" (SpecAbstract modules/nfd_pe.cpp:330, 634, 635, 939, 940, 2407):
+    // PE32, not .NET; import hash and entry point signature; version from the "EncryptPE V" string in the header.
+    if (!bDetected && !PE.is64() && !PE.isNet()) {
+        var nNfdHash64 = PE.getImportHash64(),
+            nNfdHash32 = PE.getImportHash32();
+
+        var nNfdOffset = -1;
+
+        if (PE.compareEP("609C64FF3500000000E8")) {
+            if ((nNfdHash64 == 0x4d37b2166 && nNfdHash32 == 0x556688b8)) {
+                sVersion = "1.XX-2.XX";
+                sOptions = "";
+                bDetected = true;
+            } else if ((nNfdHash64 == 0x4e0ec6281 && nNfdHash32 == 0x87857386)) {
+                sVersion = "2.XX";
+                sOptions = "";
+                bDetected = true;
+            }
+
+            if (bDetected) {
+                nNfdOffset = PE.findString(0, Math.min(PE.getSize(), 2048), "EncryptPE V");
+
+                if (nNfdOffset != -1) {
+                    sVersion = PE.getString(nNfdOffset + 11).split(",")[0];
+                }
+            }
+        }
+    }
+
     return result();
 }

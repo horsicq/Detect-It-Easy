@@ -30,5 +30,32 @@ function detect() {
         }
     }
 
+    // Ported from Nauz File Detector "ElecKey" (SpecAbstract modules/nfd_pe.cpp:412, 413, 703, 938, 1828):
+    // not .NET; entry point signature (PE32 or PE64); options from the section name and the import hash.
+    if (!bDetected && !PE.isNet()) {
+        var nNfdHash64 = PE.getImportHash64(),
+            nNfdHash32 = PE.getImportHash32();
+
+        if (!PE.is64() && PE.compareEP("515257535556E8000000005BB8........2BD8")) {
+            sVersion = "2.00.X";
+            sOptions = "";
+            bDetected = true;
+        } else if (PE.is64() && PE.compareEP("41504151515257535556E8000000005B48B8................482BD8488BEB")) {
+            sVersion = "2.00.X";
+            sOptions = "";
+            bDetected = true;
+        }
+
+        if (bDetected) {
+            if (PE.isSectionNamePresent(".sstb")) {
+                sOptions = "Section";
+            }
+
+            if ((nNfdHash64 == 0x3552ed494 && nNfdHash32 == 0xccf98822)) {
+                sOptions = sOptions ? sOptions + ", Import" : "Import";
+            }
+        }
+    }
+
     return result();
 }

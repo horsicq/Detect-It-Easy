@@ -10,5 +10,20 @@ function detect() {
         bDetected = true;
     }
 
+    // Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:2560; records :318 entry point, :625 import hash): PE32, not .NET
+    if (!bDetected && !PE.is64() && !PE.isNet() && PE.getImportHash64() === 0x2870982b && PE.getImportHash32() === 0x15bfcac8) {
+        if (PE.compareEP("60E8........EB")) {
+            var nEPSection = PE.getEntryPointSection();
+
+            if (nEPSection >= 0 && PE.getImportSection() == nEPSection && PE.isDeepScan() && PE.section[nEPSection] && PE.section[nEPSection].FileSize > 0) {
+                if (PE.findString(PE.section[nEPSection].FileOffset, PE.section[nEPSection].FileSize, "PolyCrypt PE (c) 2004-2005, JLabSoftware.") == -1) {
+                    sOptions = "Modified";
+                }
+            }
+
+            bDetected = true;
+        }
+    }
+
     return result();
 }

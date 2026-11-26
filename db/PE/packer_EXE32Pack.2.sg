@@ -10,5 +10,27 @@ function detect() {
         bDetected = true;
     }
 
+    // Ported from Nauz File Detector "exe32pack" (SpecAbstract modules/nfd_pe.cpp:218, 830, 3059):
+    // PE32, not .NET; import position hash and entry point signature; version from the "Packed by exe32pack" string.
+    if (!bDetected && !PE.is64() && !PE.isNet()) {
+        var nNfdOffset = -1;
+
+        if (PE.isImportPositionHashPresent(0, 0x174efb84)) {
+            if (PE.compareEP("3BC07402")) {
+                sVersion = "1.4X";
+                sOptions = "";
+                bDetected = true;
+            }
+
+            if (bDetected) {
+                nNfdOffset = PE.findString(0, Math.min(PE.getSize(), 0x2000), "Packed by exe32pack");
+
+                if (nNfdOffset != -1) {
+                    sVersion = PE.getString(nNfdOffset + 20, 50).split(" ")[0];
+                }
+            }
+        }
+    }
+
     return result();
 }

@@ -18,5 +18,20 @@ function detect() {
         }
     }
 
+    // Ported from Nauz File Detector "ASM Guard" (SpecAbstract modules/nfd_pe.cpp:915, 1850, 1860):
+    // not .NET, overlay present; section name "ASMGUARD", or the marker searched at file offset = overlay size (as NFD does).
+    if (!bDetected && !PE.isNet()) {
+        var nNfdOverlaySize = PE.isOverlayPresent() ? PE.getOverlaySize() : 0;
+
+        if (nNfdOverlaySize > 0) {
+            if (PE.isSectionNamePresent("ASMGUARD") ||
+                PE.findSignature(nNfdOverlaySize, PE.isDeepScan() ? nNfdOverlaySize : Math.min(nNfdOverlaySize, 0x100), "'asmg-protected'00") != -1) {
+                sVersion = "2.XX";
+                sOptions = "";
+                bDetected = true;
+            }
+        }
+    }
+
     return result();
 }

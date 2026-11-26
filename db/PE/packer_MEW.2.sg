@@ -24,5 +24,32 @@ function detect() {
         bDetected = true;
     }
 
+    // Ported from Nauz File Detector "MEW10 / MEW11 SE" (SpecAbstract modules/nfd_pe.cpp:93, 95, 96, 385, 386, 448, 540, 541, 976, 977, 2496, 2503):
+    // PE32, not .NET; MEW10: import hash and entry point signature; MEW11 SE: import hash and header marker.
+    if (!bDetected && !PE.is64() && !PE.isNet()) {
+        var nNfdHash64 = PE.getImportHash64(),
+            nNfdHash32 = PE.getImportHash32();
+
+        if ((nNfdHash64 == 0x13e215a53 && nNfdHash32 == 0x381aae8d)) {
+            if (PE.compareEP("33C0E9$$$$$$$$BE........AC91AD95AD92AD515687F297FCB2..33DBA4B3..FF55")) {
+                sVersion = "10 1.0";
+                sOptions = "";
+                bDetected = true;
+            }
+        }
+
+        if (!bDetected && (nNfdHash64 == 0x13e215a53 && nNfdHash32 == 0xdf3c1e0)) {
+            if (PE.compare("'MZkernel32.dll'0000'PE'0000")) {
+                sVersion = "SE 1.0";
+                sOptions = "";
+                bDetected = true;
+            } else if (PE.compare("'MZ'00000000000000000000'PE'00004C010200000000000000000000000000")) {
+                sVersion = "SE 1.1-1.2";
+                sOptions = "";
+                bDetected = true;
+            }
+        }
+    }
+
     return result();
 }

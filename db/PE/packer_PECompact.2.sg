@@ -104,5 +104,70 @@ function detect() {
         }
     }
 
+    // Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:1703-1722, :7774 get_PECompact_vi;
+    // records :615-619 import hash, :827-829 import position hash): PE32, not .NET.
+    if (!bDetected && !PE.is64() && !PE.isNet()) {
+        var aHashes = [
+                [0x186ad3682, 0xbea416d1, "0.90-0.91"],
+                [0x1917b3afe, 0x93312c2e, "0.92-0.94"],
+                [0x13e443f64, 0xe6aa8495, "0.97-0.971b"],
+                [0x134c8cd1e, 0x29188619, "0.975-1.10b3"],
+                [0x212cf28ad, 0xe4c11305, "1.10b7-1.34"]
+            ],
+            nHash64 = PE.getImportHash64(),
+            nHash32 = PE.getImportHash32(),
+            sImportVersion = null;
+
+        for (var i = 0; i < aHashes.length && sImportVersion === null; i++) {
+            if (aHashes[i][0] === nHash64 && aHashes[i][1] === nHash32) {
+                sImportVersion = aHashes[i][2];
+            }
+        }
+
+        if (sImportVersion === null) {
+            if (PE.isImportPositionHashPresent(0, 0x9b3305ed)) {
+                sImportVersion = "1.30-1.40";
+            } else if (PE.isImportPositionHashPresent(0, 0xcc5b2a3c)) {
+                sImportVersion = "1.40-1.84";
+            } else if (PE.isImportPositionHashPresent(0, 0x2652ce4f)) {
+                sImportVersion = "2.40-3.XX";
+            }
+        }
+
+        if (sImportVersion !== null) {
+            if (PE.compareEP("EB0668........C39C60")) {
+                sVersion = sImportVersion;
+                bDetected = true;
+            } else if (PE.getNumberOfSections() >= 2) {
+                // The first section header: PointerToRelocations = 'PEC2', PointerToLinenumbers = build number
+                var nHeaderOffset = PE.readDword(0x3c),
+                    nSectionOffset = nHeaderOffset + 24 + PE.readWord(nHeaderOffset + 20);
+
+                if (PE.compare("'PEC2'", nSectionOffset + 24)) {
+                    var nBuild = PE.readDword(nSectionOffset + 28),
+                        oBuilds = {
+                            20206: "2.70", 20240: "2.78a", 20243: "2.79b1", 20245: "2.79bB", 20247: "2.79bD", 20252: "2.80b1", 20256: "2.80b5",
+                            20261: "2.82", 20285: "2.92.0", 20288: "2.93b3", 20294: "2.96.2", 20295: "2.97b1", 20296: "2.98", 20300: "2.98.04",
+                            20301: "2.98.05", 20302: "2.98.06", 20303: "2.99b", 20308: "3.00.2", 20312: "3.01.3", 20317: "3.02.1", 20318: "3.02.2",
+                            20323: "3.03.5b", 20327: "3.03.9b", 20329: "3.03.10b", 20334: "3.03.12b", 20342: "3.03.18b", 20343: "3.03.19b",
+                            20344: "3.03.20b", 20345: "3.03.21b", 20348: "3.03.23b"
+                        };
+
+                    if (oBuilds.hasOwnProperty(nBuild)) {
+                        sVersion = oBuilds[nBuild];
+                    } else if (nBuild > 20308) {
+                        sVersion = "3.X(build " + nBuild + ")";
+                    } else if (nBuild == 0) {
+                        sVersion = "2.20-2.68";
+                    } else {
+                        sVersion = "2.X(build " + nBuild + ")";
+                    }
+
+                    bDetected = true;
+                }
+            }
+        }
+    }
+
     return result();
 }

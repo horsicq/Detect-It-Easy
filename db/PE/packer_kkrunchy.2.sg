@@ -21,5 +21,42 @@ function detect() {
         sOptions = "modified";
     }
 
+    // Ported from Nauz File Detector "kkrunchy" (SpecAbstract modules/nfd_pe.cpp:99, 100, 199, 200, 202, 526, 969, 2287):
+    // PE32, not .NET; import hash, (kkrunchy or generic tiny) header and entry point signature.
+    // Also used to fill in the version when the rule above found the product without one.
+    if ((!bDetected || (!sVersion && !sOptions)) && !PE.is64() && !PE.isNet()) {
+        var nNfdHash64 = PE.getImportHash64(),
+            nNfdHash32 = PE.getImportHash32();
+
+        var bNfdHeader = PE.compare("'MZfarbrauschPE'") ||
+            PE.compare("'MZconspiracyPE'");
+
+        var bNfdEp = false;
+
+        if (((nNfdHash64 == 0x134c8cd1e && nNfdHash32 == 0x29188619)) && (bNfdHeader || PE.compare("'MZ'....................'PE'0000"))) {
+            if (PE.compareEP("BD........C74500........FF4D08C6450C05")) {
+                sVersion = "0.23 alpha 1";
+                sOptions = "";
+                bNfdEp = true;
+            } else if (PE.compareEP("BD........C74500........B8........89450489455450C74510")) {
+                sVersion = "0.23 alpha 2";
+                sOptions = "";
+                bNfdEp = true;
+            } else if (PE.compareEP("BD........C74500........B8........89450489455850C74510")) {
+                sVersion = "0.23 alpha 3-4";
+                sOptions = "";
+                bNfdEp = true;
+            }
+
+            if (bNfdEp) {
+                if (!bNfdHeader) {
+                    sOptions = "Patched";
+                }
+
+                bDetected = true;
+            }
+        }
+    }
+
     return result();
 }

@@ -19,5 +19,24 @@ function detect() {
         }
     }
 
+    // Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:4203-4216, nfd_binary.cpp:2150 get_WindowsInstaller_vi):
+    // an MSI (compound file) overlay whose "Windows Installer ..." summary string carries a bracketed value.
+    if (!bDetected && !PE.isNet() && PE.compareOverlay("D0CF11E0A1B11AE1")) {
+        var nStringOffset = PE.findString(PE.getOverlayOffset(), PE.getOverlaySize(), "Windows Installer");
+
+        if (nStringOffset != -1) {
+            var sString = PE.getString(nStringOffset, 256),
+                aMatch = sString.match(/\((.*?)\)/);
+
+            if (aMatch && aMatch[1] != "") {
+                sVersion = aMatch[1];
+                if (/xml/i.test(sString)) {
+                    sOptions = "XML";
+                }
+                bDetected = true;
+            }
+        }
+    }
+
     return result();
 }

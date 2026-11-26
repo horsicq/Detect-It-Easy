@@ -18,5 +18,26 @@ function detect() {
         bDetected = true;
     }
 
+    // Ported from Nauz File Detector "ExeFog" (SpecAbstract modules/nfd_pe.cpp:545, 546, 2081):
+    // PE32, not .NET; import hash, zero time stamp and linker version, BaseOfData 0x1000, first section flags 0xE0000020.
+    if (!bDetected && !PE.is64() && !PE.isNet()) {
+        var nNfdHash64 = PE.getImportHash64(),
+            nNfdHash32 = PE.getImportHash32();
+
+        if (PE.getImageFileHeader("TimeDateStamp") == 0 && PE.getImageOptionalHeader("MajorLinkerVersion") == 0 &&
+            PE.getImageOptionalHeader("MinorLinkerVersion") == 0 && PE.getImageOptionalHeader("BaseOfData") == 0x1000 &&
+            PE.getNumberOfSections() > 0 && (PE.section[0].Characteristics >>> 0) == 0xe0000020) {
+            if ((nNfdHash64 == 0x13e215a53 && nNfdHash32 == 0xdf3c1e0)) {
+                sVersion = "1.1";
+                sOptions = "";
+                bDetected = true;
+            } else if ((nNfdHash64 == 0x134c8cd1e && nNfdHash32 == 0x29188619)) {
+                sVersion = "1.2";
+                sOptions = "";
+                bDetected = true;
+            }
+        }
+    }
+
     return result();
 }

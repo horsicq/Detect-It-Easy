@@ -134,5 +134,30 @@ function detect() {
 
     bDetected = bDetected || Boolean(sVersion);
 
+    // Ported from Nauz File Detector "FSG" (SpecAbstract modules/nfd_pe.cpp:87, 90, 92, 305, 306, 307, 308, 309, 529, 2477):
+    // PE32, not .NET; import hash and header marker.
+    if (!bDetected && !PE.is64() && !PE.isNet()) {
+        var nNfdHash64 = PE.getImportHash64(),
+            nNfdHash32 = PE.getImportHash32();
+
+        if ((nNfdHash64 == 0x0ee8cb83a && nNfdHash32 == 0xa4083f58)) {
+            if (PE.compare("'MZ'....................................................................................................................600000000E1FBA0E00B409CD21B8014CCD21'Windows Program'0D0A24")) {
+                sVersion = "1.00-1.20";
+                sOptions = "";
+                bDetected = true;
+            } else if (PE.compare("'MZ'....................................................................................................................40000000'PE'00004C01....'FSG!'")) {
+                sVersion = "1.30-1.32";
+                sOptions = "";
+                bDetected = true;
+            }
+
+            if (!bDetected && PE.compare("'MZ'....................'PE'00004C01....'FSG!'")) {
+                sVersion = (PE.getString(0x154) == "KERNEL32.dll") ? "1.33" : "2.00";
+                sOptions = "";
+                bDetected = true;
+            }
+        }
+    }
+
     return result();
 }

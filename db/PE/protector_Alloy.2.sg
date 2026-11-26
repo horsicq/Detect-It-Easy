@@ -9,5 +9,49 @@ function detect() {
         bDetected = true;
     }
 
+    // Ported from Nauz File Detector "Alloy" (SpecAbstract modules/nfd_pe.cpp:152, 549, 912, 1318, 2627):
+    // PE32, not .NET; (import hash or the Alloy kernel32 import layout) and entry point signature.
+    if (!bDetected && !PE.is64() && !PE.isNet()) {
+        var nNfdHash64 = PE.getImportHash64(),
+            nNfdHash32 = PE.getImportHash32();
+
+        if ((nNfdHash64 == 0x6c83794a6 && nNfdHash32 == 0xc50dde33) || isNfdAlloyImport()) {
+            if (PE.compareEP("9C60E8........33C08BC483C0..938BE3")) {
+                sVersion = "4.X";
+                sOptions = "";
+                bDetected = true;
+            }
+        }
+    }
+
     return result();
+}
+
+// NFD handle_import (nfd_pe.cpp:1318-1343): the "kernel32_alloy0" / "kernel32_alloy2" import layouts
+function isNfdAlloyImport() {
+    var aNames = ["LoadLibraryA", "GetProcAddress", "VirtualAlloc", "VirtualFree", "ExitProcess", "CreateFileA", "CloseHandle",
+            "WriteFile", "GetSystemDirectoryA", "GetFileTime", "SetFileTime", "GetWindowsDirectoryA"],
+        nCount, i;
+
+    if (PE.getNumberOfImports() < 1 || PE.getImportLibraryName(0).toUpperCase() != "KERNEL32.DLL") {
+        return false;
+    }
+
+    nCount = PE.getNumberOfImportThunks(0);
+
+    if (nCount != 13 && nCount != 15) {
+        return false;
+    }
+
+    for (i = 0; i < aNames.length; i++) {
+        if (PE.getImportFunctionName(0, i) != aNames[i]) {
+            return false;
+        }
+    }
+
+    if (nCount == 13) {
+        return PE.getImportFunctionName(0, 12) == "lstrcatA" && PE.getNumberOfImports() == 1;
+    }
+
+    return PE.getImportFunctionName(0, 14) == "GetTempPathA";
 }

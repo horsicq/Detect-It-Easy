@@ -72,5 +72,31 @@ function detect() {
         bDetected = true;
     }
 
+    // Ported from Nauz File Detector (SpecAbstract modules/nfd_pe.cpp:4304, deep scan only): a ZIP overlay and the
+    // "ZIP self-extractor" text in the data section (XPE::getNormalDataSection). NFD names it "ZIP".
+    if (!bDetected && !PE.isNet() && PE.isDeepScan() && (PE.compareOverlay("'PK'0304") || PE.compareOverlay("'PK'0506"))) {
+        var nImportSection = PE.getImportSection(),
+            nDataSection = -1,
+            i;
+
+        for (i = 1; i < PE.section.length && nDataSection == -1; i++) {
+            if ((PE.section[i].Name == "DATA" || PE.section[i].Name == ".data") && ((PE.section[i].Characteristics & 0xFF0000FF) >>> 0) == 0xC0000040 &&
+                PE.section[i].FileSize && nImportSection != i) {
+                nDataSection = i;
+            }
+        }
+
+        for (i = 1; i < PE.section.length && nDataSection == -1; i++) {
+            if (PE.section[i].FileSize && nImportSection != i && (PE.section[i].Characteristics >>> 0) != 0x60000020 &&
+                (PE.section[i].Characteristics >>> 0) != 0x40000040) {
+                nDataSection = i;
+            }
+        }
+
+        if (nDataSection != -1 && PE.findString(PE.section[nDataSection].FileOffset, PE.section[nDataSection].FileSize, "ZIP self-extractor") != -1) {
+            bDetected = true;
+        }
+    }
+
     return result();
 }
