@@ -1,0 +1,75 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_containers.cpp:dmg)
+
+meta("format", "Apple Disk Image (UDIF)");
+
+function detect() {
+    function u64be(off) {
+        var hi = Binary.read_uint32(off, _BE);
+        var lo = Binary.read_uint32(off + 4, _BE);
+        if (hi > 0x1FFFFF) return -1;
+        return hi * 4294967296 + lo;
+    }
+
+    function span(off, len, end) {
+        return off >= 0 && len >= 0 && off <= end && len <= end - off;
+    }
+
+    var nSize = Binary.getSize();
+    if (nSize < 512) return result();
+
+    var nEnd = nSize - 512;
+    if (!Binary.compare("'koly'", nEnd)) return result();
+    if (Binary.read_uint32(nEnd + 4, _BE) !== 4 || Binary.read_uint32(nEnd + 8, _BE) !== 512) return result();
+    if (Binary.read_uint32(nEnd + 56, _BE) !== 1 || Binary.read_uint32(nEnd + 60, _BE) !== 1) return result();
+    if (Binary.read_uint32(nEnd + 492, _BE) === 0 && Binary.read_uint32(nEnd + 496, _BE) === 0) return result();
+
+    var nData = u64be(nEnd + 24);
+    var nDataSize = u64be(nEnd + 32);
+    var nXml = u64be(nEnd + 216);
+    var nXmlSize = u64be(nEnd + 224);
+    var nRsrc = u64be(nEnd + 40);
+    var nRsrcSize = u64be(nEnd + 48);
+
+    if (!span(nData, nDataSize, nEnd) || nDataSize <= 0 || nXmlSize <= 0 || nXml < nData + nDataSize || !span(nXml, nXmlSize, nEnd)) {
+        return result();
+    }
+    if (!span(nRsrc, nRsrcSize, nEnd)) return result();
+
+    var aCheckPos = [80, 352];
+    for (var i = 0; i < aCheckPos.length; i++) {
+        var nType = Binary.read_uint32(nEnd + aCheckPos[i], _BE);
+        var nBits = Binary.read_uint32(nEnd + aCheckPos[i] + 4, _BE);
+        if (nBits > 1024 || (nType === 2 && nBits !== 32)) return result();
+    }
+
+    if (nXmlSize > 4 * 1024 * 1024) return result();
+
+    var nPlist = Binary.findString(nXml, nXmlSize, "<plist");
+    var nEndPlist = Binary.findString(nXml, nXmlSize, "</plist>");
+    if (nPlist === -1 || nEndPlist === -1 || nEndPlist <= nPlist) return result();
+
+    var bFoundBlkx = Binary.findString(nXml, nXmlSize, "<key>blkx</key>") !== -1;
+    if (!bFoundBlkx) {
+        var nPos = Binary.findString(nXml, nXmlSize, "<key>");
+        while (nPos !== -1 && nPos < nXml + nXmlSize) {
+            var nClose = Binary.findString(nPos + 5, Math.min(64, nXml + nXmlSize - (nPos + 5)), "</key>");
+            if (nClose !== -1) {
+                var sKey = Binary.read_ansiString(nPos + 5, nClose - (nPos + 5)).replace(/^\s+|\s+$/g, "");
+                if (sKey === "blkx") {
+                    bFoundBlkx = true;
+                    break;
+                }
+            }
+            nPos = Binary.findString(nPos + 5, nXml + nXmlSize - (nPos + 5), "<key>");
+        }
+    }
+
+    if (bFoundBlkx) {
+        sVersion = "4";
+        sOptions = "XML metadata; format revision";
+        bDetected = true;
+    }
+
+    return result();
+}

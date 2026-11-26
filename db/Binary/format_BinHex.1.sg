@@ -1,0 +1,91 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_legacy.cpp:binHex)
+
+meta("format", "BinHex");
+
+function detect() {
+    var sBanner = "(This file must be converted with BinHex 4.0)";
+    var sAlpha = "!\"#$%&'()*+,-012345689@ABCDEFGHIJKLMNPQRSTUVXYZ[`abcdefhijklmpqr";
+    var nSize = Binary.getSize();
+    if (nSize < sBanner.length + 10) return result();
+    if (!Binary.compare("'" + sBanner + "'")) return result();
+
+    var nPrefixLen = Math.min(8192, nSize);
+    var nPos = sBanner.length;
+    while (nPos < nPrefixLen) {
+        var c = Binary.read_uint8(nPos);
+        if (c === 0x0D || c === 0x0A || c === 0x20 || c === 0x09) nPos++;
+        else break;
+    }
+    if (nPos >= nPrefixLen || Binary.read_uint8(nPos) !== 0x3A) return result();
+    nPos++;
+
+    var aHeader = [];
+    var nBits = 0, nAvail = 0, nWanted = 1;
+    var bEscaped = false;
+
+    while (nPos < nPrefixLen && aHeader.length < nWanted) {
+        var chCode = Binary.read_uint8(nPos++);
+        if (chCode === 0x0D || chCode === 0x0A) continue;
+        var sChar = String.fromCharCode(chCode);
+        var nDigit = sAlpha.indexOf(sChar);
+        if (nDigit < 0) return result();
+        nBits = (nBits << 6) | nDigit;
+        nAvail += 6;
+        if (nAvail < 8) continue;
+        nAvail -= 8;
+        var nVal = (nBits >> nAvail) & 0xFF;
+
+        if (bEscaped) {
+            bEscaped = false;
+            if (nVal === 0) {
+                aHeader.push(0x90);
+            } else {
+                if (nVal === 1 || aHeader.length === 0) return result();
+                var nPrev = aHeader[aHeader.length - 1];
+                var nCopies = Math.min(nVal - 1, nWanted - aHeader.length);
+                for (var k = 0; k < nCopies; k++) aHeader.push(nPrev);
+            }
+        } else if (nVal === 0x90) {
+            bEscaped = true;
+        } else {
+            aHeader.push(nVal);
+        }
+
+        if (nWanted === 1 && aHeader.length > 0) {
+            var nNameLen = aHeader[0];
+            if (nNameLen < 1 || nNameLen > 63) return result();
+            nWanted = nNameLen + 22;
+        }
+    }
+
+    if (aHeader.length !== nWanted || aHeader[aHeader[0] + 1] !== 0) return result();
+
+    var nCrc = 0;
+    for (var i = 0; i < nWanted - 2; i++) {
+        nCrc ^= aHeader[i] << 8;
+        for (var j = 0; j < 8; j++) {
+            nCrc = (nCrc & 0x8000) ? (((nCrc << 1) ^ 0x1021) & 0xFFFF) : ((nCrc << 1) & 0xFFFF);
+        }
+    }
+    var nStoredCrc = (aHeader[nWanted - 2] << 8) | aHeader[nWanted - 1];
+    if (nCrc !== nStoredCrc) return result();
+
+    var nTailStart = Math.max(0, nSize - 128);
+    var nTailLen = nSize - nTailStart;
+    var nLast = -1;
+    for (var p = nTailStart + nTailLen - 1; p >= nTailStart; p--) {
+        var b = Binary.read_uint8(p);
+        if (b !== 0x20 && b !== 0x09 && b !== 0x0D && b !== 0x0A) {
+            nLast = b;
+            break;
+        }
+    }
+    if (nLast !== 0x3A) return result();
+
+    sVersion = "4.0";
+    sOptions = "Header CRC verified";
+    bDetected = true;
+
+    return result();
+}

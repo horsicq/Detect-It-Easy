@@ -1,0 +1,55 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_legacy.cpp:appleSingle)
+
+meta("format", "");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize < 26) return result();
+
+    var nMagic = Binary.read_uint32(0, _BE);
+    if (nMagic !== 0x00051600 && nMagic !== 0x00051607) return result();
+
+    var nVersion = Binary.read_uint32(4, _BE);
+    var nCount = Binary.read_uint16(24, _BE);
+    if ((nVersion !== 0x00010000 && nVersion !== 0x00020000) || nCount < 1 || nCount > 4096) return result();
+
+    var nFloor = 26 + nCount * 12;
+    if (nFloor > nSize) return result();
+
+    var aIds = {};
+    var aRanges = [];
+    var nEnd = nFloor;
+
+    for (var i = 0; i < nCount; i++) {
+        var nBase = 26 + i * 12;
+        var nId = Binary.read_uint32(nBase, _BE);
+        var nOff = Binary.read_uint32(nBase + 4, _BE);
+        var nLen = Binary.read_uint32(nBase + 8, _BE);
+
+        if (nId === 0 || aIds[nId] || nOff < nFloor || nLen > nSize - nOff) return result();
+        aIds[nId] = true;
+        if (nLen > 0) {
+            aRanges.push([nOff, nOff + nLen]);
+        }
+        if (nOff + nLen > nEnd) {
+            nEnd = nOff + nLen;
+        }
+    }
+
+    aRanges.sort(function(a, b) {
+        return a[0] !== b[0] ? (a[0] - b[0]) : (a[1] - b[1]);
+    });
+
+    for (var j = 1; j < aRanges.length; j++) {
+        if (aRanges[j][0] < aRanges[j - 1][1]) return result();
+    }
+
+    if (nEnd !== nSize) return result();
+
+    sName = (nMagic === 0x00051600) ? "AppleSingle" : "AppleDouble";
+    sVersion = (nVersion === 0x00010000) ? "1" : "2";
+    bDetected = true;
+
+    return result();
+}

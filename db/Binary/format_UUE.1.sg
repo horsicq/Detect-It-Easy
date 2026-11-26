@@ -1,0 +1,98 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_legacy.cpp:uuencode)
+
+meta("format", "UUE");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize < 16 || nSize > 8 * 1024 * 1024) return result();
+
+    var nSearchLim = Math.min(4096 + 64, nSize);
+    var nStart = -1;
+    var nPos = 0;
+
+    while (nPos < nSearchLim) {
+        var idx = Binary.findString(nPos, nSearchLim - nPos, "begin ");
+        if (idx < 0 || idx > 4096) return result();
+        if (idx === 0) {
+            nStart = idx;
+            break;
+        }
+        var prev = Binary.read_uint8(idx - 1);
+        if (prev === 0x0A || prev === 0x0D) {
+            nStart = idx;
+            break;
+        }
+        nPos = idx + 1;
+    }
+    if (nStart < 0) return result();
+
+    for (var i = 0; i < nStart; i++) {
+        var ch = Binary.read_uint8(i);
+        if ((ch < 0x20 && ch !== 0x0A && ch !== 0x0D && ch !== 0x09) || ch > 0x7E) return result();
+    }
+
+    var nCursor = nStart;
+    function nextLineBounds() {
+        if (nCursor >= nSize) return null;
+        var s = nCursor;
+        while (nCursor < nSize) {
+            var b = Binary.read_uint8(nCursor);
+            if (b === 0x0A || b === 0x0D) break;
+            nCursor++;
+        }
+        var e = nCursor;
+        if (nCursor < nSize && Binary.read_uint8(nCursor) === 0x0D) nCursor++;
+        if (nCursor < nSize && Binary.read_uint8(nCursor) === 0x0A) nCursor++;
+        return [s, e - s];
+    }
+
+    var oBegin = nextLineBounds();
+    if (!oBegin || oBegin[1] < 11 || oBegin[1] > 1024) return result();
+
+    var nModeEnd = 6;
+    while (nModeEnd < oBegin[1]) {
+        var m = Binary.read_uint8(oBegin[0] + nModeEnd);
+        if (m >= 0x30 && m <= 0x37) nModeEnd++;
+        else break;
+    }
+    if ((nModeEnd !== 9 && nModeEnd !== 10) || nModeEnd + 1 >= oBegin[1] ||
+            Binary.read_uint8(oBegin[0] + nModeEnd) !== 0x20) {
+        return result();
+    }
+    for (var j = nModeEnd + 1; j < oBegin[1]; j++) {
+        var fc = Binary.read_uint8(oBegin[0] + j);
+        if (fc < 0x20 || fc === 0x7F) return result();
+    }
+
+    var bData = false;
+    for (var nRec = 0; nRec < 262144 && nCursor < nSize; nRec++) {
+        var oRow = nextLineBounds();
+        if (!oRow || oRow[1] === 0) return result();
+        var nFirst = Binary.read_uint8(oRow[0]);
+        var nCount = (nFirst - 0x20) & 63;
+        if (nFirst < 0x20 || nFirst > 0x60 || nCount > 45) return result();
+
+        if (nCount === 0) {
+            if (oRow[1] !== 1 || !bData) return result();
+            var oEnd = nextLineBounds();
+            if (!oEnd || oEnd[1] !== 3 || !Binary.compare("'end'", oEnd[0])) return result();
+            while (nCursor < nSize) {
+                var tc = Binary.read_uint8(nCursor++);
+                if (tc !== 0x20 && tc !== 0x09 && tc !== 0x0D && tc !== 0x0A) return result();
+            }
+            sOptions = "uuencode";
+            bDetected = true;
+            return result();
+        }
+
+        if (oRow[1] !== 1 + 4 * Math.floor((nCount + 2) / 3)) return result();
+        for (var k = 1; k < oRow[1]; k++) {
+            var bc = Binary.read_uint8(oRow[0] + k);
+            if (bc < 0x20 || bc > 0x60) return result();
+        }
+        bData = true;
+    }
+
+    return result();
+}

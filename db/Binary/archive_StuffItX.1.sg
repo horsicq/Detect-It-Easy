@@ -1,0 +1,71 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_legacy.cpp:stuffItX)
+
+meta("archive", "StuffIt X");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize < 10 || !Binary.compare("'StuffIt!'")) return result();
+
+    var nLimitBits = Math.min(8192, nSize) * 8;
+    var aState = { pos: 64 };
+
+    function nextBit() {
+        if (aState.pos >= nLimitBits) return -1;
+        var b = (Binary.read_uint8(Math.floor(aState.pos / 8)) >> (aState.pos % 8)) & 1;
+        aState.pos++;
+        return b;
+    }
+
+    function nextInteger() {
+        var nOnes = 1;
+        while (true) {
+            var b = nextBit();
+            if (b < 0 || nOnes >= 64) return -1;
+            if (b === 0) break;
+            nOnes++;
+        }
+        var nEncoded = 0;
+        var nPow = 1;
+        for (var i = 0; i < 64 && nOnes > 0; i++) {
+            var bit = nextBit();
+            if (bit < 0) return -1;
+            if (bit !== 0) {
+                nOnes--;
+                nEncoded += nPow;
+            }
+            nPow *= 2;
+        }
+        if (nOnes !== 0 || nEncoded === 0) return -1;
+        return nEncoded - 1;
+    }
+
+    if (nextBit() < 0) return result();
+    var nType = nextInteger();
+    if (nType <= 0 || nType > 15) return result();
+
+    for (var list = 0; list < 2; list++) {
+        var aKeys = {};
+        var bTerminated = false;
+        for (var i = 0; i < 32; i++) {
+            var nKey = nextInteger();
+            if (nKey < 0) return result();
+            if (nKey === 0) {
+                bTerminated = true;
+                break;
+            }
+            var nMaxKey = list ? 6 : 10;
+            if (nKey > nMaxKey || aKeys[nKey]) return result();
+            var nVal = nextInteger();
+            if (nVal < 0) return result();
+            aKeys[nKey] = true;
+            if (list && nKey === 4) {
+                if (nextInteger() < 0) return result();
+            }
+        }
+        if (!bTerminated) return result();
+    }
+
+    bDetected = true;
+    return result();
+}

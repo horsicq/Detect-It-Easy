@@ -1,0 +1,52 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_binary.cpp:handle_Archives)
+
+meta("format", "Mach-O FAT");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize < 28) return result();
+
+    var nMagic = Binary.read_uint32(0, _BE);
+    var bFat32 = (nMagic === 0xCAFEBABE || nMagic === 0xBEBAFECA);
+    var bFat64 = (nMagic === 0xCAFEBABF || nMagic === 0xBFBAFECA);
+    if (!bFat32 && !bFat64) return result();
+
+    var nEnd = (nMagic === 0xCAFEBABE || nMagic === 0xCAFEBABF) ? _BE : _LE;
+    var nCount = Binary.read_uint32(4, nEnd);
+    var nRecSize = bFat64 ? 32 : 20;
+
+    if (nCount < 1 || nCount > 64) return result();
+    if (8 + nCount * nRecSize > nSize) return result();
+
+    // Exclude VMDK SESparse (magic BEBAFECA 00000000 01000000 ...) and Java class files
+    if (nMagic === 0xBEBAFECA && Binary.read_uint32(4, _BE) === 0) return result();
+
+    for (var i = 0; i < nCount; i++) {
+        var nBase = 8 + i * nRecSize;
+        var nArchOff, nArchSize, nAlign;
+        if (bFat64) {
+            var nOffHi = Binary.read_uint32(nBase + 8, nEnd);
+            var nOffLo = Binary.read_uint32(nBase + 12, nEnd);
+            var nSzHi = Binary.read_uint32(nBase + 16, nEnd);
+            var nSzLo = Binary.read_uint32(nBase + 20, nEnd);
+            if (nOffHi > 0x1FFFFF || nSzHi > 0x1FFFFF) return result();
+            nArchOff = nOffHi * 4294967296 + nOffLo;
+            nArchSize = nSzHi * 4294967296 + nSzLo;
+            nAlign = Binary.read_uint32(nBase + 24, nEnd);
+        } else {
+            nArchOff = Binary.read_uint32(nBase + 8, nEnd);
+            nArchSize = Binary.read_uint32(nBase + 12, nEnd);
+            nAlign = Binary.read_uint32(nBase + 16, nEnd);
+        }
+        if (nArchOff < 8 + nCount * nRecSize || nArchSize === 0 || nAlign > 31) return result();
+        if (nArchOff > nSize || nArchSize > nSize - nArchOff) return result();
+    }
+
+    if (bFat64) {
+        sOptions = "FAT64";
+    }
+    bDetected = true;
+
+    return result();
+}

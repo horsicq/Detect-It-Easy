@@ -1,0 +1,122 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_containers.cpp:cpio)
+
+meta("archive", "CPIO");
+
+function detect() {
+    function readAsciiNum(off, len, base) {
+        var nVal = 0;
+        for (var i = 0; i < len; i++) {
+            var c = Binary.read_uint8(off + i);
+            var d = -1;
+            if (c >= 0x30 && c <= 0x39) d = c - 0x30;
+            else if (c >= 0x61 && c <= 0x66) d = c - 0x61 + 10;
+            else if (c >= 0x41 && c <= 0x46) d = c - 0x41 + 10;
+            if (d < 0 || d >= base) return -1;
+            nVal = nVal * base + d;
+            if (nVal > 0x1FFFFFFFFFFFFF) return -1;
+        }
+        return nVal;
+    }
+
+    function alignUp(val, align) {
+        if (align <= 1) return val;
+        var rem = val % align;
+        return rem ? (val + align - rem) : val;
+    }
+
+    var nSize = Binary.getSize();
+    if (nSize < 26) return result();
+
+    var sMagic = Binary.read_ansiString(0, 6);
+    var bNewc = (sMagic === "070701" || sMagic === "070702");
+    var bCrc = (sMagic === "070702");
+    var bOdc = (sMagic === "070707");
+    var bBe = Binary.compare("71C7");
+    var bBinary = bBe || Binary.compare("C771");
+
+    if (!bNewc && !bOdc && !bBinary) return result();
+
+    var nHeaderSize = bNewc ? 110 : (bOdc ? 76 : 26);
+    var nAlign = bNewc ? 4 : (bBinary ? 2 : 1);
+    var nOff = 0;
+
+    for (var nRec = 0; nRec < 4096; nRec++) {
+        if (nOff + nHeaderSize > nSize) return result();
+
+        var nNameSize = 0, nFileSize = 0, nChecksum = 0, nMode = 0, nLinks = 0;
+        var i;
+
+        if (bNewc) {
+            if (Binary.read_ansiString(nOff, 6) !== sMagic) return result();
+            var aFields = [];
+            for (i = 0; i < 13; i++) {
+                var v = readAsciiNum(nOff + 6 + i * 8, 8, 16);
+                if (v < 0) return result();
+                aFields.push(v);
+            }
+            nMode = aFields[1];
+            nLinks = aFields[4];
+            nFileSize = aFields[6];
+            nNameSize = aFields[11];
+            nChecksum = aFields[12];
+            if (!bCrc && nChecksum !== 0) return result();
+        } else if (bOdc) {
+            if (Binary.read_ansiString(nOff, 6) !== sMagic) return result();
+            for (i = 0; i < 7; i++) {
+                if (readAsciiNum(nOff + 6 + i * 6, 6, 8) < 0) return result();
+            }
+            if (readAsciiNum(nOff + 48, 11, 8) < 0) return result();
+            nNameSize = readAsciiNum(nOff + 59, 6, 8);
+            nFileSize = readAsciiNum(nOff + 65, 11, 8);
+            nMode = readAsciiNum(nOff + 18, 6, 8);
+            nLinks = readAsciiNum(nOff + 36, 6, 8);
+            if (nNameSize < 0 || nFileSize < 0 || nMode < 0 || nLinks < 0) return result();
+        } else {
+            var nEnd = bBe ? _BE : _LE;
+            if (Binary.read_uint16(nOff, nEnd) !== 0x71C7) return result();
+            nMode = Binary.read_uint16(nOff + 6, nEnd);
+            nLinks = Binary.read_uint16(nOff + 12, nEnd);
+            nNameSize = Binary.read_uint16(nOff + 20, nEnd);
+            nFileSize = Binary.read_uint16(nOff + 22, nEnd) * 65536 + Binary.read_uint16(nOff + 24, nEnd);
+        }
+
+        if (nNameSize < 1 || nNameSize > 4096 || nNameSize > nSize - (nOff + nHeaderSize)) return result();
+        if (Binary.read_uint8(nOff + nHeaderSize + nNameSize - 1) !== 0) return result();
+
+        var sNameStr = Binary.read_ansiString(nOff + nHeaderSize, nNameSize);
+        if (sNameStr.length !== nNameSize - 1) return result();
+
+        var nDataOff = alignUp(nOff + nHeaderSize + nNameSize, nAlign);
+        if (nDataOff > nSize || nFileSize > nSize - nDataOff) return result();
+
+        if (sNameStr === "TRAILER!!!") {
+            if (nFileSize !== 0) return result();
+            sVersion = bNewc ? sMagic : (bOdc ? "070707" : "binary 070707");
+            if (bNewc) sOptions = bCrc ? "new ASCII; additive checksum" : "new ASCII";
+            else if (bOdc) sOptions = "old ASCII";
+            else sOptions = bBe ? "big-endian" : "little-endian";
+            bDetected = true;
+            return result();
+        }
+
+        var nKind = nMode & 0xF000;
+        if (nLinks === 0 || (nKind !== 0x8000 && nKind !== 0x4000 && nKind !== 0xA000 &&
+                nKind !== 0x6000 && nKind !== 0x2000 && nKind !== 0x1000 && nKind !== 0xC000)) {
+            return result();
+        }
+
+        if (bCrc) {
+            var nSum = 0;
+            for (var nPos = 0; nPos < nFileSize; nPos++) {
+                nSum = (nSum + Binary.read_uint8(nDataOff + nPos)) >>> 0;
+            }
+            if (nSum !== nChecksum) return result();
+        }
+
+        nOff = alignUp(nDataOff + nFileSize, nAlign);
+        if (nOff > nSize) return result();
+    }
+
+    return result();
+}

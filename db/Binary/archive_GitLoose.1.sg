@@ -1,0 +1,250 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract modules/nfd_containers.cpp:git)
+
+meta("format", "Git loose object");
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (nSize < 8 || nSize > 65536) return result();
+
+    var nCmf = Binary.read_uint8(0);
+    var nFlg = Binary.read_uint8(1);
+    if ((nCmf & 15) !== 8 || (nCmf >> 4) > 7 || (((nCmf << 8) | nFlg) % 31) !== 0 || (nFlg & 32) !== 0) {
+        return result();
+    }
+
+    var nBytePos = 2;
+    var nBitBuf = 0;
+    var nBitCnt = 0;
+    var nStreamEnd = nSize - 4;
+    var aOut = [];
+    var nMaxOut = 65536;
+
+    function needBits(n) {
+        while (nBitCnt < n) {
+            if (nBytePos >= nStreamEnd) return false;
+            nBitBuf |= Binary.read_uint8(nBytePos++) << nBitCnt;
+            nBitCnt += 8;
+        }
+        return true;
+    }
+
+    function readBits(n) {
+        if (n === 0) return 0;
+        if (!needBits(n)) return -1;
+        var v = nBitBuf & ((1 << n) - 1);
+        nBitBuf >>>= n;
+        nBitCnt -= n;
+        return v;
+    }
+
+    function alignByte() {
+        nBitBuf = 0;
+        nBitCnt = 0;
+    }
+
+    function buildTree(lengths, numSyms) {
+        var counts = [];
+        var i;
+        for (i = 0; i <= 15; i++) counts[i] = 0;
+        for (i = 0; i < numSyms; i++) {
+            if (lengths[i] > 15) return null;
+            counts[lengths[i]]++;
+        }
+        if (counts[0] === numSyms) return { empty: true };
+
+        var left = 1;
+        for (i = 1; i <= 15; i++) {
+            left <<= 1;
+            left -= counts[i];
+            if (left < 0) return null;
+        }
+
+        var offsets = [];
+        offsets[1] = 0;
+        for (i = 1; i < 15; i++) {
+            offsets[i + 1] = offsets[i] + counts[i];
+        }
+
+        var syms = [];
+        for (i = 0; i < numSyms; i++) {
+            if (lengths[i] !== 0) {
+                syms[offsets[lengths[i]]++] = i;
+            }
+        }
+        return { counts: counts, syms: syms, empty: false };
+    }
+
+    function decodeSym(tree) {
+        if (tree.empty) return -1;
+        var code = 0, first = 0, index = 0;
+        for (var len = 1; len <= 15; len++) {
+            var bit = readBits(1);
+            if (bit < 0) return -1;
+            code |= bit;
+            var count = tree.counts[len];
+            if (code - count < first) {
+                return tree.syms[index + (code - first)];
+            }
+            index += count;
+            first += count;
+            first <<= 1;
+            code <<= 1;
+        }
+        return -1;
+    }
+
+    var aFixedLit = [], i;
+    for (i = 0; i < 144; i++) aFixedLit[i] = 8;
+    for (i = 144; i < 256; i++) aFixedLit[i] = 9;
+    for (i = 256; i < 280; i++) aFixedLit[i] = 7;
+    for (i = 280; i < 288; i++) aFixedLit[i] = 8;
+    var aFixedDist = [];
+    for (i = 0; i < 32; i++) aFixedDist[i] = 5;
+
+    var oFixedLitTree = buildTree(aFixedLit, 288);
+    var oFixedDistTree = buildTree(aFixedDist, 32);
+
+    var aLenBase = [3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+    var aLenExtra = [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+    var aDistBase = [1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+    var aDistExtra = [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+    var aCodeOrder = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+
+    var bFinal = 0;
+    while (bFinal === 0) {
+        bFinal = readBits(1);
+        var nType = readBits(2);
+        if (bFinal < 0 || nType < 0 || nType === 3) return result();
+
+        if (nType === 0) {
+            alignByte();
+            if (nBytePos + 4 > nStreamEnd) return result();
+            var nLen = Binary.read_uint16(nBytePos, _LE);
+            var nNlen = Binary.read_uint16(nBytePos + 2, _LE);
+            nBytePos += 4;
+            if (((nLen ^ nNlen) & 0xFFFF) !== 0xFFFF) return result();
+            if (nBytePos + nLen > nStreamEnd || aOut.length + nLen > nMaxOut) return result();
+            for (i = 0; i < nLen; i++) aOut.push(Binary.read_uint8(nBytePos++));
+        } else {
+            var oLitTree, oDistTree;
+            if (nType === 1) {
+                oLitTree = oFixedLitTree;
+                oDistTree = oFixedDistTree;
+            } else {
+                var nHlit = readBits(5);
+                var nHdist = readBits(5);
+                var nHclen = readBits(4);
+                if (nHlit < 0 || nHdist < 0 || nHclen < 0) return result();
+                nHlit += 257; nHdist += 1; nHclen += 4;
+                if (nHlit > 286 || nHdist > 30) return result();
+
+                var aClLens = [];
+                for (i = 0; i < 19; i++) aClLens[i] = 0;
+                for (i = 0; i < nHclen; i++) {
+                    var v = readBits(3);
+                    if (v < 0) return result();
+                    aClLens[aCodeOrder[i]] = v;
+                }
+                var oClTree = buildTree(aClLens, 19);
+                if (!oClTree || oClTree.empty) return result();
+
+                var nTotal = nHlit + nHdist;
+                var aLens = [];
+                while (aLens.length < nTotal) {
+                    var sym = decodeSym(oClTree);
+                    if (sym < 0) return result();
+                    if (sym < 16) {
+                        aLens.push(sym);
+                    } else {
+                        var rep = 0, val = 0;
+                        if (sym === 16) {
+                            if (aLens.length === 0) return result();
+                            val = aLens[aLens.length - 1];
+                            rep = readBits(2);
+                            if (rep < 0) return result();
+                            rep += 3;
+                        } else if (sym === 17) {
+                            rep = readBits(3);
+                            if (rep < 0) return result();
+                            rep += 3;
+                        } else {
+                            rep = readBits(7);
+                            if (rep < 0) return result();
+                            rep += 11;
+                        }
+                        if (aLens.length + rep > nTotal) return result();
+                        while (rep-- > 0) aLens.push(val);
+                    }
+                }
+                if (aLens[256] === 0) return result();
+                oLitTree = buildTree(aLens.slice(0, nHlit), nHlit);
+                oDistTree = buildTree(aLens.slice(nHlit), nHdist);
+                if (!oLitTree || !oDistTree) return result();
+            }
+
+            while (true) {
+                var lsym = decodeSym(oLitTree);
+                if (lsym < 0) return result();
+                if (lsym < 256) {
+                    if (aOut.length >= nMaxOut) return result();
+                    aOut.push(lsym);
+                } else if (lsym === 256) {
+                    break;
+                } else {
+                    var lIdx = lsym - 257;
+                    if (lIdx >= aLenBase.length) return result();
+                    var lex = readBits(aLenExtra[lIdx]);
+                    if (lex < 0) return result();
+                    var matchLen = aLenBase[lIdx] + lex;
+
+                    var dsym = decodeSym(oDistTree);
+                    if (dsym < 0 || dsym >= aDistBase.length) return result();
+                    var dex = readBits(aDistExtra[dsym]);
+                    if (dex < 0) return result();
+                    var dist = aDistBase[dsym] + dex;
+
+                    if (dist <= 0 || dist > aOut.length || aOut.length + matchLen > nMaxOut) return result();
+                    for (i = 0; i < matchLen; i++) {
+                        aOut.push(aOut[aOut.length - dist]);
+                    }
+                }
+            }
+        }
+    }
+
+    if (nBytePos !== nStreamEnd) return result();
+
+    var nS1 = 1, nS2 = 0;
+    for (i = 0; i < aOut.length; i++) {
+        nS1 = (nS1 + aOut[i]) % 65521;
+        nS2 = (nS2 + nS1) % 65521;
+    }
+    var nAdler = ((nS2 << 16) | nS1) >>> 0;
+    if (nAdler !== Binary.read_uint32(nSize - 4, _BE)) return result();
+
+    var nZero = -1, nSpace = -1;
+    for (i = 0; i < aOut.length && i <= 64; i++) {
+        if (aOut[i] === 0x20 && nSpace === -1) nSpace = i;
+        if (aOut[i] === 0x00) { nZero = i; break; }
+    }
+    if (nSpace <= 0 || nZero <= nSpace + 1 || nZero > 64) return result();
+
+    var sKind = "";
+    for (i = 0; i < nSpace; i++) sKind += String.fromCharCode(aOut[i]);
+    if (sKind !== "blob" && sKind !== "tree" && sKind !== "commit" && sKind !== "tag") return result();
+
+    var sLen = "";
+    for (i = nSpace + 1; i < nZero; i++) {
+        if (aOut[i] < 0x30 || aOut[i] > 0x39) return result();
+        sLen += String.fromCharCode(aOut[i]);
+    }
+    if (sLen.length > 1 && sLen.charAt(0) === "0") return result();
+    var nPayloadLen = parseInt(sLen, 10);
+    if (nPayloadLen !== aOut.length - nZero - 1) return result();
+
+    sOptions = sKind + "; " + nPayloadLen + " payload bytes";
+    bDetected = true;
+
+    return result();
+}

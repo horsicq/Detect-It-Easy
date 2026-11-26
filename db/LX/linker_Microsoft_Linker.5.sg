@@ -1,0 +1,36 @@
+// Detect It Easy: detection rule file
+// Ported from Nauz File Detector (SpecAbstract nfd_lx.cpp:104-153)
+
+meta("linker", "Microsoft Linker");
+
+function detect() {
+    var bGeneric = LX.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000800000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000") ||
+                   LX.compare("'MZ'78000100000004000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000780000000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.$'0000'PE'0000");
+
+    if (!bGeneric) {
+        if (LX.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....00000E1FBA0E00B409CD21B8014CCD21'This program cannot be run in DOS mode.\r\r\n$'00000000")) {
+            bDetected = true;
+        } else if (LX.compare("'MZ'90000300000004000000FFFF0000B800000000000000400000000000000000000000000000000000000000000000000000000000000000000000....000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")) {
+            sOptions = "Patched";
+            bDetected = true;
+        }
+    }
+
+    if (LX.isRichSignaturePresent()) {
+        bDetected = true;
+        var nRichCount = LX.getNumberOfRichIDs();
+        for (var i = nRichCount - 1; i >= 0; i--) {
+            var nId = LX.getRichID(i);
+            var nBuild = LX.getRichVersion(i);
+            if (nId === 0x0002 || nId === 0x0004 || nId === 0x0010 || nId === 0x0013 || nId === 0x001e ||
+                nId === 0x003c || nId === 0x003d || nId === 0x0047 || nId === 0x0056 || nId === 0x005a ||
+                nId === 0x0078 || nId === 0x0091 || nId === 0x009d || nId === 0x00ba || nId === 0x00cc ||
+                nId === 0x00de || nId === 0x00f0 || nId === 0x0102) {
+                sOptions = "";
+                sVersion = String(nBuild);
+            }
+        }
+    }
+
+    return result();
+}
