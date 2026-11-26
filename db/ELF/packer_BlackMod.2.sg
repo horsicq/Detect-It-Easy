@@ -1,0 +1,23 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule elf/packers.yara#blackmod
+
+// https://blackmod.net/
+meta("packer", "BlackMod");
+
+function detect() {
+    var nCount = 0;
+    if (APKiD_hex("00 6c6962626d742e736f 00")) nCount++;           // \0libbmt.so\0
+    if (nCount && APKiD_hex("00 4a4e 495f 4f6e 4c6f 6164 00")) nCount++;   // \0JNI_OnLoad\0
+    if (nCount && APKiD_hex("??7?A0E3 000000EF")) nCount++;                  // MOV R7, #n; SVC 0
+    if (nCount && nCount < 3 && APKiD_hex("?80?80D2 010000D4")) nCount++;   // MOV X8, #n; SVC 0
+    // 3 of 4 strings: without \0libbmt.so\0 the other three would all be needed
+    if (!nCount && APKiD_hex("00 4a4e 495f 4f6e 4c6f 6164 00") && APKiD_hex("??7?A0E3 000000EF") && APKiD_hex("?80?80D2 010000D4")) {
+        nCount = 3;
+    }
+
+    if (nCount >= 3) {
+        bDetected = true;
+    }
+
+    return result();
+}

@@ -1,0 +1,39 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rules elf/obfuscators.yara#dexprotector, dexprotector_a,
+// dexprotector_b, dexprotector_alice
+
+// https://dexprotector.com/
+meta("obfuscator", "DexProtector");
+
+function isDexProtectorA() {
+    // for any i in (0..elf.number_of_segments): (elf.segments[i].type == elf.PT_LOAD and
+    //   elf.segments[i].flags == elf.PF_R | elf.PF_W and $dplf_header at elf.segments[i].offset)
+    var nPhnum = APKiD_elfHeader("phnum");
+    for (var i = 0; i < nPhnum; i++) {
+        var oSegment = APKiD_getSegment(i);
+        if (oSegment && oSegment.type === 1 && oSegment.flags === 6 && APKiD_hex("44504c46", oSegment.offset, 4)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function detect() {
+    // $dp_elf_header = { 7f45 4c46 (01|02) 01 0100 4450 4c46 } at 0
+    var bDexProtector = APKiD_hex("7f454c46 (01|02) 01 0100 44504c46", 0, 12);
+    // /\x00libdexprotector(\.[A-Za-z0-9.]{2,16})?\.so\x00/
+    var bDexProtectorB = APKiD_re("libdexprotector", [1], /^\x00libdexprotector(\.[A-Za-z0-9.]{2,16})?\.so\x00/, 40);
+
+    if (bDexProtector || isDexProtectorA() || bDexProtectorB) {
+        _setResult(sType, sName, "", "");
+    }
+
+    // Alice: /dexprotector\/.*\/alice-core\/.*.cpp/, "\0libalice.so\0", "dexp_crash_timer\0dexp_crash_"
+    if (APKiD_re("dexprotector/", [0], /^dexprotector\/[^\n]*\/alice-core\/[^\n]*[^\n]cpp/) ||
+        APKiD_hex("006c 6962 616c 6963 652e 736f 00") ||
+        APKiD_hex("2e64 6578 705f 6372 6173 685f 7469 6d65 7200 6465 7870 5f63 7261 7368 5f00")) {
+        _setResult(sType, sName, "", "Alice");
+    }
+
+    return result();
+}

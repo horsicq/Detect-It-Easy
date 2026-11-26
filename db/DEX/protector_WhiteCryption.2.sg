@@ -1,0 +1,19 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule dex/protectors.yara#whitecryption_dex, dex/protectors.yara#whitecryption_dex_a
+
+meta("protector", "WhiteCryption");
+
+function detect() {
+    if (APKiD.isDex()) {
+        if ((APKiD.str("Lcom/whitecryption/jcp/generated/scp;") || APKiD.str("__scpClassInit"))) {
+            bDetected = true;
+        } else {
+            var fDigit = function (b) { return b >= 0x30 && b <= 0x39; };
+            var aS2 = APKiD.textTokens("(c) 20").concat([{ t: "c", f: fDigit }, { t: "c", f: fDigit }], APKiD.textTokens(" whiteCryption"));
+            bDetected = APKiD.nOf(3, [function () { return APKiD.text("http://www.whitecryption.com"); }, function () { return APKiD.tokCount("whitecryption_s2", aS2, 1) > 0; },
+                function () { return APKiD.text("http://www.cryptanium.com"); }, function () { return APKiD.text("CryptaniumHighSpeedAes"); }, function () { return APKiD.text("Lcom/cryptanium/skb/"); }, function () { return APKiD.text("SecureKeyBoxJava"); }]);
+        }
+    }
+
+    return result();
+}

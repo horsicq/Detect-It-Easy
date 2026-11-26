@@ -1,0 +1,25 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rules elf/packers.yara#zimperium_zshield, zimperium_zshield_a
+
+// https://www.zimperium.com/zshield
+meta("packer", "Zimperium (zShield)");
+
+function detect() {
+    if (APKiD_elfHeader("machine") === APKiD_EM_AARCH64) {
+        var sSvc = "010000D4 1F1000B1"; // SVC 0; CMN X0, #4
+        // zimperium_zshield: all of $svc, $init_proc, $asm_opcodes
+        var bZShield = APKiD_hex(sSvc) &&
+            APKiD_hex("FE77BDA9 E00701A9 E24F02A9 ??000094 00001FD6") &&
+            APKiD_hex("??7B0BD5 ??????8B ??????EB ??????54 [4-32] 9F3B03D5 [4-64] ??750BD5 [4-32] 9F3B03D5 DF3F03D5");
+        // zimperium_zshield_a: ($inline_svc or $obf_svc) and #svc > 50
+        var bZShieldA = !bZShield && APKiD_count(sSvc, 51) > 50 &&
+            (APKiD_hex("E0031FAA 88158052 E1031FAA E2031FAA E3031FAA E4031FAA E5031FAA 010000D4 1F1000B1 [0-8]" +
+                       "E90300AA 21008052 20008052 C8188052 [4] E2031FAA E3031FAA E4031FAA E5031FAA 010000D4 1F1000B1") ||
+             APKiD_hex("??????93 ??????93 ??????93 [0-24] E00309AA [0-8] 010000D4 1F1000B1"));
+        if (bZShield || bZShieldA) {
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

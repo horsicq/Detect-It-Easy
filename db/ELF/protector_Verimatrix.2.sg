@@ -1,0 +1,45 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rules elf/protectors.yara#verimatrix_arm64, verimatrix_arm64_a, verimatrix_arm64_b, verimatrix_arm64_c
+
+// https://www.verimatrix.com/products/app-shield/
+meta("protector", "InsideSecure Verimatrix");
+
+function detect() {
+    if (APKiD_elfHeader("machine") !== APKiD_EM_AARCH64) {
+        return result();
+    }
+
+    var sSvc0 = "010000D4"; // SVC 0
+    var bLoad = APKiD_isSegmentTypePresent(1); // PT_LOAD
+
+    // verimatrix_arm64
+    var bV = bLoad && APKiD_isSegmentTypePresent(0) && // PT_NULL
+        APKiD_countSectionNames(/^\.text$/) === 0 &&
+        APKiD_count("007D20D4", 50) >= 50 && // BRK #0x3E8
+        APKiD_count(sSvc0, 50) >= 50;
+
+    // verimatrix_arm64_a
+    var bA = bLoad && APKiD_countSectionNames(/\.mfrt/) > 0 &&
+        APKiD_count(sSvc0, 15) >= 15 &&
+        APKiD_hex("2C7B0BD5 [12-64] 9F3B03D5 [0-32] 2A750BD5 [12-64] DF3F03D5") &&
+        APKiD_re(".so", [9, 10, 11, 12, 13, 14, 15, 16, 17], /^lib[a-z]{6,14}\.so/, 20); // /lib[a-z]{6,14}\.so/
+
+    // verimatrix_arm64_b
+    var bB = !bV && !bA && bLoad &&
+        APKiD_hex("004a 4e49 5f4f 6e4c 6f61 6400") && // \0JNI_OnLoad\0
+        APKiD_hex("2C7B0BD5 [12-32] 9F3B03D5 [12-32] 2A750BD5 [12-32] DF3F03D5") &&
+        APKiD_hex("??031FAA ??1B8052 ??008852 ??008052 ??048052 [4-32] 010000D4") &&
+        APKiD_hex("??1A8052 ??008852 [4-32] 010000D4");
+
+    // verimatrix_arm64_c
+    var bC = !bV && !bA && !bB &&
+        APKiD_hex("???????? 8898a8b8 ???????? 94a4b4c4 ???????? 8898a8b8 ???????? 94a4b4c4") &&
+        APKiD_hex("?3????54 290d?012 4921c91a ea0309cb ?a0???8a 5f01??eb 9f3b03d5 ?2????54" +
+                  "2a750bd5 4a01098b 5f01??eb ?3????54 [0-4] df3f03d5");
+
+    if (bV || bA || bB || bC) {
+        bDetected = true;
+    }
+
+    return result();
+}

@@ -1,0 +1,35 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule elf/protectors.yara#vkey_elf
+
+// https://www.v-key.com/products/v-os-app-protection/
+meta("protector", "Vkey (V-OS App Protection)");
+
+function anyOf(listStrings) {
+    for (var i = 0; i < listStrings.length; i++) {
+        if (APKiD_str(listStrings[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function detect() {
+    // $jni1 "Java_vkey_android_vos_VosWrapper_" is a prefix of $jni2..$jni5
+    if (APKiD_str("libvosWrapperEx.so") && APKiD_str("Java_vkey_android_vos_VosWrapper_") &&
+        anyOf(["V-OS.debug",
+               "********** V-Key %s: V-OS Firmware Version %d.%d.%d.%d *********",
+               "********** V-Key %s: V-OS Firmware (%s) Version %d.%d.%d.%d ****",
+               "********** V-Key Release SDK: V-OS Processor"]) &&
+        anyOf(["***** FRIDA DETECTED *****",
+               "Error creating frida tcp file scan thread",
+               "GDB detected!",
+               "run_frida_port_scan: reseting map",
+               "Error creating emulator detection thread",
+               "start_debugger_check",
+               "startEmulatorCheck",
+               "app_integrity_check_jni: "])) {
+        bDetected = true;
+    }
+
+    return result();
+}

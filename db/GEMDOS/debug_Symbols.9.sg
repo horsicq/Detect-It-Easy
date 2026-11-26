@@ -1,0 +1,26 @@
+// Detect It Easy: detection rule file
+
+// GEMDOS symbol table: 14-byte DRI entries; GST extended names use type 0x0048.
+meta("debug data", "Symbol table");
+
+function detect() {
+    var nTextSize = GEMDOS.read_uint32(2, true);
+    var nDataSize = GEMDOS.read_uint32(6, true);
+    var nSymbolSize = GEMDOS.read_uint32(14, true);
+    var nSymbolOffset = 0x1C + nTextSize + nDataSize;
+
+    if ((nSymbolSize >= 14) && (nSymbolOffset + 14 <= GEMDOS.getSize())) {
+        sOptions = "DRI";
+        var nCount = Math.min(Math.floor(nSymbolSize / 14), 64);
+        for (var i = 0; i < nCount; i++) {
+            if (GEMDOS.read_uint16(nSymbolOffset + i * 14 + 8, true) == 0x0048) {
+                sOptions = "GST";
+                break;
+            }
+        }
+        sOptions += ", " + Math.floor(nSymbolSize / 14) + " symbols";
+        bDetected = true;
+    }
+
+    return result();
+}

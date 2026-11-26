@@ -1,0 +1,63 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rules elf/obfuscators.yara#dexguard_native, dexguard_native_a,
+// dexguard_native_arm64
+
+// https://www.guardsquare.com/en/products/dexguard
+meta("obfuscator", "DexGuard");
+
+function detect() {
+    // "\0Java_com_guardsquare_dexguard_runtime_detection_HookDetector"
+    var bNative = APKiD_hex("00 4A 61 76 61 5F 63 6F 6D 5F 67 75 61 72 64 73 71 75 61 72 65 5F" +
+                            "64 65 78 67 75 61 72 64 5F 72 75 6E 74 69 6D 65 5F 64 65 74 65 63" +
+                            "74 69 6F 6E 5F 48 6F 6F 6B 44 65 74 65 63 74 6F 72");
+    var bNativeA = false;
+    var bNativeArm64 = false;
+
+    if (!bNative) {
+        // libdgrt.so and 4 of: Java_o_, JNI_OnLoad, basename, mprotect, dirname
+        if (APKiD_hex("006c 6962 6467 7274 2e73 6f00")) {
+            var listStrings = ["004a61 7661 5f6f 5f", "004a 4e49 5f4f 6e4c 6f61 6400", "006261 7365 6e61 6d65 00",
+                               "006d 7072 6f74 6563 7400", "006469 726e 616d 6500"];
+            var nCount = 0;
+            for (var i = 0; i < listStrings.length; i++) {
+                if (APKiD_hex(listStrings[i])) {
+                    nCount++;
+                }
+            }
+            bNativeA = (nCount >= 4);
+        }
+
+        if (!bNativeA && APKiD_elfHeader("machine") === APKiD_EM_AARCH64 &&
+            APKiD_hex("004a 4e49 5f4f 6e4c 6f61 6400")) {
+            var listAny = [
+                // $str1, $str2
+                "6c696938 8c????11 6c692938 29050091 3f????f1 ec179f1a",
+                "30??cc9b 10fe??d3 10a60d9b 6f696938 d0697038 0f020f4a 6f692938 29050091 3f????f1 ef179f1a",
+                // $hook1, $hook2, $hook3
+                "0b1d0012 48154038 29251b53 29010b4a 88ffff35 e8c18652 3f01086b",
+                "6c1d0012 4b154038 29251b53 29010c4a 8bffff35 eac18652 3f010a6b",
+                "e?c18652 1f000?6b",
+                // $prolog_breakage1, $prolog_breakage2
+                "e?03(0a|09)4b [4-16] ??010?4a [4-16] ?9010??? [4-16] 297d4093 (ea037db2|0a??80d2) [0-8] 28210a9b [0-8] 080140f9 00011fd6",
+                "(4?|5?)d03bd5 291540f9 a9831ef8 08??40f9 00011fd6",
+                // $obf_export
+                "00 4a617661 5f 6f 5f [1-8] 00"
+            ];
+            var bAny = false;
+            for (var j = 0; j < listAny.length && !bAny; j++) {
+                bAny = APKiD_hex(listAny[j]);
+            }
+            // #svc >= 6
+            bNativeArm64 = bAny && (APKiD_count("?8?????2 [4-32] 010000d4", 6) >= 6);
+        }
+    }
+
+    if (bNative) {
+        bDetected = true;
+    } else if (bNativeA || bNativeArm64) {
+        sVersion = "9.x";
+        bDetected = true;
+    }
+
+    return result();
+}

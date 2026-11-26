@@ -1,0 +1,20 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule dex/packers.yara#appsealing_loader_1_2_2
+
+meta("packer", "AppSealing Loader");
+
+function detect() {
+    if (APKiD.isDex() && APKiD.text("Lcom/inka/appsealing/AppSealingApplication;")) {
+        // $loader_ver = /AppSealingLoader [.]+ v1.2.2/ ("." of 1.2.2 is any byte but \n)
+        var fDot = function (b) { return b === 0x2E; },
+            fAny = function (b) { return b !== 0x0A; };
+        var aLoader = APKiD.textTokens("AppSealingLoader ").concat([{ t: "r", f: fDot, a: 1, b: 256 }],
+            APKiD.textTokens(" v1"), [{ t: "c", f: fAny }], APKiD.textTokens("2"), [{ t: "c", f: fAny }], APKiD.textTokens("2"));
+        if (APKiD.tokCount("appsealing_loader_ver", aLoader, 1) > 0) {
+            sVersion = "1.2.2";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

@@ -1,0 +1,29 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule dex/obfuscators.yara#arxan, dex/obfuscators.yara#arxan_multidex, dex/obfuscators.yara#arxan_b, dex/obfuscators.yara#arxan_c
+
+meta("obfuscator", "Arxan");
+
+function detect() {
+    var bArxan = false, bMultidex = false, bArxanB = false;
+
+    if (APKiD.isDex()) {
+        // $pkg = /L([a-z])\1{5}\/[a-z]{6}/ spelled out, over the DEX string table
+        if (DEX.isDexStringPresentExp("L(a{6}|b{6}|c{6}|d{6}|e{6}|f{6}|g{6}|h{6}|i{6}|j{6}|k{6}|l{6}|m{6}|n{6}|o{6}|p{6}|q{6}|r{6}|s{6}|t{6}|u{6}|v{6}|w{6}|x{6}|y{6}|z{6})/[a-z]{6}")) {
+            var aM = [function () { return APKiD.hex("10 62 (6? | 75) [14] 00"); }, function () { return APKiD.hex("(0b | 0d) 62 d0 [15] 00"); }, function () { return APKiD.hex("(0e | 10) 62 30 34 3? [15] 00"); }, function () { return APKiD.hex("(0b | 0d) 62 30 34 3? [13] 00"); }, function () { return APKiD.hex("(08 | 0b | 0d | 0e ) 62 [7-13] 00"); }, function () { return APKiD.hex("0a 62 (30 34 3? | d? ?? ??) [11] 00"); }, function () { return APKiD.hex("(0d | 0b | 11) (62 d1 8? | 6? ?? ??) [14] 00"); }];
+            bArxan = APKiD.nOf(6, aM);
+            bMultidex = !bArxan && APKiD.nOf(2, aM);
+        }
+        bArxanB = APKiD.hex("0A 0? DF 01 03 FF B5 01 DF 00 00 FF B5 30 B6 01 8F 1?");
+    }
+
+    if (bArxan || bArxanB) {
+        bDetected = true;
+    } else if (bMultidex) {
+        sOptions = "multidex";
+        bDetected = true;
+    } else if (APKiD.isDex() && APKiD.strPrefix("Lcom/arxan/guardit")) {
+        bDetected = true;
+    }
+
+    return result();
+}

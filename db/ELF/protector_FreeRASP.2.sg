@@ -1,0 +1,36 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule elf/protectors.yara#free_rasp_dart
+
+// https://www.talsec.app/freerasp-in-app-protection-security-talsec
+meta("protector", "FreeRASP");
+
+function isDart() {
+    // elf/common.yara#is_dart: (is_elf and 2 of ($s*)) or $ksnl
+    if (APKiD_hex("4B534E4C")) { // "KSNL"
+        return true;
+    }
+    var listStrings = ["dart:core", "dart:async", "_kDartVmSnapshotData", "_kDartVmSnapshotInstructions", "flutter_assets",
+                       "_kDartSnapshotData", "_kDartSnapshotText"];
+    var nCount = 0;
+    for (var i = 0; i < listStrings.length && nCount < 2; i++) {
+        if (APKiD_str(listStrings[i])) {
+            nCount++;
+        }
+    }
+    return nCount >= 2;
+}
+
+function detect() {
+    var listStrings = ["package:freerasp/src/errors/talsec_exception.dart", "package:freerasp/src/models/talsec_config.dart",
+                       "package:freerasp/src/talsec.dart", "talsec-failure", "TalsecException", "TalsecController"];
+    var bAny = false;
+    for (var i = 0; i < listStrings.length && !bAny; i++) {
+        bAny = APKiD_hex("00" + APKiD_textToHex(listStrings[i]) + "00");
+    }
+
+    if (bAny && isDart()) {
+        bDetected = true;
+    }
+
+    return result();
+}

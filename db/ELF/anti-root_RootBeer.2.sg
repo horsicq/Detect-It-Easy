@@ -1,0 +1,20 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule elf/protectors.yara#rootbeer
+
+// https://github.com/scottyab/rootbeer.git
+meta("anti-root", "RootBeer");
+
+function detect() {
+    if (ELF.isHeuristicScan()) {
+        var nCount = 0;
+        if (APKiD_hex("00 52 6F 6F 74 42 65 65 72 00")) nCount++;                                  // \0RootBeer\0
+        if (APKiD_hex("00 6C 69 62 74 6F 6F 6C 43 68 65 63 6B 65 72 2E 73 6F 00")) nCount++;       // \0libtoolChecker.so\0
+        // \0Java_com_ [-] _rootbeer_RootBeerNative_checkForRoot\0 (YARA unbounded jump, here up to 4096 bytes)
+        if (nCount === 1 && APKiD_hex("00 4A 61 76 61 5F 63 6F 6D 5F [-] 5F 72 6F 6F 74 62 65 65 72 5F 52 6F 6F 74 42 65 65 72 4E 61 74 69 76 65 5F 63 68 65 63 6B 46 6F 72 52 6F 6F 74 00")) nCount++;
+        if (nCount >= 2) {
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

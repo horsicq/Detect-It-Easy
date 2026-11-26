@@ -1,0 +1,21 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule res/obfuscators.yara#mtprotector_res
+
+// https://mt2.cn/download/
+meta("obfuscator", "MT Protector");
+
+// res/common.yara#is_res: { 02 00 0C 00 } at 0 and 1 of ({ 01 00 1C 00 }, { 03 00 00 00 }, { 00 02 00 00 })
+function isRes(nSize) {
+    return Binary.compare("02000C00") &&
+        (Binary.findSignature(0, nSize, "01001C00") !== -1 || Binary.findSignature(0, nSize, "03000000") !== -1 ||
+         Binary.findSignature(0, nSize, "00020000") !== -1);
+}
+
+function detect() {
+    var nSize = Binary.getSize();
+    if (isRes(nSize) && Binary.findSignature(0, nSize, "00000c0c4d545f50726f746563746f7200") !== -1) { // ..MT_Protector\0
+        bDetected = true;
+    }
+
+    return result();
+}

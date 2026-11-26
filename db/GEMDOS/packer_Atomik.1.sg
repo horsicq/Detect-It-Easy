@@ -1,0 +1,22 @@
+// Detect It Easy: detection rule file
+
+// Atomik packer (Altair): the packed data starts with "ATM5" (v3.5),
+// followed by the unpacked and packed sizes (big-endian).
+meta("packer", "Atomik");
+
+function detect() {
+    var nSize = GEMDOS.getSize();
+    var nOffset = GEMDOS.findString(0x1C, Math.min(nSize - 0x1C, 0x1000), "ATM5");
+
+    if (nOffset != -1) {
+        var nUnpacked = GEMDOS.read_uint32(nOffset + 4, true);
+        var nPacked = GEMDOS.read_uint32(nOffset + 8, true);
+
+        if ((nPacked > 0) && (nPacked <= nSize) && (nUnpacked >= nPacked) && (nUnpacked < 0x1000000)) {
+            sVersion = "3.5";
+            bDetected = true;
+        }
+    }
+
+    return result();
+}

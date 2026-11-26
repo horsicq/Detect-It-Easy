@@ -1,0 +1,105 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Raw FAT12/FAT16 floppy disk image (Atari ST .st, MSX and PC .img/.ima).
+// The engine has already validated the BPB and the root directory; this rule
+// only describes the volume: FAT width, size, disk geometry, the kind of boot
+// sector and the volume label.
+meta("format", "FAT");
+
+function appendOption(sText, sOption) {
+    return (sText == "") ? sOption : (sText + ", " + sOption);
+}
+
+// The Atari TOS boot sector is executable when its 256 big-endian words add
+// up to 0x1234.
+function isAtariBootable() {
+    var nSum = 0;
+
+    for (var i = 0; i < 512; i += 2) {
+        nSum = (nSum + FAT.read_uint16(i, true)) & 0xFFFF;
+    }
+
+    return nSum == 0x1234;
+}
+
+// The root directory entry with the volume label attribute.
+function getVolumeLabel(nRootOffset, nRootEntries) {
+    var nSize = FAT.getSize();
+
+    for (var i = 0; (i < nRootEntries) && (i < 512); i++) {
+        var nEntry = nRootOffset + i * 32;
+
+        if (nEntry + 32 > nSize) break;
+
+        var nFirst = FAT.read_uint8(nEntry);
+        var nAttributes = FAT.read_uint8(nEntry + 11);
+
+        if (nFirst == 0x00) break;
+        if (nFirst == 0xE5) continue;
+        if ((nAttributes & 0x3F) == 0x0F) continue;
+
+        if ((nAttributes & 0x18) == 0x08) {
+            var sLabel = "";
+
+            for (var j = 0; j < 11; j++) {
+                var nChar = FAT.read_uint8(nEntry + j);
+                sLabel += ((nChar >= 0x20) && (nChar < 0x7F)) ? String.fromCharCode(nChar) : "_";
+            }
+
+            return sLabel.replace(/ +$/, "");
+        }
+    }
+
+    return "";
+}
+
+function detect() {
+    // Shown only in verbose mode, like the other file-format info rules.
+    if (!FAT.isVerbose()) return result();
+
+    if (FAT.getSize() < 512) return result();
+
+    var nSectorsPerCluster = FAT.read_uint8(13);
+    var nReserved = FAT.read_uint16(14);
+    var nFats = FAT.read_uint8(16);
+    var nRootEntries = FAT.read_uint16(17);
+    var nTotal = FAT.read_uint16(19);
+    var nFatSectors = FAT.read_uint16(22);
+    var nSectorsPerTrack = FAT.read_uint16(24);
+    var nSides = FAT.read_uint16(26);
+    var nJump = FAT.read_uint8(0);
+
+    if (nReserved == 0) nReserved = 1;
+    if (nTotal == 0) nTotal = FAT.read_uint32(32);
+    if ((nSectorsPerCluster == 0) || (nTotal == 0)) return result();
+
+    var nMeta = nReserved + nFats * nFatSectors + nRootEntries / 16;
+    var nClusters = Math.floor((nTotal - nMeta) / nSectorsPerCluster);
+
+    sName = (nClusters < 4085) ? "FAT12" : "FAT16";
+    sOptions = Math.floor(nTotal / 2) + " KB";
+
+    if ((nSectorsPerTrack >= 1) && (nSectorsPerTrack <= 63) && (nSides >= 1) && (nSides <= 2) && ((nTotal % (nSectorsPerTrack * nSides)) == 0)) {
+        sOptions = appendOption(sOptions, (nTotal / (nSectorsPerTrack * nSides)) + " tracks, " + nSides + ((nSides == 1) ? " side, " : " sides, ") + nSectorsPerTrack +
+                                              " sectors");
+    }
+
+    if (isAtariBootable()) {
+        sOptions = appendOption(sOptions, "Atari ST boot sector, executable");
+    } else if (nJump == 0x60) {
+        sOptions = appendOption(sOptions, "Atari ST boot sector");
+    } else if ((nJump == 0xEB) || (nJump == 0xE9)) {
+        sOptions = appendOption(sOptions, FAT.compare("55AA", 510) ? "x86 boot sector, executable" : "x86 boot sector");
+    }
+
+    var sLabel = getVolumeLabel((nReserved + nFats * nFatSectors) * 512, nRootEntries);
+
+    if (sLabel != "") {
+        sOptions = appendOption(sOptions, "label: " + sLabel);
+    }
+
+    bDetected = true;
+
+    return result();
+}

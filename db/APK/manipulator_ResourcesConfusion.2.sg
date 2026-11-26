@@ -1,0 +1,36 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rule apk/protectors.yara#andres
+
+meta("manipulator", "Resources Confusion");
+
+function detect() {
+    // #res > 10 for /res\/[^\/]+\.xml/ over the raw APK bytes. Gate on a record name, then count
+    // raw hits like YARA (local and central names, strings of a stored resources.arsc).
+    if (APK_isRecordExp("res/[^/]+\\.xml")) {
+        var nSize = APK.getSize();
+
+        bDetected = APK_countRawString("res/", 11, function (nOffset) {
+            var nStart = nOffset + 4,
+                nEnd = Math.min(nSize, nStart + 4096);
+
+            for (var nPos = nStart; nPos < nEnd; nPos += 64) {
+                var aBytes = APK.readBytes(nPos, Math.min(67, nSize - nPos));
+
+                for (var i = 0; (i < 64) && (i < aBytes.length); i++) {
+                    if (aBytes[i] == 0x2F) {
+                        return false;
+                    }
+
+                    if ((nPos + i > nStart) && (i + 3 < aBytes.length) && (aBytes[i] == 0x2E) &&
+                        (aBytes[i + 1] == 0x78) && (aBytes[i + 2] == 0x6D) && (aBytes[i + 3] == 0x6C)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }) > 10;
+    }
+
+    return result();
+}

@@ -1,0 +1,29 @@
+// Detect It Easy: detection rule file
+// Author: horsicq <horsicq@gmail.com>
+
+// Atari ST MSA disk image (Magic Shadow Archiver): big-endian header
+// 0x0E0F, sectors per track, sides - 1, first track, last track, then one
+// length-prefixed, optionally RLE-packed record per track and side.
+meta("format", "MSA");
+
+function detect() {
+    // Shown only in verbose mode, like the other file-format info rules.
+    if (!MSA.isVerbose()) return result();
+
+    if ((MSA.getSize() >= 10) && MSA.compare("0E0F")) {
+        var nSectors = MSA.read_uint16(2, true);
+        var nSides = MSA.read_uint16(4, true) + 1;
+        var nFirstTrack = MSA.read_uint16(6, true);
+        var nLastTrack = MSA.read_uint16(8, true);
+
+        sOptions = (nLastTrack - nFirstTrack + 1) + " tracks, " + nSides + ((nSides == 1) ? " side, " : " sides, ") + nSectors + " sectors";
+
+        if (nFirstTrack != 0) {
+            sOptions += ", first track " + nFirstTrack;
+        }
+
+        bDetected = true;
+    }
+
+    return result();
+}

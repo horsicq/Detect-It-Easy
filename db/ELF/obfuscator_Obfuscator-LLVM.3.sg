@@ -1,0 +1,82 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rules elf/obfuscators.yara#ollvm_v3_4, ollvm_v3_5, ollvm_v3_6_1,
+// ollvm_v4_0, ollvm_v5_0_strenc, ollvm_v6_0_strenc, ollvm_v6_0, ollvm_v8_strenc, ollvm_v8, ollvm_v9, ollvm_v9_a,
+// ollvm_v9_strenc, ollvm_tll, ollvm_tll_a, ollvm_armariris, ollvm_strenc, ollvm_v_regex, ollvm, ollvm_lsposed
+
+// https://github.com/obfuscator-llvm/obfuscator/wiki
+meta("obfuscator", "Obfuscator-LLVM");
+
+function detect() {
+    var bStrEnc = APKiD_re(".datadiv_decode", [0], /^\.datadiv_decode\d{18}/, 40);
+    var bSymtabStrEnc = false, bSymtabStrEncDone = false;
+
+    function isSymtabStrEnc() {
+        if (!bSymtabStrEncDone) {
+            bSymtabStrEnc = APKiD_isSymtabNamePresent(".datadiv_decode", [0], /^\.datadiv_decode\d{18}/);
+            bSymtabStrEncDone = true;
+        }
+        return bSymtabStrEnc;
+    }
+
+    // Every version string below contains "Obfuscator"; skip their searches when it is absent.
+    var bObf = APKiD_str("Obfuscator");
+    var bV3_4 = bObf && APKiD_str("Obfuscator-clang version 3.4 ") && APKiD_str("(based on LLVM 3.4");
+    var bV3_5 = bObf && APKiD_str("Obfuscator- clang version 3.5.0 ") && APKiD_str("(based on LLVM 3.5");
+    var bV3_6_1 = bObf && APKiD_str("Obfuscator-LLVM clang version 3.6.1 ") && APKiD_str("(based on Obfuscator-LLVM 3.6.1)");
+    var bV4_0 = bObf && APKiD_str("Obfuscator-LLVM clang version 4.0.1 ") && APKiD_str("(based on Obfuscator-LLVM 4.0.1)");
+    var bV5_0_strenc = bObf && APKiD_str("Obfuscator-LLVM clang version 5.0.") && APKiD_str("(based on Obfuscator-LLVM 5.0.") && bStrEnc;
+    var bV6_0_strings = bObf && APKiD_str("Obfuscator-LLVM clang version 6.0.") && APKiD_str("(based on Obfuscator-LLVM 6.0.");
+    var bV6_0_strenc = bV6_0_strings && isSymtabStrEnc();
+    var bV6_0 = bV6_0_strings && !bV6_0_strenc;
+    var bV8_string = bObf && APKiD_str("Obfuscator-LLVM clang version 8.");
+    var bV8_strenc = bV8_string && bStrEnc;
+    var bV8 = bV8_string && !bV8_strenc;
+    var bV9 = APKiD_re("(based on ", [0], /^\(based on (Obfuscator-LLVM|OLLVM) 9\./, 40);
+    var bV9_a = !bV9 && APKiD_re("clang version ", [0], /^clang version \d\.\d\.\d [^\n]*OLLVM[^\n]*9\./);
+    var bV9_strenc = !bV9 && bStrEnc && bObf && APKiD_str("(based on Obfuscator-LLVM 9.") &&
+        APKiD_re("clang version ", [0], /^clang version \d\.\d\.\d /, 40);
+    var bTagsRelease = APKiD_re("clang version ", [0], /^clang version \d\.\d\.\d \(tags\/RELEASE_\d+\/final\)/, 256);
+    var bTll = bTagsRelease && bStrEnc && APKiD_str("https://github.com/yazhiwang/ollvm-tll");
+    var bTll_a = !bTll && APKiD_re("clang version ", [0], /^clang version \d+\.\d+\.\d+ \([^\n]*\) \([^\n]*\/ollvm-tll\.git [0-9a-f]{40}\)/);
+    var bArmariris = bTagsRelease && !bTll && isSymtabStrEnc();
+    var bStrenc = bStrEnc && !bTll && !bArmariris && !bV5_0_strenc && !bV6_0_strenc && !bV8_strenc && !bV9_strenc;
+    var bVRegex = !bV9 && !bV9_a && APKiD_re("clang version ", [0], /^clang version \d\.\d\.\d [^\n]*OLLVM/);
+    var bUnknown = bObf && (APKiD_str("Obfuscator-LLVM ") || APKiD_str("Obfuscator-clang ") || APKiD_str("Obfuscator- clang ")) &&
+        !bV3_4 && !bV3_5 && !bV3_6_1 && !bV4_0 && !bV5_0_strenc && !bV6_0 && !bV6_0_strenc && !bStrenc &&
+        !bV8 && !bV8_strenc && !bV9 && !bV9_strenc && !bVRegex;
+    var bLSPosed = APKiD_reCount("decrypt.", [0], /^decrypt\.[0-9a-f]{14}/, 6, 24) > 5;
+
+    var sStrEnc = "string encryption";
+    var listResults = [
+        [bV3_4, "3.4", ""],
+        [bV3_5, "3.5", ""],
+        [bV3_6_1, "3.6.1", ""],
+        [bV4_0, "4.0", ""],
+        [bV5_0_strenc, "5.0", sStrEnc],
+        [bV6_0_strenc, "6.0", sStrEnc],
+        [bV6_0, "6.0", ""],
+        [bV8_strenc, "8.x", sStrEnc],
+        [bV8, "8.x", ""],
+        [bV9, "9.x", ""],
+        [bV9_a, "9.x", ""],
+        [bV9_strenc, "9.x", sStrEnc],
+        [bTll, "", "TLL, " + sStrEnc],
+        [bTll_a, "", "TLL, " + sStrEnc],
+        [bArmariris, "", "Armariris, " + sStrEnc],
+        [bStrenc, "", sStrEnc],
+        [bVRegex, "", ""],
+        [bUnknown, "", ""],
+        [bLSPosed, "", "LSPosed, " + sStrEnc]
+    ];
+
+    var oSeen = {};
+    for (var i = 0; i < listResults.length; i++) {
+        var sKey = listResults[i][1] + "|" + listResults[i][2];
+        if (listResults[i][0] && !oSeen[sKey]) {
+            oSeen[sKey] = true;
+            _setResult(sType, sName, listResults[i][1], listResults[i][2]);
+        }
+    }
+
+    return result();
+}

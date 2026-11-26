@@ -1,0 +1,26 @@
+// Detect It Easy: detection rule file
+// Ported from APKiD 3.2.0 (RedNaga, GPL-3.0) rules elf/protectors.yara#appdome_elf, appdome_elf_a, appdome_elf_b
+
+// https://www.appdome.com/
+meta("protector", "Appdome");
+
+function detect() {
+    // appdome_elf: exported section start/stop symbols
+    var bAppdome = (APKiD_str("__start_adinit") && APKiD_str("__stop_adinit")) ||
+        (APKiD_str("__start_hook") && APKiD_str("__stop_hook")) ||
+        (APKiD_str("__start_ipcent") && APKiD_str("__stop_ipcent"));
+
+    if (!bAppdome) {
+        var nSections = APKiD_countSectionNames(/^(hook|\.hookname|adinit|\.adi|ipcent|ipcsel|\.rhash|\.imtab)$/);
+        // appdome_elf_a: at least 2 such sections; appdome_elf_b: one, with "\0libloader.so\0" or "\0LIBLOADER_VERSION="
+        bAppdome = (nSections >= 2) ||
+            (nSections === 1 && (APKiD_hex("00 6c 69 62 6c 6f 61 64 65 72 2e 73 6f 00") ||
+                                 APKiD_hex("00 4c 49 42 4c 4f 41 44 45 52 5f 56 45 52 53 49 4f 4e 3d")));
+    }
+
+    if (bAppdome) {
+        bDetected = true;
+    }
+
+    return result();
+}

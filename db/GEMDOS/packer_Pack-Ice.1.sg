@@ -1,0 +1,33 @@
+// Detect It Easy: detection rule file
+
+// Pack-Ice (Axe of Delight): the packed data starts with "ICE!" (v2.3x/2.40)
+// or "Ice!" (v2.1x), followed by the packed and unpacked sizes (big-endian).
+meta("packer", "Pack-Ice");
+
+function checkIce(sMagic) {
+    var nSize = GEMDOS.getSize();
+    var nOffset = GEMDOS.findString(0x1C, Math.min(nSize - 0x1C, 0x1000), sMagic);
+
+    if (nOffset != -1) {
+        var nPacked = GEMDOS.read_uint32(nOffset + 4, true);
+        var nUnpacked = GEMDOS.read_uint32(nOffset + 8, true);
+
+        if ((nPacked > 12) && (nPacked <= nSize) && (nUnpacked >= nPacked) && (nUnpacked < 0x1000000)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function detect() {
+    if (checkIce("ICE!")) {
+        sVersion = "2.3x-2.40";
+        bDetected = true;
+    } else if (checkIce("Ice!")) {
+        sVersion = "2.1x";
+        bDetected = true;
+    }
+
+    return result();
+}
