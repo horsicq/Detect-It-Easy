@@ -826,7 +826,9 @@ function ELF_NFD_getCommentDetects() {
         ["SnapdragonLLVMARM", "compiler", "Snapdragon LLVM ARM", function (s) { return /^Snapdragon LLVM ARM Compiler/.test(s) ? S(s, " ", 4, 4) : null; }, true],
         ["NASM", "compiler", "NASM", function (s) { return /^The Netwide Assembler/.test(s) ? S(s, "The Netwide Assembler ", 1, 1) : null; }, true],
         ["TencentLegu", "protector", "Tencent Legu", function (s) { return /^legu/.test(s) ? "" : null; }, true],
-        ["AlipayObfuscator", "protector", "Alipay Obfuscator", function (s) { return H(s, "Alipay") ? S(s, " ", 3, 3) : null; }, false],
+        ["AlipayObfuscator", "protector", "Alipay Obfuscator", function (s) {
+            return H(s, "Alipay") ? { version: S(s, " ", 3, 3), info: H(s, "Trial") ? "Trial" : "" } : null;
+        }, false],
         ["wangzehuaLLVM", "protector", "wangzehua LLVM", function (s) { return H(s, "wangzehua  clang version") ? S(s, "wangzehua  clang version", 1, 1) : null; }, true],
         ["ObfuscatorLLVM", "protector", "Obfuscator-LLVM", function (s) {
             if (H(s, "Obfuscator-clang version") || H(s, "Obfuscator- clang version") || H(s, "Obfuscator-LLVM clang version")) {
@@ -876,15 +878,20 @@ function ELF_NFD_getCommentDetects() {
             if (bValid) {
                 var sKey = aEntry[0],
                     sName = aEntry[2],
-                    sVersion = vResult;
+                    sVersion = vResult,
+                    sInfo = "";
 
                 if (typeof vResult === "object") {
-                    sKey = "SourceryCodeBenchLite";
-                    sName = "Sourcery CodeBench Lite";
+                    if (vResult.lite) {
+                        sKey = "SourceryCodeBenchLite";
+                        sName = "Sourcery CodeBench Lite";
+                    }
+
                     sVersion = vResult.version;
+                    sInfo = vResult.info || "";
                 }
 
-                oResult[sKey] = { type: aEntry[1], name: sName, version: sVersion, info: "" };
+                oResult[sKey] = { type: aEntry[1], name: sName, version: sVersion, info: sInfo };
             }
         }
     }
@@ -1033,6 +1040,21 @@ function ELF_NFD_getNote(sName) {
         if (aNotes[i].name == sName) {
             return aNotes[i];
         }
+    }
+
+    return null;
+}
+
+/**
+ * Version (and info) NFD parses from .comment for one record key, or null when NFD finds none
+ * there or its version is empty. Used by the APKiD-port obfuscator rules: NFD's version wins.
+ * @returns {Object|null} {version, info}
+ */
+function ELF_NFD_getCommentVersion(sKey) {
+    var oRecord = ELF_NFD_getCommentDetects()[sKey];
+
+    if (oRecord && (oRecord.version != "")) {
+        return { version: oRecord.version, info: oRecord.info };
     }
 
     return null;
