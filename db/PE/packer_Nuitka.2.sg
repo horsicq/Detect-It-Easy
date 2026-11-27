@@ -1,35 +1,204 @@
 // Detect It Easy: detection rule file
 // Author: KDSS-Research (koffidev365supp@gmail.com)
-
+//
 // Rewritten by DosX
 // GitHub: https://github.com/DosX-dev
 // Website: https://dosx.su
 // Telegram: @DosX_dev
 
-includeScript("python");
-
 // https://github.com/Nuitka/Nuitka
 meta("packer", "Nuitka");
 
+function nuitkaReadQword(offset) {
+    var high = PE.read_uint32(offset + 4);
+    return high <= 0x1fffff ? high * 0x100000000 + PE.read_uint32(offset) : -1;
+}
+
+function nuitkaReadImage(base, size) {
+    if (size < 64 || PE.read_uint16(base) !== 0x5a4d) return null;
+
+    var header = PE.read_uint32(base + 0x3c);
+    if (header < 64 || header > size - 24) return null;
+    header += base;
+
+    if (PE.read_uint32(header) !== 0x4550 || PE.read_uint16(header + 4) !== 0x8664) return null;
+
+    var count = PE.read_uint16(header + 6),
+        optionalSize = PE.read_uint16(header + 20),
+        optional = header + 24,
+        table = optional + optionalSize;
+
+    if (!count || count > 96 || optionalSize < 112 || table + count * 40 > base + size ||
+        PE.read_uint16(optional) !== 0x20b) return null;
+
+    var image = {base: nuitkaReadQword(optional + 24), sections: [], text: null, data: null};
+    if (image.base < 0) return null;
+
+    for (var i = 0; i < count; i++) {
+        var record = table + i * 40,
+            rawSize = PE.read_uint32(record + 16),
+            rawOffset = PE.read_uint32(record + 20);
+        if (!rawSize || rawOffset > size || rawSize > size - rawOffset) continue;
+
+        var section = {rva: PE.read_uint32(record + 12), offset: base + rawOffset, size: rawSize};
+        image.sections.push(section);
+
+        var name = PE.read_ansiString(record, 8);
+        if (name === ".text") image.text = section;
+        if (name === ".rdata") image.data = section;
+    }
+
+    return image;
+}
+
+function nuitkaRvaToOffset(image, rva, length) {
+    for (var i = 0; i < image.sections.length; i++) {
+        var section = image.sections[i], relative = rva - section.rva;
+        if (relative >= 0 && relative <= section.size - length) return section.offset + relative;
+    }
+    return -1;
+}
+
+function nuitkaRipTarget(text, displacement) {
+    return text.rva + displacement - text.offset + 4 + PE.read_int32(displacement);
+}
+
+// MSVC x64 initializes the generated PyStructSequence descriptor and writes
+// major, minor and micro using the same integer constructor and SetItem slot.
+function nuitkaReadVersionAt(image, start, marker) {
+    var text = image.text,
+        end = text.offset + text.size,
+        descriptor = nuitkaRvaToOffset(image, nuitkaRipTarget(text, start + 3), 24);
+    if (descriptor < 0 || nuitkaReadQword(descriptor) !== image.base + image.data.rva + marker - image.data.offset) return "";
+
+    var docOffset = nuitkaRvaToOffset(image, nuitkaReadQword(descriptor + 8) - image.base, 36);
+    if (docOffset < 0 || !PE.compare("'__compiled__'5C6E5C6E'Version information'", docOffset)) return "";
+    if (nuitkaRipTarget(text, start + 10) !== nuitkaRipTarget(text, start + 23)) return "";
+
+    var cursor = start + 33, tupleStorage = -1, makeInt = -1, setItem = -1, values = [];
+    for (var index = 0; index < 3; index++) {
+        if (cursor + 38 > end) return "";
+
+        var value;
+        if (PE.read_uint8(cursor) === 0xb9) {
+            value = PE.read_uint32(cursor + 1);
+            cursor += 5;
+        } else if (PE.compare("33C9", cursor)) {
+            value = 0;
+            cursor += 2;
+        } else {
+            return "";
+        }
+        if (value > 99 || (index === 0 && value === 0)) return "";
+
+        if (index === 0) {
+            if (!PE.compare("488905", cursor)) return "";
+            tupleStorage = nuitkaRipTarget(text, cursor + 3);
+            cursor += 7;
+        }
+
+        if (!PE.compare("E8........488B0D........4C8BC0", cursor)) return "";
+        var intTarget = nuitkaRipTarget(text, cursor + 1);
+        if (intTarget < text.rva || intTarget >= text.rva + text.size ||
+            (index !== 0 && intTarget !== makeInt) || nuitkaRipTarget(text, cursor + 8) !== tupleStorage) return "";
+        makeInt = intTarget;
+        cursor += 15;
+
+        if (index === 0) {
+            if (!PE.compare("33D2", cursor)) return "";
+            cursor += 2;
+        } else {
+            if (PE.read_uint8(cursor) !== 0xba || PE.read_uint32(cursor + 1) !== index) return "";
+            cursor += 5;
+        }
+        if (!PE.compare("FF15", cursor)) return "";
+        var itemTarget = nuitkaRipTarget(text, cursor + 2);
+        if (index !== 0 && itemTarget !== setItem) return "";
+        setItem = itemTarget;
+        cursor += 6;
+        values.push(value);
+    }
+
+    // Only a release is an exact version: the tuple has no candidate number.
+    if (cursor + 34 > end || !PE.compare("488D0D........FF15........488B0D........BA030000004C8BC0FF15", cursor) ||
+        nuitkaRipTarget(text, cursor + 16) !== tupleStorage || nuitkaRipTarget(text, cursor + 30) !== setItem) return "";
+
+    var levelOffset = nuitkaRvaToOffset(image, nuitkaRipTarget(text, cursor + 3), 8);
+    if (levelOffset < 0 || !PE.compare("'release'00", levelOffset)) return "";
+
+    return values[0] + "." + values[1] + (values[2] ? "." + values[2] : "");
+}
+
+function nuitkaReadVersion(image) {
+    if (!image || !image.text || !image.data) return "";
+    var text = image.text,
+        marker = PE.findSignature(image.data.offset, image.data.size, "'__nuitka_version__'00");
+    if (marker === -1) return "";
+
+    var cursor = text.offset, end = cursor + text.size;
+    while (cursor + 33 <= end) {
+        var start = PE.findSignature(cursor, end - cursor, "488D15........488D0D........FF15........488D0D........FF15........");
+        if (start === -1) break;
+        var version = nuitkaReadVersionAt(image, start, marker);
+        if (version) return version;
+        cursor = start + 1;
+    }
+    return "";
+}
+
+// Nuitka 4.4 Windows onefile releases put an uncompressed TOC before the
+// payload. The generated program is the first entry. In the default MSVC
+// layout the blob is aligned in .rdata; compressed bodies are left alone.
+function nuitkaReadOnefileImage(data) {
+    var limit = data.FileOffset + data.FileSize,
+        searchEnd = Math.min(limit - 32, data.FileOffset + 0x10000);
+    for (var offset = data.FileOffset; offset <= searchEnd; offset += 8) {
+        if (PE.read_uint32(offset + 4) || PE.read_uint32(offset + 12)) continue;
+        var tocSize = PE.read_uint32(offset),
+            bodySize = PE.read_uint32(offset + 8),
+            body = offset + 16 + tocSize;
+        if (tocSize < 22 || tocSize > 0x100000 || bodySize < 64 ||
+            body > limit || bodySize > limit - body || PE.read_uint16(body) !== 0x5a4d) continue;
+
+        var flags = PE.read_uint32(offset + 16);
+        if (flags & ~5) continue;
+
+        // Temporary payloads omit the per-file CRC field; cached payloads keep it.
+        for (var crcSize = 0; crcSize <= 4; crcSize += 4) {
+            var sizeOffset = offset + 20 + crcSize,
+                nameOffset = sizeOffset + 8,
+                size = nuitkaReadQword(sizeOffset);
+            if (size < 64 || size > bodySize) continue;
+
+            var nameEnd = nameOffset, nameLimit = Math.min(body - 2, nameOffset + 520);
+            while (nameEnd <= nameLimit && PE.read_uint16(nameEnd)) nameEnd += 2;
+            if (nameEnd > nameLimit || nameEnd - nameOffset < 10 ||
+                !PE.compare("2E0064006C006C00", nameEnd - 8) &&
+                !PE.compare("2E00650078006500", nameEnd - 8)) continue;
+            if ((flags & 4) && (nameEnd + 2 !== body || size !== bodySize)) continue;
+            if (!(flags & 4) && nameEnd + 14 > body) continue;
+
+            var image = nuitkaReadImage(body, size);
+            if (image && image.text && image.data) return image;
+        }
+    }
+    return null;
+}
+
 function detect() {
-    var dataSection = PE.section[".rdata"];
-
-    if (dataSection) {
-        var dataSectionOffset = dataSection.FileOffset,
-            dataSectionSize = dataSection.FileSize;
-
-        var pythonRuntimeLibraryName = PE.isLibraryPresentExp(/^python/i);
-
-        if (pythonRuntimeLibraryName && PE.findString(dataSectionOffset, dataSectionSize, "__nuitka_version__") !== -1) {
-            sVersion = getPythonVersionByDll(pythonRuntimeLibraryName[0]);
+    var data = PE.section[".rdata"];
+    if (data) {
+        if (PE.isLibraryPresentExp(/^python/i) &&
+            PE.findString(data.FileOffset, data.FileSize, "__nuitka_version__") !== -1) {
             bDetected = true;
-        } else if (PE.findString(dataSectionOffset, dataSectionSize, "NUITKA_ONEFILE_PARENT") !== -1) {
+            sVersion = nuitkaReadVersion(nuitkaReadImage(0, PE.getSize()));
+        } else if (PE.findString(data.FileOffset, data.FileSize, "NUITKA_ONEFILE_PARENT") !== -1) {
+            bDetected = true;
             sOptions = "OneFile";
-            bDetected = true;
+            sVersion = nuitkaReadVersion(nuitkaReadOnefileImage(data));
         }
     }
 
     sLang = "Python";
-
     return result();
 }
